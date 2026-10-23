@@ -8,6 +8,8 @@ import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -42,11 +44,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -367,6 +374,10 @@ private fun MainAgentDashboard(
     var delayedStretchJob by remember { mutableStateOf<Job?>(null) }
 
     val scrollState = rememberScrollState()
+    val mainFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        mainFocusRequester.requestFocus()
+    }
 
     // 初始状态与多会话管理
     val defaultInitialPrompt = "主人，今天有什么需要解决的技术或生活问题？"
@@ -617,8 +628,8 @@ private fun MainAgentDashboard(
                             if (canGesture) {
                                 val deltaX = change.position.x - startX
                                 val deltaY = change.position.y - startY
-                                // 水平轻划呼出左侧会话抽屉 (动画从左侧自然平滑滑入)
-                                if (abs(deltaX) > 28.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.1f) {
+                                // 仅手势明确向左轻划时唤出抽屉 (从右侧顺手推入，手势与动效完全一致)
+                                if (deltaX < -24.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
                                     if (!isSessionDrawerOpen) {
                                         isSessionDrawerOpen = true
                                     }
@@ -646,13 +657,28 @@ private fun MainAgentDashboard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp)
+                .padding(start = 28.dp, end = 28.dp)
+                .focusRequester(mainFocusRequester)
+                .focusable()
+                .onRotaryScrollEvent {
+                    scope.launch {
+                        scrollState.scrollBy(it.verticalScrollPixels)
+                        if (kotlin.math.abs(it.verticalScrollPixels) > 8f) {
+                            context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                }
+                            }
+                        }
+                    }
+                    true
+                }
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
-                    // 遮罩只要给一点点，只遮住时间下边缘一丁点地方，绝不遮盖底层背景点阵
-                    val topCutoffPx = 24.dp.toPx()
-                    val topFadePx = 36.dp.toPx()
+                    // 遮罩只要给极微弱的一点点，只遮住时间下边缘一丁点地方，绝不遮盖底层背景点阵
+                    val topCutoffPx = 16.dp.toPx()
+                    val topFadePx = 24.dp.toPx()
                     val bottomFadeStartPx = size.height - 76.dp.toPx()
                     val bottomFadeEndPx = size.height - 14.dp.toPx()
 

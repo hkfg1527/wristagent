@@ -2,8 +2,13 @@ package com.example.myapplication.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -46,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -146,7 +152,6 @@ fun BottomInteractiveBlock(
                 // 左副键：键盘文字录入 (TXT) 或切回语音 (MIC)
                 if (wingAlpha > 0.02f) {
                     val leftOffsetDp = (-50.dp * splitProgress.value)
-                    val leftLabel = if (mainInputType == MainInputType.VOICE) "TXT" else "MIC"
                     Box(
                         modifier = Modifier
                             .offset(x = leftOffsetDp)
@@ -174,24 +179,17 @@ fun BottomInteractiveBlock(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = leftLabel,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF94A3B8)
-                        )
+                        if (mainInputType == MainInputType.VOICE) {
+                            MinimalistKeyboardIcon(tint = Color(0xFF94A3B8))
+                        } else {
+                            MinimalistSoundwaveIcon(tint = Color(0xFF94A3B8), isRecording = false)
+                        }
                     }
                 }
 
                 // 右副键：模型/设置/清空 (MDL/SET/CLR)
                 if (wingAlpha > 0.02f) {
                     val rightOffsetDp = (50.dp * splitProgress.value)
-                    val rightLabel = when (rightButtonAction) {
-                        RightButtonAction.MODEL_SWITCH -> "MDL"
-                        RightButtonAction.OPEN_SETTINGS -> "SET"
-                        RightButtonAction.CLEAR_MEMORY -> "CLR"
-                    }
                     Box(
                         modifier = Modifier
                             .offset(x = rightOffsetDp)
@@ -214,13 +212,17 @@ fun BottomInteractiveBlock(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = rightLabel,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF38BDF8)
-                        )
+                        when (rightButtonAction) {
+                            RightButtonAction.MODEL_SWITCH -> MinimalistLayersIcon(tint = Color(0xFF38BDF8))
+                            RightButtonAction.OPEN_SETTINGS -> MinimalistSlidersIcon(tint = Color(0xFF38BDF8))
+                            RightButtonAction.CLEAR_MEMORY -> Text(
+                                text = "CLR",
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF38BDF8)
+                            )
+                        }
                     }
                 }
             }
@@ -316,20 +318,15 @@ fun BottomInteractiveBlock(
                 contentAlignment = Alignment.Center
             ) {
                 if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
-                    Text(
-                        text = "TXT",
-                        fontSize = 10.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
+                    MinimalistKeyboardIcon(
+                        tint = Color(0xFF0F172A),
+                        modifier = Modifier.size(15.dp, 11.dp)
                     )
                 } else {
-                    // 中心声波/待机微点
-                    Box(
-                        modifier = Modifier
-                            .size(if (mode == BottomBlockMode.RECORDING) 14.dp else 10.dp)
-                            .clip(CircleShape)
-                            .background(if (mode == BottomBlockMode.RECORDING) Color(0xFFEF4444) else Color(0xFF0F172A))
+                    MinimalistSoundwaveIcon(
+                        tint = if (mode == BottomBlockMode.RECORDING) Color(0xFFEF4444) else Color(0xFF0F172A),
+                        isRecording = mode == BottomBlockMode.RECORDING,
+                        modifier = Modifier.size(13.dp, 13.dp)
                     )
                 }
             }
@@ -480,12 +477,181 @@ private fun ApprovalLeftSlider(
                 .background(if (remainingCooldown > 0) Color(0xFF475569) else Color(0xFFEF4444)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = if (remainingCooldown > 0) "${remainingCooldown}" else "◀",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            if (remainingCooldown > 0) {
+                Text(
+                    text = "${remainingCooldown}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            } else {
+                Canvas(modifier = Modifier.size(7.dp, 9.dp)) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(size.width, 0f)
+                        lineTo(0f, size.height / 2f)
+                        lineTo(size.width, size.height)
+                        close()
+                    }
+                    drawPath(path, color = Color.White)
+                }
+            }
         }
+    }
+}
+
+/**
+ * 极简微晶键盘图标
+ */
+@Composable
+fun MinimalistKeyboardIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(15.dp, 11.dp)) {
+        val strokeW = 1.2.dp.toPx()
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(strokeW / 2, strokeW / 2),
+            size = Size(size.width - strokeW, size.height - strokeW),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+            style = Stroke(width = strokeW)
+        )
+        val dotRadius = 0.75.dp.toPx()
+        drawCircle(color = tint, radius = dotRadius, center = Offset(size.width * 0.28f, size.height * 0.35f))
+        drawCircle(color = tint, radius = dotRadius, center = Offset(size.width * 0.50f, size.height * 0.35f))
+        drawCircle(color = tint, radius = dotRadius, center = Offset(size.width * 0.72f, size.height * 0.35f))
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.30f, size.height * 0.72f),
+            end = Offset(size.width * 0.70f, size.height * 0.72f),
+            strokeWidth = 1.2.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+/**
+ * 极简声波/麦克风图标 (录音中动态起伏波形)
+ */
+@Composable
+fun MinimalistSoundwaveIcon(
+    tint: Color,
+    isRecording: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "waveAnim")
+    val wave1 by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse),
+        label = "w1"
+    )
+    val wave2 by infiniteTransition.animateFloat(
+        initialValue = 0.9f, targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse),
+        label = "w2"
+    )
+    val wave3 by infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(tween(520, easing = LinearEasing), RepeatMode.Reverse),
+        label = "w3"
+    )
+
+    Canvas(modifier = modifier.size(13.dp, 13.dp)) {
+        val barWidth = 1.8.dp.toPx()
+        val spacing = size.width / 4f
+        val centerY = size.height / 2f
+
+        val h1 = if (isRecording) size.height * (0.35f + 0.65f * wave1) else size.height * 0.45f
+        val h2 = if (isRecording) size.height * (0.45f + 0.55f * wave2) else size.height * 0.90f
+        val h3 = if (isRecording) size.height * (0.35f + 0.65f * wave3) else size.height * 0.45f
+
+        drawLine(
+            color = tint,
+            start = Offset(spacing * 1, centerY - h1 / 2),
+            end = Offset(spacing * 1, centerY + h1 / 2),
+            strokeWidth = barWidth,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(spacing * 2, centerY - h2 / 2),
+            end = Offset(spacing * 2, centerY + h2 / 2),
+            strokeWidth = barWidth,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(spacing * 3, centerY - h3 / 2),
+            end = Offset(spacing * 3, centerY + h3 / 2),
+            strokeWidth = barWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+/**
+ * 极简调节滑块图标 (对应设置)
+ */
+@Composable
+fun MinimalistSlidersIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(13.dp, 11.dp)) {
+        val strokeW = 1.2.dp.toPx()
+        val dotR = 1.3.dp.toPx()
+        // Line 1
+        drawLine(
+            color = tint,
+            start = Offset(0f, size.height * 0.28f),
+            end = Offset(size.width, size.height * 0.28f),
+            strokeWidth = strokeW,
+            cap = StrokeCap.Round
+        )
+        drawCircle(color = tint, radius = dotR, center = Offset(size.width * 0.35f, size.height * 0.28f))
+
+        // Line 2
+        drawLine(
+            color = tint,
+            start = Offset(0f, size.height * 0.72f),
+            end = Offset(size.width, size.height * 0.72f),
+            strokeWidth = strokeW,
+            cap = StrokeCap.Round
+        )
+        drawCircle(color = tint, radius = dotR, center = Offset(size.width * 0.68f, size.height * 0.72f))
+    }
+}
+
+/**
+ * 极简模型分层图标 (对应模型切换)
+ */
+@Composable
+fun MinimalistLayersIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(13.dp, 11.dp)) {
+        val strokeW = 1.2.dp.toPx()
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.15f, size.height * 0.2f),
+            end = Offset(size.width * 0.85f, size.height * 0.2f),
+            strokeWidth = strokeW,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.25f, size.height * 0.5f),
+            end = Offset(size.width * 0.75f, size.height * 0.5f),
+            strokeWidth = strokeW,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = tint,
+            start = Offset(size.width * 0.15f, size.height * 0.8f),
+            end = Offset(size.width * 0.85f, size.height * 0.8f),
+            strokeWidth = strokeW,
+            cap = StrokeCap.Round
+        )
     }
 }

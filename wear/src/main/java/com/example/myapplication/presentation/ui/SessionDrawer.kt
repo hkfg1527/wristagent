@@ -1,7 +1,12 @@
 package com.example.myapplication.presentation.ui
 
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,22 +28,37 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -48,16 +69,19 @@ import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.ChatSession
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * 谷歌 Wear OS Material Design 3 风格居中会话切换器
  * - 纯横条卡片排布：每一条会话均为一个横向 Squircle 小横条
  * - 屏幕曲率变形挤压：依托 ScalingLazyColumn，在圆屏上下边缘随物理边界平滑挤压缩放
- * - 右滑自然退出：从左滑出，向右滑动或轻触返回键平滑退回
+ * - 右滑跟手阻尼退出：手势向左划自右推入，向右轻划跟手推回退出
+ * - 硬件物理表冠联动：旋转表冠顺滑滚动并伴随轻微齿轮触觉微震
  */
 @Composable
 fun SessionDrawer(
@@ -69,35 +93,80 @@ fun SessionDrawer(
     onDeleteSession: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
     AnimatedVisibility(
         visible = isOpen,
-        enter = fadeIn(tween(180)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { -it },
-        exit = fadeOut(tween(160)) + slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { -it }
+        // 手势向左划：抽屉顺从物理直觉从屏幕右侧推入；退出时向右侧顺滑飞出
+        enter = fadeIn(tween(180)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it },
+        exit = fadeOut(tween(160)) + slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it }
     ) {
         val listState = rememberScalingLazyListState()
+        val drawerFocusRequester = remember { FocusRequester() }
+
+        // 表冠获焦
+        LaunchedEffect(Unit) {
+            drawerFocusRequester.requestFocus()
+        }
+
+        // 右滑跟手阻尼推回手势
+        val dragOffsetX = remember { Animatable(0f) }
+        var screenWidthPx by remember { mutableFloatStateOf(384f) }
+        val dismissThresholdPx = with(density) { 50.dp.toPx() }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF000000).copy(alpha = 0.92f))
-                .pointerInput(Unit) {
+                .background(Color(0xFF000000).copy(alpha = 0.94f))
+                .onGloballyPositioned { coords ->
+                    screenWidthPx = coords.size.width.toFloat()
+                }
+                .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
+                .alpha(1f - (dragOffsetX.value / (screenWidthPx * 1.6f)).coerceIn(0f, 0.6f))
+                .pointerInput(screenWidthPx) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val startX = down.position.x
                         val startY = down.position.y
+                        var isDraggingRight = false
 
                         while (true) {
                             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                             if (!change.pressed) {
-                                val deltaX = change.position.x - startX
-                                val deltaY = change.position.y - startY
-                                // 从左向右轻划（或向左轻划）：快速收回会话抽屉
-                                if (abs(deltaX) > 24.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.1f) {
-                                    onClose()
+                                if (isDraggingRight) {
+                                    if (dragOffsetX.value >= dismissThresholdPx) {
+                                        scope.launch {
+                                            dragOffsetX.animateTo(screenWidthPx, tween(140))
+                                            onClose()
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            dragOffsetX.animateTo(0f, spring(0.75f, 350f))
+                                        }
+                                    }
                                 }
                                 break
+                            }
+
+                            val deltaX = change.position.x - startX
+                            val deltaY = change.position.y - startY
+
+                            if (!isDraggingRight) {
+                                if (deltaX > 16.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
+                                    isDraggingRight = true
+                                }
+                            }
+
+                            if (isDraggingRight) {
+                                change.consume()
+                                val clamped = deltaX.coerceAtLeast(0f)
+                                scope.launch {
+                                    dragOffsetX.snapTo(clamped)
+                                }
                             }
                         }
                     }
@@ -106,7 +175,23 @@ fun SessionDrawer(
         ) {
             ScalingLazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusRequester(drawerFocusRequester)
+                    .focusable()
+                    .onRotaryScrollEvent {
+                        scope.launch {
+                            listState.scrollBy(it.verticalScrollPixels)
+                            if (abs(it.verticalScrollPixels) > 8f) {
+                                context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                    }
+                                }
+                            }
+                        }
+                        true
+                    },
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -126,8 +211,8 @@ fun SessionDrawer(
                                 color = Color(0xFFF8FAFC)
                             )
                             Text(
-                                text = "右滑返回",
-                                fontSize = 8.5.sp,
+                                text = "右滑顺畅退出 →",
+                                fontSize = 8.sp,
                                 color = Color(0xFF94A3B8)
                             )
                         }
@@ -179,7 +264,7 @@ fun SessionDrawer(
                     }
                 }
 
-                // 2. 一条一条平滑变形挤压的 M3 会话横条
+                // 2. 一条一条平滑变形挤压的 M3 会话横条 (参考微信 C100 / QQ Next 紧致风格)
                 items(sessions, key = { it.id }) { session ->
                     val isSelected = session.id == activeSessionId
                     M3SessionStrip(
@@ -203,8 +288,8 @@ fun SessionDrawer(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "← 右滑或轻触返回",
-                            fontSize = 9.sp,
+                            text = "向右轻划退出",
+                            fontSize = 8.5.sp,
                             color = Color(0xFFCBD5E1)
                         )
                     }
@@ -281,7 +366,7 @@ private fun M3SessionStrip(
                 }
             }
 
-            // 右侧独立删除键 (40x40 触摸保护)
+            // 右侧独立删除键 (触摸防护)
             Box(
                 modifier = Modifier
                     .size(24.dp)

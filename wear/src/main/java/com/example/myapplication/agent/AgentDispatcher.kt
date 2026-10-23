@@ -1,6 +1,10 @@
 package com.example.myapplication.agent
 
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.util.Log
 import com.example.myapplication.agent.contract.AgentMemory
 import com.example.myapplication.agent.contract.ConversationBlock
@@ -17,6 +21,9 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -54,9 +61,38 @@ class AgentDispatcher(
         initSystemMessage()
     }
 
+    private fun buildDynamicTelemetryBlock(): String {
+        val nowStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss EEEE", Locale.getDefault()).format(Date())
+        val batteryLevel = runCatching {
+            val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val isCharging = (intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1) == BatteryManager.BATTERY_STATUS_CHARGING
+            if (level != -1 && scale != -1) {
+                "${(level * 100 / scale.toFloat()).toInt()}% (${if (isCharging) "充电中" else "放电中"})"
+            } else "未知"
+        }.getOrDefault("未知")
+
+        val clipSnippet = runCatching {
+            val clipManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val item = clipManager?.primaryClip?.getItemAt(0)
+            item?.text?.toString()?.take(60) ?: "空"
+        }.getOrDefault("空")
+
+        return """
+        [宿主物理环境与实时感知 Telemetry]:
+        - 当前精准系统时刻: $nowStr
+        - 宿主设备物理形态: Wear OS 圆屏穿戴设备 (Pixel Watch 2 / 圆形表盘)
+        - 电池遥测状态: $batteryLevel
+        - 剪贴板最新文字: "$clipSnippet"
+        在回答主人关于时间、日期、电量或刚才复制的内容时，直接引用上述客观事实，无需重复反问。
+        """.trimIndent()
+    }
+
     private fun initSystemMessage() {
         conversationHistory.clear()
         val memoryHeader = memory.buildSystemMemoryHeader()
+        val telemetryBlock = buildDynamicTelemetryBlock()
         val basePrompt = if (preferences.customSystemPrompt.isNotBlank()) {
             preferences.customSystemPrompt
         } else {
@@ -82,7 +118,7 @@ class AgentDispatcher(
             - 在高危或涉及系统持久修改的操作前，向主人通报意图与后果，由内置安全护栏协同守护。
             """.trimIndent()
         }
-        val systemPrompt = "$memoryHeader\n\n$basePrompt"
+        val systemPrompt = "$memoryHeader\n\n$telemetryBlock\n\n$basePrompt"
 
         conversationHistory.add(ChatMessage(role = AgentRole.SYSTEM, content = systemPrompt))
     }
@@ -161,7 +197,7 @@ class AgentDispatcher(
     ) {
         var currentState = initialState
         val blocks = currentState.conversationBlocks.toMutableList()
-        val maxTurns = 30 // 放开限制，模型自主完成任务后自动退出，防止极端死循环
+        val maxTurns = 5 // 穿戴设备严格限额 5 轮，防止死循环大量烧电发热
 
         for (turn in 1..maxTurns) {
             if (isCancelled) break
@@ -376,7 +412,21 @@ class AgentDispatcher(
                     )
                     onStateUpdate(currentState)
 
-                    val result = toolRegistry.executeTool(call)
+                    val result = try {
+                        toolRegistry.executeTool(call)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "工具执行异常自愈处理: ${e.message}", e)
+                        ToolResult(
+                            toolCallId = call.id,
+                            toolName = call.name,
+                            output = JSONObject().apply {
+                                put("status", "error")
+                                put("error_type", e.javaClass.simpleName)
+                                put("message", e.message ?: "执行故障")
+                                put("recovery_hint", "请根据错误提示调整入参重试或直接向主人汇报。")
+                            }.toString()
+                        )
+                    }
 
                     // 清洗并提取精炼摘要
                     val summaryText = extractToolSummary(call.name, result.output)

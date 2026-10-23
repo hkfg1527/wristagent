@@ -1,5 +1,8 @@
 package com.example.myapplication.presentation.ui
 
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -15,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,9 +32,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,10 +50,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -161,9 +172,31 @@ fun SettingsScreen(
             }
     ) {
         val listState = rememberScalingLazyListState()
+        val settingsFocusRequester = remember { FocusRequester() }
+        val context = LocalContext.current
+
+        LaunchedEffect(Unit) {
+            settingsFocusRequester.requestFocus()
+        }
 
         ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(settingsFocusRequester)
+                .focusable()
+                .onRotaryScrollEvent {
+                    scope.launch {
+                        listState.scrollBy(it.verticalScrollPixels)
+                        if (abs(it.verticalScrollPixels) > 8f) {
+                            context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                }
+                            }
+                        }
+                    }
+                    true
+                },
             state = listState,
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -502,6 +535,28 @@ private fun SubSettingsModal(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF0F1219))
                 .border(0.8.dp, Color(0xFF2B3446), RoundedCornerShape(16.dp))
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startX = down.position.x
+                        val startY = down.position.y
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                            if (!change.pressed) {
+                                val deltaX = change.position.x - startX
+                                val deltaY = change.position.y - startY
+                                // 二级子弹窗任意区域向右轻划，顺畅关闭返回
+                                if (deltaX > 24.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
+                                    onDismiss()
+                                }
+                                break
+                            }
+                        }
+                    }
+                }
                 .clickable(enabled = false) {}
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
