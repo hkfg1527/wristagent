@@ -13,15 +13,23 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +41,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -59,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -72,6 +82,7 @@ import com.example.myapplication.agent.AgentExecutionState
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.agent.ApprovalVisualState
+import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.RiskAssessment
@@ -83,6 +94,7 @@ import com.example.myapplication.presentation.ui.FrostedPhysicalMaskCard
 import com.example.myapplication.presentation.ui.FrostedTextMaskContainer
 import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.RenderableConversationItem
+import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.SettingsScreen
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
@@ -98,6 +110,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 import java.util.UUID
 import kotlin.coroutines.resume
 
@@ -242,53 +255,67 @@ fun WearAgentUnifiedApp() {
         }
     }
 
-    when (currentScreen) {
-        AppScreen.ONBOARDING -> {
-            OnboardingScreen(
-                preferences = preferences,
-                onFinish = {
-                    liveSpacingDp = preferences.matrixSpacingDp
-                    currentScreen = AppScreen.MAIN
-                }
-            )
-        }
-
-        AppScreen.SETTINGS -> {
-            DisposableEffect(Unit) {
-                MainActivity.onBackPressedCustom = {
-                    liveSpacingDp = preferences.matrixSpacingDp
-                    currentScreen = AppScreen.MAIN
-                    true
-                }
-                onDispose {
-                    MainActivity.onBackPressedCustom = null
-                }
+    AnimatedContent(
+        targetState = currentScreen,
+        transitionSpec = {
+            if (targetState == AppScreen.SETTINGS) {
+                (fadeIn(tween(260)) + scaleIn(initialScale = 0.92f, animationSpec = tween(260, easing = FastOutSlowInEasing)))
+                    .togetherWith(fadeOut(tween(180)) + scaleOut(targetScale = 1.05f, animationSpec = tween(180)))
+            } else {
+                (fadeIn(tween(240)) + scaleIn(initialScale = 1.05f, animationSpec = tween(240, easing = FastOutSlowInEasing)))
+                    .togetherWith(fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180)))
             }
-            BackHandler {
-                liveSpacingDp = preferences.matrixSpacingDp
-                currentScreen = AppScreen.MAIN
+        },
+        label = "screenTransition"
+    ) { screen ->
+        when (screen) {
+            AppScreen.ONBOARDING -> {
+                OnboardingScreen(
+                    preferences = preferences,
+                    onFinish = {
+                        liveSpacingDp = preferences.matrixSpacingDp
+                        currentScreen = AppScreen.MAIN
+                    }
+                )
             }
-            SettingsScreen(
-                preferences = preferences,
-                onBack = {
+
+            AppScreen.SETTINGS -> {
+                DisposableEffect(Unit) {
+                    MainActivity.onBackPressedCustom = {
+                        liveSpacingDp = preferences.matrixSpacingDp
+                        currentScreen = AppScreen.MAIN
+                        true
+                    }
+                    onDispose {
+                        MainActivity.onBackPressedCustom = null
+                    }
+                }
+                BackHandler {
                     liveSpacingDp = preferences.matrixSpacingDp
                     currentScreen = AppScreen.MAIN
-                },
-                onRestartOnboarding = {
-                    preferences.hasCompletedOnboarding = false
-                    currentScreen = AppScreen.ONBOARDING
                 }
-            )
-        }
+                SettingsScreen(
+                    preferences = preferences,
+                    onBack = {
+                        liveSpacingDp = preferences.matrixSpacingDp
+                        currentScreen = AppScreen.MAIN
+                    },
+                    onRestartOnboarding = {
+                        preferences.hasCompletedOnboarding = false
+                        currentScreen = AppScreen.ONBOARDING
+                    }
+                )
+            }
 
-        AppScreen.MAIN -> {
-            MainAgentDashboard(
-                preferences = preferences,
-                agentDispatcher = agentDispatcher,
-                voiceInputManager = voiceInputManager,
-                liveSpacingDp = liveSpacingDp,
-                onOpenSettings = { currentScreen = AppScreen.SETTINGS }
-            )
+            AppScreen.MAIN -> {
+                MainAgentDashboard(
+                    preferences = preferences,
+                    agentDispatcher = agentDispatcher,
+                    voiceInputManager = voiceInputManager,
+                    liveSpacingDp = liveSpacingDp,
+                    onOpenSettings = { currentScreen = AppScreen.SETTINGS }
+                )
+            }
         }
     }
 }
@@ -324,18 +351,78 @@ private fun MainAgentDashboard(
 
     val scrollState = rememberScrollState()
 
-    // 初始状态
+    // 初始状态与多会话管理
     val defaultInitialPrompt = "主人，今天有什么需要解决的技术或生活问题？"
+    val initialSession = remember {
+        ChatSession(
+            id = "session_default",
+            title = "当前对话",
+            conversationBlocks = listOf(
+                ConversationBlock.Text(id = "init_0", content = defaultInitialPrompt, isUser = false)
+            )
+        )
+    }
+
+    var sessions by remember { mutableStateOf(listOf(initialSession)) }
+    var activeSessionId by remember { mutableStateOf("session_default") }
+    var isSessionDrawerOpen by remember { mutableStateOf(false) }
+
+    val currentSession = sessions.find { it.id == activeSessionId } ?: sessions.first()
+
     var agentState by remember {
         mutableStateOf(
             AgentExecutionState(
                 prompt = "伴生就绪",
-                conversationBlocks = listOf(
-                    ConversationBlock.Text(id = "init_0", content = defaultInitialPrompt, isUser = false)
-                ),
+                conversationBlocks = currentSession.conversationBlocks,
                 isFinished = true
             )
         )
+    }
+
+    fun switchToSession(id: String) {
+        val target = sessions.find { it.id == id } ?: return
+        activeSessionId = id
+        agentDispatcher.loadConversationHistory(target.history)
+        agentState = agentState.copy(
+            conversationBlocks = target.conversationBlocks,
+            isFinished = true,
+            isThinking = false
+        )
+        isSessionDrawerOpen = false
+    }
+
+    fun createNewSession() {
+        val newS = ChatSession(
+            title = "新对话",
+            conversationBlocks = listOf(
+                ConversationBlock.Text(
+                    id = java.util.UUID.randomUUID().toString(),
+                    content = defaultInitialPrompt,
+                    isUser = false
+                )
+            )
+        )
+        sessions = listOf(newS) + sessions
+        activeSessionId = newS.id
+        agentDispatcher.resetConversation()
+        agentState = AgentExecutionState(
+            prompt = "新对话就绪",
+            conversationBlocks = newS.conversationBlocks,
+            isFinished = true
+        )
+        isSessionDrawerOpen = false
+    }
+
+    fun deleteSession(id: String) {
+        val remaining = sessions.filter { it.id != id }
+        if (remaining.isEmpty()) {
+            createNewSession()
+        } else {
+            sessions = remaining
+            if (activeSessionId == id) {
+                switchToSession(remaining.first().id)
+            }
+        }
     }
 
     var isExecutingAgent by remember { mutableStateOf(false) }
@@ -350,9 +437,14 @@ private fun MainAgentDashboard(
         }
     }
 
-    // 审批挂起与返回拦截 (当处于审批态时，向右滑或返回视为拒绝，退出审批)
-    DisposableEffect(bottomBlockMode) {
-        if (bottomBlockMode == BottomBlockMode.ACTION_ALLOW) {
+    // 审批挂起、返回拦截与多会话抽屉关闭
+    DisposableEffect(bottomBlockMode, isSessionDrawerOpen) {
+        if (isSessionDrawerOpen) {
+            MainActivity.onBackPressedCustom = {
+                isSessionDrawerOpen = false
+                true
+            }
+        } else if (bottomBlockMode == BottomBlockMode.ACTION_ALLOW) {
             MainActivity.onBackPressedCustom = {
                 pendingContinuation?.resume(false)
                 pendingContinuation = null
@@ -385,7 +477,7 @@ private fun MainAgentDashboard(
         delayedStretchJob?.cancel()
 
         scope.launch {
-            // 1. 水波纹自底栏向中心扩散激荡 (冲击到达中心时自动炸开四溅水花并转化为思考涟漪)
+            // 水波纹自底栏向中心扩散激荡 (纯白微晶光波)
             launch {
                 shockwaveAnim.snapTo(0f)
                 shockwaveAnim.animateTo(1f, tween(360, easing = LinearEasing))
@@ -402,9 +494,28 @@ private fun MainAgentDashboard(
                 }
             }
 
-            agentDispatcher.executeUserPrompt(prompt) { newState ->
+            val updatedTitle = if (currentSession.title == "新对话" || currentSession.title == "当前对话") {
+                prompt.take(12)
+            } else {
+                currentSession.title
+            }
+
+            agentDispatcher.executeUserPrompt(
+                prompt = prompt,
+                existingBlocks = currentSession.conversationBlocks
+            ) { newState ->
                 agentState = newState
                 isThinkingActive = isExecutingAgent && !newState.isFinished && (newState.isThinking || newState.isExecutingTool)
+
+                sessions = sessions.map { s ->
+                    if (s.id == activeSessionId) {
+                        s.copy(
+                            title = updatedTitle,
+                            conversationBlocks = newState.conversationBlocks,
+                            history = agentDispatcher.getConversationHistory()
+                        )
+                    } else s
+                }
 
                 if (newState.isFinished) {
                     isExecutingAgent = false
@@ -415,7 +526,6 @@ private fun MainAgentDashboard(
                     isTaskCompletedTrigger = true
                     bottomBlockMode = BottomBlockMode.IDLE
                 } else if (!newState.isThinking && !newState.isExecutingTool && bottomBlockMode != BottomBlockMode.ACTION_ALLOW) {
-                    // 模型在流式输出文字时，底栏恢复闲置小圆，绝不在输出时一直挂着“停止输出”
                     bottomBlockMode = BottomBlockMode.IDLE
                 }
             }
@@ -468,6 +578,32 @@ private fun MainAgentDashboard(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val startX = down.position.x
+                    val startY = down.position.y
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+
+                        if (!change.pressed) {
+                            val deltaX = change.position.x - startX
+                            val deltaY = change.position.y - startY
+                            // 水平轻滑手势：向左滑呼出会话切换抽屉，向右滑收回抽屉
+                            if (abs(deltaX) > 36.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
+                                if (deltaX < 0f && !isSessionDrawerOpen) {
+                                    isSessionDrawerOpen = true
+                                } else if (deltaX > 0f && isSessionDrawerOpen) {
+                                    isSessionDrawerOpen = false
+                                }
+                            }
+                            break
+                        }
+                    }
+                }
+            }
     ) {
         // ================= 1. 全局唯一点阵坐标系 (通体清晰方阵，覆盖全圆屏) =================
         UnifiedMatrixCanvas(
@@ -481,21 +617,30 @@ private fun MainAgentDashboard(
         )
 
         // ================= 2. 文字与原生高斯模糊简单框一体联动滚动流 =================
-        // 全屏纵向滑动，文字两侧贴近边缘线，顶部与底部自然渐隐，不遮挡背景点阵
+        // 全屏纵向滑动，正文卡片微内缩 (24dp)，顶部与底部微自然遮罩，绝不遮挡底层点阵
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 16.dp, end = 16.dp)
+                .padding(start = 24.dp, end = 24.dp)
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
-                    // 仅对文字流应用顶部时间与底部按键区域的自然渐隐，绝不遮盖背景点阵
+                    // 遮罩只要给一点点，只遮住时间下边缘一丁点地方，绝不遮盖底层背景点阵
+                    val topCutoffPx = 24.dp.toPx()
+                    val topFadePx = 36.dp.toPx()
+                    val bottomFadeStartPx = size.height - 76.dp.toPx()
+                    val bottomFadeEndPx = size.height - 14.dp.toPx()
+
                     drawRect(
                         brush = Brush.verticalGradient(
-                            0.0f to Color.Transparent, // 顶部时间区域：文字完全不显示
-                            0.11f to Color.Black,      // 46dp 处：文字完全可见
-                            0.86f to Color.Black,      // 底部按键上方：文字完全可见
-                            1.0f to Color.Transparent  // 底部按键区域：文字平滑渐隐
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                (topCutoffPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
+                                (topFadePx / size.height).coerceIn(0f, 1f) to Color.Black,
+                                (bottomFadeStartPx / size.height).coerceIn(0f, 1f) to Color.Black,
+                                (bottomFadeEndPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
+                                1.0f to Color.Transparent
+                            )
                         ),
                         blendMode = BlendMode.DstIn
                     )
@@ -504,8 +649,8 @@ private fun MainAgentDashboard(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 顶部时间留白
-            Spacer(modifier = Modifier.height(44.dp))
+            // 顶部时间与会话胶囊留白
+            Spacer(modifier = Modifier.height(58.dp))
 
             // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形毛玻璃框，工具调用完整内嵌)
             val conversationItems = remember(agentState.conversationBlocks) {
@@ -599,38 +744,49 @@ private fun MainAgentDashboard(
             Spacer(modifier = Modifier.height(78.dp))
         }
 
-        // ================= 3. 顶部时间遮罩区 (原生高斯模糊 + 渐变微黑边，让文字不会在时间区域内显示) =================
-        Box(
+        // ================= 3. 顶部弧形微晶时间与会话胶囊 (Google M3 规范，点击或左滑快速切换) =================
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(48.dp)
-                .graphicsLayer {
-                    renderEffect = RenderEffect.createBlurEffect(
-                        16f,
-                        16f,
-                        Shader.TileMode.CLAMP
-                    ).asComposeRenderEffect()
-                }
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.95f),
-                            Color.Black.copy(alpha = 0.65f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        // 顶部弧形微晶时间
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(48.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             TopClockBar(timeText = currentTime)
+
+            // 贴边微型会话标签胶囊 (M3 意纯圆药丸，展示当前对话，点击快速呼出会话抽屉)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF141720).copy(alpha = 0.88f))
+                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(10.dp))
+                    .clickable { isSessionDrawerOpen = true }
+                    .padding(horizontal = 9.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                    Text(
+                        text = currentSession.title,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFE2E8F0),
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "▾",
+                        fontSize = 7.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+            }
         }
 
         // ================= 4. 单体演变底栏控制器 =================
@@ -726,15 +882,15 @@ private fun MainAgentDashboard(
                         value = customInputText,
                         onValueChange = { customInputText = it },
                         textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        cursorBrush = SolidColor(Color(0xFF38BDF8)),
+                        cursorBrush = SolidColor(Color.White),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF161922))
-                            .border(0.8.dp, Color(0xFF38BDF8), RoundedCornerShape(8.dp))
+                            .background(Color(0xFF141720))
+                            .border(0.8.dp, Color(0xFF333D4F), RoundedCornerShape(8.dp))
                             .padding(10.dp)
                     )
-                    // 预置快捷指令胶囊 (极简纯净纯色无 Emoji)
+                    // 预置快捷指令胶囊 (极简纯净纯色无 Emoji，纯黑白冷灰体系)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -742,13 +898,13 @@ private fun MainAgentDashboard(
                         Text(
                             text = "时间天气与资讯",
                             fontSize = 9.sp,
-                            color = Color(0xFF93C5FD),
+                            color = Color(0xFFE2E8F0),
                             maxLines = 1,
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF162032))
-                                .border(0.6.dp, Color(0xFF38BDF8).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                .background(Color(0xFF181D26))
+                                .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
                                 .clickable {
                                     val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
                                     showCustomInputDialog = false
@@ -759,13 +915,13 @@ private fun MainAgentDashboard(
                         Text(
                             text = "诊断电量与马达",
                             fontSize = 9.sp,
-                            color = Color(0xFFA7F3D0),
+                            color = Color(0xFFE2E8F0),
                             maxLines = 1,
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF132A24))
-                                .border(0.6.dp, Color(0xFF10B981).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                .background(Color(0xFF181D26))
+                                .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
                                 .clickable {
                                     val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
                                     showCustomInputDialog = false
@@ -782,7 +938,7 @@ private fun MainAgentDashboard(
                             color = Color(0xFF94A3B8),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF1E2433))
+                                .background(Color(0xFF1E2430))
                                 .clickable { showCustomInputDialog = false }
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         )
@@ -790,10 +946,10 @@ private fun MainAgentDashboard(
                             text = "发送",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = Color(0xFF0F172A),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF38BDF8))
+                                .background(Color(0xFFF8FAFC))
                                 .clickable {
                                     if (customInputText.isNotBlank()) {
                                         val send = customInputText
@@ -808,5 +964,16 @@ private fun MainAgentDashboard(
                 }
             }
         }
+
+        // ================= 7. Google M3 原生贴边自适应多会话抽屉 =================
+        SessionDrawer(
+            isOpen = isSessionDrawerOpen,
+            sessions = sessions,
+            activeSessionId = activeSessionId,
+            onSelectSession = { id -> switchToSession(id) },
+            onCreateSession = { createNewSession() },
+            onDeleteSession = { id -> deleteSession(id) },
+            onClose = { isSessionDrawerOpen = false }
+        )
     }
 }

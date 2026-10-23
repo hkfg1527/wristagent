@@ -38,7 +38,7 @@ private class MatrixGridPoint(
 )
 
 private val COLOR_DOT_BASE = Color(0xFFE2E8F0)
-private val COLOR_DOT_SHOCK = Color(0xFF7DD3FC)
+private val COLOR_DOT_SHOCK = Color(0xFFFFFFFF) // 纯净亮白微晶光芒，彻底消除廉价土味蓝
 private val COLOR_DOT_GREEN = Color(0xFF10B981)
 private val COLOR_DOT_CASCADE = Color(0xFFEF4444)
 private val COLOR_DOT_WHITE = Color.White

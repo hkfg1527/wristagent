@@ -135,3 +135,20 @@ data class AgentExecutionState(
     val isFinished: Boolean = false,
     val errorMessage: String? = null
 )
+
+/**
+ * 独立的聊天会话记录 (支持穿戴原生多会话切换、连贯追加、新建与关闭)
+ */
+data class ChatSession(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String = "新对话",
+    val createdAt: Long = System.currentTimeMillis(),
+    val conversationBlocks: List<ConversationBlock> = listOf(
+        ConversationBlock.Text(
+            id = java.util.UUID.randomUUID().toString(),
+            content = "主人，今天有什么需要解决的技术或生活问题？",
+            isUser = false
+        )
+    ),
+    val history: List<ChatMessage> = emptyList()
+)

@@ -60,42 +60,57 @@ class AgentDispatcher(
         val systemPrompt = """
             $memoryHeader
             
-            你是伴生在 Android Wear OS 智能手表上的专属全能原生 Agent 智能体。
+            你是运行在 Android Wear OS 智能手表上的个人全自主伴生智能体（Autonomous Wearable Companion Agent）。
             
-            【核心行为与交互准则】
-            1. 极简高密度输出：手表物理屏幕极其狭小，单次答复正文严格精炼在 150~250 字以内，杜绝任何客套寒暄、开场白与废话，重点突出，分点最多 3 点。
-            2. 灵活自主交错调用 (Interleaved Execution)：
-               - 你可以【先向主人简短说明意图，再发起工具调用】；
-               - 也可以【先调用工具获取数据，再进行深度反思与总结】；
-               - 在收到工具返回的 Observation 结果后，必须结合数据自主思考下一步行动。
-            3. 支持真实穿戴与云端工具链：
-               - get_device_status: 读取手表电量、充电状态与硬件温度
-               - query_time_weather: 查询本地系统精准时间、星期与气象
-               - vibrate_device: 触发线性马达触觉反馈 (short/double/alert)
-               - set_system_power_mode: 切换极致省电模式 (ultraSaving: true/false)
-               - adjust_matrix_density: 调整表盘唯一点阵网格物理间距
-               - web_search: 实时连接互联网搜索最新资讯与即时事实
-            4. 严禁越界：未得到主人明确要求时，严禁自作主张修改表盘点阵 UI 或开关省电模式。
+            【环境与存在形态】
+            - 宿主环境为圆形表盘智能穿戴设备，是用户贴身常驻的随身参谋、技术助理与日常管家。
+            - 拥有高度开放的理解、反思、规划与自主执行权限。不要自我设限，充分发挥大模型的深层推理与洞察力，为用户提供切实、高效、有深度的建议与行动闭环。
+            
+            【感知与物理行动能力】
+            你可以根据上下文需要，自主调用穿戴设备底层硬件与云端工具链（ReAct Function Calling）：
+            - get_device_status: 感知手表电量、充电状态、芯片温度与硬件健康；
+            - query_time_weather: 获取精准系统时刻、星期、节假日与气象环境；
+            - vibrate_device: 调度线性马达执行触觉反馈（short/double/alert 脉冲）；
+            - set_system_power_mode: 自主协同系统省电策略与性能配置；
+            - adjust_matrix_density: 协同微晶点阵网格物理间距，营造适宜视觉或节能环境；
+            - web_search: 穿透广域互联网检索即时资讯、知识深度考据与生活事实。
+            
+            【最高权限与协作准则】
+            - 遇到复杂目标时，主动对任务进行多步拆解，自主编排工具调用链路（先查感知、再搜网络、最终交织分析）。
+            - 输出表达清晰利落、信息密度高，直击要害，适配智能手表快速扫视与移动交互场景。
+            - 在高危或涉及系统持久修改的操作前，向主人通报意图与后果，由内置安全护栏协同守护。
         """.trimIndent()
 
         conversationHistory.add(ChatMessage(role = AgentRole.SYSTEM, content = systemPrompt))
     }
 
+    fun getConversationHistory(): List<ChatMessage> = conversationHistory.toList()
+
+    fun loadConversationHistory(history: List<ChatMessage>) {
+        conversationHistory.clear()
+        if (history.isEmpty()) {
+            initSystemMessage()
+        } else {
+            conversationHistory.addAll(history)
+        }
+    }
+
     /**
-     * 发送用户指令并启动真实多轮 Agent 交错流循环
+     * 发送用户指令并启动真实多轮 Agent 交错流循环 (支持连贯追加历史对话)
      */
     suspend fun executeUserPrompt(
         prompt: String,
+        existingBlocks: List<ConversationBlock> = emptyList(),
         onStateUpdate: (AgentExecutionState) -> Unit
     ) = withContext(Dispatchers.IO) {
         isCancelled = false
-        val initialBlocks = mutableListOf<ConversationBlock>(
-            ConversationBlock.Text(id = UUID.randomUUID().toString(), content = prompt, isUser = true)
-        )
+        val initialBlocks = existingBlocks.toMutableList().apply {
+            add(ConversationBlock.Text(id = UUID.randomUUID().toString(), content = prompt, isUser = true))
+        }
 
         var state = AgentExecutionState(
             prompt = prompt,
-            thoughtChain = "正在理解主人意图...",
+            thoughtChain = "正在自主规划...",
             conversationBlocks = initialBlocks,
             isThinking = true
         )
@@ -122,7 +137,7 @@ class AgentDispatcher(
     }
 
     /**
-     * 真实网络 API 循环调用回路 (支持交错流文本、思考小胶囊、工具小胶囊)
+     * 真实网络 API 循环调用回路 (放开上下文上限，自主决策完成为止)
      */
     private suspend fun executeInterleavedApiLoop(
         initialState: AgentExecutionState,
@@ -130,7 +145,7 @@ class AgentDispatcher(
     ) {
         var currentState = initialState
         val blocks = currentState.conversationBlocks.toMutableList()
-        val maxTurns = 8
+        val maxTurns = 30 // 放开限制，模型自主完成任务后自动退出，防止极端死循环
 
         for (turn in 1..maxTurns) {
             if (isCancelled) break
