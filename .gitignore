@@ -1,0 +1,60 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+*/build/
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk.dir, API keys, etc.)
+local.properties
+/local.properties
+
+# Log files
+*.log
+
+# Android Studio Navigation editor temp files
+.navigation/
+
+# Android Studio captures folder
+captures/
+
+# IntelliJ IDEA
+*.iml
+.idea/
+.idea
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Kotlin
+.kotlin/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Media & Scratch Files
+*.png
+*.mp4
+*.bak
+*.tmp
+*.swp
+*.patch
+*.diff
+watch_preview.html
