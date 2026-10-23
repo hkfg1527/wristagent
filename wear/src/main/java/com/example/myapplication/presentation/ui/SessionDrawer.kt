@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -84,19 +85,19 @@ fun SessionDrawer(
                 .background(Color(0xFF000000).copy(alpha = 0.88f))
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val startX = down.position.x
                         val startY = down.position.y
 
                         while (true) {
-                            val event = awaitPointerEvent()
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                             if (!change.pressed) {
                                 val deltaX = change.position.x - startX
                                 val deltaY = change.position.y - startY
-                                // 向左轻滑退出抽屉
-                                if (deltaX < -32.dp.toPx() && abs(deltaX) > abs(deltaY)) {
+                                // 水平轻划（左滑或右滑）快速退出抽屉
+                                if (abs(deltaX) > 28.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.1f) {
                                     onClose()
                                 }
                                 break

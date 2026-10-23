@@ -23,6 +23,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -68,6 +70,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -129,6 +132,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
@@ -255,66 +260,72 @@ fun WearAgentUnifiedApp() {
         }
     }
 
-    AnimatedContent(
-        targetState = currentScreen,
-        transitionSpec = {
-            if (targetState == AppScreen.SETTINGS) {
-                (fadeIn(tween(260)) + scaleIn(initialScale = 0.92f, animationSpec = tween(260, easing = FastOutSlowInEasing)))
-                    .togetherWith(fadeOut(tween(180)) + scaleOut(targetScale = 1.05f, animationSpec = tween(180)))
-            } else {
-                (fadeIn(tween(240)) + scaleIn(initialScale = 1.05f, animationSpec = tween(240, easing = FastOutSlowInEasing)))
-                    .togetherWith(fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(180)))
-            }
-        },
-        label = "screenTransition"
-    ) { screen ->
-        when (screen) {
-            AppScreen.ONBOARDING -> {
-                OnboardingScreen(
-                    preferences = preferences,
-                    onFinish = {
-                        liveSpacingDp = preferences.matrixSpacingDp
-                        currentScreen = AppScreen.MAIN
-                    }
-                )
-            }
-
-            AppScreen.SETTINGS -> {
-                DisposableEffect(Unit) {
-                    MainActivity.onBackPressedCustom = {
-                        liveSpacingDp = preferences.matrixSpacingDp
-                        currentScreen = AppScreen.MAIN
-                        true
-                    }
-                    onDispose {
-                        MainActivity.onBackPressedCustom = null
-                    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        AnimatedContent(
+            targetState = currentScreen,
+            transitionSpec = {
+                if (targetState == AppScreen.SETTINGS) {
+                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
+                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeOut(tween(180)))
+                } else {
+                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
+                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180)))
                 }
-                BackHandler {
-                    liveSpacingDp = preferences.matrixSpacingDp
-                    currentScreen = AppScreen.MAIN
+            },
+            label = "screenTransition"
+        ) { screen ->
+            when (screen) {
+                AppScreen.ONBOARDING -> {
+                    OnboardingScreen(
+                        preferences = preferences,
+                        onFinish = {
+                            liveSpacingDp = preferences.matrixSpacingDp
+                            currentScreen = AppScreen.MAIN
+                        }
+                    )
                 }
-                SettingsScreen(
-                    preferences = preferences,
-                    onBack = {
+
+                AppScreen.SETTINGS -> {
+                    DisposableEffect(Unit) {
+                        MainActivity.onBackPressedCustom = {
+                            liveSpacingDp = preferences.matrixSpacingDp
+                            currentScreen = AppScreen.MAIN
+                            true
+                        }
+                        onDispose {
+                            MainActivity.onBackPressedCustom = null
+                        }
+                    }
+                    BackHandler {
                         liveSpacingDp = preferences.matrixSpacingDp
                         currentScreen = AppScreen.MAIN
-                    },
-                    onRestartOnboarding = {
-                        preferences.hasCompletedOnboarding = false
-                        currentScreen = AppScreen.ONBOARDING
                     }
-                )
-            }
+                    SettingsScreen(
+                        preferences = preferences,
+                        onBack = {
+                            liveSpacingDp = preferences.matrixSpacingDp
+                            currentScreen = AppScreen.MAIN
+                        },
+                        onRestartOnboarding = {
+                            preferences.hasCompletedOnboarding = false
+                            currentScreen = AppScreen.ONBOARDING
+                        }
+                    )
+                }
 
-            AppScreen.MAIN -> {
-                MainAgentDashboard(
-                    preferences = preferences,
-                    agentDispatcher = agentDispatcher,
-                    voiceInputManager = voiceInputManager,
-                    liveSpacingDp = liveSpacingDp,
-                    onOpenSettings = { currentScreen = AppScreen.SETTINGS }
-                )
+                AppScreen.MAIN -> {
+                    MainAgentDashboard(
+                        preferences = preferences,
+                        agentDispatcher = agentDispatcher,
+                        voiceInputManager = voiceInputManager,
+                        liveSpacingDp = liveSpacingDp,
+                        onOpenSettings = { currentScreen = AppScreen.SETTINGS }
+                    )
+                }
             }
         }
     }
@@ -578,25 +589,33 @@ private fun MainAgentDashboard(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
-            .pointerInput(Unit) {
+            .pointerInput(bottomBlockMode, isExecutingAgent, showCustomInputDialog, isSessionDrawerOpen) {
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     val startX = down.position.x
                     val startY = down.position.y
 
+                    // 空间严格隔离：仅在中部正文区监听，完全避开顶部 42dp 状态栏与底部 96dp 交互栏
+                    val inContentZone = startY > 42.dp.toPx() && startY < (size.height - 96.dp.toPx())
+                    // 状态严格隔离：仅在底栏空闲、未在录音、未在执行智能体、未在文本输入时才允许手势
+                    val canGesture = inContentZone &&
+                            bottomBlockMode == BottomBlockMode.IDLE &&
+                            !isExecutingAgent &&
+                            !showCustomInputDialog
+
                     while (true) {
-                        val event = awaitPointerEvent()
+                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                         if (!change.pressed) {
-                            val deltaX = change.position.x - startX
-                            val deltaY = change.position.y - startY
-                            // 水平轻滑手势：向左滑呼出会话切换抽屉，向右滑收回抽屉
-                            if (abs(deltaX) > 36.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
-                                if (deltaX < 0f && !isSessionDrawerOpen) {
-                                    isSessionDrawerOpen = true
-                                } else if (deltaX > 0f && isSessionDrawerOpen) {
-                                    isSessionDrawerOpen = false
+                            if (canGesture) {
+                                val deltaX = change.position.x - startX
+                                val deltaY = change.position.y - startY
+                                // 水平轻划呼出左侧会话抽屉 (动画从左侧自然平滑滑入)
+                                if (abs(deltaX) > 28.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.1f) {
+                                    if (!isSessionDrawerOpen) {
+                                        isSessionDrawerOpen = true
+                                    }
                                 }
                             }
                             break

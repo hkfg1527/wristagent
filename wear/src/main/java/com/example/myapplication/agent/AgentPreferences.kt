@@ -63,6 +63,22 @@ class AgentPreferences(context: Context) {
         get() = prefs.getFloat("temperature", 0.7f)
         set(value) = prefs.edit().putFloat("temperature", value).apply()
 
+    var mcpEndpoint: String
+        get() = prefs.getString("mcp_endpoint", "http://127.0.0.1:8000/sse") ?: "http://127.0.0.1:8000/sse"
+        set(value) = prefs.edit().putString("mcp_endpoint", value).apply()
+
+    var isMcpEnabled: Boolean
+        get() = prefs.getBoolean("is_mcp_enabled", true)
+        set(value) = prefs.edit().putBoolean("is_mcp_enabled", value).apply()
+
+    var customSystemPrompt: String
+        get() = prefs.getString("custom_system_prompt", "") ?: ""
+        set(value) = prefs.edit().putString("custom_system_prompt", value).apply()
+
+    var maxContextTurns: Int
+        get() = prefs.getInt("max_context_turns", 30)
+        set(value) = prefs.edit().putInt("max_context_turns", value).apply()
+
     fun resetAll() {
         prefs.edit().clear().apply()
     }

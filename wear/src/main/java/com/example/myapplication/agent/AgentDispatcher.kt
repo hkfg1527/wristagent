@@ -57,9 +57,10 @@ class AgentDispatcher(
     private fun initSystemMessage() {
         conversationHistory.clear()
         val memoryHeader = memory.buildSystemMemoryHeader()
-        val systemPrompt = """
-            $memoryHeader
-            
+        val basePrompt = if (preferences.customSystemPrompt.isNotBlank()) {
+            preferences.customSystemPrompt
+        } else {
+            """
             你是运行在 Android Wear OS 智能手表上的个人全自主伴生智能体（Autonomous Wearable Companion Agent）。
             
             【环境与存在形态】
@@ -79,10 +80,25 @@ class AgentDispatcher(
             - 遇到复杂目标时，主动对任务进行多步拆解，自主编排工具调用链路（先查感知、再搜网络、最终交织分析）。
             - 输出表达清晰利落、信息密度高，直击要害，适配智能手表快速扫视与移动交互场景。
             - 在高危或涉及系统持久修改的操作前，向主人通报意图与后果，由内置安全护栏协同守护。
-        """.trimIndent()
+            """.trimIndent()
+        }
+        val systemPrompt = "$memoryHeader\n\n$basePrompt"
 
         conversationHistory.add(ChatMessage(role = AgentRole.SYSTEM, content = systemPrompt))
     }
+
+    fun clearLongTermMemory() {
+        memory.longTermNotes = ""
+        initSystemMessage()
+    }
+
+    fun getMemoryFactCount(): Int {
+        val notes = memory.longTermNotes
+        if (notes.isBlank()) return 0
+        return notes.split("\n", ";", "；").count { it.isNotBlank() }
+    }
+
+    fun getRegisteredTools(): List<ToolDefinition> = toolRegistry.getToolDefinitions()
 
     fun getConversationHistory(): List<ChatMessage> = conversationHistory.toList()
 
