@@ -92,6 +92,7 @@ import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
+import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.FrostedPhysicalMaskCard
 import com.example.myapplication.presentation.ui.FrostedTextMaskContainer
@@ -354,8 +355,13 @@ private fun MainAgentDashboard(
 
     var isTaskCompletedTrigger by remember { mutableStateOf(false) }
 
-    // 底部交互模式
+    // 底部交互模式与主按键形态
     var bottomBlockMode by remember { mutableStateOf(BottomBlockMode.IDLE) }
+    var mainInputType by remember {
+        mutableStateOf(
+            if (preferences.mainInputType == "KEYBOARD") MainInputType.KEYBOARD else MainInputType.VOICE
+        )
+    }
     var currentRiskAssessment by remember { mutableStateOf<RiskAssessment?>(null) }
     var pendingContinuation by remember { mutableStateOf<CancellableContinuation<Boolean>?>(null) }
     var delayedStretchJob by remember { mutableStateOf<Job?>(null) }
@@ -814,6 +820,11 @@ private fun MainAgentDashboard(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 12.dp),
+            mainInputType = mainInputType,
+            onMainInputTypeChange = { newType ->
+                mainInputType = newType
+                preferences.mainInputType = newType.name
+            },
             rightButtonAction = preferences.rightButtonAction,
             cooldownSeconds = currentRiskAssessment?.requireCooldownSeconds ?: 0,
             riskExplanation = currentRiskAssessment?.riskSummary ?: "",

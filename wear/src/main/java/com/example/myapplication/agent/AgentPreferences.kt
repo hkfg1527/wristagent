@@ -79,6 +79,46 @@ class AgentPreferences(context: Context) {
         get() = prefs.getInt("max_context_turns", 30)
         set(value) = prefs.edit().putInt("max_context_turns", value).apply()
 
+    var mainInputType: String
+        get() = prefs.getString("main_input_type", "VOICE") ?: "VOICE"
+        set(value) = prefs.edit().putString("main_input_type", value).apply()
+
+    var maxOutputTokens: Int
+        get() = prefs.getInt("max_output_tokens", 300)
+        set(value) = prefs.edit().putInt("max_output_tokens", value).apply()
+
+    var streamMode: Boolean
+        get() = prefs.getBoolean("stream_mode", true)
+        set(value) = prefs.edit().putBoolean("stream_mode", value).apply()
+
+    var cachedRemoteModels: String
+        get() = prefs.getString("cached_remote_models", "deepseek-chat,deepseek-reasoner") ?: "deepseek-chat,deepseek-reasoner"
+        set(value) = prefs.edit().putString("cached_remote_models", value).apply()
+
+    var toolDeviceStatusEnabled: Boolean
+        get() = prefs.getBoolean("tool_device_status_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_device_status_enabled", value).apply()
+
+    var toolVibrateEnabled: Boolean
+        get() = prefs.getBoolean("tool_vibrate_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_vibrate_enabled", value).apply()
+
+    var toolMatrixDensityEnabled: Boolean
+        get() = prefs.getBoolean("tool_matrix_density_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_matrix_density_enabled", value).apply()
+
+    var toolPowerModeEnabled: Boolean
+        get() = prefs.getBoolean("tool_power_mode_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_power_mode_enabled", value).apply()
+
+    var toolWeatherEnabled: Boolean
+        get() = prefs.getBoolean("tool_weather_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_weather_enabled", value).apply()
+
+    var toolWebSearchEnabled: Boolean
+        get() = prefs.getBoolean("tool_web_search_enabled", true)
+        set(value) = prefs.edit().putBoolean("tool_web_search_enabled", value).apply()
+
     fun resetAll() {
         prefs.edit().clear().apply()
     }

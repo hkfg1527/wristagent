@@ -75,12 +75,22 @@ enum class BottomBlockMode {
 }
 
 /**
+ * 主按键模式：语音优先 vs 键盘优先
+ */
+enum class MainInputType {
+    VOICE,
+    KEYBOARD
+}
+
+/**
  * 单体形态演变底栏控制器 (左右滑动弹性弹射两翼 · 点击弹性收回 · 绝无 Emoji)
  */
 @Composable
 fun BottomInteractiveBlock(
     mode: BottomBlockMode,
     modifier: Modifier = Modifier,
+    mainInputType: MainInputType = MainInputType.VOICE,
+    onMainInputTypeChange: (MainInputType) -> Unit = {},
     rightButtonAction: RightButtonAction = RightButtonAction.MODEL_SWITCH,
     cooldownSeconds: Int = 0,               // 小白模式下的风险锁定倒计时
     riskExplanation: String = "",           // 审批横条上方的最坏后果说明
@@ -133,9 +143,10 @@ fun BottomInteractiveBlock(
                 val wingScale = (0.4f + 0.6f * splitProgress.value).coerceIn(0f, 1f)
                 val wingAlpha = splitProgress.value.coerceIn(0f, 1f)
 
-                // 左副键：键盘文字录入 (TXT)
+                // 左副键：键盘文字录入 (TXT) 或切回语音 (MIC)
                 if (wingAlpha > 0.02f) {
                     val leftOffsetDp = (-50.dp * splitProgress.value)
+                    val leftLabel = if (mainInputType == MainInputType.VOICE) "TXT" else "MIC"
                     Box(
                         modifier = Modifier
                             .offset(x = leftOffsetDp)
@@ -153,13 +164,18 @@ fun BottomInteractiveBlock(
                                         isSplitExpanded = false
                                         splitProgress.animateTo(0f, spring(0.72f, 280f))
                                     }
-                                    onLeftKeyboardClick()
+                                    if (mainInputType == MainInputType.VOICE) {
+                                        onMainInputTypeChange(MainInputType.KEYBOARD)
+                                        onLeftKeyboardClick()
+                                    } else {
+                                        onMainInputTypeChange(MainInputType.VOICE)
+                                    }
                                 }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "TXT",
+                            text = leftLabel,
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -271,8 +287,11 @@ fun BottomInteractiveBlock(
                                         } else if (mode == BottomBlockMode.RECORDING) {
                                             // 正在录音时单触：结束录音并触发
                                             onVoiceStopAndTrigger()
+                                        } else if (mainInputType == MainInputType.KEYBOARD) {
+                                            // 键盘主键模式下单触：直接弹出文字输入对话框
+                                            onLeftKeyboardClick()
                                         } else {
-                                            // 闲置状态下单触：启动录音 (设备若无录音引擎则弹出快捷输入)
+                                            // 语音模式下单触：启动录音 (设备若无录音引擎则弹出快捷输入)
                                             onVoiceStartRecord()
                                         }
                                     }
@@ -296,13 +315,23 @@ fun BottomInteractiveBlock(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // 中心声波/待机微点
-                Box(
-                    modifier = Modifier
-                        .size(if (mode == BottomBlockMode.RECORDING) 14.dp else 10.dp)
-                        .clip(CircleShape)
-                        .background(if (mode == BottomBlockMode.RECORDING) Color(0xFFEF4444) else Color(0xFF0F172A))
-                )
+                if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
+                    Text(
+                        text = "TXT",
+                        fontSize = 10.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                } else {
+                    // 中心声波/待机微点
+                    Box(
+                        modifier = Modifier
+                            .size(if (mode == BottomBlockMode.RECORDING) 14.dp else 10.dp)
+                            .clip(CircleShape)
+                            .background(if (mode == BottomBlockMode.RECORDING) Color(0xFFEF4444) else Color(0xFF0F172A))
+                    )
+                }
             }
         } else if (isApproval) {
             // ================= 审批拦截：向左滑动放行 (小白倒计时锁定 + 纯红滑块) =================

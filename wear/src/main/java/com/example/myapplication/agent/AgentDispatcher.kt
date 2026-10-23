@@ -515,14 +515,22 @@ class AgentDispatcher(
             val requestBody = JSONObject().apply {
                 put("model", preferences.modelName)
                 put("temperature", preferences.temperature)
+                put("max_tokens", preferences.maxOutputTokens)
                 val msgs = JSONArray()
-                conversationHistory.forEach { msgs.put(it.toJson()) }
+                val turnsLimit = preferences.maxContextTurns
+                val systemMsg = conversationHistory.firstOrNull { it.role == AgentRole.SYSTEM }
+                val dialogMsgs = conversationHistory.filter { it.role != AgentRole.SYSTEM }.takeLast(turnsLimit * 2)
+                if (systemMsg != null) msgs.put(systemMsg.toJson())
+                dialogMsgs.forEach { msgs.put(it.toJson()) }
                 put("messages", msgs)
 
-                val tools = JSONArray()
-                toolRegistry.getToolDefinitions().forEach { tools.put(it.toJson()) }
-                put("tools", tools)
-                put("tool_choice", "auto")
+                val toolDefs = toolRegistry.getToolDefinitions()
+                if (toolDefs.isNotEmpty()) {
+                    val tools = JSONArray()
+                    toolDefs.forEach { tools.put(it.toJson()) }
+                    put("tools", tools)
+                    put("tool_choice", "auto")
+                }
             }
 
             OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(requestBody.toString()) }
@@ -543,6 +551,47 @@ class AgentDispatcher(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    companion object {
+        suspend fun fetchRemoteModels(baseUrl: String, apiKey: String): Pair<Long, List<String>> = withContext(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+            val cleanBase = baseUrl.trim().trimEnd('/')
+            val urlStr = if (cleanBase.endsWith("/v1/models")) cleanBase else "$cleanBase/v1/models"
+            try {
+                val url = URL(urlStr)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                if (apiKey.isNotBlank()) {
+                    conn.setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
+                }
+                conn.setRequestProperty("Content-Type", "application/json")
+
+                val code = conn.responseCode
+                val latency = System.currentTimeMillis() - startTime
+                if (code in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    val dataArr = json.optJSONArray("data")
+                    val result = mutableListOf<String>()
+                    if (dataArr != null) {
+                        for (i in 0 until dataArr.length()) {
+                            val id = dataArr.optJSONObject(i)?.optString("id")
+                            if (!id.isNullOrBlank()) {
+                                result.add(id)
+                            }
+                        }
+                    }
+                    latency to result
+                } else {
+                    -1L to emptyList()
+                }
+            } catch (e: Exception) {
+                -1L to emptyList()
+            }
         }
     }
 }

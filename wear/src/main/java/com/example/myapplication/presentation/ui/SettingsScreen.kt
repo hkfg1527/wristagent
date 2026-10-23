@@ -55,12 +55,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.Text
+import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
@@ -215,7 +218,7 @@ fun SettingsScreen(
             // 1. 当前运行大模型服务 (动态读取与端点配置)
             item {
                 AgentConsoleCard(
-                    title = "当前运行大模型",
+                    title = "模型与端点",
                     statusBadge = "实时生效",
                     valueText = currentModel,
                     descText = currentBaseUrl,
@@ -223,18 +226,37 @@ fun SettingsScreen(
                 )
             }
 
-            // 2. 原生工具集与 MCP 扩展探针
+            // 2. 推理超参数调优 (Temperature / MaxTokens / Stream)
             item {
                 AgentConsoleCard(
-                    title = "工具集与 MCP 协议",
-                    statusBadge = if (isMcpEnabled) "MCP 就绪" else "原生模式",
-                    valueText = "6项穿戴原生工具已激活",
-                    descText = "电量感知 • 触觉反馈 • 点阵谐振 • 功耗调度 • 气象环境 • 联网搜索",
+                    title = "推理超参数",
+                    statusBadge = "创客模式",
+                    valueText = "Temp: ${preferences.temperature} | Max: ${preferences.maxOutputTokens}",
+                    descText = if (preferences.streamMode) "流式输出开启 • 精准采样" else "非流式输出 • 稳定整包",
+                    onClick = { activeDialog = SettingsSubDialog.HYPER_PARAMS }
+                )
+            }
+
+            // 3. 原生工具集细粒度权限 (6 项穿戴工具独立开关)
+            item {
+                val activeCount = listOf(
+                    preferences.toolDeviceStatusEnabled,
+                    preferences.toolVibrateEnabled,
+                    preferences.toolMatrixDensityEnabled,
+                    preferences.toolPowerModeEnabled,
+                    preferences.toolWeatherEnabled,
+                    preferences.toolWebSearchEnabled
+                ).count { it }
+                AgentConsoleCard(
+                    title = "工具集细粒度权限",
+                    statusBadge = "$activeCount/6 启用",
+                    valueText = if (activeCount == 6) "全部原生工具已就绪" else "已按需定制放行",
+                    descText = "电量感知 • 触觉反馈 • 点阵谐振 • 功耗调度 • 气象环境 • 广域搜索",
                     onClick = { activeDialog = SettingsSubDialog.TOOLS_MCP }
                 )
             }
 
-            // 3. 伴生系统提示词与角色设定 (System Prompt / Persona)
+            // 4. 伴生系统提示词与角色设定 (System Prompt / Persona)
             item {
                 AgentConsoleCard(
                     title = "伴生系统提示词",
@@ -245,18 +267,18 @@ fun SettingsScreen(
                 )
             }
 
-            // 4. 上下文与长记忆管理
+            // 5. 上下文与长记忆管理
             item {
                 AgentConsoleCard(
                     title = "上下文与长记忆",
-                    statusBadge = "持久锁定",
-                    valueText = "30 轮深度记忆窗口",
-                    descText = "多轮自然滚动，首层锁定用户画像与持久事实",
+                    statusBadge = "${preferences.maxContextTurns} 轮",
+                    valueText = "${preferences.maxContextTurns} 轮动态滚动窗口",
+                    descText = "超出自动向前滑窗裁剪，顶层持久锁定用户长期偏好",
                     onClick = { activeDialog = SettingsSubDialog.MEMORY_MANAGER }
                 )
             }
 
-            // 5. 两翼快捷键定义 (卡片化二级交互)
+            // 6. 两翼快捷键定义 (卡片化二级交互)
             item {
                 AgentConsoleCard(
                     title = "主界面两翼快捷键",
@@ -271,7 +293,7 @@ fun SettingsScreen(
                 )
             }
 
-            // 6. AI 安全护栏审查模式
+            // 7. AI 安全护栏审查模式
             item {
                 AgentConsoleCard(
                     title = "AI 安全审查护栏",
@@ -366,6 +388,7 @@ fun SettingsScreen(
  */
 enum class SettingsSubDialog {
     MODEL_CONFIG,
+    HYPER_PARAMS,
     TOOLS_MCP,
     PROMPT_VIEWER,
     MEMORY_MANAGER,
@@ -487,13 +510,20 @@ private fun SubSettingsModal(
             when (dialog) {
                 SettingsSubDialog.MODEL_CONFIG -> {
                     ModelConfigContent(
+                        preferences = preferences,
                         currentModel = currentModel,
                         currentBaseUrl = currentBaseUrl,
                         onSelect = onModelChange
                     )
                 }
+                SettingsSubDialog.HYPER_PARAMS -> {
+                    HyperParamsContent(
+                        preferences = preferences
+                    )
+                }
                 SettingsSubDialog.TOOLS_MCP -> {
                     ToolsMcpContent(
+                        preferences = preferences,
                         isMcpEnabled = isMcpEnabled,
                         mcpEndpoint = mcpEndpoint,
                         onToggleMcp = onMcpChange
@@ -546,38 +576,169 @@ private fun SubSettingsModal(
 }
 
 /**
- * 1. 模型与端点配置内容
+ * 1. 模型与端点配置内容 (支持实时拉取端点与测速)
  */
 @Composable
 private fun ModelConfigContent(
+    preferences: AgentPreferences,
     currentModel: String,
     currentBaseUrl: String,
     onSelect: (model: String, baseUrl: String) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    var inputBaseUrl by remember { mutableStateOf(currentBaseUrl) }
+    var inputApiKey by remember { mutableStateOf(preferences.apiKey) }
+    var isEditingUrl by remember { mutableStateOf(false) }
+    var isEditingKey by remember { mutableStateOf(false) }
+
+    var isFetching by remember { mutableStateOf(false) }
+    var fetchResultText by remember { mutableStateOf<String?>(null) }
+    var fetchedModels by remember {
+        mutableStateOf(
+            preferences.cachedRemoteModels.split(",").filter { it.isNotBlank() }
+        )
+    }
+
+    val scrollState = rememberScrollState()
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(5.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("当前运行大模型与端点", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("大模型端点与在线探测", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
-        val models = listOf(
-            Triple("deepseek-chat", "DeepSeek-V3", "https://api.deepseek.com"),
-            Triple("deepseek-reasoner", "DeepSeek-R1", "https://api.deepseek.com"),
-            Triple("gemini-2.5-flash", "Gemini 2.5 Flash", "https://generativelanguage.googleapis.com"),
-            Triple("claude-3-5-sonnet", "Claude 3.5 Sonnet", "https://api.anthropic.com"),
-            Triple("ollama-local", "Ollama 本地服务", "http://10.0.2.2:11434")
-        )
+        // Base URL 配置行
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141720))
+                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
+                .clickable { isEditingUrl = !isEditingUrl }
+                .padding(6.dp)
+        ) {
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("API Base URL", fontSize = 8.sp, color = Color(0xFF94A3B8))
+                    Text(if (isEditingUrl) "点击收起" else "点击编辑", fontSize = 7.5.sp, color = Color(0xFFCBD5E1))
+                }
+                if (isEditingUrl) {
+                    BasicTextField(
+                        value = inputBaseUrl,
+                        onValueChange = {
+                            inputBaseUrl = it
+                            preferences.baseUrl = it
+                        },
+                        textStyle = TextStyle(color = Color.White, fontSize = 8.5.sp),
+                        cursorBrush = SolidColor(Color.White),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp)
+                    )
+                } else {
+                    Text(inputBaseUrl, fontSize = 8.5.sp, color = Color.White, maxLines = 1)
+                }
+            }
+        }
 
-        models.forEach { (key, label, url) ->
-            val isSelected = currentModel == key
+        // API Key 状态行
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141720))
+                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
+                .clickable { isEditingKey = !isEditingKey }
+                .padding(6.dp)
+        ) {
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("API Key", fontSize = 8.sp, color = Color(0xFF94A3B8))
+                    Text(if (isEditingKey) "点击收起" else "点击编辑", fontSize = 7.5.sp, color = Color(0xFFCBD5E1))
+                }
+                if (isEditingKey) {
+                    BasicTextField(
+                        value = inputApiKey,
+                        onValueChange = {
+                            inputApiKey = it
+                            preferences.apiKey = it
+                        },
+                        textStyle = TextStyle(color = Color.White, fontSize = 8.5.sp),
+                        cursorBrush = SolidColor(Color.White),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 2.dp)
+                    )
+                } else {
+                    val masked = if (inputApiKey.length > 8) {
+                        "${inputApiKey.take(4)}...${inputApiKey.takeLast(4)}"
+                    } else if (inputApiKey.isNotBlank()) {
+                        "********"
+                    } else {
+                        "未配置 API Key"
+                    }
+                    Text(masked, fontSize = 8.5.sp, color = Color.White)
+                }
+            }
+        }
+
+        // 测速并拉取模型按钮
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isFetching) Color(0xFF1E2430) else Color(0xFF233045))
+                .border(0.6.dp, Color(0xFF475569), RoundedCornerShape(8.dp))
+                .clickable(enabled = !isFetching) {
+                    isFetching = true
+                    fetchResultText = "探测端点中..."
+                    scope.launch {
+                        val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
+                        isFetching = false
+                        if (timeMs >= 0 && models.isNotEmpty()) {
+                            fetchResultText = "探测成功 • 延迟 ${timeMs}ms"
+                            fetchedModels = models
+                            preferences.cachedRemoteModels = models.joinToString(",")
+                        } else {
+                            fetchResultText = "端点握手失败，已加载预置"
+                        }
+                    }
+                }
+                .padding(vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isFetching) "正在连接 /v1/models ..." else "测速并实时拉取模型列表",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+
+        fetchResultText?.let {
+            Text(it, fontSize = 8.sp, color = Color(0xFF38BDF8))
+        }
+
+        Text("可用模型 (点击即选生效)：", fontSize = 8.5.sp, color = Color(0xFF94A3B8), modifier = Modifier.align(Alignment.Start))
+
+        val displayList = if (fetchedModels.isNotEmpty()) {
+            fetchedModels
+        } else {
+            listOf("deepseek-chat", "deepseek-reasoner", "gemini-2.5-flash", "claude-3-5-sonnet")
+        }
+
+        displayList.forEach { modelId ->
+            val isSelected = currentModel == modelId
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) Color(0xFFF8FAFC) else Color(0xFF141720))
-                    .border(0.6.dp, if (isSelected) Color.White else Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                    .clickable { onSelect(key, url) }
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (isSelected) Color.White else Color(0xFF141720))
+                    .border(0.5.dp, if (isSelected) Color.White else Color(0xFF262D3D), RoundedCornerShape(6.dp))
+                    .clickable { onSelect(modelId, inputBaseUrl) }
                     .padding(horizontal = 8.dp, vertical = 5.dp)
             ) {
                 Row(
@@ -585,21 +746,14 @@ private fun ModelConfigContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color(0xFF0F172A) else Color.White
-                        )
-                        Text(
-                            text = url,
-                            fontSize = 7.5.sp,
-                            color = if (isSelected) Color(0xFF475569) else Color(0xFF94A3B8)
-                        )
-                    }
+                    Text(
+                        text = modelId,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) Color(0xFF0F172A) else Color.White
+                    )
                     if (isSelected) {
-                        Text("•", fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                        Text("当前生效", fontSize = 7.5.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -608,47 +762,138 @@ private fun ModelConfigContent(
 }
 
 /**
- * 2. 工具集与 MCP 服务状态
+ * 2. 推理超参数调优控制台 (Temperature / MaxTokens / Stream)
  */
 @Composable
-private fun ToolsMcpContent(
-    isMcpEnabled: Boolean,
-    mcpEndpoint: String,
-    onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
+private fun HyperParamsContent(
+    preferences: AgentPreferences
 ) {
+    var temp by remember { mutableFloatStateOf(preferences.temperature) }
+    var maxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
+    var isStream by remember { mutableStateOf(preferences.streamMode) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Agent 工具集与 MCP 协议", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("AI 推理超参数调优", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
+        // 1. Temperature 步进微调
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF141720))
                 .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(6.dp)
+                .padding(8.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("原生已激活穿戴工具 (6 项)：", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFCBD5E1))
-                Text("• get_device_status (电量与温控)", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                Text("• vibrate_device (线性马达触觉反馈)", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                Text("• adjust_matrix_density (表盘微晶点阵谐振)", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                Text("• set_system_power_mode (系统能耗协同)", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                Text("• query_time_weather (高精度时钟与气象)", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                Text("• web_search (广域互联网即时搜索)", fontSize = 8.sp, color = Color(0xFF94A3B8))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("采样温度 (Temperature)", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
+                    Text(
+                        text = "%.1f".format(temp),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1E2430))
+                            .clickable {
+                                val next = (temp - 0.1f).coerceIn(0.0f, 1.5f)
+                                temp = (next * 10).roundToInt() / 10f
+                                preferences.temperature = temp
+                            }
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("- 0.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1E2430))
+                            .clickable {
+                                val next = (temp + 0.1f).coerceIn(0.0f, 1.5f)
+                                temp = (next * 10).roundToInt() / 10f
+                                preferences.temperature = temp
+                            }
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("+ 0.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
             }
         }
 
+        // 2. Max Output Tokens
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF141720))
                 .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .clickable { onToggleMcp(!isMcpEnabled, mcpEndpoint) }
+                .padding(8.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("最大输出长度 (Max Output Tokens)", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(150, 300, 600, 1200).forEach { tokens ->
+                        val isSel = maxTokens == tokens
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSel) Color.White else Color(0xFF1E2430))
+                                .clickable {
+                                    maxTokens = tokens
+                                    preferences.maxOutputTokens = tokens
+                                }
+                                .padding(vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "$tokens",
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSel) Color(0xFF0F172A) else Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 流式传输开关
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141720))
+                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
+                .clickable {
+                    isStream = !isStream
+                    preferences.streamMode = isStream
+                }
                 .padding(horizontal = 8.dp, vertical = 6.dp)
         ) {
             Row(
@@ -657,20 +902,149 @@ private fun ToolsMcpContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("MCP 服务探针 (SSE/StdIO)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(mcpEndpoint, fontSize = 7.5.sp, color = Color(0xFF94A3B8))
+                    Text("流式输出 (Stream Mode)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("逐字打字机动效与首字极速响应", fontSize = 7.5.sp, color = Color(0xFF94A3B8))
                 }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
-                        .background(if (isMcpEnabled) Color(0xFF10B981) else Color(0xFF475569))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .background(if (isStream) Color.White else Color(0xFF333D4F))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (isStream) "已开启" else "已关闭",
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isStream) Color(0xFF0F172A) else Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 3. 工具集细粒度权限控制与 MCP 协议探针
+ */
+@Composable
+private fun ToolsMcpContent(
+    preferences: AgentPreferences,
+    isMcpEnabled: Boolean,
+    mcpEndpoint: String,
+    onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
+) {
+    var toolDeviceStatus by remember { mutableStateOf(preferences.toolDeviceStatusEnabled) }
+    var toolVibrate by remember { mutableStateOf(preferences.toolVibrateEnabled) }
+    var toolMatrixDensity by remember { mutableStateOf(preferences.toolMatrixDensityEnabled) }
+    var toolPowerMode by remember { mutableStateOf(preferences.toolPowerModeEnabled) }
+    var toolWeather by remember { mutableStateOf(preferences.toolWeatherEnabled) }
+    var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
+
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("原生工具细粒度放行控制", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+        val toolItems = listOf(
+            Triple("get_device_status", "电量与温控感知", toolDeviceStatus) to {
+                toolDeviceStatus = !toolDeviceStatus
+                preferences.toolDeviceStatusEnabled = toolDeviceStatus
+            },
+            Triple("vibrate_device", "线性马达触觉反馈", toolVibrate) to {
+                toolVibrate = !toolVibrate
+                preferences.toolVibrateEnabled = toolVibrate
+            },
+            Triple("adjust_matrix_density", "微晶点阵谐振调度", toolMatrixDensity) to {
+                toolMatrixDensity = !toolMatrixDensity
+                preferences.toolMatrixDensityEnabled = toolMatrixDensity
+            },
+            Triple("set_system_power_mode", "系统级能耗协同", toolPowerMode) to {
+                toolPowerMode = !toolPowerMode
+                preferences.toolPowerModeEnabled = toolPowerMode
+            },
+            Triple("query_time_weather", "高精度时钟与气象", toolWeather) to {
+                toolWeather = !toolWeather
+                preferences.toolWeatherEnabled = toolWeather
+            },
+            Triple("web_search", "广域互联网即时搜索", toolWebSearch) to {
+                toolWebSearch = !toolWebSearch
+                preferences.toolWebSearchEnabled = toolWebSearch
+            }
+        )
+
+        toolItems.forEach { (meta, toggle) ->
+            val (name, label, enabled) = meta
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF141720))
+                    .border(0.5.dp, Color(0xFF262D3D), RoundedCornerShape(6.dp))
+                    .clickable { toggle() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(label, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(name, fontSize = 7.sp, color = Color(0xFF94A3B8))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (enabled) Color.White else Color(0xFF333D4F))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (enabled) "放行" else "拦截",
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (enabled) Color(0xFF0F172A) else Color.White
+                        )
+                    }
+                }
+            }
+        }
+
+        // MCP 协议控制项
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF141720))
+                .border(0.5.dp, Color(0xFF262D3D), RoundedCornerShape(6.dp))
+                .clickable { onToggleMcp(!isMcpEnabled, mcpEndpoint) }
+                .padding(horizontal = 8.dp, vertical = 5.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("MCP 协议探针", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(mcpEndpoint, fontSize = 7.sp, color = Color(0xFF94A3B8))
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isMcpEnabled) Color(0xFF10B981) else Color(0xFF333D4F))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = if (isMcpEnabled) "已连接" else "未启用",
                         fontSize = 7.5.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
@@ -771,13 +1145,14 @@ private fun PromptViewerContent(
 }
 
 /**
- * 4. 上下文与长记忆管理
+ * 4. 上下文与长记忆管理 (动态轮数调节与持久偏好)
  */
 @Composable
 private fun MemoryManagerContent(
     preferences: AgentPreferences
 ) {
     var memoryCleared by remember { mutableStateOf(false) }
+    var turns by remember { mutableIntStateOf(preferences.maxContextTurns) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -785,6 +1160,47 @@ private fun MemoryManagerContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("上下文与长记忆管理", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+        // 上下文滑窗轮数单选
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF141720))
+                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
+                .padding(6.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("单会话滑窗轮数限制", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(4 to "4轮节能", 10 to "10轮标准", 30 to "30轮深度").forEach { (count, label) ->
+                        val isSel = turns == count
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSel) Color.White else Color(0xFF1E2430))
+                                .clickable {
+                                    turns = count
+                                    preferences.maxContextTurns = count
+                                }
+                                .padding(vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSel) Color(0xFF0F172A) else Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -795,9 +1211,9 @@ private fun MemoryManagerContent(
                 .padding(6.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("• 记忆策略：单会话自动滚动记忆 (上限 30 轮)", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
-                Text("• 永久记忆：用户长期偏好锁定于 System 顶层", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
-                Text("• 会话隔离：支持左滑唤出抽屉独立管理与切换", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
+                Text("• 记忆策略：超出设定轮数后自动向前滑窗淘汰", fontSize = 8.sp, color = Color(0xFFCBD5E1))
+                Text("• 永久记忆：首层提示词持久锁定长期人设与事实", fontSize = 8.sp, color = Color(0xFFCBD5E1))
+                Text("• 会话隔离：支持左滑唤出抽屉独立管理与切换", fontSize = 8.sp, color = Color(0xFFCBD5E1))
             }
         }
 
@@ -811,7 +1227,7 @@ private fun MemoryManagerContent(
                     preferences.resetAll()
                     memoryCleared = true
                 }
-                .padding(vertical = 7.dp),
+                .padding(vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(

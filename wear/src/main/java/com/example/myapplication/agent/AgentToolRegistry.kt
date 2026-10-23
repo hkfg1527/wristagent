@@ -17,7 +17,10 @@ import java.util.Locale
 /**
  * 手表原生 Agent 工具注册表
  */
-class AgentToolRegistry(private val context: Context) {
+class AgentToolRegistry(
+    private val context: Context,
+    private val preferences: AgentPreferences? = null
+) {
 
     // 观察外部配置或 UI 变化的回调
     var onMatrixDensityChange: ((spacingDp: Float) -> Unit)? = null
@@ -27,98 +30,123 @@ class AgentToolRegistry(private val context: Context) {
      * 获取所有支持导出的工具列表 (符合 OpenAI / LLM JSON Schema)
      */
     fun getToolDefinitions(): List<ToolDefinition> {
-        return listOf(
-            // 1. 获取设备电量与温控
-            ToolDefinition(
-                name = "get_device_status",
-                description = "获取智能手表的当前电池电量、充电状态、电池温度与当前硬件工作负载",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    put("properties", JSONObject())
-                    put("required", JSONArray())
-                }
-            ),
-            // 2. 物理马达振动触觉反馈
-            ToolDefinition(
-                name = "vibrate_device",
-                description = "触发手表的线性马达执行触觉振动反馈",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    val patternProp = JSONObject().apply {
-                        put("type", "string")
-                        put("enum", JSONArray(listOf("short", "double", "alert")))
-                        put("description", "振动模式：short (短脉冲轻快反馈), double (双击确认), alert (醒目长振动)")
+        val all = mutableListOf<ToolDefinition>()
+
+        if (preferences == null || preferences.toolDeviceStatusEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "get_device_status",
+                    description = "获取智能手表的当前电池电量、充电状态、电池温度与当前硬件工作负载",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        put("properties", JSONObject())
+                        put("required", JSONArray())
                     }
-                    props.put("pattern", patternProp)
-                    put("properties", props)
-                    put("required", JSONArray(listOf("pattern")))
-                }
-            ),
-            // 3. 实时调整圆形表盘点阵密度
-            ToolDefinition(
-                name = "adjust_matrix_density",
-                description = "动态调整手表圆形表盘唯一点阵物理基底的网格粒子间距与呼吸密度",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    val spacingProp = JSONObject().apply {
-                        put("type", "number")
-                        put("description", "点阵网格粒子间距 (单位 dp，推荐 12.0~20.0，数值越小越密集细腻)")
-                    }
-                    props.put("spacingDp", spacingProp)
-                    put("properties", props)
-                    put("required", JSONArray(listOf("spacingDp")))
-                }
-            ),
-            // 4. 极致省电模式控制
-            ToolDefinition(
-                name = "set_system_power_mode",
-                description = "设置手表电源模式。开启极致省电模式将挂起后台常驻高耗进程并将点阵降频",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    val ultraProp = JSONObject().apply {
-                        put("type", "boolean")
-                        put("description", "是否开启极致省电模式")
-                    }
-                    props.put("ultraSaving", ultraProp)
-                    put("properties", props)
-                    put("required", JSONArray(listOf("ultraSaving")))
-                }
-            ),
-            // 5. 本地天气与时间查询
-            ToolDefinition(
-                name = "query_time_weather",
-                description = "查询当前手表本地精准系统时间、星期与当前气象环境",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    val locProp = JSONObject().apply {
-                        put("type", "string")
-                        put("description", "查询地点，默认为本地表盘位置")
-                    }
-                    props.put("location", locProp)
-                    put("properties", props)
-                }
-            ),
-            // 6. 实时互联网搜索 (返回清洗后的精炼摘要，防止撑爆手表屏幕与上下文)
-            ToolDefinition(
-                name = "web_search",
-                description = "连接互联网实时检索最新资讯、新闻、技术事实与即时答案。返回精炼清洗后的纯文本摘要",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    val queryProp = JSONObject().apply {
-                        put("type", "string")
-                        put("description", "精确简练的搜索关键词")
-                    }
-                    props.put("query", queryProp)
-                    put("properties", props)
-                    put("required", JSONArray(listOf("query")))
-                }
+                )
             )
-        )
+        }
+
+        if (preferences == null || preferences.toolVibrateEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "vibrate_device",
+                    description = "触发手表的线性马达执行触觉振动反馈",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        val patternProp = JSONObject().apply {
+                            put("type", "string")
+                            put("enum", JSONArray(listOf("short", "double", "alert")))
+                            put("description", "振动模式：short (短脉冲轻快反馈), double (双击确认), alert (醒目长振动)")
+                        }
+                        props.put("pattern", patternProp)
+                        put("properties", props)
+                        put("required", JSONArray(listOf("pattern")))
+                    }
+                )
+            )
+        }
+
+        if (preferences == null || preferences.toolMatrixDensityEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "adjust_matrix_density",
+                    description = "动态调整手表圆形表盘唯一点阵物理基底的网格粒子间距与呼吸密度",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        val spacingProp = JSONObject().apply {
+                            put("type", "number")
+                            put("description", "点阵网格粒子间距 (单位 dp，推荐 12.0~20.0，数值越小越密集细腻)")
+                        }
+                        props.put("spacingDp", spacingProp)
+                        put("properties", props)
+                        put("required", JSONArray(listOf("spacingDp")))
+                    }
+                )
+            )
+        }
+
+        if (preferences == null || preferences.toolPowerModeEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "set_system_power_mode",
+                    description = "设置手表电源模式。开启极致省电模式将挂起后台常驻高耗进程并将点阵降频",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        val ultraProp = JSONObject().apply {
+                            put("type", "boolean")
+                            put("description", "是否开启极致省电模式")
+                        }
+                        props.put("ultraSaving", ultraProp)
+                        put("properties", props)
+                        put("required", JSONArray(listOf("ultraSaving")))
+                    }
+                )
+            )
+        }
+
+        if (preferences == null || preferences.toolWeatherEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "query_time_weather",
+                    description = "查询当前手表本地精准系统时间、星期与当前气象环境",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        val locProp = JSONObject().apply {
+                            put("type", "string")
+                            put("description", "查询地点，默认为本地表盘位置")
+                        }
+                        props.put("location", locProp)
+                        put("properties", props)
+                    }
+                )
+            )
+        }
+
+        if (preferences == null || preferences.toolWebSearchEnabled) {
+            all.add(
+                ToolDefinition(
+                    name = "web_search",
+                    description = "连接互联网实时检索最新资讯、新闻、技术事实与即时答案。返回精炼清洗后的纯文本摘要",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        val queryProp = JSONObject().apply {
+                            put("type", "string")
+                            put("description", "精确简练的搜索关键词")
+                        }
+                        props.put("query", queryProp)
+                        put("properties", props)
+                        put("required", JSONArray(listOf("query")))
+                    }
+                )
+            )
+        }
+
+        return all
     }
 
     /**
