@@ -7,6 +7,11 @@
 ## [未发布]
 
 ### 新增与优化特性
+- **语音按键触发异常与自动劫持为键盘弹窗 Bug 根治**：
+  - 在 `AndroidManifest.xml` 中补全 Android 11+ 软件包可见性声明 `<queries>`（覆盖 `android.speech.action.RECOGNIZE_SPEECH` 与 `android.speech.RecognitionService`），彻底解决系统语音服务查询返回 false 的底链隐患；
+  - 接入 Google Wear OS 官方语音识别组件与 ActivityResult 协议，轻触与长按均精准拉起穿戴原生语音识别界面（Microphone Voice Screen）；
+  - 彻底移除语音出错或未识别时自动弹出键盘输入框的劫持逻辑，杜绝无论怎么点都跳出键盘的问题；
+  - 新增应用内 `VoiceListeningOverlay` 倾听悬浮层与状态路由分发单元测试。
 - **文字气泡卡片底部大留白与多余空白彻底根除**：
   - 彻底移除正文卡片容器硬编码的 145dp 最小高度限制，改为 `wrapContentHeight` 自适应包裹；
   - 短回复紧致贴合（单行/短句卡片即刻收敛），长回复随文字延伸排布，内边距严格收敛，彻底杜绝下方空旷黑洞。
