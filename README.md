@@ -1,135 +1,137 @@
 # Wear Agent
 
-面向 Wear OS 圆形智能手表的原生 AI 智能体系统 (Autonomous Agent on Watch)
-
-Wear Agent 是一款专为智能穿戴设备（Wear OS 480x480 纯圆表盘）量身打造的原生 AI 智能体应用。系统搭载 DeepSeek 智能体引擎，采用底层笛卡尔点阵物理光场、双重镜像原生高斯模糊、单体形态学（Single Morphing Element）单手底栏控制器，以及多轮 Function Calling 硬件感知闭环。
+Wear OS 穿戴智能助手应用技术实现与工程交接文档。
 
 ---
 
-## 核心特性
+## 1. 系统概述
 
-- **大圆角 Squircle 原生硬件高斯模糊卡片**：
-  - 针对 Android 系统无原生同屏兄弟节点 backdrop-filter 的限制，采用双重镜像漫射（Mirroring Backdrop Rendering）架构；
-  - 底座深黑基底彻底阻隔下层锐利小点透出，内部将点阵光场与水波置入 Android 13 原生接口 `RenderEffect.createBlurEffect(22f, 22f, TileMode.CLAMP)` 进行物理 GPU 滤波；
-  - 呈现卡片外部锐利点阵、卡片内部朦胧柔光星云的真实物理磨砂毛玻璃质感。
-- **内嵌彩色工具胶囊与弹簧折叠动效**：
-  - 回复正文统归于单一偏正方 Squircle 现代卡片中，消除聊天气泡的生硬割裂感；
-  - 工具调用以内嵌专属彩色胶囊呈现（时间天气琥珀金、联网搜索霓虹青、系统诊断翡翠绿、马达振动紫罗兰、电源控制珊瑚橙）；
-  - 支持阻尼弹簧（`dampingRatio = 0.72f, stiffness = 280f`）折叠与展开，可实时查看结构化参数与底层执行结果。
-- **单体形态学底部交互（Single Morphing Pill）**：
-  - 单键支持轻触切换录音/呼出键盘、长按说话松手发送；
-  - 水平轻滑弹性弹射左右副键（TXT 键盘录入与模型/操作切换）；
-  - 任务执行与文字流式输出时自动收敛为静止正圆，绝不以多余提示遮挡阅读。
-- **全闭环穿戴硬件工具链 (ReAct Function Calling)**：
-  - `get_device_status`：实时读取手表电量比例、充电状态、电池温度与硬件负载；
-  - `query_time_weather`：精确读取系统本地时刻、星期与气象环境；
-  - `vibrate_device`：调度穿戴线性马达触觉反馈（单击短脉冲、双击确认、长振动）；
-  - `adjust_matrix_density`：实时动态重构圆形表盘点阵几何间距（12dp~20dp）；
-  - `set_system_power_mode`：动态调度表盘电源策略与后台动画节流；
-  - `web_search`：实时连接互联网检索即时资讯与事实。
-- **三级安全护栏系统 (Security Guardrail)**：
-  - 致命系统指令硬黑名单绝对拦截；
-  - 小白模式（高危命令 3 秒冷却锁与人话通俗解释）；
-  - 普通人模式（只读感知工具静默放行，修改类工具触发手势滑动审批）；
-  - 大佬模式（免审批极速自主执行）。
+本项目为面向 Wear OS 圆形屏幕智能手表（基准分辨率 480x480 / 454x454，API 33+）的原生智能助手应用。前端基于 Android Jetpack Compose for Wear OS 构建，后台集成 ReAct 循环调度器与 OpenAI 兼容端点，提供端侧工具调度（Function Calling）、多轮流式对话、系统原生语音识别、硬件表冠联动与三级安全审查机制。
 
 ---
 
-## 系统要求
+## 2. 核心功能实现细节
 
-- **操作系统**：Wear OS 4.0 及以上（Android 13 / API 33 及以上）
-- **屏幕形态**：推荐 454x454 或 480x480 纯圆表盘
-- **开发工具**：Android Studio Ladybug / Meerkat，Gradle 8.11+，JDK 17/21
-- **硬件特性**：线性马达、麦克风输入、Wi-Fi/蓝牙网络连接
+### 2.1 智能体调度总线 (AgentDispatcher)
+- **调度循环**：基于 Kotlin 协程与 `StateFlow` 实现多轮 ReAct（Reasoning + Acting）流式状态机。单次任务自主规划硬上限为 5 轮，防止死循环与穿戴设备过度耗电。
+- **流式响应**：对接 OpenAI 兼容的 `/v1/chat/completions` SSE（Server-Sent Events）数据流，支持打字机逐字渲染。
+- **系统上下文注入**：调度引擎在每次请求的 System Prompt 首层动态注入穿戴设备实时状态，包括精准时间、星期、电池电量百分比、充电状态与系统剪贴板内容。
+- **异常自愈**：工具调用执行异常会被捕获并封装为结构化错误信息返回给模型，触发二次自我纠错，不中断整体执行流。
 
----
+### 2.2 穿戴工具注册表 (AgentToolRegistry)
+系统内置 6 项穿戴原生与网络工具，声明标准的 JSON Schema 供模型调用：
+1. `get_device_status`：读取设备当前电量、充电状态、电池温度与硬件运行状态；
+2. `query_time_weather`：查询本地精确时间、星期与气象信息；
+3. `vibrate_device`：调度线性马达输出预设脉冲振动（单击、双击、长振动）；
+4. `adjust_matrix_density`：动态调整表盘背景点阵间距（12dp 至 20dp）；
+5. `set_system_power_mode`：切换系统电源模式，支持开启或退出省电节流；
+6. `web_search`：通过联网接口获取实时资讯与外部事实。
 
-## 快速上手与部署
+### 2.3 操作安全审查引擎 (SecurityGuardrail)
+- **硬黑名单**：涉及格式化、高危删除、破坏性指令的调用实行绝对拦截。
+- **三级安全策略**：
+  - **严格确认模式 (NOVICE)**：全部工具调用均触发前端确认面板，带有 3 秒倒计时防误触锁定与直白影响说明；
+  - **标准模式 (STANDARD)**：只读类感知工具静默放行，修改类与高危工具触发前端滑动确认；
+  - **自动执行模式 (EXPERT)**：除硬黑名单外全部放行自动执行。
 
-### 1. 编译构建 Release APK
+### 2.4 设置模块体系 (SettingsScreen)
+设置架构分为 6 大功能域，各功能域均配备状态徽章与二级独立下钻面板：
+1. **模型与服务**：展示当前模型名称、Base URL 与 API Key 掩码，支持端点延迟测速（Ping 毫秒）与从 `/v1/models` 接口动态拉取远端模型列表；
+2. **模型参数**：支持采样温度（Temperature，0.0 至 1.5，步进 0.1 调节）、最大输出长度（150 / 300 / 600 / 1200 Tokens 胶囊单选）与流式输出开关；
+3. **内置工具**：对 6 项穿戴工具提供独立放行开关，未放行的工具不注入模型 Schema；
+4. **系统提示词**：提供穿戴助手默认 System Prompt 的查看、自定义编辑与一键恢复默认功能；
+5. **会话与上下文**：提供 4 轮、10 轮、30 轮上下文滑窗记忆限制调节与会话记忆清空功能；
+6. **快捷操作与安全策略**：支持底栏右侧副键动作映射（切换模型、打开设置、清空会话），并提供安全策略单选切换。
 
-本项目支持直接使用 Gradle 命令行构建优化的 Release 安装包：
-
-```bash
-# 执行单元测试
-./gradlew :wear:testDebugUnitTest
-
-# 构建最终 Release 安装包 (已配置自动调试签名)
-./gradlew :wear:assembleRelease
-```
-
-生成产物位于：
-`wear/build/outputs/apk/release/wear-release.apk`
-
-### 2. 通过 ADB 安装至手表
-
-```bash
-adb install -r wear/build/outputs/apk/release/wear-release.apk
-adb shell am start -n com.example.myapplication/.presentation.MainActivity
-```
-
-### 3. 配置 DeepSeek API 密钥
-
-提供两种安全配置方式：
-
-- **方式一：通过配置文件注入（推荐开发者使用）**
-  在项目根目录的 `local.properties`（已被 `.gitignore` 忽略，安全不泄露）中添加：
-  ```properties
-  DEEPSEEK_API_KEY=sk-your-deepseek-api-key-here
-  ```
-  重新编译后应用将自动加载该密钥。
-
-- **方式二：手表端设置界面配置**
-  启动应用后，在主屏底部单体按键处按住并向上轻滑进入设置页，在密钥输入项填入您的 DeepSeek API Key（支持官方平台标准密钥）。
-
-- **方式三：ADB 命令行动态写入**
-  ```bash
-  adb shell am start -n com.example.myapplication/.presentation.MainActivity --es api_key "sk-your-deepseek-api-key-here"
-  ```
+### 2.5 交互层与硬件联动
+- **语音与输入分发**：主按键在语音模式下调用系统原生 `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` 拉取 Wear OS 原生录音交互，杜绝异常键盘弹窗；底栏副键支持一键切换并持久化为文本输入框模式。
+- **物理表冠联动**：主会话列表、抽屉导航与设置界面均挂载 `onRotaryScrollEvent`，旋转表冠平滑滚动列表并触发系统 `EFFECT_TICK` 触觉震动反馈。
+- **右滑返回手势**：所有二级面板、侧边会话抽屉均支持边缘阻尼跟手拖拽与右滑推回退出（`Swipe-to-Dismiss`），松手过半退出，未过半弹性复位。
+- **气泡紧致排布**：正文卡片容器去除固定高度硬编码，采用 `wrapContentHeight` 贴合文字，消除底部多余大留白。
 
 ---
 
-## 工程架构概览
+## 3. 项目交接与工程目录
 
 ```text
 MyApplication/
-|-- wear/                             # 穿戴端独立运行产物 (主工程)
+|-- wear/                             # Wear OS 穿戴端主工程模块
+|   |-- src/main/AndroidManifest.xml  # 清单文件 (含语音识别 queries 与权限声明)
 |   |-- src/main/java/com/example/myapplication/
-|   |   |-- agent/                    # 智能体总线与工具链
-|   |   |   |-- AgentDispatcher.kt    # ReAct 调度总线与多轮工具调用引擎
-|   |   |   |-- AgentModels.kt        # 状态机与 OpenAI 契约 DTO
-|   |   |   |-- AgentPreferences.kt   # 本地偏好设置持久化仓储
-|   |   |   |-- AgentToolRegistry.kt  # 穿戴硬件感知与控制工具集
-|   |   |   `-- contract/             # 内存摘要与三级安全护栏
-|   |   |-- presentation/             # 表现层与动效组件
-|   |   |   |-- MainActivity.kt       # 顶层应用入口与全屏手势联动
+|   |   |-- agent/                    # 调度总线与工具体系
+|   |   |   |-- AgentDispatcher.kt    # ReAct 调度核心与模型流式通讯
+|   |   |   |-- AgentModels.kt        # 状态实体与 OpenAI 协议 DTO
+|   |   |   |-- AgentPreferences.kt   # 偏好设置持久化 (SharedPreferences)
+|   |   |   |-- AgentToolRegistry.kt  # 6 项穿戴工具注册与执行实现
+|   |   |   `-- contract/             # 契约接口与三级安全护栏
+|   |   |       |-- AgentContracts.kt # 安全模式与模型契约
+|   |   |       `-- SecurityGuardrail.kt # 指令风险判定与倒计时引擎
+|   |   |-- presentation/             # 表现层与 UI 组件
+|   |   |   |-- MainActivity.kt       # 应用主入口、返回栈与手势中枢
 |   |   |   `-- ui/
-|   |   |       |-- FrostedGlassComponents.kt # Squircle 磨砂毛玻璃卡片与彩色胶囊
 |   |   |       |-- BottomInteractiveBlock.kt # 单体演变底栏与审批滑块
-|   |   |       |-- VoxelMatrixEffect.kt      # 笛卡尔微晶点阵与物理行波光场
-|   |   |       |-- SettingsScreen.kt         # 表盘偏好设置与密钥管理界面
-|   |   |       `-- OnboardingScreen.kt       # 初次使用安全模式选择向导
+|   |   |       |-- FrostedGlassComponents.kt # 气泡卡片与工具调用折叠胶囊
+|   |   |       |-- SettingsScreen.kt         # 6 大功能域设置与下钻面板
+|   |   |       |-- OnboardingScreen.kt       # 初始配置向导
+|   |   |       `-- VoxelMatrixEffect.kt      # 背景点阵渲染引擎
 |   |   `-- voice/
-|   |       `-- VoiceInputManager.kt  # 穿戴语音输入抽象与异常降级通道
-|   `-- src/test/                     # 单元测试套件 (安全护栏与会话重组测试)
-|-- mobile/                           # 伴生移动端工程模块
-|-- build.gradle.kts                  # 根构建配置
-|-- settings.gradle.kts               # 模块配置
-|-- CHANGELOG.md                      # 变更历史日志
-|-- LICENSE                           # 开源许可协议 (MIT)
-`-- README.md                         # 项目使用说明
+|   |       `-- VoiceInputManager.kt  # 系统语音接口调用与回调包装
+|   `-- src/test/                     # 单元测试套件
+|       `-- java/com/example/myapplication/presentation/
+|           `-- VoiceInputRoutingTest.kt # 输入路由与状态机测试
+|-- mobile/                           # 移动端辅助模块
+|-- CHANGELOG.md                      # 版本更新日志 (遵循 SemVer)
+|-- LICENSE                           # 许可证文件 (MIT)
+`-- README.md                         # 本交接文档
 ```
 
 ---
 
-## 安全与隐私规范
+## 4. 构建、部署与环境配置
 
-1. **密钥隔离**：应用内绝无硬编码 API 密钥，代码库已执行全历史扫描净化，严格遵守安全保密底线；
-2. **本地硬件保护**：所有硬件控制指令（如马达振动、点阵调整、省电模式）均通过 `SecurityGuardrail` 进行安全级别判定与用户明确放行拦截；
-3. **数据最小化**：仅在发起模型推理与网络检索时通过 TLS 1.3 加密传输上下文，不收集或上传任何穿戴设备个人隐私数据。
+### 4.1 环境要求
+- **Android SDK**：API 33 至 API 35
+- **JDK**：OpenJDK 17 或 21
+- **Gradle**：8.11+
+- **构建目标**：统一构建 Release 包（带有 release 签名配置），禁止在穿戴设备部署未优化的 Debug 包。
+
+### 4.2 编译命令
+```bash
+# 执行本地单元测试套件
+./gradlew :wear:test
+
+# 编译生成穿戴端 Release APK
+./gradlew :wear:assembleRelease
+```
+构建产物输出位置：
+`wear/build/outputs/apk/release/wear-release.apk`
+
+### 4.3 部署与运行约束
+> 重要规范：所有日常测试、截图验证必须且只能在 Wear OS 模拟器（`emulator-5554`）上执行，禁止在未获授权的实体手表上执行测试安装。
+
+```bash
+# 安装至指定的模拟器设备
+adb -s emulator-5554 install -r wear/build/outputs/apk/release/wear-release.apk
+
+# 启动主界面
+adb -s emulator-5554 shell am start -n com.example.myapplication/.presentation.MainActivity
+```
+
+### 4.4 接口与密钥注入方式
+应用优先读取用户在设置界面配置的参数，同时支持以下预注入通道：
+1. **本地配置文件注入（编译期）**：
+   在工程根目录的 `local.properties`（已被 Git 忽略）中配置：
+   ```properties
+   DEEPSEEK_API_KEY=sk-your-api-key-here
+   ```
+2. **手表端设置界面配置（运行时）**：
+   在主界面底栏向上轻滑打开设置面板，进入“模型与服务”填入 API Key 与 Base URL。
+3. **ADB 动态传参注入**：
+   ```bash
+   adb -s emulator-5554 shell am start -n com.example.myapplication/.presentation.MainActivity --es api_key "sk-your-api-key-here"
+   ```
 
 ---
 
-## 许可证
-
-本项目采用 [MIT License](LICENSE) 许可协议开源。
+## 5. 许可证
+本项目依据 [MIT License](LICENSE) 授权开源。
