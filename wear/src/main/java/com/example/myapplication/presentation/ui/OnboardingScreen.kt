@@ -159,7 +159,7 @@ fun OnboardingScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "欢迎使用穿戴伴生体",
+                                text = "欢迎使用穿戴智能助手",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF334155),
@@ -254,13 +254,13 @@ private fun OnboardingConfigPhase(
                             .background(Color.White)
                     )
                     Text(
-                        text = "欢迎配置智能体",
+                        text = "配置 AI 模型",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFF8FAFC)
                     )
                     Text(
-                        text = "配置服务商端点，即刻唤醒随身参谋",
+                        text = "设置 API 端点与密钥后即可开始使用",
                         fontSize = 8.sp,
                         color = Color(0xFF94A3B8)
                     )

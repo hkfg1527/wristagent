@@ -239,7 +239,7 @@ fun SettingsScreen(
 
                     ListHeader(modifier = Modifier.padding(top = 2.dp)) {
                         Text(
-                            text = "智能体控制台",
+                            text = "设置",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFF8FAFC)
@@ -248,29 +248,29 @@ fun SettingsScreen(
                 }
             }
 
-            // 1. 当前运行大模型服务 (动态读取与端点配置)
+            // 1. 模型与服务
             item {
                 AgentConsoleCard(
-                    title = "模型与端点",
-                    statusBadge = "实时生效",
+                    title = "模型与服务",
+                    statusBadge = "已配置",
                     valueText = currentModel,
                     descText = currentBaseUrl,
                     onClick = { activeDialog = SettingsSubDialog.MODEL_CONFIG }
                 )
             }
 
-            // 2. 推理超参数调优 (Temperature / MaxTokens / Stream)
+            // 2. 模型参数 (Temperature / MaxTokens / Stream)
             item {
                 AgentConsoleCard(
-                    title = "推理超参数",
-                    statusBadge = "创客模式",
-                    valueText = "Temp: ${preferences.temperature} | Max: ${preferences.maxOutputTokens}",
-                    descText = if (preferences.streamMode) "流式输出开启 • 精准采样" else "非流式输出 • 稳定整包",
+                    title = "模型参数",
+                    statusBadge = "Temp ${preferences.temperature}",
+                    valueText = "最大输出 ${preferences.maxOutputTokens} Token",
+                    descText = if (preferences.streamMode) "流式输出开启" else "非流式输出",
                     onClick = { activeDialog = SettingsSubDialog.HYPER_PARAMS }
                 )
             }
 
-            // 3. 原生工具集细粒度权限 (6 项穿戴工具独立开关)
+            // 3. 内置工具
             item {
                 val activeCount = listOf(
                     preferences.toolDeviceStatusEnabled,
@@ -281,69 +281,69 @@ fun SettingsScreen(
                     preferences.toolWebSearchEnabled
                 ).count { it }
                 AgentConsoleCard(
-                    title = "工具集细粒度权限",
-                    statusBadge = "$activeCount/6 启用",
-                    valueText = if (activeCount == 6) "全部原生工具已就绪" else "已按需定制放行",
-                    descText = "电量感知 • 触觉反馈 • 点阵谐振 • 功耗调度 • 气象环境 • 广域搜索",
+                    title = "内置工具",
+                    statusBadge = "$activeCount/6 已启用",
+                    valueText = if (activeCount == 6) "全部 6 项工具已启用" else "已启用 $activeCount 项工具",
+                    descText = "电量感知 • 马达振动 • 表盘点阵 • 省电模式 • 天气时钟 • 网络搜索",
                     onClick = { activeDialog = SettingsSubDialog.TOOLS_MCP }
                 )
             }
 
-            // 4. 伴生系统提示词与角色设定 (System Prompt / Persona)
+            // 4. 系统提示词
             item {
                 AgentConsoleCard(
-                    title = "伴生系统提示词",
-                    statusBadge = if (customPrompt.isBlank()) "原生默认" else "自定义",
-                    valueText = "Wear OS 全自主伴生体",
-                    descText = "开放反思 • ReAct 工具编排 • 随身参谋",
+                    title = "系统提示词",
+                    statusBadge = if (customPrompt.isBlank()) "默认" else "自定义",
+                    valueText = "穿戴 AI 助手",
+                    descText = "任务规划与工具调用设定",
                     onClick = { activeDialog = SettingsSubDialog.PROMPT_VIEWER }
                 )
             }
 
-            // 5. 上下文与长记忆管理
+            // 5. 会话与上下文
             item {
                 AgentConsoleCard(
-                    title = "上下文与长记忆",
+                    title = "会话与上下文",
                     statusBadge = "${preferences.maxContextTurns} 轮",
-                    valueText = "${preferences.maxContextTurns} 轮动态滚动窗口",
-                    descText = "超出自动向前滑窗裁剪，顶层持久锁定用户长期偏好",
+                    valueText = "单会话保留 ${preferences.maxContextTurns} 轮历史",
+                    descText = "超出后自动滑窗淘汰早期对话",
                     onClick = { activeDialog = SettingsSubDialog.MEMORY_MANAGER }
                 )
             }
 
-            // 6. 两翼快捷键定义 (卡片化二级交互)
+            // 6. 快捷操作
             item {
                 AgentConsoleCard(
-                    title = "主界面两翼快捷键",
-                    statusBadge = "可自定义",
+                    title = "快捷操作",
+                    statusBadge = "右侧副键",
                     valueText = when (currentRightAction) {
                         RightButtonAction.MODEL_SWITCH -> "切换模型"
                         RightButtonAction.OPEN_SETTINGS -> "打开设置"
-                        RightButtonAction.CLEAR_MEMORY -> "清空长记忆"
+                        RightButtonAction.CLEAR_MEMORY -> "清空记忆"
                     },
-                    descText = "底栏向右滑动轻触右翼按键触发的功能",
+                    descText = "滑动底栏时右侧按钮的功能",
                     onClick = { activeDialog = SettingsSubDialog.WING_SHORTCUT }
                 )
             }
 
-            // 7. AI 安全护栏审查模式
+            // 7. 操作安全确认
             item {
                 AgentConsoleCard(
-                    title = "AI 安全审查护栏",
+                    title = "操作安全确认",
                     statusBadge = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "小白模式"
-                        SecurityMode.STANDARD -> "普通模式"
-                        SecurityMode.EXPERT -> "大佬模式"
+                        SecurityMode.NOVICE -> "严格确认"
+                        SecurityMode.STANDARD -> "标准提示"
+                        SecurityMode.EXPERT -> "自动执行"
                     },
                     valueText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "新手小白 (3秒强制锁)"
-                        SecurityMode.STANDARD -> "普通人 (智能预审)"
-                        SecurityMode.EXPERT -> "我是大佬 (极速自主)"
+                        SecurityMode.NOVICE -> "严格确认 (倒计时保护)"
+                        SecurityMode.STANDARD -> "标准提示 (高危需确认)"
+                        SecurityMode.EXPERT -> "自动执行 (跳过确认)"
                     },
                     descText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "全操作大白话通报，高风险锁定3秒"
-                        SecurityMode.STANDARD -> "无风险静默放行，有风险滑动确认"
-                        SecurityMode.EXPERT -> "除破坏性指令外，极速全自主执行"
+                        SecurityMode.NOVICE -> "敏感与系统操作均弹出详情并锁定 3 秒"
+                        SecurityMode.STANDARD -> "只读操作自动放行，高风险操作需滑动确认"
+                        SecurityMode.EXPERT -> "除致命指令拦截外，直接执行"
                     },
                     onClick = { activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL }
                 )
@@ -620,7 +620,7 @@ private fun SubSettingsModal(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "完成返回",
+                    text = "完成",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFF8FAFC)
@@ -663,7 +663,7 @@ private fun ModelConfigContent(
         verticalArrangement = Arrangement.spacedBy(5.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("大模型端点与在线探测", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("模型与端点设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         // Base URL 配置行
         Box(
@@ -832,7 +832,7 @@ private fun HyperParamsContent(
         verticalArrangement = Arrangement.spacedBy(7.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("AI 推理超参数调优", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("模型参数设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         // 1. Temperature 步进微调
         Box(
@@ -1004,30 +1004,30 @@ private fun ToolsMcpContent(
         verticalArrangement = Arrangement.spacedBy(5.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("原生工具细粒度放行控制", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("内置工具管理", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         val toolItems = listOf(
-            Triple("get_device_status", "电量与温控感知", toolDeviceStatus) to {
+            Triple("get_device_status", "电量与温度感知", toolDeviceStatus) to {
                 toolDeviceStatus = !toolDeviceStatus
                 preferences.toolDeviceStatusEnabled = toolDeviceStatus
             },
-            Triple("vibrate_device", "线性马达触觉反馈", toolVibrate) to {
+            Triple("vibrate_device", "马达振动提醒", toolVibrate) to {
                 toolVibrate = !toolVibrate
                 preferences.toolVibrateEnabled = toolVibrate
             },
-            Triple("adjust_matrix_density", "微晶点阵谐振调度", toolMatrixDensity) to {
+            Triple("adjust_matrix_density", "表盘点阵间距", toolMatrixDensity) to {
                 toolMatrixDensity = !toolMatrixDensity
                 preferences.toolMatrixDensityEnabled = toolMatrixDensity
             },
-            Triple("set_system_power_mode", "系统级能耗协同", toolPowerMode) to {
+            Triple("set_system_power_mode", "省电模式设置", toolPowerMode) to {
                 toolPowerMode = !toolPowerMode
                 preferences.toolPowerModeEnabled = toolPowerMode
             },
-            Triple("query_time_weather", "高精度时钟与气象", toolWeather) to {
+            Triple("query_time_weather", "时间与天气感知", toolWeather) to {
                 toolWeather = !toolWeather
                 preferences.toolWeatherEnabled = toolWeather
             },
-            Triple("web_search", "广域互联网即时搜索", toolWebSearch) to {
+            Triple("web_search", "网络搜索", toolWebSearch) to {
                 toolWebSearch = !toolWebSearch
                 preferences.toolWebSearchEnabled = toolWebSearch
             }
@@ -1108,7 +1108,7 @@ private fun ToolsMcpContent(
 }
 
 /**
- * 3. 伴生系统提示词查看与编辑
+ * 3. 系统提示词查看与编辑
  */
 @Composable
 private fun PromptViewerContent(
@@ -1123,7 +1123,7 @@ private fun PromptViewerContent(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("伴生智能体核心提示词", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("系统提示词", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         Box(
             modifier = Modifier
@@ -1144,7 +1144,7 @@ private fun PromptViewerContent(
                 )
             } else {
                 Text(
-                    text = if (customPrompt.isNotBlank()) customPrompt else "【伴生定位】Wear OS 圆形表盘贴身全自主伴生智能体。\n【行动权限】自主多步反思、深度推理、ReAct 调用 6 大原生穿戴工具，直击要害，适配智能手表快速扫视场景。",
+                    text = if (customPrompt.isNotBlank()) customPrompt else "你是运行在 Android Wear OS 智能手表上的 AI 助手。支持工具调用，回答简短精准，适配手表快速浏览。",
                     fontSize = 8.sp,
                     color = Color(0xFFCBD5E1),
                     lineHeight = 10.5.sp
@@ -1169,7 +1169,7 @@ private fun PromptViewerContent(
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("恢复原生", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
+                Text("恢复默认", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
             }
 
             Box(
@@ -1189,7 +1189,7 @@ private fun PromptViewerContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (editMode) "保存设定" else "微调自定义",
+                    text = if (editMode) "保存设定" else "编辑提示词",
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (editMode) Color(0xFF0F172A) else Color.White
@@ -1214,7 +1214,7 @@ private fun MemoryManagerContent(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("上下文与长记忆管理", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("会话记忆设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         // 上下文滑窗轮数单选
         Box(
@@ -1286,7 +1286,7 @@ private fun MemoryManagerContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (memoryCleared) "已清空长记忆槽" else "一键重置长时持久记忆",
+                text = if (memoryCleared) "已清空记忆" else "清空会话记忆",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (memoryCleared) Color(0xFF94A3B8) else Color(0xFFF87171)
@@ -1308,7 +1308,7 @@ private fun WingShortcutContent(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("两翼快捷按键绑定", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("快捷操作绑定", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         val actions = listOf(
             RightButtonAction.MODEL_SWITCH to "切换大模型",
@@ -1360,12 +1360,12 @@ private fun SecurityGuardrailContent(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("AI 安全审查护栏模式", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("操作安全确认策略", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
         val modes = listOf(
-            Triple(SecurityMode.NOVICE, "新手小白模式", "全命令审批 + 大白话后果说明 + 危险操作强制锁定滑块 3 秒"),
-            Triple(SecurityMode.STANDARD, "普通人模式", "快速模型预审，无风险静默放行，有风险滑动确认"),
-            Triple(SecurityMode.EXPERT, "我是大佬模式", "除致命破坏指令硬拦截外，全部极速自主执行")
+            Triple(SecurityMode.NOVICE, "严格确认模式", "所有敏感与系统操作均需审批，高危操作锁定 3 秒防误触"),
+            Triple(SecurityMode.STANDARD, "标准提示模式", "只读查询自动放行，涉及修改系统配置需滑动确认"),
+            Triple(SecurityMode.EXPERT, "自动执行模式", "除致命危险指令外，跳过确认弹窗直接执行")
         )
 
         modes.forEach { (mode, label, desc) ->

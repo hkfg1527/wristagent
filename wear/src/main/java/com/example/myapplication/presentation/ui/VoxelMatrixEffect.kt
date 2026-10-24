@@ -26,7 +26,7 @@ import kotlin.math.cos
 import kotlin.math.sqrt
 
 /**
- * 预计算并缓存的静态微晶点阵几何节点 (零 GC 开销 · 消除逐帧 sqrt 与 pow)
+ * 预计算并缓存的静态点阵几何节点 (零 GC 开销 · 消除逐帧 sqrt 与 pow)
  */
 private class MatrixGridPoint(
     val x: Float,

@@ -5,9 +5,9 @@ import java.util.regex.Pattern
 /**
  * AI 三级安全护栏审查引擎
  * 1. 致命指令硬黑名单绝对拦截 (rm -rf, 格式化, 擦除数据等)
- * 2. 小白模式 (默认)：全部审批 + 风险命令 3 秒冷却锁 + 大白话人话说明
- * 3. 普通人模式：无风险只读工具静默放行，有风险工具触发审批并给出最严重后果说明
- * 4. 大佬模式：除致命黑名单外全部放行
+ * 2. 严格确认模式：全部审批 + 风险命令 3 秒冷却锁 + 直白影响说明
+ * 3. 标准模式 (默认)：无风险只读工具静默放行，有风险工具触发审批并给出风险后果说明
+ * 4. 自动执行模式：除致命黑名单外全部放行
  */
 class SecurityGuardrail {
 
@@ -45,19 +45,19 @@ class SecurityGuardrail {
             SecurityMode.EXPERT -> RiskAssessment(
                 isHardBlocked = false,
                 isHighRisk = false,
-                riskSummary = "大佬模式已放行此命令",
+                riskSummary = "自动执行模式：跳过二次确认",
                 requireCooldownSeconds = 0
             )
             SecurityMode.STANDARD -> RiskAssessment(
                 isHardBlocked = false,
                 isHighRisk = true,
-                riskSummary = "此命令将直接在系统底层执行，最高可能导致系统服务中断或应用闪退。",
+                riskSummary = "此命令将直接在系统底层执行，可能影响系统稳定性。",
                 requireCooldownSeconds = 0
             )
             SecurityMode.NOVICE -> RiskAssessment(
                 isHardBlocked = false,
                 isHighRisk = true,
-                riskSummary = "警告：此命令将修改手表底层运行状态，可能导致系统不稳定。请仔细确认后再滑动！",
+                riskSummary = "严格确认：此命令涉及底层操作，已锁定 3 秒，请确认后滑动放行。",
                 requireCooldownSeconds = 3
             )
         }
@@ -72,7 +72,7 @@ class SecurityGuardrail {
             return RiskAssessment(
                 isHardBlocked = true,
                 isHighRisk = true,
-                riskSummary = "工具参数中检测到致命高危指令，已被安全机制强制拒死！",
+                riskSummary = "工具参数中检测到高危指令，已被安全机制拦截。",
                 requireCooldownSeconds = 0
             )
         }
@@ -84,16 +84,16 @@ class SecurityGuardrail {
             SecurityMode.EXPERT -> RiskAssessment(
                 isHardBlocked = false,
                 isHighRisk = false,
-                riskSummary = "大佬模式：自动放行执行",
+                riskSummary = "自动模式：直接执行",
                 requireCooldownSeconds = 0
             )
 
             SecurityMode.STANDARD -> {
                 if (isSystemControlTool) {
                     val summary = if (toolName == "set_system_power_mode") {
-                        "该操作将变更系统功耗。开启极致省电会挂起后台同步并降低刷新率，可能导致来电提醒延迟。"
+                        "该操作将变更系统功耗设置，可能影响后台同步频率。"
                     } else {
-                        "该操作将实时重构手表屏幕底层的物理点阵网格。"
+                        "该操作将调整手表屏幕点阵间距。"
                     }
                     RiskAssessment(
                         isHardBlocked = false,
@@ -114,20 +114,20 @@ class SecurityGuardrail {
 
             SecurityMode.NOVICE -> {
                 if (isSystemControlTool) {
-                    val summary = "高危提醒：将调整手表的核心电源策略！可能导致后台通知无法及时接收，最严重会导致网络断开。"
+                    val summary = "高危确认：将调整系统电源或显示策略，已锁定 3 秒防误触。"
                     RiskAssessment(
                         isHardBlocked = false,
                         isHighRisk = true,
                         riskSummary = summary,
-                        requireCooldownSeconds = 3 // 必须强制锁 3 秒！
+                        requireCooldownSeconds = 3 // 锁定 3 秒
                     )
                 } else {
-                    // 普通读数工具在小白模式下也提示确认，但无需 3 秒锁
+                    // 普通读数工具在严格模式下也提示确认，但无需 3 秒锁
                     val friendlyName = when (toolName) {
                         "get_device_status" -> "获取手表电量与硬件温度"
-                        "query_time_weather" -> "获取当前精准时间与本地天气"
+                        "query_time_weather" -> "获取当前时间与本地天气"
                         "vibrate_device" -> "触发表盘马达振动"
-                        "web_search" -> "连接互联网搜索实时资讯"
+                        "web_search" -> "连接互联网搜索资讯"
                         else -> toolName
                     }
                     RiskAssessment(

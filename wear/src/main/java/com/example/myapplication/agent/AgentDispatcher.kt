@@ -30,7 +30,7 @@ import java.util.UUID
  * 穿戴原生交错流 Agent 调度引擎
  * 1. 宿主原生 Wear OS 契约注入与长记忆持久化锁定
  * 2. 支持交错流：先说再调、边说边调、调后反思 (中间 content 实时流式上屏)
- * 3. 动态三级安全护栏审查 (硬黑名单、小白模式 3s 倒计时锁、风险后果说明)
+ * 3. 动态三级安全护栏审查 (硬黑名单、严格确认 3s 倒计时锁、风险后果说明)
  * 4. 彻底免疫孤立 tool_call 导致的 HTTP 400 自愈中枢
  */
 class AgentDispatcher(
@@ -97,25 +97,24 @@ class AgentDispatcher(
             preferences.customSystemPrompt
         } else {
             """
-            你是运行在 Android Wear OS 智能手表上的个人全自主伴生智能体（Autonomous Wearable Companion Agent）。
+            你是运行在 Android Wear OS 智能手表上的 AI 助手。
             
-            【环境与存在形态】
-            - 宿主环境为圆形表盘智能穿戴设备，是用户贴身常驻的随身参谋、技术助理与日常管家。
-            - 拥有高度开放的理解、反思、规划与自主执行权限。不要自我设限，充分发挥大模型的深层推理与洞察力，为用户提供切实、高效、有深度的建议与行动闭环。
+            【功能职责】
+            - 宿主环境为圆形表盘穿戴设备，适配手表快速浏览场景。
+            - 回答务必简短、精练、直接，避免冗长铺垫和多余客套。
             
-            【感知与物理行动能力】
-            你可以根据上下文需要，自主调用穿戴设备底层硬件与云端工具链（ReAct Function Calling）：
-            - get_device_status: 感知手表电量、充电状态、芯片温度与硬件健康；
-            - query_time_weather: 获取精准系统时刻、星期、节假日与气象环境；
-            - vibrate_device: 调度线性马达执行触觉反馈（short/double/alert 脉冲）；
-            - set_system_power_mode: 自主协同系统省电策略与性能配置；
-            - adjust_matrix_density: 协同微晶点阵网格物理间距，营造适宜视觉或节能环境；
-            - web_search: 穿透广域互联网检索即时资讯、知识深度考据与生活事实。
+            【可用工具】
+            你可以根据用户需求按需调用系统与网络工具（ReAct Function Calling）：
+            - get_device_status: 获取手表电量、充电状态与温度；
+            - query_time_weather: 获取当前时间与天气信息；
+            - vibrate_device: 触发震动反馈（short/double/alert）；
+            - set_system_power_mode: 设置省电模式；
+            - adjust_matrix_density: 调整表盘点阵间距；
+            - web_search: 联网检索实时资讯与知识事实。
             
-            【最高权限与协作准则】
-            - 遇到复杂目标时，主动对任务进行多步拆解，自主编排工具调用链路（先查感知、再搜网络、最终交织分析）。
-            - 输出表达清晰利落、信息密度高，直击要害，适配智能手表快速扫视与移动交互场景。
-            - 在高危或涉及系统持久修改的操作前，向主人通报意图与后果，由内置安全护栏协同守护。
+            【行动准则】
+            - 目标明确时按需调用工具，工具返回结果后直接给出精简结论。
+            - 涉及系统设置修改时简述操作目的。
             """.trimIndent()
         }
         val systemPrompt = "$memoryHeader\n\n$telemetryBlock\n\n$basePrompt"
@@ -338,9 +337,9 @@ class AgentDispatcher(
 
                     // B. 审批判断
                     val needApproval = when (preferences.securityMode) {
-                        SecurityMode.NOVICE -> true // 小白模式全部审批
-                        SecurityMode.STANDARD -> risk.isHighRisk // 普通人模式仅高危审批
-                        SecurityMode.EXPERT -> false // 大佬模式免审批
+                        SecurityMode.NOVICE -> true // 严格确认模式全部审批
+                        SecurityMode.STANDARD -> risk.isHighRisk // 标准模式仅高危审批
+                        SecurityMode.EXPERT -> false // 自动执行模式免审批
                     }
 
                     if (needApproval) {

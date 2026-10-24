@@ -410,7 +410,7 @@ private fun MainAgentDashboard(
     var agentState by remember {
         mutableStateOf(
             AgentExecutionState(
-                prompt = "伴生就绪",
+                prompt = "就绪",
                 conversationBlocks = currentSession.conversationBlocks,
                 isFinished = true
             )

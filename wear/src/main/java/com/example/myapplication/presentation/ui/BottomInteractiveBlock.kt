@@ -98,7 +98,7 @@ fun BottomInteractiveBlock(
     mainInputType: MainInputType = MainInputType.VOICE,
     onMainInputTypeChange: (MainInputType) -> Unit = {},
     rightButtonAction: RightButtonAction = RightButtonAction.MODEL_SWITCH,
-    cooldownSeconds: Int = 0,               // 小白模式下的风险锁定倒计时
+    cooldownSeconds: Int = 0,               // 严格确认模式下的风险锁定倒计时
     riskExplanation: String = "",           // 审批横条上方的最坏后果说明
     onVoiceStartRecord: () -> Unit,
     onVoiceStopAndTrigger: () -> Unit,

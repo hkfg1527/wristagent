@@ -71,13 +71,13 @@ class AgentToolRegistry(
             all.add(
                 ToolDefinition(
                     name = "adjust_matrix_density",
-                    description = "动态调整手表圆形表盘唯一点阵物理基底的网格粒子间距与呼吸密度",
+                    description = "调整手表表盘点阵间距与显示密度",
                     parametersSchema = JSONObject().apply {
                         put("type", "object")
                         val props = JSONObject()
                         val spacingProp = JSONObject().apply {
                             put("type", "number")
-                            put("description", "点阵网格粒子间距 (单位 dp，推荐 12.0~20.0，数值越小越密集细腻)")
+                            put("description", "点阵网格间距 (单位 dp，推荐 12.0~20.0)")
                         }
                         props.put("spacingDp", spacingProp)
                         put("properties", props)
@@ -91,7 +91,7 @@ class AgentToolRegistry(
             all.add(
                 ToolDefinition(
                     name = "set_system_power_mode",
-                    description = "设置手表电源模式。开启极致省电模式将挂起后台常驻高耗进程并将点阵降频",
+                    description = "设置手表电源模式。可开启或关闭极致省电模式",
                     parametersSchema = JSONObject().apply {
                         put("type", "object")
                         val props = JSONObject()
