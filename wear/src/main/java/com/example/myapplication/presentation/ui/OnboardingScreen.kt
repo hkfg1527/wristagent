@@ -1,5 +1,9 @@
 package com.example.myapplication.presentation.ui
 
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.scrollBy
+import kotlinx.coroutines.launch
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -218,6 +222,7 @@ private fun OnboardingConfigPhase(
 
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -234,6 +239,9 @@ private fun OnboardingConfigPhase(
                 .focusRequester(focusRequester)
                 .focusable()
                 .onRotaryScrollEvent {
+                    coroutineScope.launch {
+                        listState.scrollBy(it.verticalScrollPixels)
+                    }
                     true
                 },
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),

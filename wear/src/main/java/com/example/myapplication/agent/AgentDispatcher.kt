@@ -204,9 +204,17 @@ class AgentDispatcher(
             currentState = currentState.copy(isThinking = true)
             onStateUpdate(currentState)
 
-            val apiResult = callChatCompletionsApi()
-            if (apiResult.isFailure) {
-                val err = apiResult.exceptionOrNull()?.message ?: "网络通信异常"
+            val turnResult = streamChatCompletions(
+                blocks = blocks,
+                currentStateProvider = { currentState },
+                onStateUpdate = { newState ->
+                    currentState = newState
+                    onStateUpdate(currentState)
+                }
+            )
+
+            if (turnResult.isFailure) {
+                val err = turnResult.exceptionOrNull()?.message ?: "网络通信异常"
                 Log.e(TAG, "API 调用失败 (第 $turn 轮): $err")
                 val errorBlock = ConversationBlock.Text(
                     id = UUID.randomUUID().toString(),
@@ -222,74 +230,12 @@ class AgentDispatcher(
                 return
             }
 
-            val responseJson = apiResult.getOrNull()!!
-            val choice = responseJson.optJSONArray("choices")?.optJSONObject(0)
-            val msg = choice?.optJSONObject("message")
-            if (msg == null) {
-                currentState = currentState.copy(
-                    isThinking = false,
-                    isFinished = true,
-                    errorMessage = "未解析到有效回复消息"
-                )
-                onStateUpdate(currentState)
-                return
-            }
+            val modelTurn = turnResult.getOrNull()!!
+            val content = modelTurn.content
+            val currentCalls = modelTurn.toolCalls
 
-            val reasoningContent = msg.optString("reasoning_content", "")
-            val content = msg.optString("content", "")
-            val toolCallsArray = msg.optJSONArray("tool_calls")
-
-            // 1. 若有深度思考链，生成【思考小胶囊】插入交错流中
-            if (reasoningContent.isNotBlank()) {
-                val thoughtBlock = ConversationBlock.Thought(
-                    id = UUID.randomUUID().toString(),
-                    reasoning = reasoningContent,
-                    durationMs = 2800L,
-                    isExpanded = false
-                )
-                blocks.add(thoughtBlock)
-                currentState = currentState.copy(
-                    thoughtChain = reasoningContent,
-                    conversationBlocks = blocks.toList()
-                )
-                onStateUpdate(currentState)
-            }
-
-            // 2. 若有随包附带的解释性文本（先说或边说边调），立即流式推送到交错流中！
-            if (content.isNotBlank()) {
-                val textBlockId = UUID.randomUUID().toString()
-                val textBlock = ConversationBlock.Text(id = textBlockId, content = "", isStreaming = true)
-                blocks.add(textBlock)
-                currentState = currentState.copy(conversationBlocks = blocks.toList())
-                onStateUpdate(currentState)
-
-                val sb = StringBuilder()
-                for (ch in content) {
-                    if (isCancelled) break
-                    sb.append(ch)
-                    val idx = blocks.indexOfFirst { it.id == textBlockId }
-                    if (idx != -1) {
-                        blocks[idx] = ConversationBlock.Text(id = textBlockId, content = sb.toString(), isStreaming = true)
-                        currentState = currentState.copy(conversationBlocks = blocks.toList(), finalResponse = sb.toString())
-                        onStateUpdate(currentState)
-                    }
-                    delay(12)
-                }
-                // 流式结束
-                val finalIdx = blocks.indexOfFirst { it.id == textBlockId }
-                if (finalIdx != -1) {
-                    blocks[finalIdx] = ConversationBlock.Text(id = textBlockId, content = content, isStreaming = false)
-                    currentState = currentState.copy(conversationBlocks = blocks.toList())
-                    onStateUpdate(currentState)
-                }
-            }
-
-            // 3. 检查是否有工具调用
-            if (toolCallsArray != null && toolCallsArray.length() > 0) {
-                val currentCalls = mutableListOf<ToolCall>()
-                for (i in 0 until toolCallsArray.length()) {
-                    currentCalls.add(ToolCall.fromJson(toolCallsArray.getJSONObject(i)))
-                }
+            // 检查是否有工具调用
+            if (currentCalls.isNotEmpty()) {
 
                 // 将 assistant 的消息记录加入历史
                 conversationHistory.add(
@@ -542,8 +488,25 @@ class AgentDispatcher(
         conversationHistory.addAll(sanitized)
     }
 
-    private fun callChatCompletionsApi(): Result<JSONObject> {
-        return try {
+private data class ToolCallAccumulator(
+        var id: String = "",
+        var name: String = "",
+        val arguments: java.lang.StringBuilder = java.lang.StringBuilder()
+    )
+
+    private data class ModelTurnResult(
+        val content: String,
+        val reasoning: String,
+        val toolCalls: List<ToolCall>
+    )
+
+    private suspend fun streamChatCompletions(
+        blocks: MutableList<ConversationBlock>,
+        currentStateProvider: () -> AgentExecutionState,
+        onStateUpdate: (AgentExecutionState) -> Unit
+    ): Result<ModelTurnResult> = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
+        try {
             sanitizeConversationHistory()
 
             val endpoint = if (preferences.baseUrl.endsWith("/")) {
@@ -552,19 +515,23 @@ class AgentDispatcher(
                 preferences.baseUrl + "/chat/completions"
             }
             val url = URL(endpoint)
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "POST"
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
-            conn.connectTimeout = 15000
-            conn.readTimeout = 40000
-            conn.doOutput = true
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", if (preferences.streamMode) "text/event-stream" else "application/json")
+                setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
+                connectTimeout = 15000
+                readTimeout = 40000
+                doOutput = true
+            }
 
             val requestBody = JSONObject().apply {
                 put("model", preferences.modelName)
                 put("temperature", preferences.temperature)
                 put("max_tokens", preferences.maxOutputTokens)
+                if (preferences.streamMode) {
+                    put("stream", true)
+                }
                 val msgs = JSONArray()
                 val turnsLimit = preferences.maxContextTurns
                 val systemMsg = conversationHistory.firstOrNull { it.role == AgentRole.SYSTEM }
@@ -585,21 +552,190 @@ class AgentDispatcher(
             OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(requestBody.toString()) }
 
             val responseCode = conn.responseCode
-            if (responseCode in 200..299) {
+            if (responseCode !in 200..299) {
+                val errorBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                return@withContext Result.failure(Exception("HTTP $responseCode: $errorBody"))
+            }
+
+            val accumulatedContent = java.lang.StringBuilder()
+            val accumulatedReasoning = java.lang.StringBuilder()
+            val toolCallsMap = mutableMapOf<Int, ToolCallAccumulator>()
+            var textBlockId: String? = null
+            var thoughtBlockId: String? = null
+
+            if (preferences.streamMode) {
+                // 真正的 SSE 实时流式读取 (零 delay 字节到达即刻上屏)
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
-                val sb = StringBuilder()
                 var line: String?
                 while (reader.readLine().also { line = it } != null) {
-                    sb.append(line)
+                    if (isCancelled) break
+                    val currentLine = line?.trim() ?: continue
+                    if (currentLine.isEmpty() || currentLine.startsWith(":")) continue
+                    if (!currentLine.startsWith("data:")) continue
+
+                    val data = currentLine.removePrefix("data:").trim()
+                    if (data == "[DONE]") break
+
+                    try {
+                        val chunkJson = JSONObject(data)
+                        val choices = chunkJson.optJSONArray("choices") ?: continue
+                        if (choices.length() == 0) continue
+                        val choice = choices.getJSONObject(0)
+                        val delta = choice.optJSONObject("delta") ?: continue
+
+                        // 1. 深度思考链流式输出
+                        if (delta.has("reasoning_content")) {
+                            val rPiece = delta.optString("reasoning_content", "")
+                            if (rPiece.isNotEmpty()) {
+                                accumulatedReasoning.append(rPiece)
+                                if (thoughtBlockId == null) {
+                                    thoughtBlockId = UUID.randomUUID().toString()
+                                    blocks.add(
+                                        ConversationBlock.Thought(
+                                            id = thoughtBlockId!!,
+                                            reasoning = accumulatedReasoning.toString()
+                                        )
+                                    )
+                                } else {
+                                    val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
+                                    if (idx != -1) {
+                                        blocks[idx] = ConversationBlock.Thought(
+                                            id = thoughtBlockId!!,
+                                            reasoning = accumulatedReasoning.toString()
+                                        )
+                                    }
+                                }
+                                val updated = currentStateProvider().copy(
+                                    thoughtChain = accumulatedReasoning.toString(),
+                                    conversationBlocks = blocks.toList()
+                                )
+                                onStateUpdate(updated)
+                            }
+                        }
+
+                        // 2. 正文 Token 实时上屏 (彻底废除伪造 delay)
+                        if (delta.has("content")) {
+                            val cPiece = delta.optString("content", "")
+                            if (cPiece.isNotEmpty()) {
+                                accumulatedContent.append(cPiece)
+                                if (textBlockId == null) {
+                                    textBlockId = UUID.randomUUID().toString()
+                                    blocks.add(
+                                        ConversationBlock.Text(
+                                            id = textBlockId!!,
+                                            content = accumulatedContent.toString(),
+                                            isStreaming = true
+                                        )
+                                    )
+                                } else {
+                                    val idx = blocks.indexOfFirst { it.id == textBlockId }
+                                    if (idx != -1) {
+                                        blocks[idx] = ConversationBlock.Text(
+                                            id = textBlockId!!,
+                                            content = accumulatedContent.toString(),
+                                            isStreaming = true
+                                        )
+                                    }
+                                }
+                                val updated = currentStateProvider().copy(
+                                    finalResponse = accumulatedContent.toString(),
+                                    conversationBlocks = blocks.toList()
+                                )
+                                onStateUpdate(updated)
+                            }
+                        }
+
+                        // 3. 工具调用分片拼接
+                        val tcArr = delta.optJSONArray("tool_calls")
+                        if (tcArr != null) {
+                            for (i in 0 until tcArr.length()) {
+                                val item = tcArr.getJSONObject(i)
+                                val idx = item.optInt("index", i)
+                                val acc = toolCallsMap.getOrPut(idx) { ToolCallAccumulator() }
+                                if (item.has("id")) acc.id = item.optString("id")
+                                val fn = item.optJSONObject("function")
+                                if (fn != null) {
+                                    if (fn.has("name")) acc.name += fn.optString("name")
+                                    if (fn.has("arguments")) acc.arguments.append(fn.optString("arguments"))
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
                 }
                 reader.close()
-                Result.success(JSONObject(sb.toString()))
+
+                if (textBlockId != null) {
+                    val idx = blocks.indexOfFirst { it.id == textBlockId }
+                    if (idx != -1) {
+                        blocks[idx] = ConversationBlock.Text(
+                            id = textBlockId!!,
+                            content = accumulatedContent.toString(),
+                            isStreaming = false
+                        )
+                        val updated = currentStateProvider().copy(conversationBlocks = blocks.toList())
+                        onStateUpdate(updated)
+                    }
+                }
             } else {
-                val errorBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                Result.failure(Exception("HTTP $responseCode: $errorBody"))
+                val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
+                val sb = java.lang.StringBuilder()
+                var l: String?
+                while (reader.readLine().also { l = it } != null) {
+                    sb.append(l)
+                }
+                reader.close()
+
+                val json = JSONObject(sb.toString())
+                val choice = json.optJSONArray("choices")?.optJSONObject(0)
+                val msg = choice?.optJSONObject("message")
+                if (msg != null) {
+                    val rc = msg.optString("reasoning_content", "")
+                    val c = msg.optString("content", "")
+                    if (rc.isNotBlank()) {
+                        accumulatedReasoning.append(rc)
+                        blocks.add(ConversationBlock.Thought(id = UUID.randomUUID().toString(), reasoning = rc))
+                    }
+                    if (c.isNotBlank()) {
+                        accumulatedContent.append(c)
+                        blocks.add(ConversationBlock.Text(id = UUID.randomUUID().toString(), content = c, isStreaming = false))
+                    }
+                    val tArr = msg.optJSONArray("tool_calls")
+                    if (tArr != null) {
+                        for (i in 0 until tArr.length()) {
+                            val obj = tArr.getJSONObject(i)
+                            val acc = toolCallsMap.getOrPut(i) { ToolCallAccumulator() }
+                            acc.id = obj.optString("id")
+                            val fn = obj.optJSONObject("function")
+                            acc.name = fn?.optString("name") ?: ""
+                            acc.arguments.append(fn?.optString("arguments") ?: "")
+                        }
+                    }
+                    onStateUpdate(currentStateProvider().copy(
+                        finalResponse = accumulatedContent.toString(),
+                        thoughtChain = accumulatedReasoning.toString(),
+                        conversationBlocks = blocks.toList()
+                    ))
+                }
             }
+
+            val finalToolCalls = toolCallsMap.values.filter { it.name.isNotBlank() }.map { acc ->
+                ToolCall(
+                    id = acc.id.ifBlank { "call_${UUID.randomUUID().toString().take(8)}" },
+                    name = acc.name,
+                    arguments = acc.arguments.toString()
+                )
+            }
+
+            Result.success(ModelTurnResult(
+                content = accumulatedContent.toString(),
+                reasoning = accumulatedReasoning.toString(),
+                toolCalls = finalToolCalls
+            ))
         } catch (e: Exception) {
             Result.failure(e)
+        } finally {
+            conn?.disconnect()
         }
     }
 

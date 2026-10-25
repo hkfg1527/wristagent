@@ -304,10 +304,10 @@ fun BottomInteractiveBlock(
                                 val deltaY = change.position.y - startY
 
                                 if (!isDraggingX && !isDraggingY && !isLongPressActive) {
-                                    if (abs(deltaX) > 12.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.1f) {
+                                    if (abs(deltaX) > 22.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.4f) {
                                         isDraggingX = true
                                         longPressJob.cancel()
-                                    } else if (deltaY < -16.dp.toPx() && abs(deltaY) > abs(deltaX) * 1.1f) {
+                                    } else if (deltaY < -32.dp.toPx() && abs(deltaY) > abs(deltaX) * 1.4f) {
                                         isDraggingY = true
                                         longPressJob.cancel()
                                     }

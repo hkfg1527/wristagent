@@ -1,5 +1,9 @@
 package com.example.myapplication.presentation.ui
 
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import androidx.compose.animation.AnimatedVisibility
@@ -317,28 +321,31 @@ fun SpringStreamingText(
     isStreaming: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val bounceScale = remember { Animatable(1f) }
+    val infiniteTransition = rememberInfiniteTransition(label = "cursorBlink")
+    val cursorAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(450, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cursorAlpha"
+    )
 
-    // 逐字生成时触发细微的弹簧微晶跃动
-    LaunchedEffect(text.length) {
-        if (isStreaming && text.isNotEmpty()) {
-            bounceScale.snapTo(1.025f)
-            bounceScale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.45f,
-                    stiffness = 500f
-                )
-            )
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .scale(bounceScale.value)
-    ) {
+    Box(modifier = modifier) {
         Text(
-            text = text + if (isStreaming) " ▋" else "",
+            text = buildAnnotatedString {
+                append(text)
+                if (isStreaming) {
+                    withStyle(
+                        SpanStyle(
+                            color = Color(0xFF93C5FD).copy(alpha = cursorAlpha)
+                        )
+                    ) {
+                        append(" ▌")
+                    }
+                }
+            },
             fontSize = 13.5.sp,
             lineHeight = 19.sp,
             fontWeight = FontWeight.Normal,

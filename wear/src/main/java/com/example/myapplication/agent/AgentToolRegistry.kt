@@ -272,17 +272,17 @@ class AgentToolRegistry(
     }
 
     private fun executeQueryTimeWeather(location: String): JSONObject {
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val dateSdf = SimpleDateFormat("M月d日 EEEE", Locale.getDefault())
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val dateSdf = SimpleDateFormat("yyyy年M月d日 EEEE", Locale.getDefault())
         val now = Date()
+        val timeZone = java.util.TimeZone.getDefault().id
         return JSONObject().apply {
             put("location", location)
             put("current_time", sdf.format(now))
             put("current_date", dateSdf.format(now))
-            put("temperature", "22℃")
-            put("weather", "晴朗微风")
-            put("air_quality", "优")
-            put("summary", "当前时间为 ${sdf.format(now)}，天气晴朗微风，气温 22℃")
+            put("timezone", timeZone)
+            put("weather_status", "unavailable_without_sensor_or_api")
+            put("summary", "当前手表本地时间为 ${dateSdf.format(now)} ${sdf.format(now)} (${timeZone})。手表端暂无环境气象传感器且未配置外部天气服务。")
         }
     }
 
@@ -295,25 +295,73 @@ class AgentToolRegistry(
             }
         }
 
-        // 针对手表端做精简摘要提取，控制总字数不超过 300 字
         return try {
-            val resultsArray = JSONArray()
-            // 默认返回当前时效性精炼摘要
-            resultsArray.put(JSONObject().apply {
-                put("title", "实时检索: $trimmedQuery")
-                put("snippet", "互联网最新资讯更新：关于 [$trimmedQuery] 的核心动态已索引，当前状态稳定，技术与即时信息有效。")
-            })
-            JSONObject().apply {
-                put("status", "success")
-                put("query", trimmedQuery)
-                put("results_count", 1)
-                put("results", resultsArray)
-                put("summary", "已检索到关于 [$trimmedQuery] 的最新事实要点，内容已清洗压缩。")
+            val encoded = java.net.URLEncoder.encode(trimmedQuery, "UTF-8")
+            val url = java.net.URL("https://api.duckduckgo.com/?q=$encoded&format=json&no_html=1&skip_disambig=1")
+            val conn = url.openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 5000
+            conn.readTimeout = 7000
+            conn.setRequestProperty("User-Agent", "WearAgent/1.0 (Android Wear OS)")
+
+            val responseCode = conn.responseCode
+            if (responseCode in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(body)
+                val abstractText = json.optString("AbstractText", "")
+                val heading = json.optString("Heading", "")
+                val relatedTopics = json.optJSONArray("RelatedTopics")
+
+                val snippets = mutableListOf<String>()
+                if (abstractText.isNotBlank()) {
+                    snippets.add(abstractText)
+                }
+                if (relatedTopics != null) {
+                    for (i in 0 until relatedTopics.length()) {
+                        if (snippets.size >= 3) break
+                        val topic = relatedTopics.optJSONObject(i)
+                        val text = topic?.optString("Text", "")
+                        if (!text.isNullOrBlank()) {
+                            snippets.add(text)
+                        }
+                    }
+                }
+
+                if (snippets.isNotEmpty()) {
+                    val combinedSummary = snippets.joinToString("\n\n").take(400)
+                    val resultsArray = JSONArray()
+                    snippets.forEach { snippet ->
+                        resultsArray.put(JSONObject().apply {
+                            put("title", heading.ifBlank { trimmedQuery })
+                            put("snippet", snippet)
+                        })
+                    }
+                    JSONObject().apply {
+                        put("status", "success")
+                        put("query", trimmedQuery)
+                        put("results_count", snippets.size)
+                        put("results", resultsArray)
+                        put("summary", combinedSummary)
+                    }
+                } else {
+                    JSONObject().apply {
+                        put("status", "no_results")
+                        put("query", trimmedQuery)
+                        put("message", "检索请求已成功发起，但未能检索到关键词 [$trimmedQuery] 的公开知识库条目或摘要。")
+                    }
+                }
+            } else {
+                JSONObject().apply {
+                    put("status", "http_error")
+                    put("query", trimmedQuery)
+                    put("message", "检索服务器响应异常: HTTP $responseCode")
+                }
             }
         } catch (e: Exception) {
             JSONObject().apply {
                 put("status", "error")
-                put("message", "网络搜索暂时不可用: ${e.message}")
+                put("query", trimmedQuery)
+                put("message", "网络检索失败: ${e.localizedMessage ?: "连接超时或网络未就绪"}")
             }
         }
     }

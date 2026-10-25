@@ -117,6 +117,8 @@ import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.SettingsScreen
+import com.example.myapplication.presentation.ui.TopClockBar
+import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
@@ -136,17 +138,7 @@ import java.util.UUID
 import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
-    companion object {
-        var onBackPressedCustom: (() -> Boolean)? = null
-        var onPromptTrigger: ((String) -> Unit)? = null
-    }
-
-    override fun onBackPressed() {
-        if (onBackPressedCustom?.invoke() == true) {
-            return
-        }
-        super.onBackPressed()
-    }
+    private val externalPromptState = androidx.compose.runtime.mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -156,7 +148,10 @@ class MainActivity : ComponentActivity() {
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         setContent {
-            WearAgentUnifiedApp()
+            WearAgentUnifiedApp(
+                externalPrompt = externalPromptState.value,
+                onClearExternalPrompt = { externalPromptState.value = null }
+            )
         }
         handleIntent(intent)
     }
@@ -180,69 +175,11 @@ class MainActivity : ComponentActivity() {
         }
         val prompt = intent?.getStringExtra("prompt")
         if (!prompt.isNullOrBlank()) {
-            onPromptTrigger?.invoke(prompt)
+            externalPromptState.value = prompt
         }
     }
 }
 
-/**
- * 顶部弧形微晶时间显示 (完全贴合圆形表盘边缘弧度 · 居中工整 · 绝不倒字)
- */
-/**
- * 顶部弧形微晶时间显示 (高精细极坐标逐字弧形贴边排版 · 绝对居中对称 · 严禁重叠倒字)
- */
-@Composable
-fun TopClockBar(
-    timeText: String,
-    modifier: Modifier = Modifier
-) {
-    Canvas(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp)
-    ) {
-        val w = size.width
-        val centerX = w / 2f
-        val centerY = centerX // 手表圆心在 (centerX, centerX)
-        // 贴合圆形表盘顶部弧线半径 (圆盘半径内缩 14dp 作为字符几何中心)
-        val arcRadius = centerX - 14.dp.toPx()
-
-        drawIntoCanvas { canvas ->
-            val paint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                color = android.graphics.Color.parseColor("#E2E8F0")
-                textSize = 13.sp.toPx()
-                typeface = android.graphics.Typeface.create(
-                    android.graphics.Typeface.MONOSPACE,
-                    android.graphics.Typeface.BOLD
-                )
-                textAlign = android.graphics.Paint.Align.CENTER
-            }
-
-            val textLength = timeText.length
-            val midIndex = (textLength - 1) / 2f
-            val charAngleStepDeg = 4.6f // 每个字符的表盘极坐标弧度夹角 (度)
-
-            for (i in 0 until textLength) {
-                val charStr = timeText[i].toString()
-                // 12 点钟正顶端对应极坐标 -90 度
-                val angleDeg = -90f + (i - midIndex) * charAngleStepDeg
-                val angleRad = angleDeg * (Math.PI.toFloat() / 180f)
-
-                val charX = centerX + arcRadius * kotlin.math.cos(angleRad)
-                val charY = centerY + arcRadius * kotlin.math.sin(angleRad)
-                val rotationDeg = angleDeg + 90f // 字符沿切线自然微倾
-
-                canvas.nativeCanvas.save()
-                canvas.nativeCanvas.translate(charX, charY)
-                canvas.nativeCanvas.rotate(rotationDeg)
-                // 绘制在旋转坐标系原点
-                canvas.nativeCanvas.drawText(charStr, 0f, paint.textSize / 3f, paint)
-                canvas.nativeCanvas.restore()
-            }
-        }
-    }
-}
 
 enum class AppScreen {
     ONBOARDING,
@@ -251,7 +188,10 @@ enum class AppScreen {
 }
 
 @Composable
-fun WearAgentUnifiedApp() {
+fun WearAgentUnifiedApp(
+    externalPrompt: String? = null,
+    onClearExternalPrompt: () -> Unit = {}
+) {
     val context = LocalContext.current
 
     val preferences = remember { AgentPreferences(context) }
@@ -308,16 +248,6 @@ fun WearAgentUnifiedApp() {
                 }
 
                 AppScreen.SETTINGS -> {
-                    DisposableEffect(Unit) {
-                        MainActivity.onBackPressedCustom = {
-                            liveSpacingDp = preferences.matrixSpacingDp
-                            currentScreen = AppScreen.MAIN
-                            true
-                        }
-                        onDispose {
-                            MainActivity.onBackPressedCustom = null
-                        }
-                    }
                     BackHandler {
                         liveSpacingDp = preferences.matrixSpacingDp
                         currentScreen = AppScreen.MAIN
@@ -341,7 +271,9 @@ fun WearAgentUnifiedApp() {
                         agentDispatcher = agentDispatcher,
                         voiceInputManager = voiceInputManager,
                         liveSpacingDp = liveSpacingDp,
-                        onOpenSettings = { currentScreen = AppScreen.SETTINGS }
+                        onOpenSettings = { currentScreen = AppScreen.SETTINGS },
+                        externalPrompt = externalPrompt,
+                        onClearExternalPrompt = onClearExternalPrompt
                     )
                 }
             }
@@ -355,7 +287,9 @@ private fun MainAgentDashboard(
     agentDispatcher: AgentDispatcher,
     voiceInputManager: VoiceInputManager,
     liveSpacingDp: Float,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    externalPrompt: String? = null,
+    onClearExternalPrompt: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -490,25 +424,13 @@ private fun MainAgentDashboard(
     }
 
     // 审批挂起、返回拦截与多会话抽屉关闭
-    DisposableEffect(bottomBlockMode, isSessionDrawerOpen) {
-        if (isSessionDrawerOpen) {
-            MainActivity.onBackPressedCustom = {
-                isSessionDrawerOpen = false
-                true
-            }
-        } else if (bottomBlockMode == BottomBlockMode.ACTION_ALLOW) {
-            MainActivity.onBackPressedCustom = {
-                pendingContinuation?.resume(false)
-                pendingContinuation = null
-                bottomBlockMode = BottomBlockMode.IDLE
-                true
-            }
-        } else {
-            MainActivity.onBackPressedCustom = null
-        }
-        onDispose {
-            MainActivity.onBackPressedCustom = null
-        }
+    BackHandler(enabled = isSessionDrawerOpen) {
+        isSessionDrawerOpen = false
+    }
+    BackHandler(enabled = bottomBlockMode == BottomBlockMode.ACTION_ALLOW) {
+        pendingContinuation?.resume(false)
+        pendingContinuation = null
+        bottomBlockMode = BottomBlockMode.IDLE
     }
 
     DisposableEffect(agentDispatcher) {
@@ -615,12 +537,7 @@ private fun MainAgentDashboard(
         }
         launchVoiceInputAction = { launchVoiceInput() }
 
-        MainActivity.onPromptTrigger = { prompt ->
-            triggerAgent(prompt)
-        }
-        onDispose {
-            MainActivity.onPromptTrigger = null
-        }
+        onDispose { }
     }
 
     LaunchedEffect(agentState.conversationBlocks.size) {
@@ -945,8 +862,11 @@ private fun MainAgentDashboard(
             onStopClick = {
                 agentDispatcher.cancelCurrentExecution()
                 voiceInputManager.cancel()
+                pendingContinuation?.resume(false)
+                pendingContinuation = null
                 bottomBlockMode = BottomBlockMode.IDLE
                 isExecutingAgent = false
+                isThinkingActive = false
             },
             onAllow = {
                 pendingContinuation?.resume(true)
@@ -1088,103 +1008,3 @@ private fun MainAgentDashboard(
     }
 }
 
-/**
- * 应用内语音倾听悬浮层 (圆屏自适应 · 居中动态声波波浪 · 绝无 Emoji)
- */
-@Composable
-fun VoiceListeningOverlay(
-    onCancel: () -> Unit
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "voicePulse")
-    val waveScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "waveScale"
-    )
-    val ringAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ringAlpha"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.94f))
-            .clickable(onClick = onCancel),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(72.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // 外层呼吸光环
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(
-                        color = Color(0xFF38BDF8).copy(alpha = ringAlpha),
-                        radius = (size.minDimension / 2f) * waveScale,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                    )
-                }
-
-                // 核心麦克风圆球
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF38BDF8))
-                        .shadow(elevation = 6.dp, shape = CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    MinimalistSoundwaveIcon(
-                        tint = Color(0xFF0F172A),
-                        isRecording = true,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Text(
-                text = "正在倾听...",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            Text(
-                text = "请对准手表说话",
-                fontSize = 9.sp,
-                color = Color(0xFF94A3B8)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF1E2430))
-                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(12.dp))
-                    .clickable(onClick = onCancel)
-                    .padding(horizontal = 14.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    text = "取消",
-                    fontSize = 10.sp,
-                    color = Color(0xFF94A3B8)
-                )
-            }
-        }
-    }
-}
