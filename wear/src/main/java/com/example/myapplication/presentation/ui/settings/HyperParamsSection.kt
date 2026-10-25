@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,7 +33,7 @@ import com.example.myapplication.agent.AgentPreferences
 import kotlin.math.roundToInt
 
 /**
- * 推理超参数调优控制台 (大触控区域、物理振动步进器、2x2 Token 网格)
+ * 推理超参数调优控制台 (全按钮化直观调试)
  */
 @Composable
 fun HyperParamsContent(
@@ -59,7 +58,7 @@ fun HyperParamsContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Temperature 步进微调器 (大尺寸双按钮，触觉马达回馈)
+        // 1. Temperature 步进与预设调试按钮
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -87,15 +86,15 @@ fun HyperParamsContent(
                     )
                 }
 
+                // 步进按钮 (46dp 标准大触控)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // 减少按钮 (46dp 标准大触控)
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp)
+                            .height(44.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFF222B3C))
                             .border(0.8.dp, Color(0xFF384661), RoundedCornerShape(12.dp))
@@ -116,11 +115,10 @@ fun HyperParamsContent(
                         )
                     }
 
-                    // 增加按钮 (46dp 标准大触控)
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp)
+                            .height(44.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xFF222B3C))
                             .border(0.8.dp, Color(0xFF384661), RoundedCornerShape(12.dp))
@@ -141,10 +139,50 @@ fun HyperParamsContent(
                         )
                     }
                 }
+
+                // 温度一键调试预设按钮
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        0.2f to "极速 0.2",
+                        0.7f to "平衡 0.7",
+                        1.2f to "发散 1.2"
+                    ).forEach { (presetTemp, label) ->
+                        val isSel = (temp * 10).roundToInt() == (presetTemp * 10).roundToInt()
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF1E2536))
+                            .border(
+                                0.6.dp,
+                                if (isSel) AccentCyan else Color(0xFF333E54),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                temp = presetTemp
+                                preferences.temperature = presetTemp
+                                notifyChange()
+                            },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // 2. Max Output Tokens (2x2 舒适网格替代原有拥挤的 4 项一排)
+        // 2. Max Output Tokens (2x2 大药丸按钮网格)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -154,9 +192,8 @@ fun HyperParamsContent(
                 .padding(10.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("最大输出长度限制", fontSize = 12.sp, color = TextSecondaryColor)
+                Text("最大输出 Token 调试", fontSize = 12.sp, color = TextSecondaryColor)
 
-                // 第一行 (150, 300)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -166,9 +203,9 @@ fun HyperParamsContent(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSel) Color(0xFF1E293B) else Color(0xFF222B3C))
+                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
                                 .border(
                                     width = if (isSel) 1.2.dp else 0.6.dp,
                                     color = if (isSel) AccentCyan else Color(0xFF384661),
@@ -192,19 +229,18 @@ fun HyperParamsContent(
                     }
                 }
 
-                // 第二行 (600, 1200)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(600 to "600 完整", 1200 to "1200 极长").forEach { (tokens, label) ->
+                    listOf(600 to "600 完整", 1200 to "1200 深度").forEach { (tokens, label) ->
                         val isSel = maxTokens == tokens
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSel) Color(0xFF1E293B) else Color(0xFF222B3C))
+                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
                                 .border(
                                     width = if (isSel) 1.2.dp else 0.6.dp,
                                     color = if (isSel) AccentCyan else Color(0xFF384661),
@@ -230,47 +266,74 @@ fun HyperParamsContent(
             }
         }
 
-        // 3. 流式传输开关 (48dp 大尺寸触控)
+        // 3. 流式传输一键切换大按钮组
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color(0xFF161A24))
                 .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
-                .clickable {
-                    context.vibrateTick()
-                    isStream = !isStream
-                    preferences.streamMode = isStream
-                    notifyChange()
-                }
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("真实 SSE 流式传输", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimaryColor)
-                    Text(
-                        text = if (isStream) "首字即刻上屏 (推荐)" else "整段生成后一次性返回",
-                        fontSize = 11.sp,
-                        color = TextSecondaryColor
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isStream) AccentCyanDark else Color(0xFF334155))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("传输协议调试", fontSize = 12.sp, color = TextSecondaryColor)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = if (isStream) "已开启" else "已关闭",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isStream) Color(0xFF0284C7) else Color(0xFF222B3C))
+                            .border(
+                                1.dp,
+                                if (isStream) AccentCyan else Color(0xFF384661),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                isStream = true
+                                preferences.streamMode = true
+                                notifyChange()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "开启 SSE 流式",
+                            fontSize = 12.sp,
+                            fontWeight = if (isStream) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isStream) Color.White else Color(0xFFCBD5E1)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (!isStream) Color(0xFF0284C7) else Color(0xFF222B3C))
+                            .border(
+                                1.dp,
+                                if (!isStream) AccentCyan else Color(0xFF384661),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                isStream = false
+                                preferences.streamMode = false
+                                notifyChange()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "关闭流式",
+                            fontSize = 12.sp,
+                            fontWeight = if (!isStream) FontWeight.Bold else FontWeight.Medium,
+                            color = if (!isStream) Color.White else Color(0xFFCBD5E1)
+                        )
+                    }
                 }
             }
         }

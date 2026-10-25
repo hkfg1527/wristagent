@@ -36,7 +36,7 @@ import com.example.myapplication.agent.AgentPreferences
 import kotlinx.coroutines.launch
 
 /**
- * 模型与端点配置内容 (支持实时拉取端点与测速)
+ * 模型与端点配置内容 (纯按钮化直观调试面板)
  */
 @Composable
 fun ModelConfigContent(
@@ -49,16 +49,10 @@ fun ModelConfigContent(
     val scope = rememberCoroutineScope()
     var inputBaseUrl by remember { mutableStateOf(currentBaseUrl) }
     var inputApiKey by remember { mutableStateOf(preferences.apiKey) }
-    var isEditingUrl by remember { mutableStateOf(false) }
-    var isEditingKey by remember { mutableStateOf(false) }
+    var showCustomInput by remember { mutableStateOf(false) }
 
     var isFetching by remember { mutableStateOf(false) }
     var fetchResultText by remember { mutableStateOf<String?>(null) }
-    var fetchedModels by remember {
-        mutableStateOf(
-            preferences.cachedRemoteModels.split(",").filter { it.isNotBlank() }
-        )
-    }
 
     val scrollState = rememberScrollState()
 
@@ -69,96 +63,202 @@ fun ModelConfigContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Base URL 配置项 (触控区域提升至 44dp+)
-        Box(
+        // 1. 模型一键调试切换按钮矩阵 (2x2 大按钮，一键调试)
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF181C26))
-                .border(0.8.dp, Color(0xFF2C3547), RoundedCornerShape(12.dp))
-                .clickable {
-                    context.vibrateTick()
-                    isEditingUrl = !isEditingUrl
-                }
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF161A24))
+                .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("API Base URL", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AccentCyan)
-                    Text(if (isEditingUrl) "收起" else "编辑", fontSize = 11.sp, color = TextSecondaryColor)
+            Text("模型直选调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
+
+            // 第一行
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "gemini-2.5-flash" to "Flash 极速",
+                    "gemini-2.5-pro" to "Pro 深度"
+                ).forEach { (modelId, label) ->
+                    val isSel = currentModel == modelId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
+                            .border(
+                                1.dp,
+                                if (isSel) AccentCyan else Color(0xFF384661),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                onSelect(modelId, inputBaseUrl)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                        )
+                    }
                 }
-                if (isEditingUrl) {
+            }
+
+            // 第二行
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "deepseek-chat" to "DeepSeek 对话",
+                    "deepseek-reasoner" to "DeepSeek 推理"
+                ).forEach { (modelId, label) ->
+                    val isSel = currentModel == modelId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
+                            .border(
+                                1.dp,
+                                if (isSel) AccentCyan else Color(0xFF384661),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                onSelect(modelId, inputBaseUrl)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. 端点一键切换按钮组
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF161A24))
+                .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text("API 端点调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(
+                    "https://api.deepseek.com" to "DeepSeek",
+                    "https://generativelanguage.googleapis.com" to "Google"
+                ).forEach { (url, name) ->
+                    val isSel = inputBaseUrl == url
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSel) Color(0xFF1E3A5F) else Color(0xFF222B3C))
+                            .border(
+                                0.8.dp,
+                                if (isSel) AccentCyan else Color(0xFF384661),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                context.vibrateTick()
+                                inputBaseUrl = url
+                                preferences.baseUrl = url
+                                onSelect(currentModel, url)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = name,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                        )
+                    }
+                }
+            }
+
+            // 自定义输入切换按钮
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E2430))
+                    .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(8.dp))
+                    .clickable {
+                        context.vibrateTick()
+                        showCustomInput = !showCustomInput
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (showCustomInput) "收起自定义输入" else "手动修改 BaseUrl / Key",
+                    fontSize = 11.5.sp,
+                    color = Color(0xFF94A3B8)
+                )
+            }
+
+            if (showCustomInput) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     BasicTextField(
                         value = inputBaseUrl,
                         onValueChange = {
                             inputBaseUrl = it
                             preferences.baseUrl = it
                         },
-                        textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
                         cursorBrush = SolidColor(AccentCyan),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF0F1219))
+                            .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(6.dp))
+                            .padding(6.dp)
                     )
-                } else {
-                    Text(inputBaseUrl, fontSize = 12.sp, color = TextPrimaryColor, maxLines = 1)
-                }
-            }
-        }
 
-        // API Key 状态项 (44dp+ 触控)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF181C26))
-                .border(0.8.dp, Color(0xFF2C3547), RoundedCornerShape(12.dp))
-                .clickable {
-                    context.vibrateTick()
-                    isEditingKey = !isEditingKey
-                }
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("API Key", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AccentCyan)
-                    Text(if (isEditingKey) "收起" else "编辑", fontSize = 11.sp, color = TextSecondaryColor)
-                }
-                if (isEditingKey) {
                     BasicTextField(
                         value = inputApiKey,
                         onValueChange = {
                             inputApiKey = it
                             preferences.apiKey = it
                         },
-                        textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
                         cursorBrush = SolidColor(AccentCyan),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF0F1219))
+                            .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(6.dp))
+                            .padding(6.dp)
                     )
-                } else {
-                    val masked = if (inputApiKey.length > 8) {
-                        "${inputApiKey.take(4)}...${inputApiKey.takeLast(4)}"
-                    } else if (inputApiKey.isNotBlank()) {
-                        "••••••••"
-                    } else {
-                        "未配置 API Key"
-                    }
-                    Text(masked, fontSize = 12.sp, color = TextPrimaryColor)
                 }
             }
         }
 
-        // 测速并拉取模型按钮 (44dp 触控标准)
+        // 3. 测速与握手 Ping 调试按钮
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -169,23 +269,24 @@ fun ModelConfigContent(
                 .clickable(enabled = !isFetching) {
                     context.vibrateTick()
                     isFetching = true
-                    fetchResultText = "探测端点中..."
+                    fetchResultText = "正在握手探测..."
                     scope.launch {
                         val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
                         isFetching = false
-                        if (timeMs >= 0 && models.isNotEmpty()) {
-                            fetchResultText = "探测成功 • 延迟 ${timeMs}ms"
-                            fetchedModels = models
-                            preferences.cachedRemoteModels = models.joinToString(",")
+                        if (timeMs >= 0) {
+                            fetchResultText = "端点就绪 • 延迟 ${timeMs}ms (${models.size} 个可用模型)"
+                            if (models.isNotEmpty()) {
+                                preferences.cachedRemoteModels = models.joinToString(",")
+                            }
                         } else {
-                            fetchResultText = "端点握手失败，使用预置"
+                            fetchResultText = "端点握手失败，网络超时"
                         }
                     }
                 },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (isFetching) "正在连接端点..." else "测速并实时拉取模型",
+                text = if (isFetching) "正在 Ping 测试..." else "端点测速与实时握手 Ping",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (isFetching) Color(0xFF94A3B8) else Color.White
@@ -193,66 +294,7 @@ fun ModelConfigContent(
         }
 
         fetchResultText?.let {
-            Text(it, fontSize = 11.sp, color = AccentCyan)
-        }
-
-        Text(
-            text = "可用模型 (点击即选)：",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextSecondaryColor,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        val displayList = if (fetchedModels.isNotEmpty()) {
-            fetchedModels
-        } else {
-            listOf("deepseek-chat", "deepseek-reasoner", "gemini-2.5-flash", "claude-3-5-sonnet")
-        }
-
-        displayList.forEach { modelId ->
-            val isSelected = currentModel == modelId
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) Color(0xFF1E293B) else Color(0xFF141720))
-                    .border(
-                        width = if (isSelected) 1.2.dp else 0.6.dp,
-                        color = if (isSelected) AccentCyan else Color(0xFF2C3547),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .clickable {
-                        context.vibrateTick()
-                        onSelect(modelId, inputBaseUrl)
-                    }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = modelId,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) Color.White else Color(0xFFCBD5E1)
-                    )
-                    if (isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(AccentCyanDark)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("生效中", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                }
-            }
+            Text(it, fontSize = 11.5.sp, color = AccentCyan)
         }
     }
 }

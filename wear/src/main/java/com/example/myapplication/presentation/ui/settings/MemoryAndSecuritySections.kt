@@ -33,7 +33,7 @@ import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 
 /**
- * 上下文与长记忆管理 (动态轮数调节与持久偏好)
+ * 上下文与长记忆管理 (全按钮调试化)
  */
 @Composable
 fun MemoryManagerContent(
@@ -51,7 +51,7 @@ fun MemoryManagerContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 上下文滑窗轮数单选 (44dp 大尺寸药丸)
+        // 会话轮数调试按钮组
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -61,7 +61,7 @@ fun MemoryManagerContent(
                 .padding(10.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("单会话保留轮数", fontSize = 12.sp, color = TextSecondaryColor)
+                Text("单会话保留轮数调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -71,9 +71,9 @@ fun MemoryManagerContent(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(42.dp)
+                                .height(44.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSel) Color(0xFF1E293B) else Color(0xFF222B3C))
+                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
                                 .border(
                                     width = if (isSel) 1.2.dp else 0.6.dp,
                                     color = if (isSel) AccentCyan else Color(0xFF384661),
@@ -98,22 +98,7 @@ fun MemoryManagerContent(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF161A24))
-                .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
-                .padding(10.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("• 记忆策略：超出设定轮数后自动淘汰早期对话", fontSize = 11.5.sp, color = Color(0xFFCBD5E1))
-                Text("• 永久记忆：提示词持久锁定长期人设与指令", fontSize = 11.5.sp, color = Color(0xFFCBD5E1))
-                Text("• 会话隔离：支持左滑唤出侧边栏切换会话", fontSize = 11.5.sp, color = Color(0xFFCBD5E1))
-            }
-        }
-
-        // 清空会话记忆按钮 (44dp 警示操作)
+        // 清空会话记忆按钮 (44dp 红色大按钮)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,7 +114,7 @@ fun MemoryManagerContent(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (memoryCleared) "已清空当前记忆" else "清空全部记忆与偏好",
+                text = if (memoryCleared) "已清空当前记忆与偏好" else "一键清空全部记忆与偏好",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (memoryCleared) TextSecondaryColor else Color(0xFFF87171)
@@ -139,7 +124,7 @@ fun MemoryManagerContent(
 }
 
 /**
- * 两翼快捷键定义
+ * 两翼快捷键定义 (全按钮调试化)
  */
 @Composable
 fun WingShortcutContent(
@@ -157,9 +142,9 @@ fun WingShortcutContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val actions = listOf(
-            RightButtonAction.MODEL_SWITCH to "切换大模型",
-            RightButtonAction.OPEN_SETTINGS to "打开系统设置",
-            RightButtonAction.CLEAR_MEMORY to "一键清空长记忆"
+            RightButtonAction.MODEL_SWITCH to "绑定：切换大模型",
+            RightButtonAction.OPEN_SETTINGS to "绑定：打开系统设置",
+            RightButtonAction.CLEAR_MEMORY to "绑定：一键清空长记忆"
         )
 
         actions.forEach { (act, label) ->
@@ -167,9 +152,9 @@ fun WingShortcutContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(46.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) Color(0xFF1E293B) else Color(0xFF161A24))
+                    .background(if (isSelected) Color(0xFF0284C7) else Color(0xFF161A24))
                     .border(
                         width = if (isSelected) 1.2.dp else 0.8.dp,
                         color = if (isSelected) AccentCyan else Color(0xFF2C3548),
@@ -194,14 +179,7 @@ fun WingShortcutContent(
                         color = if (isSelected) Color.White else Color(0xFFCBD5E1)
                     )
                     if (isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(AccentCyanDark)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("已绑定", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        Text("• 已生效", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -210,7 +188,7 @@ fun WingShortcutContent(
 }
 
 /**
- * AI 安全护栏模式选择
+ * AI 安全护栏模式选择 (全按钮调试化)
  */
 @Composable
 fun SecurityGuardrailContent(
@@ -228,9 +206,9 @@ fun SecurityGuardrailContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val modes = listOf(
-            Triple(SecurityMode.NOVICE, "严格确认模式", "所有敏感与系统操作均需审批，高危操作锁定 3 秒防误触"),
-            Triple(SecurityMode.STANDARD, "标准提示模式", "只读查询自动放行，涉及修改系统配置需滑动确认"),
-            Triple(SecurityMode.EXPERT, "自动执行模式", "除致命危险指令外，跳过确认弹窗直接执行")
+            Triple(SecurityMode.NOVICE, "严格安全模式", "所有敏感与系统操作均需审批 (3秒倒计时防误触)"),
+            Triple(SecurityMode.STANDARD, "标准提示模式", "只读查询自动放行，修改系统配置需滑动确认"),
+            Triple(SecurityMode.EXPERT, "极速放行模式", "除致命危险指令外，跳过所有弹窗直接执行")
         )
 
         modes.forEach { (mode, label, desc) ->
@@ -239,7 +217,7 @@ fun SecurityGuardrailContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) Color(0xFF1E293B) else Color(0xFF161A24))
+                    .background(if (isSelected) Color(0xFF0284C7) else Color(0xFF161A24))
                     .border(
                         width = if (isSelected) 1.2.dp else 0.8.dp,
                         color = if (isSelected) AccentCyan else Color(0xFF2C3548),
@@ -249,9 +227,9 @@ fun SecurityGuardrailContent(
                         context.vibrateTick()
                         onSelect(mode)
                     }
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 9.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -264,21 +242,14 @@ fun SecurityGuardrailContent(
                             color = if (isSelected) Color.White else Color(0xFFCBD5E1)
                         )
                         if (isSelected) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(AccentCyanDark)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text("生效中", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
+                            Text("已激活", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                     Text(
                         text = desc,
-                        fontSize = 11.5.sp,
-                        color = TextSecondaryColor,
-                        lineHeight = 15.sp
+                        fontSize = 11.sp,
+                        color = if (isSelected) Color(0xFFE0F2FE) else TextSecondaryColor,
+                        lineHeight = 14.sp
                     )
                 }
             }

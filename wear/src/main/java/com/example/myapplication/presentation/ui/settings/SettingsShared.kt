@@ -11,8 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,11 +20,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -35,20 +33,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Text
 import kotlinx.coroutines.launch
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 // 调色板与材质规范
 val SettingsCardBg = Color(0xFF161922)
@@ -162,7 +158,7 @@ fun AgentConsoleCard(
 }
 
 /**
- * 全屏二级配置遮罩面板 (支持手势右滑返回与 44dp 底部操作按钮)
+ * 全屏二级配置遮罩面板 (支持物理手势右滑返回与丝滑展开动效，手势停驻绝对无闪烁)
  */
 @Composable
 fun SubSettingsModal(
@@ -175,62 +171,64 @@ fun SubSettingsModal(
     val context = LocalContext.current
 
     val dragOffsetX = remember { Animatable(0f) }
+    val entryScale = remember { Animatable(0.86f) }
+    val entryAlpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        launch {
+            entryScale.animateTo(1f, spring(0.72f, 300f))
+        }
+        launch {
+            entryAlpha.animateTo(1f, tween(160))
+        }
+    }
+
     var screenWidthPx by remember { mutableFloatStateOf(480f) }
-    val dismissThresholdPx = with(density) { 60.dp.toPx() }
+    val dismissThresholdPx = with(density) { 50.dp.toPx() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.92f))
+            .background(Color.Black.copy(alpha = 0.92f * entryAlpha.value))
             .onGloballyPositioned { coords ->
                 screenWidthPx = coords.size.width.toFloat()
             }
-            .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
-            .pointerInput(screenWidthPx) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val startX = down.position.x
-                    val startY = down.position.y
-                    var isSwipingRight = false
-
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
-                        if (!change.pressed) {
-                            if (isSwipingRight) {
-                                if (dragOffsetX.value >= dismissThresholdPx) {
-                                    scope.launch {
-                                        dragOffsetX.animateTo(screenWidthPx, tween(140))
-                                        onDismiss()
-                                    }
-                                } else {
-                                    scope.launch {
-                                        dragOffsetX.animateTo(0f, spring(0.75f, 320f))
-                                    }
-                                }
-                            }
-                            break
-                        }
-
-                        val deltaX = change.position.x - startX
-                        val deltaY = change.position.y - startY
-
-                        if (!isSwipingRight) {
-                            if (deltaX > 20.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
-                                isSwipingRight = true
-                            }
-                        }
-
-                        if (isSwipingRight) {
-                            change.consume()
-                            val clamped = deltaX.coerceAtLeast(0f)
+            .graphicsLayer {
+                translationX = dragOffsetX.value
+                scaleX = entryScale.value
+                scaleY = entryScale.value
+                alpha = (1f - (dragOffsetX.value / (screenWidthPx * 1.5f))).coerceIn(0f, 1f) * entryAlpha.value
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (dragOffsetX.value >= dismissThresholdPx) {
                             scope.launch {
-                                dragOffsetX.snapTo(clamped)
+                                dragOffsetX.animateTo(screenWidthPx, tween(140))
+                                onDismiss()
+                            }
+                        } else {
+                            scope.launch {
+                                dragOffsetX.animateTo(0f, spring(0.75f, 320f))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            dragOffsetX.animateTo(0f, spring(0.75f, 320f))
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        // 增量驱动，手指停止滑动时 dragAmount=0，位移保持不变，彻底杜绝闪烁抽搐
+                        if (dragAmount > 0f || dragOffsetX.value > 0f) {
+                            change.consume()
+                            val next = (dragOffsetX.value + dragAmount).coerceAtLeast(0f)
+                            scope.launch {
+                                dragOffsetX.snapTo(next)
                             }
                         }
                     }
-                }
+                )
             },
         contentAlignment = Alignment.Center
     ) {
@@ -244,7 +242,7 @@ fun SubSettingsModal(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 顶部小标题栏
+            // 顶部标题栏
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -258,7 +256,7 @@ fun SubSettingsModal(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
-            // 中间可滚动主体
+            // 中间主体
             Box(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -268,7 +266,7 @@ fun SubSettingsModal(
                 content()
             }
 
-            // 统一底部大尺寸完成确认键 (高度 42dp，圆角 14dp，符合穿戴指触规范)
+            // 统一底部大尺寸完成确认键 (高度 42dp，圆角 14dp)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.88f)

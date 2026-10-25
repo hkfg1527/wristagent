@@ -31,6 +31,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -278,6 +279,45 @@ fun WearAgentUnifiedApp(
                 }
             }
         }
+    }
+}
+
+/**
+ * 发送消息与回复卡片弹出物理动效容器 (微晶弹簧微动效)
+ */
+@Composable
+private fun AnimatedMessageCard(
+    key: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val scale = remember(key) { Animatable(0.90f) }
+    val alpha = remember(key) { Animatable(0f) }
+    val offsetY = remember(key) { Animatable(16f) }
+
+    LaunchedEffect(key) {
+        launch {
+            scale.animateTo(1f, spring(0.72f, 280f))
+        }
+        launch {
+            alpha.animateTo(1f, tween(180))
+        }
+        launch {
+            offsetY.animateTo(0f, spring(0.75f, 300f))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+                this.alpha = alpha.value
+                translationY = offsetY.value
+            }
+    ) {
+        content()
     }
 }
 
@@ -599,7 +639,7 @@ private fun MainAgentDashboard(
                                 val deltaX = change.position.x - startX
                                 val deltaY = change.position.y - startY
                                 // 仅手势明确向左轻划时唤出抽屉 (从右侧顺手推入，手势与动效完全一致)
-                                if (deltaX < -24.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
+                                if (abs(deltaX) > 24.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
                                     if (!isSessionDrawerOpen) {
                                         isSessionDrawerOpen = true
                                     }
@@ -679,7 +719,12 @@ private fun MainAgentDashboard(
             }
 
             conversationItems.forEach { item ->
-                when (item) {
+                val itemKey = when (item) {
+                    is RenderableConversationItem.UserPrompt -> item.block.id
+                    is RenderableConversationItem.AssistantTurn -> item.key
+                }
+                AnimatedMessageCard(key = itemKey) {
+                    when (item) {
                     is RenderableConversationItem.UserPrompt -> {
                         // 2.1 用户指令：允许右对齐聊天气泡样式，随手势一体滚动
                         Box(
@@ -739,6 +784,7 @@ private fun MainAgentDashboard(
                         }
                     }
                 }
+                }
             }
 
             // 错误提示 (随手势一体滑动)
@@ -765,49 +811,14 @@ private fun MainAgentDashboard(
             Spacer(modifier = Modifier.height(78.dp))
         }
 
-        // ================= 3. 顶部弧形微晶时间与会话胶囊 (Google M3 规范，点击或左滑快速切换) =================
-        Column(
+        // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
+        Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            contentAlignment = Alignment.TopCenter
         ) {
             TopClockBar(timeText = currentTime)
-
-            // 贴边微型会话标签胶囊 (M3 意纯圆药丸，展示当前对话，点击快速呼出会话抽屉)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF141720).copy(alpha = 0.88f))
-                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(10.dp))
-                    .clickable { isSessionDrawerOpen = true }
-                    .padding(horizontal = 9.dp, vertical = 2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                    )
-                    Text(
-                        text = currentSession.title,
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFE2E8F0),
-                        maxLines = 1
-                    )
-                    Text(
-                        text = "▾",
-                        fontSize = 7.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                }
-            }
         }
 
         // ================= 4. 单体演变底栏控制器 =================
@@ -984,11 +995,15 @@ private fun MainAgentDashboard(
             }
         }
 
-        // ================= 7. Google M3 原生贴边自适应多会话抽屉 =================
+        // ================= 7. Google M3 原生贴边自适应多会话抽屉 (支持快捷调试模型) =================
         SessionDrawer(
             isOpen = isSessionDrawerOpen,
             sessions = sessions,
             activeSessionId = activeSessionId,
+            currentModelName = preferences.modelName,
+            onSelectModel = { selectedModel ->
+                preferences.modelName = selectedModel
+            },
             onSelectSession = { id -> switchToSession(id) },
             onCreateSession = { createNewSession() },
             onDeleteSession = { id -> deleteSession(id) },

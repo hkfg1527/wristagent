@@ -16,8 +16,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,6 +88,8 @@ fun SessionDrawer(
     isOpen: Boolean,
     sessions: List<ChatSession>,
     activeSessionId: String,
+    currentModelName: String = "",
+    onSelectModel: ((String) -> Unit)? = null,
     onSelectSession: (String) -> Unit,
     onCreateSession: () -> Unit,
     onDeleteSession: (String) -> Unit,
@@ -99,19 +101,17 @@ fun SessionDrawer(
 
     AnimatedVisibility(
         visible = isOpen,
-        // 手势向左划：抽屉顺从物理直觉从屏幕右侧推入；退出时向右侧顺滑飞出
         enter = fadeIn(tween(180)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it },
         exit = fadeOut(tween(160)) + slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it }
     ) {
         val listState = rememberScalingLazyListState()
         val drawerFocusRequester = remember { FocusRequester() }
 
-        // 表冠获焦
         LaunchedEffect(Unit) {
             drawerFocusRequester.requestFocus()
         }
 
-        // 右滑跟手阻尼推回手势
+        // 右滑跟手防抖动推回手势 (基于增量 delta 累加，杜绝局部坐标递归反向漂移闪烁)
         val dragOffsetX = remember { Animatable(0f) }
         var screenWidthPx by remember { mutableFloatStateOf(384f) }
         val dismissThresholdPx = with(density) { 50.dp.toPx() }
@@ -123,53 +123,40 @@ fun SessionDrawer(
                 .onGloballyPositioned { coords ->
                     screenWidthPx = coords.size.width.toFloat()
                 }
-                .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
-                .alpha(1f - (dragOffsetX.value / (screenWidthPx * 1.6f)).coerceIn(0f, 0.6f))
-                .pointerInput(screenWidthPx) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        val startX = down.position.x
-                        val startY = down.position.y
-                        var isDraggingRight = false
-
-                        while (true) {
-                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
-                            if (!change.pressed) {
-                                if (isDraggingRight) {
-                                    if (dragOffsetX.value >= dismissThresholdPx) {
-                                        scope.launch {
-                                            dragOffsetX.animateTo(screenWidthPx, tween(140))
-                                            onClose()
-                                        }
-                                    } else {
-                                        scope.launch {
-                                            dragOffsetX.animateTo(0f, spring(0.75f, 350f))
-                                        }
-                                    }
-                                }
-                                break
-                            }
-
-                            val deltaX = change.position.x - startX
-                            val deltaY = change.position.y - startY
-
-                            if (!isDraggingRight) {
-                                if (deltaX > 16.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
-                                    isDraggingRight = true
-                                }
-                            }
-
-                            if (isDraggingRight) {
-                                change.consume()
-                                val clamped = deltaX.coerceAtLeast(0f)
+                .graphicsLayer {
+                    translationX = dragOffsetX.value
+                    alpha = (1f - (dragOffsetX.value / (screenWidthPx * 1.5f))).coerceIn(0f, 1f)
+                }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (dragOffsetX.value >= dismissThresholdPx) {
                                 scope.launch {
-                                    dragOffsetX.snapTo(clamped)
+                                    dragOffsetX.animateTo(screenWidthPx, tween(140))
+                                    onClose()
+                                }
+                            } else {
+                                scope.launch {
+                                    dragOffsetX.animateTo(0f, spring(0.75f, 350f))
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                dragOffsetX.animateTo(0f, spring(0.75f, 350f))
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            // 物理增量累加，手指停下时 dragAmount=0，位移保持不动，绝对无闪烁
+                            if (dragAmount > 0f || dragOffsetX.value > 0f) {
+                                change.consume()
+                                val next = (dragOffsetX.value + dragAmount).coerceAtLeast(0f)
+                                scope.launch {
+                                    dragOffsetX.snapTo(next)
                                 }
                             }
                         }
-                    }
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -193,7 +180,7 @@ fun SessionDrawer(
                         true
                     },
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // 顶部标题横条
@@ -205,32 +192,92 @@ fun SessionDrawer(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "会话切换",
-                                fontSize = 11.5.sp,
+                                text = "模型与会话管理",
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFF8FAFC)
                             )
                             Text(
-                                text = "右滑顺畅退出 →",
-                                fontSize = 8.sp,
+                                text = "右滑退出 →",
+                                fontSize = 11.sp,
                                 color = Color(0xFF94A3B8)
                             )
                         }
                     }
                 }
 
-                // 1. "+ 新开对话" 居中白色/银色小横条
+                // 快捷模型调试切换按钮行 (满足用户右滑快捷切换模型与调试需求)
+                item(key = "model_switch_row") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF141824))
+                            .border(0.8.dp, Color(0xFF2C3548), RoundedCornerShape(14.dp))
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            text = "当前模型调试",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF38BDF8)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            listOf(
+                                "gemini-2.5-flash" to "Flash",
+                                "gemini-2.5-pro" to "Pro",
+                                "deepseek-chat" to "DeepSeek"
+                            ).forEach { (modelKey, label) ->
+                                val isSel = currentModelName == modelKey
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSel) Color(0xFF0284C7) else Color(0xFF1E2536))
+                                        .border(
+                                            0.6.dp,
+                                            if (isSel) Color(0xFF38BDF8) else Color(0xFF333E54),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable {
+                                            context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                                }
+                                            }
+                                            onSelectModel?.invoke(modelKey)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 1. "+ 新开对话" 居中白色/银色横条 (高度 44dp 规范)
                 item(key = "action_new_session") {
                     Card(
                         onClick = onCreateSession,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(42.dp),
+                            .height(44.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFFF8FAFC),
                             contentColor = Color(0xFF0F172A)
                         ),
-                        shape = RoundedCornerShape(21.dp)
+                        shape = RoundedCornerShape(22.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -241,14 +288,14 @@ fun SessionDrawer(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(16.dp)
+                                    .size(18.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFF0F172A)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "+",
-                                    fontSize = 11.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -256,7 +303,7 @@ fun SessionDrawer(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "新开对话",
-                                fontSize = 11.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF0F172A)
                             )
