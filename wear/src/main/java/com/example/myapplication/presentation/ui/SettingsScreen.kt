@@ -1,21 +1,12 @@
 package com.example.myapplication.presentation.ui
 
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
@@ -30,13 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,42 +37,43 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Card
-import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.Text
-import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
-import kotlinx.coroutines.delay
+import com.example.myapplication.presentation.ui.settings.AgentConsoleCard
+import com.example.myapplication.presentation.ui.settings.HyperParamsContent
+import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
+import com.example.myapplication.presentation.ui.settings.ModelConfigContent
+import com.example.myapplication.presentation.ui.settings.PromptViewerContent
+import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
+import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
+import com.example.myapplication.presentation.ui.settings.SubSettingsModal
+import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
+import com.example.myapplication.presentation.ui.settings.WingShortcutContent
+import com.example.myapplication.presentation.ui.settings.vibrateTick
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * 谷歌 Wear OS Material 3 智能体系统设置控制台
- * - 纯黑 OLED 沉浸基底，消除白闪
- * - 遵循 ScalingLazyColumn 圆屏上下自适应贴合
- * - 深度集成 Agent 大模型端点、工具集状态、MCP 扩展、长记忆与安全护栏
+ * 谷歌 Wear OS 现代 Jetpack Compose 端侧 AI 设置中心
+ * - 纯黑 OLED 沉浸基底，搭配微光超椭圆卡片
+ * - ScalingLazyColumn 圆屏上下自适应贴合与物理表冠联动
+ * - 全触控区域严格符合 40dp+ 穿戴规范，彻底消灭蚂蚁字体
  */
 @Composable
 fun SettingsScreen(
@@ -98,6 +84,7 @@ fun SettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val context = LocalContext.current
 
     var currentModel by remember { mutableStateOf(preferences.modelName) }
     var currentBaseUrl by remember { mutableStateOf(preferences.baseUrl) }
@@ -106,6 +93,9 @@ fun SettingsScreen(
     var mcpEndpoint by remember { mutableStateOf(preferences.mcpEndpoint) }
     var isMcpEnabled by remember { mutableStateOf(preferences.isMcpEnabled) }
     var customPrompt by remember { mutableStateOf(preferences.customSystemPrompt) }
+    var currentTemp by remember { mutableFloatStateOf(preferences.temperature) }
+    var currentMaxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
+    var currentStreamMode by remember { mutableStateOf(preferences.streamMode) }
 
     // 二级弹窗状态
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
@@ -118,7 +108,7 @@ fun SettingsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF000000))
+            .background(Color.Black)
             .onGloballyPositioned { coords ->
                 screenWidthPx = coords.size.width.toFloat()
             }
@@ -155,7 +145,7 @@ fun SettingsScreen(
                         val deltaY = change.position.y - startY
 
                         if (!isSwipingRight) {
-                            if (deltaX > 18.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
+                            if (deltaX > 20.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
                                 isSwipingRight = true
                             }
                         }
@@ -173,7 +163,6 @@ fun SettingsScreen(
     ) {
         val listState = rememberScalingLazyListState()
         val settingsFocusRequester = remember { FocusRequester() }
-        val context = LocalContext.current
 
         LaunchedEffect(Unit) {
             settingsFocusRequester.requestFocus()
@@ -187,62 +176,63 @@ fun SettingsScreen(
                 .onRotaryScrollEvent {
                     scope.launch {
                         listState.scrollBy(it.verticalScrollPixels)
-                        if (abs(it.verticalScrollPixels) > 8f) {
-                            context.getSystemService(Vibrator::class.java)?.let { vib ->
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                }
-                            }
+                        if (abs(it.verticalScrollPixels) > 10f) {
+                            context.vibrateTick()
                         }
                     }
                     true
                 },
             state = listState,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 顶部返回与标题
+            // 顶部返回与标题 (升级为 42dp 大触控胶囊)
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp, bottom = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF141720))
-                            .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(12.dp))
-                            .clickable(onClick = onBack)
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                            .fillMaxWidth(0.85f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(21.dp))
+                            .background(Color(0xFF1E2533))
+                            .border(0.8.dp, Color(0xFF3B4860), RoundedCornerShape(21.dp))
+                            .clickable {
+                                context.vibrateTick()
+                                onBack()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = "←",
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                             Text(
-                                text = "右滑或轻触返回",
-                                fontSize = 9.sp,
-                                color = Color(0xFFCBD5E1)
+                                text = "返回主界面",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFE2E8F0)
                             )
                         }
                     }
 
-                    ListHeader(modifier = Modifier.padding(top = 2.dp)) {
+                    ListHeader(modifier = Modifier.padding(top = 4.dp)) {
                         Text(
-                            text = "设置",
-                            fontSize = 12.sp,
+                            text = "系统设置",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF8FAFC)
+                            color = Color.White
                         )
                     }
                 }
@@ -259,18 +249,18 @@ fun SettingsScreen(
                 )
             }
 
-            // 2. 模型参数 (Temperature / MaxTokens / Stream)
+            // 2. 模型参数
             item {
                 AgentConsoleCard(
                     title = "模型参数",
-                    statusBadge = "Temp ${preferences.temperature}",
-                    valueText = "最大输出 ${preferences.maxOutputTokens} Token",
-                    descText = if (preferences.streamMode) "流式输出开启" else "非流式输出",
+                    statusBadge = "Temp %.1f".format(currentTemp),
+                    valueText = "最大输出 $currentMaxTokens Token",
+                    descText = if (currentStreamMode) "真实 SSE 流式传输已开启" else "非流式输出",
                     onClick = { activeDialog = SettingsSubDialog.HYPER_PARAMS }
                 )
             }
 
-            // 3. 内置工具
+            // 3. 内置工具与 MCP
             item {
                 val activeCount = listOf(
                     preferences.toolDeviceStatusEnabled,
@@ -281,10 +271,10 @@ fun SettingsScreen(
                     preferences.toolWebSearchEnabled
                 ).count { it }
                 AgentConsoleCard(
-                    title = "内置工具",
+                    title = "端侧工具与 MCP",
                     statusBadge = "$activeCount/6 已启用",
-                    valueText = if (activeCount == 6) "全部 6 项工具已启用" else "已启用 $activeCount 项工具",
-                    descText = "电量感知 • 马达振动 • 表盘点阵 • 省电模式 • 天气时钟 • 网络搜索",
+                    valueText = if (activeCount == 6) "全部 6 项工具已就绪" else "已启用 $activeCount 项工具",
+                    descText = "电量感知 • 振动 • 点阵 • 省电 • 天气 • 真实搜索",
                     onClick = { activeDialog = SettingsSubDialog.TOOLS_MCP }
                 )
             }
@@ -293,9 +283,9 @@ fun SettingsScreen(
             item {
                 AgentConsoleCard(
                     title = "系统提示词",
-                    statusBadge = if (customPrompt.isBlank()) "默认" else "自定义",
-                    valueText = "穿戴 AI 助手",
-                    descText = "任务规划与工具调用设定",
+                    statusBadge = if (customPrompt.isBlank()) "预置默认" else "自定义",
+                    valueText = "穿戴端侧 AI 助手",
+                    descText = "指令偏好与工具调用基准设定",
                     onClick = { activeDialog = SettingsSubDialog.PROMPT_VIEWER }
                 )
             }
@@ -303,7 +293,7 @@ fun SettingsScreen(
             // 5. 会话与上下文
             item {
                 AgentConsoleCard(
-                    title = "会话与上下文",
+                    title = "会话记忆管理",
                     statusBadge = "${preferences.maxContextTurns} 轮",
                     valueText = "单会话保留 ${preferences.maxContextTurns} 轮历史",
                     descText = "超出后自动滑窗淘汰早期对话",
@@ -314,1093 +304,173 @@ fun SettingsScreen(
             // 6. 快捷操作
             item {
                 AgentConsoleCard(
-                    title = "快捷操作",
+                    title = "底栏副键绑定",
                     statusBadge = "右侧副键",
                     valueText = when (currentRightAction) {
-                        RightButtonAction.MODEL_SWITCH -> "切换模型"
-                        RightButtonAction.OPEN_SETTINGS -> "打开设置"
-                        RightButtonAction.CLEAR_MEMORY -> "清空记忆"
+                        RightButtonAction.MODEL_SWITCH -> "切换大模型"
+                        RightButtonAction.OPEN_SETTINGS -> "打开系统设置"
+                        RightButtonAction.CLEAR_MEMORY -> "一键清空长记忆"
                     },
-                    descText = "滑动底栏时右侧按钮的功能",
+                    descText = "长滑展开底栏时右侧按钮的功能",
                     onClick = { activeDialog = SettingsSubDialog.WING_SHORTCUT }
                 )
             }
 
-            // 7. 操作安全确认
+            // 7. 操作安全防线
             item {
                 AgentConsoleCard(
-                    title = "操作安全确认",
+                    title = "操作安全策略",
                     statusBadge = when (currentSecurityMode) {
                         SecurityMode.NOVICE -> "严格确认"
                         SecurityMode.STANDARD -> "标准提示"
                         SecurityMode.EXPERT -> "自动执行"
                     },
                     valueText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "严格确认 (倒计时保护)"
+                        SecurityMode.NOVICE -> "严格确认 (倒计时防误触)"
                         SecurityMode.STANDARD -> "标准提示 (高危需确认)"
                         SecurityMode.EXPERT -> "自动执行 (跳过确认)"
                     },
                     descText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "敏感与系统操作均弹出详情并锁定 3 秒"
-                        SecurityMode.STANDARD -> "只读操作自动放行，高风险操作需滑动确认"
-                        SecurityMode.EXPERT -> "除致命指令拦截外，直接执行"
+                        SecurityMode.NOVICE -> "所有敏感与系统操作均弹出确认详情"
+                        SecurityMode.STANDARD -> "只读查询自动放行，修改系统需确认"
+                        SecurityMode.EXPERT -> "除致命危险指令外直接执行"
                     },
                     onClick = { activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL }
                 )
             }
 
-            // 7. 新手引导
+            // 8. 重新观看新手引导 (44dp 标准高度)
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF141720))
-                        .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onRestartOnboarding)
-                        .padding(vertical = 9.dp),
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF1E2533))
+                        .border(0.8.dp, Color(0xFF3B4860), RoundedCornerShape(14.dp))
+                        .clickable {
+                            context.vibrateTick()
+                            onRestartOnboarding()
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "重新观看操作引导",
-                        fontSize = 10.sp,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFCBD5E1)
                     )
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(36.dp))
             }
         }
 
         // ================= 二级配置对话弹窗 =================
         activeDialog?.let { dialog ->
-            SubSettingsModal(
-                dialog = dialog,
-                preferences = preferences,
-                currentModel = currentModel,
-                currentBaseUrl = currentBaseUrl,
-                currentSecurityMode = currentSecurityMode,
-                currentRightAction = currentRightAction,
-                mcpEndpoint = mcpEndpoint,
-                isMcpEnabled = isMcpEnabled,
-                customPrompt = customPrompt,
-                onModelChange = { model, base ->
-                    currentModel = model
-                    currentBaseUrl = base
-                    preferences.modelName = model
-                    preferences.baseUrl = base
-                },
-                onMcpChange = { enabled, ep ->
-                    isMcpEnabled = enabled
-                    mcpEndpoint = ep
-                    preferences.isMcpEnabled = enabled
-                    preferences.mcpEndpoint = ep
-                },
-                onSecurityModeChange = { mode ->
-                    currentSecurityMode = mode
-                    preferences.securityMode = mode
-                },
-                onRightActionChange = { action ->
-                    currentRightAction = action
-                    preferences.rightButtonAction = action
-                },
-                onPromptChange = { prompt ->
-                    customPrompt = prompt
-                    preferences.customSystemPrompt = prompt
-                },
-                onDismiss = { activeDialog = null }
-            )
-        }
-    }
-}
-
-/**
- * 设置子弹窗类型
- */
-enum class SettingsSubDialog {
-    MODEL_CONFIG,
-    HYPER_PARAMS,
-    TOOLS_MCP,
-    PROMPT_VIEWER,
-    MEMORY_MANAGER,
-    WING_SHORTCUT,
-    SECURITY_GUARDRAIL
-}
-
-/**
- * 谷歌 Wear OS M3 卡片封装
- */
-@Composable
-private fun AgentConsoleCard(
-    title: String,
-    statusBadge: String,
-    valueText: String,
-    descText: String,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF11141C),
-            contentColor = Color(0xFFF1F5F9)
-        ),
-        border = BorderStroke(0.6.dp, Color(0xFF262D3D)),
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF8FAFC)
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF1E2430))
-                        .border(0.5.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = statusBadge,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFCBD5E1)
-                    )
-                }
-            }
-
-            Text(
-                text = valueText,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
-
-            Text(
-                text = descText,
-                fontSize = 8.5.sp,
-                color = Color(0xFF94A3B8),
-                lineHeight = 11.5.sp,
-                maxLines = 2
-            )
-        }
-    }
-}
-
-/**
- * 全功能二级配置遮罩面板
- */
-@Composable
-private fun SubSettingsModal(
-    dialog: SettingsSubDialog,
-    preferences: AgentPreferences,
-    currentModel: String,
-    currentBaseUrl: String,
-    currentSecurityMode: SecurityMode,
-    currentRightAction: RightButtonAction,
-    mcpEndpoint: String,
-    isMcpEnabled: Boolean,
-    customPrompt: String,
-    onModelChange: (model: String, baseUrl: String) -> Unit,
-    onMcpChange: (enabled: Boolean, endpoint: String) -> Unit,
-    onSecurityModeChange: (SecurityMode) -> Unit,
-    onRightActionChange: (RightButtonAction) -> Unit,
-    onPromptChange: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF000000).copy(alpha = 0.94f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize(0.92f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF0F1219))
-                .border(0.8.dp, Color(0xFF2B3446), RoundedCornerShape(16.dp))
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val startX = down.position.x
-                        val startY = down.position.y
-
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
-                            if (!change.pressed) {
-                                val deltaX = change.position.x - startX
-                                val deltaY = change.position.y - startY
-                                // 二级子弹窗任意区域向右轻划，顺畅关闭返回
-                                if (deltaX > 24.dp.toPx() && deltaX > abs(deltaY) * 1.2f) {
-                                    onDismiss()
-                                }
-                                break
-                            }
-                        }
-                    }
-                }
-                .clickable(enabled = false) {}
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
             when (dialog) {
                 SettingsSubDialog.MODEL_CONFIG -> {
-                    ModelConfigContent(
-                        preferences = preferences,
-                        currentModel = currentModel,
-                        currentBaseUrl = currentBaseUrl,
-                        onSelect = onModelChange
-                    )
+                    SubSettingsModal(
+                        title = "模型与端点设置",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        ModelConfigContent(
+                            preferences = preferences,
+                            currentModel = currentModel,
+                            currentBaseUrl = currentBaseUrl,
+                            onSelect = { model, base ->
+                                currentModel = model
+                                currentBaseUrl = base
+                                preferences.modelName = model
+                                preferences.baseUrl = base
+                            }
+                        )
+                    }
                 }
                 SettingsSubDialog.HYPER_PARAMS -> {
-                    HyperParamsContent(
-                        preferences = preferences
-                    )
+                    SubSettingsModal(
+                        title = "模型推理参数",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        HyperParamsContent(
+                            preferences = preferences,
+                            onParamsChanged = { temp, tokens, stream ->
+                                currentTemp = temp
+                                currentMaxTokens = tokens
+                                currentStreamMode = stream
+                            }
+                        )
+                    }
                 }
                 SettingsSubDialog.TOOLS_MCP -> {
-                    ToolsMcpContent(
-                        preferences = preferences,
-                        isMcpEnabled = isMcpEnabled,
-                        mcpEndpoint = mcpEndpoint,
-                        onToggleMcp = onMcpChange
-                    )
+                    SubSettingsModal(
+                        title = "端侧工具与 MCP",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        ToolsMcpContent(
+                            preferences = preferences,
+                            isMcpEnabled = isMcpEnabled,
+                            mcpEndpoint = mcpEndpoint,
+                            onToggleMcp = { enabled, ep ->
+                                isMcpEnabled = enabled
+                                mcpEndpoint = ep
+                                preferences.isMcpEnabled = enabled
+                                preferences.mcpEndpoint = ep
+                            }
+                        )
+                    }
                 }
                 SettingsSubDialog.PROMPT_VIEWER -> {
-                    PromptViewerContent(
-                        customPrompt = customPrompt,
-                        onSavePrompt = onPromptChange
-                    )
+                    SubSettingsModal(
+                        title = "系统提示词",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        PromptViewerContent(
+                            customPrompt = customPrompt,
+                            onSavePrompt = { prompt ->
+                                customPrompt = prompt
+                                preferences.customSystemPrompt = prompt
+                            }
+                        )
+                    }
                 }
                 SettingsSubDialog.MEMORY_MANAGER -> {
-                    MemoryManagerContent(
-                        preferences = preferences
-                    )
+                    SubSettingsModal(
+                        title = "会话记忆管理",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        MemoryManagerContent(preferences = preferences)
+                    }
                 }
                 SettingsSubDialog.WING_SHORTCUT -> {
-                    WingShortcutContent(
-                        currentAction = currentRightAction,
-                        onSelect = onRightActionChange
-                    )
+                    SubSettingsModal(
+                        title = "快捷操作绑定",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        WingShortcutContent(
+                            currentAction = currentRightAction,
+                            onSelect = { action ->
+                                currentRightAction = action
+                                preferences.rightButtonAction = action
+                            }
+                        )
+                    }
                 }
                 SettingsSubDialog.SECURITY_GUARDRAIL -> {
-                    SecurityGuardrailContent(
-                        currentMode = currentSecurityMode,
-                        onSelect = onSecurityModeChange
-                    )
-                }
-            }
-
-            // 统一底部关闭确认键
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E2430))
-                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(8.dp))
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 18.dp, vertical = 5.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "完成",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF8FAFC)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 1. 模型与端点配置内容 (支持实时拉取端点与测速)
- */
-@Composable
-private fun ModelConfigContent(
-    preferences: AgentPreferences,
-    currentModel: String,
-    currentBaseUrl: String,
-    onSelect: (model: String, baseUrl: String) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    var inputBaseUrl by remember { mutableStateOf(currentBaseUrl) }
-    var inputApiKey by remember { mutableStateOf(preferences.apiKey) }
-    var isEditingUrl by remember { mutableStateOf(false) }
-    var isEditingKey by remember { mutableStateOf(false) }
-
-    var isFetching by remember { mutableStateOf(false) }
-    var fetchResultText by remember { mutableStateOf<String?>(null) }
-    var fetchedModels by remember {
-        mutableStateOf(
-            preferences.cachedRemoteModels.split(",").filter { it.isNotBlank() }
-        )
-    }
-
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("模型与端点设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        // Base URL 配置行
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .clickable { isEditingUrl = !isEditingUrl }
-                .padding(6.dp)
-        ) {
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("API Base URL", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                    Text(if (isEditingUrl) "点击收起" else "点击编辑", fontSize = 7.5.sp, color = Color(0xFFCBD5E1))
-                }
-                if (isEditingUrl) {
-                    BasicTextField(
-                        value = inputBaseUrl,
-                        onValueChange = {
-                            inputBaseUrl = it
-                            preferences.baseUrl = it
-                        },
-                        textStyle = TextStyle(color = Color.White, fontSize = 8.5.sp),
-                        cursorBrush = SolidColor(Color.White),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp)
-                    )
-                } else {
-                    Text(inputBaseUrl, fontSize = 8.5.sp, color = Color.White, maxLines = 1)
-                }
-            }
-        }
-
-        // API Key 状态行
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .clickable { isEditingKey = !isEditingKey }
-                .padding(6.dp)
-        ) {
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("API Key", fontSize = 8.sp, color = Color(0xFF94A3B8))
-                    Text(if (isEditingKey) "点击收起" else "点击编辑", fontSize = 7.5.sp, color = Color(0xFFCBD5E1))
-                }
-                if (isEditingKey) {
-                    BasicTextField(
-                        value = inputApiKey,
-                        onValueChange = {
-                            inputApiKey = it
-                            preferences.apiKey = it
-                        },
-                        textStyle = TextStyle(color = Color.White, fontSize = 8.5.sp),
-                        cursorBrush = SolidColor(Color.White),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp)
-                    )
-                } else {
-                    val masked = if (inputApiKey.length > 8) {
-                        "${inputApiKey.take(4)}...${inputApiKey.takeLast(4)}"
-                    } else if (inputApiKey.isNotBlank()) {
-                        "********"
-                    } else {
-                        "未配置 API Key"
-                    }
-                    Text(masked, fontSize = 8.5.sp, color = Color.White)
-                }
-            }
-        }
-
-        // 测速并拉取模型按钮
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (isFetching) Color(0xFF1E2430) else Color(0xFF233045))
-                .border(0.6.dp, Color(0xFF475569), RoundedCornerShape(8.dp))
-                .clickable(enabled = !isFetching) {
-                    isFetching = true
-                    fetchResultText = "探测端点中..."
-                    scope.launch {
-                        val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
-                        isFetching = false
-                        if (timeMs >= 0 && models.isNotEmpty()) {
-                            fetchResultText = "探测成功 • 延迟 ${timeMs}ms"
-                            fetchedModels = models
-                            preferences.cachedRemoteModels = models.joinToString(",")
-                        } else {
-                            fetchResultText = "端点握手失败，已加载预置"
-                        }
-                    }
-                }
-                .padding(vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (isFetching) "正在连接 /v1/models ..." else "测速并实时拉取模型列表",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        fetchResultText?.let {
-            Text(it, fontSize = 8.sp, color = Color(0xFF38BDF8))
-        }
-
-        Text("可用模型 (点击即选生效)：", fontSize = 8.5.sp, color = Color(0xFF94A3B8), modifier = Modifier.align(Alignment.Start))
-
-        val displayList = if (fetchedModels.isNotEmpty()) {
-            fetchedModels
-        } else {
-            listOf("deepseek-chat", "deepseek-reasoner", "gemini-2.5-flash", "claude-3-5-sonnet")
-        }
-
-        displayList.forEach { modelId ->
-            val isSelected = currentModel == modelId
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (isSelected) Color.White else Color(0xFF141720))
-                    .border(0.5.dp, if (isSelected) Color.White else Color(0xFF262D3D), RoundedCornerShape(6.dp))
-                    .clickable { onSelect(modelId, inputBaseUrl) }
-                    .padding(horizontal = 8.dp, vertical = 5.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = modelId,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color(0xFF0F172A) else Color.White
-                    )
-                    if (isSelected) {
-                        Text("当前生效", fontSize = 7.5.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 2. 推理超参数调优控制台 (Temperature / MaxTokens / Stream)
- */
-@Composable
-private fun HyperParamsContent(
-    preferences: AgentPreferences
-) {
-    var temp by remember { mutableFloatStateOf(preferences.temperature) }
-    var maxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
-    var isStream by remember { mutableStateOf(preferences.streamMode) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("模型参数设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        // 1. Temperature 步进微调
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(8.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("采样温度 (Temperature)", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
-                    Text(
-                        text = "%.1f".format(temp),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1E2430))
-                            .clickable {
-                                val next = (temp - 0.1f).coerceIn(0.0f, 1.5f)
-                                temp = (next * 10).roundToInt() / 10f
-                                preferences.temperature = temp
+                    SubSettingsModal(
+                        title = "操作安全策略",
+                        onDismiss = { activeDialog = null }
+                    ) {
+                        SecurityGuardrailContent(
+                            currentMode = currentSecurityMode,
+                            onSelect = { mode ->
+                                currentSecurityMode = mode
+                                preferences.securityMode = mode
                             }
-                            .padding(vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("- 0.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1E2430))
-                            .clickable {
-                                val next = (temp + 0.1f).coerceIn(0.0f, 1.5f)
-                                temp = (next * 10).roundToInt() / 10f
-                                preferences.temperature = temp
-                            }
-                            .padding(vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("+ 0.1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-            }
-        }
-
-        // 2. Max Output Tokens
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(8.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("最大输出长度 (Max Output Tokens)", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    listOf(150, 300, 600, 1200).forEach { tokens ->
-                        val isSel = maxTokens == tokens
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSel) Color.White else Color(0xFF1E2430))
-                                .clickable {
-                                    maxTokens = tokens
-                                    preferences.maxOutputTokens = tokens
-                                }
-                                .padding(vertical = 5.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "$tokens",
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSel) Color(0xFF0F172A) else Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. 流式传输开关
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .clickable {
-                    isStream = !isStream
-                    preferences.streamMode = isStream
-                }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("流式输出 (Stream Mode)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("逐字打字机动效与首字极速响应", fontSize = 7.5.sp, color = Color(0xFF94A3B8))
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isStream) Color.White else Color(0xFF333D4F))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (isStream) "已开启" else "已关闭",
-                        fontSize = 7.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isStream) Color(0xFF0F172A) else Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * 3. 工具集细粒度权限控制与 MCP 协议探针
- */
-@Composable
-private fun ToolsMcpContent(
-    preferences: AgentPreferences,
-    isMcpEnabled: Boolean,
-    mcpEndpoint: String,
-    onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
-) {
-    var toolDeviceStatus by remember { mutableStateOf(preferences.toolDeviceStatusEnabled) }
-    var toolVibrate by remember { mutableStateOf(preferences.toolVibrateEnabled) }
-    var toolMatrixDensity by remember { mutableStateOf(preferences.toolMatrixDensityEnabled) }
-    var toolPowerMode by remember { mutableStateOf(preferences.toolPowerModeEnabled) }
-    var toolWeather by remember { mutableStateOf(preferences.toolWeatherEnabled) }
-    var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
-
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("内置工具管理", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        val toolItems = listOf(
-            Triple("get_device_status", "电量与温度感知", toolDeviceStatus) to {
-                toolDeviceStatus = !toolDeviceStatus
-                preferences.toolDeviceStatusEnabled = toolDeviceStatus
-            },
-            Triple("vibrate_device", "马达振动提醒", toolVibrate) to {
-                toolVibrate = !toolVibrate
-                preferences.toolVibrateEnabled = toolVibrate
-            },
-            Triple("adjust_matrix_density", "表盘点阵间距", toolMatrixDensity) to {
-                toolMatrixDensity = !toolMatrixDensity
-                preferences.toolMatrixDensityEnabled = toolMatrixDensity
-            },
-            Triple("set_system_power_mode", "省电模式设置", toolPowerMode) to {
-                toolPowerMode = !toolPowerMode
-                preferences.toolPowerModeEnabled = toolPowerMode
-            },
-            Triple("query_time_weather", "时间与天气感知", toolWeather) to {
-                toolWeather = !toolWeather
-                preferences.toolWeatherEnabled = toolWeather
-            },
-            Triple("web_search", "网络搜索", toolWebSearch) to {
-                toolWebSearch = !toolWebSearch
-                preferences.toolWebSearchEnabled = toolWebSearch
-            }
-        )
-
-        toolItems.forEach { (meta, toggle) ->
-            val (name, label, enabled) = meta
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF141720))
-                    .border(0.5.dp, Color(0xFF262D3D), RoundedCornerShape(6.dp))
-                    .clickable { toggle() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(label, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text(name, fontSize = 7.sp, color = Color(0xFF94A3B8))
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (enabled) Color.White else Color(0xFF333D4F))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (enabled) "放行" else "拦截",
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (enabled) Color(0xFF0F172A) else Color.White
                         )
                     }
-                }
-            }
-        }
-
-        // MCP 协议控制项
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF141720))
-                .border(0.5.dp, Color(0xFF262D3D), RoundedCornerShape(6.dp))
-                .clickable { onToggleMcp(!isMcpEnabled, mcpEndpoint) }
-                .padding(horizontal = 8.dp, vertical = 5.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("MCP 协议探针", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(mcpEndpoint, fontSize = 7.sp, color = Color(0xFF94A3B8))
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isMcpEnabled) Color(0xFF10B981) else Color(0xFF333D4F))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (isMcpEnabled) "已连接" else "未启用",
-                        fontSize = 7.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * 3. 系统提示词查看与编辑
- */
-@Composable
-private fun PromptViewerContent(
-    customPrompt: String,
-    onSavePrompt: (String) -> Unit
-) {
-    var editMode by remember { mutableStateOf(false) }
-    var textValue by remember { mutableStateOf(customPrompt) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("系统提示词", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(115.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(6.dp)
-        ) {
-            if (editMode) {
-                BasicTextField(
-                    value = textValue,
-                    onValueChange = { textValue = it },
-                    textStyle = TextStyle(color = Color.White, fontSize = 8.sp, lineHeight = 10.sp),
-                    cursorBrush = SolidColor(Color.White),
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = if (customPrompt.isNotBlank()) customPrompt else "你是运行在 Android Wear OS 智能手表上的 AI 助手。支持工具调用，回答简短精准，适配手表快速浏览。",
-                    fontSize = 8.sp,
-                    color = Color(0xFFCBD5E1),
-                    lineHeight = 10.5.sp
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF1E2430))
-                    .clickable {
-                        onSavePrompt("")
-                        textValue = ""
-                        editMode = false
-                    }
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("恢复默认", fontSize = 8.5.sp, color = Color(0xFFCBD5E1))
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (editMode) Color.White else Color(0xFF1E2430))
-                    .clickable {
-                        if (editMode) {
-                            onSavePrompt(textValue)
-                            editMode = false
-                        } else {
-                            editMode = true
-                        }
-                    }
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (editMode) "保存设定" else "编辑提示词",
-                    fontSize = 8.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (editMode) Color(0xFF0F172A) else Color.White
-                )
-            }
-        }
-    }
-}
-
-/**
- * 4. 上下文与长记忆管理 (动态轮数调节与持久偏好)
- */
-@Composable
-private fun MemoryManagerContent(
-    preferences: AgentPreferences
-) {
-    var memoryCleared by remember { mutableStateOf(false) }
-    var turns by remember { mutableIntStateOf(preferences.maxContextTurns) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("会话记忆设置", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        // 上下文滑窗轮数单选
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(6.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("单会话滑窗轮数限制", fontSize = 8.5.sp, color = Color(0xFF94A3B8))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    listOf(4 to "4轮节能", 10 to "10轮标准", 30 to "30轮深度").forEach { (count, label) ->
-                        val isSel = turns == count
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSel) Color.White else Color(0xFF1E2430))
-                                .clickable {
-                                    turns = count
-                                    preferences.maxContextTurns = count
-                                }
-                                .padding(vertical = 5.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSel) Color(0xFF0F172A) else Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF141720))
-                .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                .padding(6.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("• 记忆策略：超出设定轮数后自动向前滑窗淘汰", fontSize = 8.sp, color = Color(0xFFCBD5E1))
-                Text("• 永久记忆：首层提示词持久锁定长期人设与事实", fontSize = 8.sp, color = Color(0xFFCBD5E1))
-                Text("• 会话隔离：支持左滑唤出抽屉独立管理与切换", fontSize = 8.sp, color = Color(0xFFCBD5E1))
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (memoryCleared) Color(0xFF1E2430) else Color(0xFF261216))
-                .border(0.6.dp, if (memoryCleared) Color(0xFF333D4F) else Color(0xFFEF4444), RoundedCornerShape(8.dp))
-                .clickable {
-                    preferences.resetAll()
-                    memoryCleared = true
-                }
-                .padding(vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (memoryCleared) "已清空记忆" else "清空会话记忆",
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (memoryCleared) Color(0xFF94A3B8) else Color(0xFFF87171)
-            )
-        }
-    }
-}
-
-/**
- * 5. 两翼快捷键定义
- */
-@Composable
-private fun WingShortcutContent(
-    currentAction: RightButtonAction,
-    onSelect: (RightButtonAction) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("快捷操作绑定", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        val actions = listOf(
-            RightButtonAction.MODEL_SWITCH to "切换大模型",
-            RightButtonAction.OPEN_SETTINGS to "打开系统设置",
-            RightButtonAction.CLEAR_MEMORY to "一键清空长记忆"
-        )
-
-        actions.forEach { (act, label) ->
-            val isSelected = currentAction == act
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) Color(0xFFF8FAFC) else Color(0xFF141720))
-                    .border(0.6.dp, if (isSelected) Color.White else Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                    .clickable { onSelect(act) }
-                    .padding(horizontal = 10.dp, vertical = 7.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color(0xFF0F172A) else Color.White
-                    )
-                    if (isSelected) {
-                        Text("•", fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 6. AI 安全护栏模式选择
- */
-@Composable
-private fun SecurityGuardrailContent(
-    currentMode: SecurityMode,
-    onSelect: (SecurityMode) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("操作安全确认策略", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-
-        val modes = listOf(
-            Triple(SecurityMode.NOVICE, "严格确认模式", "所有敏感与系统操作均需审批，高危操作锁定 3 秒防误触"),
-            Triple(SecurityMode.STANDARD, "标准提示模式", "只读查询自动放行，涉及修改系统配置需滑动确认"),
-            Triple(SecurityMode.EXPERT, "自动执行模式", "除致命危险指令外，跳过确认弹窗直接执行")
-        )
-
-        modes.forEach { (mode, label, desc) ->
-            val isSelected = currentMode == mode
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) Color(0xFFF8FAFC) else Color(0xFF141720))
-                    .border(0.6.dp, if (isSelected) Color.White else Color(0xFF262D3D), RoundedCornerShape(8.dp))
-                    .clickable { onSelect(mode) }
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) Color(0xFF0F172A) else Color.White
-                        )
-                        if (isSelected) {
-                            Text("•", fontSize = 12.sp, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Text(
-                        text = desc,
-                        fontSize = 7.5.sp,
-                        color = if (isSelected) Color(0xFF475569) else Color(0xFF94A3B8),
-                        lineHeight = 10.sp
-                    )
                 }
             }
         }
