@@ -36,7 +36,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -115,6 +115,7 @@ import com.example.myapplication.presentation.ui.AgentSquareBlurBox
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.MainInputType
+import com.example.myapplication.presentation.ui.CameraCurve
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.RenderableConversationItem
@@ -314,22 +315,20 @@ private fun AnimatedMessageCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val scale = remember(key) { Animatable(0.90f) }
+    val scale = remember(key) { Animatable(0.94f) }
     val alpha = remember(key) { Animatable(0f) }
-    val offsetY = remember(key) { Animatable(16f) }
 
     LaunchedEffect(key) {
         launch {
-            scale.animateTo(1f, spring(0.72f, 280f))
+            scale.animateTo(1f, spring(0.8f, 320f))
         }
         launch {
-            alpha.animateTo(1f, tween(180))
-        }
-        launch {
-            offsetY.animateTo(0f, spring(0.75f, 300f))
+            alpha.animateTo(1f, tween(160))
         }
     }
 
+    // 入场只做"轻微放大 + 淡入"，不做纵向位移：
+    // 卡片自己沿 Y 移动的同时镜头也在滚，两层位移叠加就是肉眼看到的"卡来卡去"。
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -337,7 +336,6 @@ private fun AnimatedMessageCard(
                 scaleX = scale.value
                 scaleY = scale.value
                 this.alpha = alpha.value
-                translationY = offsetY.value
             }
     ) {
         content()
@@ -345,14 +343,23 @@ private fun AnimatedMessageCard(
 }
 
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
-private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
+/** 用户主动滚动（拖拽/表冠）后，镜头暂停这么久再继续跟随，避免和手指抢。 */
+private const val CameraPauseAfterUserScrollMs = 1200L
 
 /**
- * 流式跟随时每帧最多前进的距离（约 4dp/帧 ≈ 240dp/s）。
- * 不设成"直接滚到末端"是因为：模型吐字有时一秒几行，镜头全速追赶会让整块文字持续抖动；
- * 限速后跟不上就先让它跑，新字从底部冒出来，观感更像"文字在写"而不是"画面在追"。
+ * 剩余距离（px）：最后一条可见项的底部到"目标位置"（视口底部再减掉底部留白）有多远。
+ * Wear 的 ScalingLazyList 不给内容总高，只能从 visibleItemsInfo 反推。
  */
-private val StreamFollowStepDp = 4.dp
+private fun ScalingLazyListState.remainingToEndPx(bottomPaddingPx: Float): Float {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return 0f
+    return CameraCurve.remainingPx(
+        lastItemOffsetPx = last.offset.toFloat(),
+        lastItemSizePx = last.size.toFloat(),
+        viewportHeightPx = info.viewportSize.height.toFloat(),
+        bottomPaddingPx = bottomPaddingPx
+    )
+}
 
 /** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
 private const val TEMP_TOOL_TEST_COMMAND =
@@ -1074,22 +1081,42 @@ private fun MainAgentDashboard(
     // 现在收敛成一条链路：同一时刻只有一个滚动协程，且两种状态互斥。
     val hasUserTurn = conversationItems.any { it is RenderableConversationItem.UserPrompt }
     val density = LocalDensity.current
+    // 表冠/拖拽之后的一小段"镜头让路"窗口
+    var cameraPauseUntil by remember { mutableLongStateOf(0L) }
+
+    // 唯一镜头引擎：一条加速曲线，没有第二套瞬移机制。
     LaunchedEffect(isExecutingAgent, hasUserTurn, conversationItems.size) {
-        // 空会话（只有问候语）不滚动：否则首条会被顶到屏幕最上面，开屏像"往下弹了一下又回去"
         if (!hasUserTurn) return@LaunchedEffect
-        if (isExecutingAgent) {
-            // 流式阶段：**限速跟随**。每帧最多前进 StreamFollowStepDp，
-            // 内容长得比这快就让它先跑（新字从可见区底部冒出来），镜头不再死追光标；
-            // 到末端时 scrollBy 自然被夹住，于是自动停下。
-            val stepPx = with(density) { StreamFollowStepDp.toPx() }
-            while (isActive) {
-                withFrameMillis { }
-                listState.scroll { scrollBy(stepPx) }
+        val bottomPaddingPx = with(density) { Wear.Size.ListCenterReach.toPx() }
+        var speedPxPerSec = 0f
+        var lastFrameNanos = 0L
+        while (isActive) {
+            val frameNanos = withFrameMillis { it }
+            val dt = if (lastFrameNanos == 0L) {
+                0.016f
+            } else {
+                ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.004f, 0.05f)
             }
-        } else {
-            // 一轮结束：只做一次动画归位，然后再瞬时钉住末端（两步串行，不再有第二个动画抢锁）
-            listState.animateScrollToItem(conversationItems.lastIndex)
-            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+            lastFrameNanos = frameNanos
+            // 用户在拖/刚转过表冠：这一帧不推进，避免和手指抢位置
+            val userBusy = listState.isScrollInProgress || SystemClock.uptimeMillis() < cameraPauseUntil
+            if (userBusy) {
+                speedPxPerSec = 0f
+                continue
+            }
+            val remainingPx = listState.remainingToEndPx(bottomPaddingPx)
+            if (remainingPx <= 0.5f) {
+                speedPxPerSec = 0f
+                // 已经贴到末端：流式阶段等新内容；一轮结束就收工（全程没有瞬移）
+                if (!isExecutingAgent) break
+                continue
+            }
+            // 速度由剩余距离决定（远快近慢），再由加速度上限决定"多久能加到那么快"（ease-in）；
+            // 越接近末端目标速度越小，于是减速是自然发生的（ease-out）。
+            val targetSpeed = CameraCurve.targetSpeed(remainingPx)
+            speedPxPerSec = CameraCurve.nextSpeed(speedPxPerSec, targetSpeed, dt)
+            val stepPx = CameraCurve.stepPx(speedPxPerSec, dt, remainingPx)
+            if (stepPx > 0f) listState.dispatchRawDelta(stepPx)
         }
     }
 
@@ -1214,8 +1241,9 @@ private fun MainAgentDashboard(
                 // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件
                 // （wear 自己的 Modifier.rotaryScrollable 也是 rotaryHandler(...).focusRequester(...).focusable 这个顺序）。
                 .onRotaryScrollEvent { event ->
-                    // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与"贴底跟随"抢同一把 scroll 互斥锁，
+                    // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与镜头抢同一把 scroll 互斥锁，
                     // 每格刻度都立刻生效（scope.launch + scroll{} 在高频刻度下会被逐帧滚动挤掉，真表上就像没接上）
+                    cameraPauseUntil = SystemClock.uptimeMillis() + CameraPauseAfterUserScrollMs
                     listState.dispatchRawDelta(event.verticalScrollPixels)
                     if (kotlin.math.abs(event.verticalScrollPixels) > 8f) {
                         context.getSystemService(Vibrator::class.java)?.let { vib ->
