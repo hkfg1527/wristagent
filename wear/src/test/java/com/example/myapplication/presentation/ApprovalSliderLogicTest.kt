@@ -115,14 +115,75 @@ class ApprovalSliderLogicTest {
         assertTrue(ApprovalSliderLogic.shouldAllow(1f))
     }
 
-    /** 0.5 是文案切换点：0.49 仍是"滑向放行"，0.5 与 0.51 变"松开即放行"。 */
+    /** 0.5 是文案切换点：未滑过是"点拒绝 · 左滑放行"，0.5 与 0.51 变"松开即放行"。 */
     @Test
     fun testLabelFor_switchesAtHalf() {
-        assertEquals("← 滑向放行", ApprovalSliderLogic.labelFor(0f))
-        assertEquals("← 滑向放行", ApprovalSliderLogic.labelFor(0.49f))
+        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0f))
+        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0.49f))
         assertEquals("松开即放行", ApprovalSliderLogic.labelFor(0.5f))
         assertEquals("松开即放行", ApprovalSliderLogic.labelFor(0.51f))
         assertEquals("松开即放行", ApprovalSliderLogic.labelFor(1f))
+    }
+
+    /** 锁定倒计时是第三态：无论进度多少都显示"锁定"，优先于进度文案。 */
+    @Test
+    fun testLabelFor_lockedOverridesProgress() {
+        assertEquals("锁定", ApprovalSliderLogic.labelFor(0f, true))
+        assertEquals("锁定", ApprovalSliderLogic.labelFor(0.49f, true))
+        assertEquals("锁定", ApprovalSliderLogic.labelFor(0.5f, true))
+        assertEquals("锁定", ApprovalSliderLogic.labelFor(1f, true))
+        // 未锁定时必须回落到进度文案，锁定分支不能污染常态
+        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0f, false))
+        assertEquals("松开即放行", ApprovalSliderLogic.labelFor(1f, false))
+    }
+
+    /** 单击拒绝的容差边界：0 / 21 / 22 都算单击，23 起算滑动。 */
+    @Test
+    fun testIsRejectTap_withinSlopBoundary_isTap() {
+        assertTrue(ApprovalSliderLogic.isRejectTap(0f, 0f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(-21f, 0f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(21f, 0f, 22f))
+        // 恰好等于容差仍算单击，边界向内取闭区间
+        assertTrue(ApprovalSliderLogic.isRejectTap(22f, 0f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(-22f, 0f, 22f))
+    }
+
+    /** 越过容差即滑动：23 起不再是单击，不能误判成拒绝。 */
+    @Test
+    fun testIsRejectTap_beyondSlop_isNotTap() {
+        assertFalse(ApprovalSliderLogic.isRejectTap(23f, 0f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(-23f, 0f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(0f, 23f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(0f, -23f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(120f, 0f, 22f))
+    }
+
+    /** 纯纵向位移同样按容差判定：小幅抖动仍是单击，明显上下一划就不是。 */
+    @Test
+    fun testIsRejectTap_pureVerticalDrift_usesSameSlop() {
+        assertTrue(ApprovalSliderLogic.isRejectTap(0f, 18f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(0f, 22f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(0f, 40f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(0f, -40f, 22f))
+    }
+
+    /** 斜向位移两轴独立判定：任一轴越界即算滑动，两轴都不越界才算单击。 */
+    @Test
+    fun testIsRejectTap_diagonal_checksBothAxes() {
+        assertTrue(ApprovalSliderLogic.isRejectTap(15f, 15f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(22f, 22f, 22f))
+        assertTrue(ApprovalSliderLogic.isRejectTap(-22f, 22f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(23f, 5f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(5f, -23f, 22f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(-23f, -23f, 22f))
+    }
+
+    /** 默认容差就是 22：调用方不传 slop 时按 22dp 的换算结果判定。 */
+    @Test
+    fun testIsRejectTap_defaultSlopIs22() {
+        assertEquals(22f, ApprovalSliderLogic.TAP_SLOP_PX, 0f)
+        assertTrue(ApprovalSliderLogic.isRejectTap(22f, 0f))
+        assertFalse(ApprovalSliderLogic.isRejectTap(23f, 0f))
     }
 
     /** 两个阈值常量对外暴露，UI 与测试共用同一份数值。 */

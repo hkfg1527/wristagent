@@ -76,9 +76,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -94,7 +92,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
@@ -125,7 +122,6 @@ import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
@@ -418,65 +414,126 @@ private fun DialogActionButton(
     }
 }
 
+/** 全屏审批内容块宽度上限：内容块中心处弦长约 225dp，190dp 让两侧始终留余量。 */
+private val ApprovalContentMaxWidth = 190.dp
+
 /**
- * 审批内容卡片：标题 / 工具名胶囊 / 风险说明 / 三段危险条。
- * 底色 Surface + 左侧 3dp Danger 竖条（不再整圈红描边），内边距左右 Lg、上下 Xs/Sm，
- * 行距压到 Xs(4dp)：240dp 圆屏上卡片顶边 56dp、两行说明时底边 156dp，危险条落在 142~148dp，
- * 完整露在底栏审批行顶边（152dp）之上；行距回到 Sm(8dp) 会把危险条顶进胶囊底下。
- * 危险条未点亮段用 Border，点亮：等级 1 → Accent，等级 2/3 → Danger。
+ * 全屏审批视图：审批态整屏接管，不再以卡片形式浮在对话之上。
+ * 底色 [Wear.Palette.Bg] + 10% Danger 叠色（危险态但不亮红）+ 自下而上的微弱渐变；
+ * 内容没有 Surface 底、没有描边、没有圆角边界：标题 / 工具名 / 风险说明 / 加大的危险条。
+ * 宽度按内容块中心处的圆弦长收窄（≈190dp），底边与底栏滑块之间留 [Wear.Space.Lg]。
  */
 @Composable
-private fun ApprovalRequestCard(
+private fun ApprovalFullScreen(
+    visible: Boolean,
     toolDisplayName: String,
     riskExplanation: String,
     riskLevel: Int,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(Wear.Radius.Card))
-            .background(Wear.Palette.Surface)
-            // 左侧 3dp 危险竖条：被 Radius.Card 圆角裁切，替代原来的整圈红描边
-            .drawBehind {
-                drawRect(
-                    color = Wear.Palette.Danger,
-                    size = Size(width = 3.dp.toPx(), height = size.height)
-                )
+    val density = LocalDensity.current
+    val windowSize = LocalWindowInfo.current.containerSize
+    var contentTopPx by remember { mutableFloatStateOf(0f) }
+    var contentHeightPx by remember { mutableFloatStateOf(0f) }
+
+    val contentWidth = remember(contentTopPx, contentHeightPx, windowSize.width, windowSize.height, density) {
+        val radiusPx = min(windowSize.width, windowSize.height) / 2f
+        val centerY = windowSize.height / 2f
+        if (radiusPx <= 0f || contentHeightPx <= 0f) {
+            // 首帧尚无实测高度：先给安全宽度，第二帧再按弦长收窄
+            ApprovalContentMaxWidth
+        } else {
+            val dy = abs(contentTopPx + contentHeightPx / 2f - centerY)
+            if (dy >= radiusPx) {
+                ApprovalContentMaxWidth
+            } else {
+                val chordDp = with(density) { (2f * sqrt(radiusPx * radiusPx - dy * dy)).toDp() }
+                minOf(ApprovalContentMaxWidth, chordDp - Wear.Space.Sm * 2f)
+                    .coerceAtLeast(Wear.Size.Orb * 3f)
             }
-            .padding(
-                start = Wear.Space.Lg,
-                end = Wear.Space.Lg,
-                top = Wear.Space.Xs,
-                bottom = Wear.Space.Sm
-            ),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
-    ) {
-        // 标题行高固定 18sp：CJK 默认行高约 1.57em 会把卡片多撑高 5dp，吃掉了危险条与底栏之间的安全距离
-        BasicText(
-            text = "需要你的许可",
-            style = Wear.TextTitle.copy(lineHeight = 18.sp),
-            maxLines = 1
-        )
-        // 工具名：WearBadge 胶囊（DangerSurface 底 + Danger 12sp 文字），不再是一行裸正文
-        WearBadge(text = toolDisplayName, tone = Tone.DANGER)
-        if (riskExplanation.isNotBlank()) {
-            BasicText(
-                text = riskExplanation,
-                style = Wear.TextCaption,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
         }
-        // 三段危险条：每段 28×6dp、圆角 3dp、间距 4dp
-        Row(horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
-            repeat(3) { index ->
-                val litColor = if (riskLevel >= 2) Wear.Palette.Danger else Wear.Palette.Accent
-                Box(
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        // 整屏淡入 + 轻微放大，而不是卡片滑入
+        enter = fadeIn(tween(160)) + scaleIn(tween(160), initialScale = 0.94f),
+        exit = fadeOut(tween(120)),
+        modifier = modifier.fillMaxSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Wear.Palette.Bg)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Wear.Palette.Danger.copy(alpha = 0.10f))
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            1f to Wear.Palette.Danger.copy(alpha = 0.06f)
+                        )
+                    )
+            )
+            // 内容垂直居中偏上：底边停在底栏保留区之上，整块落在圆心中线上方
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = Wear.Size.BottomBarReserve + BottomBarBottomInset + Wear.Space.Lg),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Column(
                     modifier = Modifier
-                        .size(width = 28.dp, height = 6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(if (index < riskLevel) litColor else Wear.Palette.Border)
-                )
+                        .width(contentWidth)
+                        .onGloballyPositioned { coords ->
+                            contentTopPx = coords.positionInRoot().y
+                            contentHeightPx = coords.size.height.toFloat()
+                        },
+                    verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    BasicText(
+                        text = "需要你的许可",
+                        style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                        maxLines = 1
+                    )
+                    BasicText(
+                        text = toolDisplayName,
+                        style = Wear.TextBody.copy(
+                            color = Wear.Palette.Danger,
+                            textAlign = TextAlign.Center
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (riskExplanation.isNotBlank()) {
+                        BasicText(
+                            text = riskExplanation,
+                            style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    // 加大的危险条：3 段 40×8dp、圆角 4dp、间距 6dp
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        repeat(3) { index ->
+                            val litColor = if (riskLevel >= 2) Wear.Palette.Danger else Wear.Palette.Accent
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 40.dp, height = 8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (index < riskLevel) litColor else Wear.Palette.Border)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -567,44 +624,11 @@ private fun MainAgentDashboard(
         )
     }
 
-    // 审批滑块进度：0=拒绝红屏，1=放行绿屏，由底栏回调驱动全屏绿光与卡片
+    // 审批滑块进度：0=拒绝红屏，1=放行绿屏，由底栏回调驱动全屏绿光
     var approvalProgress by remember { mutableFloatStateOf(0f) }
 
-    // 审批聚焦模式：正文降到 0.28 + 全屏压暗层 0.45，两者都按 120ms 过渡进出，不做硬切
+    // 审批沉浸态：整屏交给 ApprovalFullScreen，对话列表彻底退场（不留半透明残影）
     val isApprovalFocus = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
-    val approvalListAlpha by animateFloatAsState(
-        targetValue = if (isApprovalFocus) 0.28f else 1f,
-        animationSpec = tween(durationMillis = 120),
-        label = "approvalListAlpha"
-    )
-    val approvalScrimAlpha by animateFloatAsState(
-        targetValue = if (isApprovalFocus) 0.45f else 0f,
-        animationSpec = tween(durationMillis = 120),
-        label = "approvalScrimAlpha"
-    )
-
-    // 审批卡片实测位置：顶边固定在 56dp 向下生长，宽度取离圆心更远的横边（这里是顶边）所在弦长
-    var approvalCardTopPx by remember { mutableFloatStateOf(0f) }
-    var approvalCardHeightPx by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    val windowSize = LocalWindowInfo.current.containerSize
-    val approvalCardWidth = remember(approvalCardTopPx, approvalCardHeightPx, windowSize) {
-        val radiusPx = min(windowSize.width, windowSize.height) / 2f
-        val centerY = windowSize.height / 2f
-        val farEdge = max(
-            abs(approvalCardTopPx - centerY),
-            abs(approvalCardTopPx + approvalCardHeightPx - centerY)
-        )
-        if (radiusPx <= 0f || farEdge >= radiusPx) {
-            // 首帧尚无实测位置：先给圆屏中段的安全宽度，第二帧再按弦长收窄
-            200.dp
-        } else {
-            val halfChord = sqrt(radiusPx * radiusPx - farEdge * farEdge)
-            with(density) { (2f * halfChord).toDp() }
-                .minus(Wear.Space.Sm * 2f)
-                .coerceAtLeast(Wear.Size.Orb * 3f)
-        }
-    }
 
     fun switchToSession(id: String) {
         val target = sessions.find { it.id == id } ?: return
@@ -914,13 +938,6 @@ private fun MainAgentDashboard(
             gridSpacingDp = liveSpacingDp
         )
 
-        // ================= 1.5 审批绿光：点阵之上、内容之下，随滑块进度淡入，0 时完全不可见 =================
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Wear.Palette.Success.copy(alpha = 0.18f * approvalProgress))
-        )
-
         // ================= 2. 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除) =================
         // 全屏纵向滑动，正文左右内缩 Wear.Space.Edge；靠近上下边缘时按位置自动缩小淡出，正文可与时钟/主键重叠
         ScalingLazyColumn(
@@ -930,8 +947,8 @@ private fun MainAgentDashboard(
             contentPadding = PaddingValues(top = 14.dp, bottom = Wear.Size.ListCenterReach),
             modifier = Modifier
                 .fillMaxSize()
-                // 审批聚焦：整列正文淡到 0.28，背景退到卡片之后
-                .graphicsLayer { alpha = approvalListAlpha }
+                // 审批沉浸：整列正文彻底退场（alpha 0），不留半透明残影
+                .graphicsLayer { alpha = if (isApprovalFocus) 0f else 1f }
                 // 最外圈 14dp 轻度淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
@@ -1050,44 +1067,30 @@ private fun MainAgentDashboard(
         }
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
-        // 曲线坐标系取整屏圆形；绘制在内容列表之后，正文从时钟下方穿过时只被轻微压暗，不会被抹掉
-        TopClockBar(
-            timeText = currentTime,
-            modifier = Modifier.fillMaxSize()
+        // 曲线坐标系取整屏圆形；绘制在内容列表之后，正文从时钟下方穿过时只被轻微压暗，不会被抹掉。
+        // 审批沉浸态整屏由 ApprovalFullScreen 接管，内容块顶边（约 21dp）会压到弧形时钟字形，
+        // 因此审批期间隐藏时钟：全屏接管要的是沉浸，而不是留下一条状态栏残影。
+        if (!isApprovalFocus) {
+            TopClockBar(
+                timeText = currentTime,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // ================= 3.5 全屏审批视图：审批态整屏接管对话，不再以卡片浮层呈现 =================
+        ApprovalFullScreen(
+            visible = isApprovalFocus,
+            toolDisplayName = lastToolDisplayName(agentState.conversationBlocks) ?: "执行高风险操作",
+            riskExplanation = currentRiskAssessment?.riskSummary ?: "",
+            riskLevel = riskLevelOf(currentRiskAssessment)
         )
 
-        // ================= 3.2 审批聚焦压暗层：压在列表与时钟之上、审批卡片之下 =================
-        // 全屏铺一层 Bg，让被淡化的正文与时钟彻底退到后面，只有审批卡片和底栏留在前景
+        // ================= 3.8 审批绿光：压在全屏审批视图之上、底栏之下，随滑块进度淡入，0 时完全不可见 =================
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Wear.Palette.Bg.copy(alpha = approvalScrimAlpha))
+                .background(Wear.Palette.Success.copy(alpha = 0.18f * approvalProgress))
         )
-
-        // ================= 3.5 审批内容卡片：屏幕中上部浮出，宽度按所在 y 处圆弦长收窄 =================
-        // 画在底栏之前，滑块永远压在卡片之上；卡片不再贴底栏，整块上移让视觉重心回到圆心附近
-        AnimatedVisibility(
-            visible = bottomBlockMode == BottomBlockMode.ACTION_ALLOW,
-            enter = fadeIn(tween(140)) + slideInVertically(tween(180)) { it / 3 },
-            exit = fadeOut(tween(120)),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                // 顶距 44dp：与时钟字形下沿（25dp）仍有 19dp，且把卡片整体上移 12dp，
-                // 使三段式危险条与底栏审批胶囊之间留出真实可见的呼吸间隙（实测 56dp 时几乎贴住）
-                .padding(top = 44.dp)
-        ) {
-            ApprovalRequestCard(
-                toolDisplayName = lastToolDisplayName(agentState.conversationBlocks) ?: "执行高风险操作",
-                riskExplanation = currentRiskAssessment?.riskSummary ?: "",
-                riskLevel = riskLevelOf(currentRiskAssessment),
-                modifier = Modifier
-                    .width(approvalCardWidth)
-                    .onGloballyPositioned { coords ->
-                        approvalCardTopPx = coords.positionInRoot().y
-                        approvalCardHeightPx = coords.size.height.toFloat()
-                    }
-            )
-        }
 
         // ================= 4. 单体演变底栏控制器 =================
         BottomInteractiveBlock(

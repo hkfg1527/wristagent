@@ -64,7 +64,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -136,9 +135,9 @@ fun BottomInteractiveBlock(
     val windowSize = LocalWindowInfo.current.containerSize
     var blockTopPx by remember { mutableFloatStateOf(0f) }
 
-    // 审批行 = 胶囊 + [Wear.Space.Md] + 拒绝键 44dp。用该 y 处的圆弦长反推胶囊宽：
-    // 行顶贴齐底栏顶边，圆心取屏幕正中，R = min(w,h)/2，弦长一半 = sqrt(R² - farEdge²)，
-    // 因此整行四角到圆心必然 ≤ R。480px/2.0 密度下整行约 185dp、胶囊约 129dp。
+    // 审批滑块是整行唯一控件，宽度直接取满该 y 处的圆弦长：行顶贴齐底栏顶边，圆心取屏幕正中，
+    // R = min(w,h)/2，弦长一半 = sqrt(R² - farEdge²)，于是滑块四角到圆心必然 ≤ R。
+    // 480px/2.0 密度下弦长约 185dp。
     val approvalCapsuleWidth = remember(blockTopPx, windowSize, density) {
         val radiusPx = min(windowSize.width, windowSize.height) / 2f
         val centerY = windowSize.height / 2f
@@ -151,9 +150,7 @@ fun BottomInteractiveBlock(
                 Wear.Size.Orb
             } else {
                 val halfChord = sqrt(radiusPx * radiusPx - farEdge * farEdge)
-                with(density) { (2f * halfChord).toDp() }
-                    .minus(Wear.Size.Touch + Wear.Space.Md)
-                    .coerceAtLeast(Wear.Size.Orb)
+                with(density) { (2f * halfChord).toDp() }.coerceAtLeast(Wear.Size.Orb)
             }
         }
     }
@@ -421,8 +418,9 @@ fun BottomInteractiveBlock(
                 }
             }
         } else if (isApproval) {
-            // ================= 审批拦截：主键自己拉长成滑块，右侧同排 44dp 显式拒绝键 =================
-            ApprovalMorphBar(
+            // ================= 审批拦截：整行只剩一条滑块，单击=拒绝 / 左滑=放行 =================
+            ApprovalTrack(
+                modifier = Modifier.align(Alignment.TopCenter),
                 trackWidth = capsuleWidth,
                 trackHeight = capsuleHeight,
                 cooldownSeconds = cooldownSeconds,
@@ -459,76 +457,21 @@ fun BottomInteractiveBlock(
 }
 
 /**
- * 审批行：主键自己拉长成滑块胶囊 + 同排 44dp 拒绝键。
- * 行顶贴齐底栏顶边，胶囊宽由调用方按该 y 处圆弦长反推（见 BottomInteractiveBlock 的 approvalCapsuleWidth），
- * 整行 = 胶囊 + [Wear.Space.Md] + [Wear.Size.Touch]，四角到圆心必然 ≤ R。
+ * 审批滑块：整行唯一控件，白色主键底条拉长成占满弦长的横向胶囊，拇指自右端向左拖动。
+ * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
+ * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
+ * 未滑过的右侧区域保留 0.34 的红调，已滑过区域取 0.72 的绿调；
+ * 交互只有两种结局：位移都在 [ApprovalSliderLogic.TAP_SLOP_PX] 内是单击（拒绝），
+ * 左滑松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才放行，滑不够则弹簧回弹且什么都不发生。
  */
 @Composable
-private fun ApprovalMorphBar(
+private fun ApprovalTrack(
+    modifier: Modifier = Modifier,
     trackWidth: Dp,
     trackHeight: Dp,
     cooldownSeconds: Int,
     onAllow: () -> Unit,
     onReject: () -> Unit,
-    onApprovalProgress: (Float) -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        // 顶对齐能把整行抬到弦长更大的位置，横向可用宽度随之上限更高
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Row(
-            modifier = Modifier
-                .height(Wear.Size.Touch)
-                .width(trackWidth + Wear.Space.Md + Wear.Size.Touch),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ApprovalTrack(
-                modifier = Modifier.weight(1f),
-                trackHeight = trackHeight,
-                cooldownSeconds = cooldownSeconds,
-                onAllow = onAllow,
-                onApprovalProgress = onApprovalProgress
-            )
-            RejectButton(onClick = onReject)
-        }
-    }
-}
-
-/** 44dp 拒绝键：DangerSurface 底 + 1.5dp Danger 描边 + Danger 文字，不再实心亮红与胶囊争焦点。 */
-@Composable
-private fun RejectButton(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(Wear.Size.Touch)
-            .clip(CircleShape)
-            .background(Wear.Palette.DangerSurface)
-            .border(1.5.dp, Wear.Palette.Danger, CircleShape)
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        BasicText(
-            text = "拒绝",
-            style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
-            maxLines = 1
-        )
-    }
-}
-
-/**
- * 审批滑块：白色主键底条自己拉长成横向胶囊，拇指自右端向左拖动。
- * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
- * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
- * 未滑过的左侧区域保留 0.34 的红调，已滑过区域取 0.72 的绿调（更翠，不再是偏橄榄的绿）；
- * 松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才算放行，否则弹簧回弹。
- */
-@Composable
-private fun ApprovalTrack(
-    modifier: Modifier = Modifier,
-    trackHeight: Dp,
-    cooldownSeconds: Int,
-    onAllow: () -> Unit,
     onApprovalProgress: (Float) -> Unit
 ) {
     val density = LocalDensity.current
@@ -545,6 +488,11 @@ private fun ApprovalTrack(
             delay(1000)
             remainingCooldown--
         }
+    }
+    // 进入审批态（或进入锁定态）时进度必须归零：否则上一轮拖动残留会让文案一进审批就显示"松开即放行"
+    // 进入审批态（ApprovalTrack 重新组合）时进度必须归零：否则残留会让文案一进审批就显示"松开即放行"
+    LaunchedEffect(Unit) {
+        dragProgress.snapTo(0f)
     }
     LaunchedEffect(isLocked) {
         if (isLocked) dragProgress.snapTo(0f)
@@ -564,39 +512,54 @@ private fun ApprovalTrack(
     val thumbSlotPx = with(density) { trackHeight.toPx() }
     val thumbDiameter = (trackHeight - 8.dp).coerceAtLeast(20.dp)
     val travelPx = (trackPx - thumbSlotPx).coerceAtLeast(1f)
+    // 单击容差：设计值 22dp，按本机密度换算成 px 后交给纯逻辑判定
+    val tapSlopPx = with(density) { ApprovalSliderLogic.TAP_SLOP_PX.dp.toPx() }
 
     Box(
         modifier = modifier
+            .width(trackWidth)
             .height(trackHeight)
             .clip(CircleShape)
             // 审批态底条沿用主键冷银白（同一颗键的延续），红/绿由着色层叠加
             .background(Wear.Palette.Orb)
             .onGloballyPositioned { coords -> trackPx = coords.size.width.toFloat() }
-            .pointerInput(isLocked, trackPx, thumbSlotPx) {
+            .pointerInput(isLocked, trackPx, thumbSlotPx, tapSlopPx) {
+                // 锁定倒计时内单击与滑动都无效
                 if (isLocked) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val startX = down.position.x
-                    var hasDragged = false
+                    val startY = down.position.y
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) {
-                            if (hasDragged && ApprovalSliderLogic.shouldAllow(dragProgress.value)) {
-                                scope.launch {
-                                    dragProgress.snapTo(1f)
-                                    onAllow()
-                                }
+                            // 松手定性：位移都落在 touchSlop 内 = 单击 → 拒绝；
+                            // 否则是滑动，左滑完成度达标才放行，滑不够就回弹（回弹不算拒绝）
+                            val totalDxPx = change.position.x - startX
+                            val totalDyPx = change.position.y - startY
+                            if (ApprovalSliderLogic.isRejectTap(totalDxPx, totalDyPx, tapSlopPx)) {
+                                onReject()
                             } else {
-                                scope.launch {
-                                    dragProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 280f))
+                                val releasedProgress = ApprovalSliderLogic.progress(
+                                    startX = startX,
+                                    currentX = change.position.x,
+                                    trackWidthPx = trackPx,
+                                    thumbWidthPx = thumbSlotPx
+                                )
+                                if (ApprovalSliderLogic.shouldAllow(releasedProgress)) {
+                                    scope.launch { dragProgress.snapTo(1f) }
+                                    onAllow()
+                                } else {
+                                    scope.launch {
+                                        dragProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 280f))
+                                    }
                                 }
                             }
                             break
                         }
                         // 独占指针流：不消费则 Wear 系统的"右滑返回"会把横向拖动抢成返回手势
                         change.consume()
-                        hasDragged = true
                         val nextProgress = ApprovalSliderLogic.progress(
                             startX = startX,
                             currentX = change.position.x,
@@ -625,9 +588,9 @@ private fun ApprovalTrack(
             )
         }
 
-        // 文案：锁定倒计时优先，其次按进度在"滑向放行 / 松开即放行"之间切换
+        // 文案三态：锁定倒计时优先，其次按进度在"点拒绝 · 左滑放行 / 松开即放行"之间切换
         BasicText(
-            text = if (isLocked) "锁定" else ApprovalSliderLogic.labelFor(dragProgress.value),
+            text = ApprovalSliderLogic.labelFor(dragProgress.value, isLocked),
             // 白键底叠红/绿后仍偏亮，用深色文字（对比≈13:1），近白字反而只有 1.4:1
             style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
             maxLines = 1,
