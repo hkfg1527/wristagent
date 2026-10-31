@@ -453,14 +453,14 @@ fun BottomInteractiveBlock(
                 onApprovalProgress = onApprovalProgress
             )
         } else {
-            // ================= 思考中：微型停止按钮 =================
+            // ================= 思考中：白色停止按钮 =================
+            // 与主键同色（Orb 冷银白），文字用 Bg 深色保证对比；不再加边框，白底在深色点阵上已经足够分离。
             val stopShape = RoundedCornerShape(Wear.Radius.Chip)
             Box(
                 modifier = Modifier
                     .size(capsuleWidth, Wear.Size.Touch)
                     .clip(stopShape)
-                    .background(Wear.Palette.SurfaceAlt)
-                    .border(1.dp, Wear.Palette.Border, stopShape)
+                    .background(Wear.Palette.Orb)
                     .clickable { onStopClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -471,7 +471,7 @@ fun BottomInteractiveBlock(
                     Box(modifier = Modifier.size(8.dp).background(Wear.Palette.Danger, CircleShape))
                     BasicText(
                         text = "停止",
-                        style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+                        style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                         maxLines = 1
                     )
                 }
