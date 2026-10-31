@@ -7,6 +7,14 @@
 ## [未发布]
 
 ### 新增与优化特性
+- **输入闭环、模型真相源统一与第三方语音通道**：
+  - 文本输入弹窗改为 insets 驱动避让输入法（`imePadding` + 可滚动输入区 + 固定底部按钮），键盘展开时"发送/取消"始终可见可点；返回键只关闭弹窗且未发送文本保留；
+  - 会话抽屉与模型设置面板的模型入口改为从 `cachedRemoteModels` 派生（新增 `ModelLabels` 短标签与分行纯逻辑），删除硬编码的 gemini 入口；模型清单为空时给出中文提示，超过 3 项改为横向滚动而非挤压错位；
+  - 语音链路失败全部可见：无引擎、无麦克风权限、录音失败、未配置第三方密钥、第三方错误码、网络失败均给出可读中文原因（唯一错误出口 `reportError`），不再静默；
+  - 新增可插拔 `AsrProvider` 契约与百度短语音识别（REST）实现（token 缓存、WAV 封装、错误码中文映射），设置中心新增"语音转写"分区（厂商/密钥/语言/测试转写），未填密钥时自动回退系统识别器；
+  - 外部 intent prompt 入口真正生效并保证同一 intent 只触发一次；
+  - 默认输出上限由 300 提升至 2048，并在超参面板补齐 2048 档位；
+  - 新增单测：`ModelLabelsTest`、`ModelCycleTest`、`TextInputDialogStateMachineTest`、`ExternalPromptConsumptionTest`、`SpeechErrorNoticeTest`、`WavEncoderTest`、`BaiduTokenCacheTest`、`BaiduAsrProviderTest`、`AsrServiceRouterTest`、`VoiceAsrGatewayTest`、`AgentPreferencesDefaultsTest`。
 - **手势闪烁根治、卡片弹簧微动效与全按钮化调试体验重塑**：
   - 定位并根治手势拖动停止时因 `Modifier.offset` 与局部坐标 `deltaX` 产生正负反馈循环导致 60Hz 抽搐闪烁的底层缺陷，全面改用物理增量驱动的 `detectHorizontalDragGestures` 与 `graphicsLayer` 硬件层位移，滑动停驻绝对物理稳定、零闪烁；
   - 彻底移除主界面时间下方常驻的微型会话胶囊（“当前对话”），保持圆屏视觉通透与层级纯净；

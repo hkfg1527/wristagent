@@ -60,8 +60,10 @@ import com.example.myapplication.presentation.ui.settings.SecurityGuardrailConte
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.settings.SubSettingsModal
 import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
+import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.WingShortcutContent
 import com.example.myapplication.presentation.ui.settings.vibrateTick
+import com.example.myapplication.voice.AsrProviderId
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -94,8 +96,13 @@ fun SettingsScreen(
     var currentMaxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
     var currentStreamMode by remember { mutableStateOf(preferences.streamMode) }
 
+    var asrEnabled by remember { mutableStateOf(preferences.asrEnabled) }
+    var asrProviderKey by remember { mutableStateOf(preferences.asrProvider) }
+    var asrKeyReady by remember { mutableStateOf(preferences.asrSettings().hasBaiduCredentials) }
+
     // 二级弹窗状态
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
+    var showVoiceAsr by remember { mutableStateOf(false) }
 
     // 右滑返回手势 (基于增量物理位移防抖，停止滑动绝对无闪烁)
     val dragOffsetX = remember { Animatable(0f) }
@@ -322,7 +329,24 @@ fun SettingsScreen(
                 )
             }
 
-            // 8. 重新观看新手引导
+            // 8. 语音转写
+            item {
+                val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
+                AgentConsoleCard(
+                    title = "语音转写",
+                    statusBadge = if (!asrEnabled) "已关闭" else asrProvider.displayName,
+                    valueText = when {
+                        !asrEnabled -> "语音转写未开启"
+                        asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "百度语音：密钥未填写"
+                        asrProvider == AsrProviderId.BAIDU -> "百度短语音已配置"
+                        else -> "系统语音识别"
+                    },
+                    descText = "厂商切换 • AK/SK • 识别语言 • 测试转写",
+                    onClick = { showVoiceAsr = true }
+                )
+            }
+
+            // 9. 重新观看新手引导
             item {
                 Box(
                     modifier = Modifier
@@ -455,6 +479,22 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        if (showVoiceAsr) {
+            SubSettingsModal(
+                title = "语音转写",
+                onDismiss = { showVoiceAsr = false }
+            ) {
+                VoiceAsrContent(
+                    preferences = preferences,
+                    onSettingsChanged = { settings ->
+                        asrEnabled = settings.enabled
+                        asrProviderKey = settings.providerId.storageKey
+                        asrKeyReady = settings.hasBaiduCredentials
+                    }
+                )
             }
         }
     }

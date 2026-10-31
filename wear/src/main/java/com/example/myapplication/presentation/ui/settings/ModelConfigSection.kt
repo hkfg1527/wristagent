@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,11 +29,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ModelCycle
+import com.example.myapplication.presentation.ui.ModelLabels
 import kotlinx.coroutines.launch
 
 /**
@@ -75,76 +79,51 @@ fun ModelConfigContent(
         ) {
             Text("模型直选调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
 
-            // 第一行
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(
-                    "gemini-2.5-flash" to "Flash 极速",
-                    "gemini-2.5-pro" to "Pro 深度"
-                ).forEach { (modelId, label) ->
-                    val isSel = currentModel == modelId
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
-                            .border(
-                                1.dp,
-                                if (isSel) AccentCyan else Color(0xFF384661),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable {
-                                context.vibrateTick()
-                                onSelect(modelId, inputBaseUrl)
-                            },
-                        contentAlignment = Alignment.Center
+            val models = ModelCycle.parse(preferences.cachedRemoteModels)
+            if (ModelLabels.isEmpty(models)) {
+                Text(
+                    text = "未发现可用模型，请先点击下方按钮拉取模型列表",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8)
+                )
+            } else {
+                ModelLabels.rows(models, perRow = 2).forEach { rowModels ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = label,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
-                        )
-                    }
-                }
-            }
-
-            // 第二行
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(
-                    "deepseek-chat" to "DeepSeek 对话",
-                    "deepseek-reasoner" to "DeepSeek 推理"
-                ).forEach { (modelId, label) ->
-                    val isSel = currentModel == modelId
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
-                            .border(
-                                1.dp,
-                                if (isSel) AccentCyan else Color(0xFF384661),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable {
-                                context.vibrateTick()
-                                onSelect(modelId, inputBaseUrl)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
-                        )
+                        rowModels.forEach { modelId ->
+                            val isSel = currentModel == modelId
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
+                                    .border(
+                                        1.dp,
+                                        if (isSel) AccentCyan else Color(0xFF384661),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        context.vibrateTick()
+                                        onSelect(modelId, inputBaseUrl)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = ModelLabels.label(modelId),
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                                )
+                            }
+                        }
+                        if (rowModels.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }

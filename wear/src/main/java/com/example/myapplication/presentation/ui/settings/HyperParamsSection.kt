@@ -233,7 +233,7 @@ fun HyperParamsContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(600 to "600 完整", 1200 to "1200 深度").forEach { (tokens, label) ->
+                    listOf(600 to "600 完整", 1200 to "1200 深度", 2048 to "2048 满额").forEach { (tokens, label) ->
                         val isSel = maxTokens == tokens
                         Box(
                             modifier = Modifier

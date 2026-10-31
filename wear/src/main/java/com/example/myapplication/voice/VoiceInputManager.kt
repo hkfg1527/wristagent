@@ -8,17 +8,29 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
- * 手表语音输入交互管理器 (带模拟器智能语料降级与真实系统语音双通道)
+ * 手表语音输入交互管理器（系统识别通道 + 可插拔第三方 ASR 通道）
+ *
+ * 约定：任何失败都必须通过 onSpeechError 交付一条非空的中文原因，
+ * 上层只需把该字符串显示出来，不需要再判断错误类型。
  */
-class VoiceInputManager(private val context: Context) {
+class VoiceInputManager(
+    private val context: Context,
+    private val asrGateway: VoiceAsrGateway? = null
+) {
 
     var onSpeechResult: ((String) -> Unit)? = null
     var onSpeechError: ((String) -> Unit)? = null
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val sampleVoiceCommands = listOf(
         "帮我检查手表的电量和当前天气。如果电量充足且天气晴朗，就把表盘点阵网格调整为微距14dp，并双击振动马达提醒我出门散步。",
@@ -39,12 +51,15 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * 启动语音识别
+     * 系统识别通道：启动平台 SpeechRecognizer
      */
     fun startListening() {
+        if (!hasAudioPermission()) {
+            reportError(AsrMessages.NO_MIC_PERMISSION)
+            return
+        }
         if (!isRecognitionAvailable()) {
-            onListeningStateChanged?.invoke(false)
-            onSpeechError?.invoke("设备未安装语音识别服务")
+            reportError(AsrMessages.NO_ENGINE)
             return
         }
 
@@ -57,22 +72,17 @@ class VoiceInputManager(private val context: Context) {
                     }
 
                     override fun onBeginningOfSpeech() {}
+
                     override fun onRmsChanged(rmsdB: Float) {}
+
                     override fun onBufferReceived(buffer: ByteArray?) {}
+
                     override fun onEndOfSpeech() {
                         onListeningStateChanged?.invoke(false)
                     }
 
                     override fun onError(error: Int) {
-                        onListeningStateChanged?.invoke(false)
-                        val errorMsg = when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> "未识别到语音输入"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "未检测到说话声音"
-                            SpeechRecognizer.ERROR_AUDIO -> "音频录制异常"
-                            SpeechRecognizer.ERROR_NETWORK -> "语音网络服务不可用"
-                            else -> "语音识别异常 ($error)"
-                        }
-                        onSpeechError?.invoke(errorMsg)
+                        reportError(describeRecognizerError(error))
                     }
 
                     override fun onResults(results: Bundle?) {
@@ -82,11 +92,12 @@ class VoiceInputManager(private val context: Context) {
                         if (!text.isNullOrBlank()) {
                             onSpeechResult?.invoke(text)
                         } else {
-                            onSpeechError?.invoke("未识别到有效文字")
+                            reportError(AsrMessages.EMPTY_RESULT)
                         }
                     }
 
                     override fun onPartialResults(partialResults: Bundle?) {}
+
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
@@ -96,16 +107,56 @@ class VoiceInputManager(private val context: Context) {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             }
             speechRecognizer?.startListening(intent)
-        } catch (e: Exception) {
+        } catch (e: SecurityException) {
+            reportError(AsrMessages.NO_MIC_PERMISSION)
+        } catch (e: IllegalStateException) {
+            reportError("启动语音录入失败：" + describeThrowable(e))
+        } catch (e: RuntimeException) {
+            reportError("启动语音录入失败：" + describeThrowable(e))
+        }
+    }
+
+    /**
+     * 第三方转写通道：录音 16kHz WAV 后交给可插拔 provider（百度等）
+     */
+    fun startThirdPartyListening(settings: AsrSettings) {
+        if (!hasAudioPermission()) {
+            reportError(AsrMessages.NO_MIC_PERMISSION)
+            return
+        }
+        val gateway = asrGateway
+        if (gateway == null) {
+            reportError(AsrMessages.NO_PROVIDER)
+            return
+        }
+
+        onListeningStateChanged?.invoke(true)
+        scope.launch {
+            val result = gateway.transcribe(settings, isRecognitionAvailable())
             onListeningStateChanged?.invoke(false)
-            onSpeechError?.invoke("启动语音录入失败: ${e.message}")
+            when (result) {
+                is AsrResult.Success -> {
+                    val text = result.text.trim()
+                    if (text.isBlank()) {
+                        reportError(AsrMessages.EMPTY_RESULT)
+                    } else {
+                        onSpeechResult?.invoke(text)
+                    }
+                }
+                is AsrResult.Failure -> reportError(result.reason)
+            }
         }
     }
 
     fun stopListening() {
-        try {
-            speechRecognizer?.stopListening()
-        } catch (_: Exception) {}
+        val recognizer = speechRecognizer
+        if (recognizer != null) {
+            try {
+                recognizer.stopListening()
+            } catch (e: IllegalStateException) {
+                reportError("停止语音识别失败：" + describeThrowable(e))
+            }
+        }
         onListeningStateChanged?.invoke(false)
     }
 
@@ -114,9 +165,44 @@ class VoiceInputManager(private val context: Context) {
     }
 
     fun destroy() {
-        try {
-            speechRecognizer?.destroy()
-        } catch (_: Exception) {}
+        scope.cancel()
+        val recognizer = speechRecognizer
         speechRecognizer = null
+        if (recognizer != null) {
+            try {
+                recognizer.destroy()
+            } catch (e: IllegalStateException) {
+                reportError("释放语音识别器失败：" + describeThrowable(e))
+            } catch (e: RuntimeException) {
+                reportError("释放语音识别器失败：" + describeThrowable(e))
+            }
+        }
+        onListeningStateChanged?.invoke(false)
+    }
+
+    /** 唯一错误出口：兜底空串，保证上层永远拿到可显示的文字 */
+    private fun reportError(reason: String) {
+        onListeningStateChanged?.invoke(false)
+        onSpeechError?.invoke(reason.takeIf { it.isNotBlank() } ?: AsrMessages.UNKNOWN)
+    }
+
+    private fun describeThrowable(error: Throwable): String =
+        error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+
+    private fun describeRecognizerError(error: Int): String = when (error) {
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> AsrMessages.NO_MIC_PERMISSION
+        SpeechRecognizer.ERROR_NO_MATCH -> AsrMessages.EMPTY_RESULT
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "没有听到说话声，请靠近麦克风重试"
+        SpeechRecognizer.ERROR_AUDIO -> "录音失败，麦克风可能被其他应用占用"
+        SpeechRecognizer.ERROR_NETWORK -> "语音识别网络不可用，请检查手表网络"
+        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "语音识别网络超时，请重试"
+        SpeechRecognizer.ERROR_SERVER -> "语音识别服务出错，请稍后重试"
+        SpeechRecognizer.ERROR_CLIENT -> "语音识别客户端异常，请重试"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "语音识别器正忙，请稍后重试"
+        SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "语音识别请求过于频繁，请稍后重试"
+        SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "与语音识别服务断开连接，请重试"
+        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "当前语言不被语音识别服务支持"
+        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "当前语言暂不可用，请改选其他语言"
+        else -> "语音识别异常（错误码 " + error + "），请重试"
     }
 }

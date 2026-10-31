@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.gestures.scrollBy
@@ -60,6 +61,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -94,9 +97,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentExecutionState
@@ -125,6 +130,9 @@ import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
 import com.example.myapplication.presentation.ui.UserChatBubble
+import com.example.myapplication.voice.AsrProviderId
+import com.example.myapplication.voice.AudioRecordWavCapture
+import com.example.myapplication.voice.VoiceAsrGateway
 import com.example.myapplication.voice.VoiceInputManager
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Job
@@ -139,13 +147,17 @@ import java.util.UUID
 import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
-    private val externalPromptState = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private var externalPromptSeq = 0L
+    private val externalPromptState = androidx.compose.runtime.mutableStateOf<ExternalPrompt?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // 输入法由 Compose insets 驱动避让：窗口不整体平移，也不二次压缩内容高度
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         setContent {
@@ -176,7 +188,8 @@ class MainActivity : ComponentActivity() {
         }
         val prompt = intent?.getStringExtra("prompt")
         if (!prompt.isNullOrBlank()) {
-            externalPromptState.value = prompt
+            // 每次 intent 递增序号：同文本的新 intent 也能再触发，重组则不会重复触发
+            externalPromptState.value = ExternalPrompt(seq = ++externalPromptSeq, text = prompt)
         }
     }
 }
@@ -190,7 +203,7 @@ enum class AppScreen {
 
 @Composable
 fun WearAgentUnifiedApp(
-    externalPrompt: String? = null,
+    externalPrompt: ExternalPrompt? = null,
     onClearExternalPrompt: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -198,7 +211,7 @@ fun WearAgentUnifiedApp(
     val preferences = remember { AgentPreferences(context) }
     val toolRegistry = remember { AgentToolRegistry(context) }
     val agentDispatcher = remember { AgentDispatcher(context, toolRegistry, preferences) }
-    val voiceInputManager = remember { VoiceInputManager(context) }
+    val voiceInputManager = remember { VoiceInputManager(context, VoiceAsrGateway(capture = AudioRecordWavCapture(context))) }
 
     var currentScreen by remember {
         mutableStateOf(if (preferences.hasCompletedOnboarding) AppScreen.MAIN else AppScreen.ONBOARDING)
@@ -328,7 +341,7 @@ private fun MainAgentDashboard(
     voiceInputManager: VoiceInputManager,
     liveSpacingDp: Float,
     onOpenSettings: () -> Unit,
-    externalPrompt: String? = null,
+    externalPrompt: ExternalPrompt? = null,
     onClearExternalPrompt: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -438,8 +451,25 @@ private fun MainAgentDashboard(
     }
 
     var isExecutingAgent by remember { mutableStateOf(false) }
-    var showCustomInputDialog by remember { mutableStateOf(false) }
-    var customInputText by remember { mutableStateOf("") }
+    var inputState by remember { mutableStateOf(TextInputState()) }
+
+    // 瞬时提示：语音错误与模型切换反馈共用一条，短时可见后自动消失
+    var noticeText by remember { mutableStateOf<String?>(null) }
+    var noticeIsError by remember { mutableStateOf(false) }
+    var noticeSeq by remember { mutableStateOf(0) }
+
+    fun showNotice(text: String, isError: Boolean) {
+        noticeText = text
+        noticeIsError = isError
+        noticeSeq += 1
+    }
+
+    LaunchedEffect(noticeSeq) {
+        if (noticeSeq > 0) {
+            delay(2600)
+            noticeText = null
+        }
+    }
 
     var triggerAgentAction by remember { mutableStateOf<(String) -> Unit>({}) }
     var launchVoiceInputAction by remember { mutableStateOf<() -> Unit>({}) }
@@ -559,6 +589,12 @@ private fun MainAgentDashboard(
                 return
             }
 
+            val asr = preferences.asrSettings()
+            if (asr.enabled && asr.providerId == AsrProviderId.BAIDU && asr.hasBaiduCredentials) {
+                voiceInputManager.startThirdPartyListening(asr)
+                return
+            }
+
             val speechIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PROMPT, "请说话，正在倾听...")
@@ -586,6 +622,22 @@ private fun MainAgentDashboard(
         }
     }
 
+    // 外部 intent prompt：进入主界面且空闲时触发一次，随后回清并记录序号防止重组重放
+    var consumedExternalSeq by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(externalPrompt, isExecutingAgent, consumedExternalSeq) {
+        val prompt = externalPrompt ?: return@LaunchedEffect
+        if (!ExternalPromptGate.shouldConsume(
+                prompt = prompt,
+                ready = !isExecutingAgent,
+                lastConsumedSeq = consumedExternalSeq
+            )
+        ) return@LaunchedEffect
+
+        consumedExternalSeq = prompt.seq
+        onClearExternalPrompt()
+        triggerAgent(prompt.text.trim())
+    }
+
     LaunchedEffect(Unit) {
         voiceInputManager.onListeningStateChanged = { listening ->
             isRecordingVoice = listening
@@ -596,9 +648,10 @@ private fun MainAgentDashboard(
             bottomBlockMode = BottomBlockMode.IDLE
             triggerAgent(recognizedText)
         }
-        voiceInputManager.onSpeechError = { _ ->
+        voiceInputManager.onSpeechError = { rawMessage ->
             isRecordingVoice = false
             bottomBlockMode = BottomBlockMode.IDLE
+            SpeechErrorNotice.message(rawMessage)?.let { showNotice(it, true) }
         }
     }
 
@@ -616,7 +669,7 @@ private fun MainAgentDashboard(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
-            .pointerInput(bottomBlockMode, isExecutingAgent, showCustomInputDialog, isSessionDrawerOpen) {
+            .pointerInput(bottomBlockMode, isExecutingAgent, inputState.isOpen, isSessionDrawerOpen) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     val startX = down.position.x
@@ -628,7 +681,7 @@ private fun MainAgentDashboard(
                     val canGesture = inContentZone &&
                             bottomBlockMode == BottomBlockMode.IDLE &&
                             !isExecutingAgent &&
-                            !showCustomInputDialog
+                            !inputState.isOpen
 
                     while (true) {
                         val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -846,14 +899,19 @@ private fun MainAgentDashboard(
                 voiceInputManager.stopListening()
             },
             onLeftKeyboardClick = {
-                showCustomInputDialog = true
+                inputState = inputState.reduce(TextInputEvent.Open)
             },
             onRightActionClick = {
                 when (preferences.rightButtonAction) {
                     RightButtonAction.MODEL_SWITCH -> {
-                        // 切换模型 (Gemini 2.5 Flash / Pro)
-                        val next = if (preferences.modelName == "gemini-2.5-flash") "gemini-2.5-pro" else "gemini-2.5-flash"
-                        preferences.modelName = next
+                        // 只在后端已缓存的模型清单内循环，绝不切到与 baseUrl 不匹配的模型
+                        val next = ModelCycle.next(preferences.modelName, preferences.cachedRemoteModels)
+                        if (next == null) {
+                            showNotice("未发现可用模型，请先在设置中拉取模型列表", true)
+                        } else {
+                            preferences.modelName = next
+                            showNotice("模型已切换: $next", false)
+                        }
                     }
                     RightButtonAction.CLEAR_MEMORY -> {
                         agentDispatcher.resetConversation()
@@ -894,73 +952,138 @@ private fun MainAgentDashboard(
             }
         )
 
-        // ================= 6. 自定义文本输入弹窗 =================
-        if (showCustomInputDialog) {
+        // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================
+        val inlineNotice = noticeText
+        if (!inlineNotice.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 104.dp)
+                    .fillMaxWidth(0.88f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (noticeIsError) Color(0xFF261216).copy(alpha = 0.92f)
+                        else Color(0xFF0F172A).copy(alpha = 0.94f)
+                    )
+                    .border(
+                        0.8.dp,
+                        if (noticeIsError) Color(0xFFEF4444) else Color(0xFF38BDF8),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = inlineNotice,
+                    fontSize = 10.sp,
+                    color = if (noticeIsError) Color(0xFFF87171) else Color(0xFF38BDF8),
+                    maxLines = 3
+                )
+            }
+        }
+
+        // ================= 6. 自定义文本输入弹窗 (避让输入法 / 返回键只关弹窗) =================
+        if (inputState.isOpen) {
+            val dialogFocusRequester = remember { FocusRequester() }
+
+            // 返回键只关闭弹窗，绝不退出 Activity；未发送文本保留在状态机中
+            BackHandler {
+                inputState = inputState.reduce(TextInputEvent.Cancel)
+            }
+
+            LaunchedEffect(Unit) {
+                dialogFocusRequester.requestFocus()
+            }
+
+            // 提交：屏幕按钮与输入法 Action 键共用同一条路径（Wear 输入法整屏时按钮够不到）
+            val submitInput: () -> Unit = {
+                val afterSubmit = inputState.reduce(TextInputEvent.Submit)
+                inputState = afterSubmit
+                afterSubmit.lastSent?.let { triggerAgent(it) }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.92f))
-                    .padding(24.dp),
+                    // 外层承接口感遮罩，内容整体抬到输入法上沿之上
+                    .imePadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("输入文字指令", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    BasicTextField(
-                        value = customInputText,
-                        onValueChange = { customInputText = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        cursorBrush = SolidColor(Color.White),
+                    // 输入区可滚动：高度不足时只压缩这一块，操作按钮永不被挤出圆屏
+                    Column(
                         modifier = Modifier
+                            .weight(1f, fill = false)
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF141720))
-                            .border(0.8.dp, Color(0xFF333D4F), RoundedCornerShape(8.dp))
-                            .padding(10.dp)
-                    )
-                    // 预置快捷指令胶囊 (极简纯净纯色无 Emoji，纯黑白冷灰体系)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = "时间天气与资讯",
-                            fontSize = 9.sp,
-                            color = Color(0xFFE2E8F0),
-                            maxLines = 1,
+                        Text("输入文字指令", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        BasicTextField(
+                            value = inputState.text,
+                            onValueChange = { inputState = inputState.reduce(TextInputEvent.Change(it)) },
+                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                            cursorBrush = SolidColor(Color.White),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { submitInput() }),
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF181D26))
-                                .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
-                                .clickable {
-                                    val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
-                                    showCustomInputDialog = false
-                                    triggerAgent(send)
-                                }
-                                .padding(vertical = 5.dp, horizontal = 4.dp)
+                                .fillMaxWidth()
+                                .focusRequester(dialogFocusRequester)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF141720))
+                                .border(0.8.dp, Color(0xFF333D4F), RoundedCornerShape(8.dp))
+                                .padding(10.dp)
                         )
-                        Text(
-                            text = "诊断电量与马达",
-                            fontSize = 9.sp,
-                            color = Color(0xFFE2E8F0),
-                            maxLines = 1,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF181D26))
-                                .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
-                                .clickable {
-                                    val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
-                                    showCustomInputDialog = false
-                                    triggerAgent(send)
-                                }
-                                .padding(vertical = 5.dp, horizontal = 4.dp)
-                        )
+                        // 预置快捷指令胶囊 (极简纯净纯色无 Emoji，纯黑白冷灰体系)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "时间天气与资讯",
+                                fontSize = 9.sp,
+                                color = Color(0xFFE2E8F0),
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF181D26))
+                                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
+                                        inputState = inputState.reduce(TextInputEvent.Cancel)
+                                        triggerAgent(send)
+                                    }
+                                    .padding(vertical = 5.dp, horizontal = 4.dp)
+                            )
+                            Text(
+                                text = "诊断电量与马达",
+                                fontSize = 9.sp,
+                                color = Color(0xFFE2E8F0),
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF181D26))
+                                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
+                                        inputState = inputState.reduce(TextInputEvent.Cancel)
+                                        triggerAgent(send)
+                                    }
+                                    .padding(vertical = 5.dp, horizontal = 4.dp)
+                            )
+                        }
                     }
 
+                    // 操作按钮固定在可视区底部：键盘展开时始终可见可点
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "取消",
@@ -969,7 +1092,7 @@ private fun MainAgentDashboard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFF1E2430))
-                                .clickable { showCustomInputDialog = false }
+                                .clickable { inputState = inputState.reduce(TextInputEvent.Cancel) }
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         )
                         Text(
@@ -980,14 +1103,7 @@ private fun MainAgentDashboard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Color(0xFFF8FAFC))
-                                .clickable {
-                                    if (customInputText.isNotBlank()) {
-                                        val send = customInputText
-                                        customInputText = ""
-                                        showCustomInputDialog = false
-                                        triggerAgent(send)
-                                    }
-                                }
+                                .clickable { submitInput() }
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         )
                     }
@@ -1001,6 +1117,7 @@ private fun MainAgentDashboard(
             sessions = sessions,
             activeSessionId = activeSessionId,
             currentModelName = preferences.modelName,
+            availableModels = ModelCycle.parse(preferences.cachedRemoteModels),
             onSelectModel = { selectedModel ->
                 preferences.modelName = selectedModel
             },
@@ -1021,5 +1138,71 @@ private fun MainAgentDashboard(
             )
         }
     }
+}
+
+
+// ============================================================================
+// 纯逻辑：文本输入弹窗状态机（无 Compose / Android 依赖，可单测）
+// ============================================================================
+data class TextInputState(
+    val isOpen: Boolean = false,
+    val text: String = "",
+    val lastSent: String? = null
+)
+
+sealed class TextInputEvent {
+    /** 打开弹窗：不清空未发送文本 */
+    object Open : TextInputEvent()
+
+    /** 取消 / 返回键关闭：文本原样保留，重开可继续编辑 */
+    object Cancel : TextInputEvent()
+
+    data class Change(val text: String) : TextInputEvent()
+
+    /** 提交：仅非空白文本才关闭并产出一条一次性待发指令 */
+    object Submit : TextInputEvent()
+}
+
+fun TextInputState.reduce(event: TextInputEvent): TextInputState = when (event) {
+    TextInputEvent.Open -> copy(isOpen = true)
+    TextInputEvent.Cancel -> copy(isOpen = false)
+    is TextInputEvent.Change -> copy(text = event.text)
+    TextInputEvent.Submit ->
+        if (text.isBlank()) this else copy(isOpen = false, text = "", lastSent = text)
+}
+
+// ============================================================================
+// 纯逻辑：右副键模型循环（只在 cachedRemoteModels 清单内循环）
+// ============================================================================
+object ModelCycle {
+    fun parse(cached: String?): List<String> = (cached ?: "")
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+
+    fun next(current: String?, cached: String?): String? {
+        val models = parse(cached)
+        if (models.isEmpty()) return null
+        val index = models.indexOf(current?.trim())
+        return models[(index + 1) % models.size]
+    }
+}
+
+// ============================================================================
+// 纯逻辑：externalPrompt 一次性消费（seq 标识单次 intent，重组不重放）
+// ============================================================================
+data class ExternalPrompt(val seq: Long, val text: String)
+
+object ExternalPromptGate {
+    fun shouldConsume(prompt: ExternalPrompt?, ready: Boolean, lastConsumedSeq: Long?): Boolean =
+        prompt != null && ready && prompt.text.isNotBlank() && prompt.seq != lastConsumedSeq
+}
+
+// ============================================================================
+// 纯逻辑：语音错误提示文案规整（空白消息不产生提示条）
+// ============================================================================
+object SpeechErrorNotice {
+    fun message(raw: String?): String? = raw?.trim()?.takeIf { it.isNotEmpty() }
 }
 

@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.voice.AsrLanguage
+import com.example.myapplication.voice.AsrProviderId
+import com.example.myapplication.voice.AsrSettings
 
 /**
  * Agent 与表盘偏好设置持久化仓库
@@ -12,18 +15,16 @@ class AgentPreferences(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("agent_prefs", Context.MODE_PRIVATE)
 
     var securityMode: SecurityMode
-        get() = try {
-            SecurityMode.valueOf(prefs.getString("security_mode", SecurityMode.STANDARD.name) ?: SecurityMode.STANDARD.name)
-        } catch (_: Exception) {
-            SecurityMode.STANDARD
+        get() {
+            val stored = prefs.getString("security_mode", SecurityMode.STANDARD.name)
+            return SecurityMode.values().firstOrNull { it.name == stored } ?: SecurityMode.STANDARD
         }
         set(value) = prefs.edit().putString("security_mode", value.name).apply()
 
     var rightButtonAction: RightButtonAction
-        get() = try {
-            RightButtonAction.valueOf(prefs.getString("right_button_action", RightButtonAction.MODEL_SWITCH.name) ?: RightButtonAction.MODEL_SWITCH.name)
-        } catch (_: Exception) {
-            RightButtonAction.MODEL_SWITCH
+        get() {
+            val stored = prefs.getString("right_button_action", RightButtonAction.MODEL_SWITCH.name)
+            return RightButtonAction.values().firstOrNull { it.name == stored } ?: RightButtonAction.MODEL_SWITCH
         }
         set(value) = prefs.edit().putString("right_button_action", value.name).apply()
 
@@ -83,8 +84,9 @@ class AgentPreferences(context: Context) {
         get() = prefs.getString("main_input_type", "VOICE") ?: "VOICE"
         set(value) = prefs.edit().putString("main_input_type", value).apply()
 
+    /** 默认 2048：300 会把正常长度的回复硬截断 */
     var maxOutputTokens: Int
-        get() = prefs.getInt("max_output_tokens", 300)
+        get() = prefs.getInt("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
         set(value) = prefs.edit().putInt("max_output_tokens", value).apply()
 
     var streamMode: Boolean
@@ -119,7 +121,54 @@ class AgentPreferences(context: Context) {
         get() = prefs.getBoolean("tool_web_search_enabled", true)
         set(value) = prefs.edit().putBoolean("tool_web_search_enabled", value).apply()
 
+    /** 语音转写总开关：关闭时上层直接给出中文提示，不发起任何录音或网络请求 */
+    var asrEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ASR_ENABLED, DEFAULT_ASR_ENABLED)
+        set(value) = prefs.edit().putBoolean(KEY_ASR_ENABLED, value).apply()
+
+    /** 语音服务厂商，持久化为 AsrProviderId.storageKey 字符串 */
+    var asrProvider: String
+        get() = prefs.getString(KEY_ASR_PROVIDER, DEFAULT_ASR_PROVIDER) ?: DEFAULT_ASR_PROVIDER
+        set(value) = prefs.edit().putString(KEY_ASR_PROVIDER, value).apply()
+
+    var baiduApiKey: String
+        get() = prefs.getString(KEY_ASR_BAIDU_API_KEY, DEFAULT_ASR_KEY) ?: DEFAULT_ASR_KEY
+        set(value) = prefs.edit().putString(KEY_ASR_BAIDU_API_KEY, value).apply()
+
+    var baiduSecretKey: String
+        get() = prefs.getString(KEY_ASR_BAIDU_SECRET_KEY, DEFAULT_ASR_KEY) ?: DEFAULT_ASR_KEY
+        set(value) = prefs.edit().putString(KEY_ASR_BAIDU_SECRET_KEY, value).apply()
+
+    /** 识别语言，存百度 dev_pid 数值（1537 普通话 / 1737 英语 / 1637 粤语 / 1837 四川话） */
+    var asrDevPid: Int
+        get() = prefs.getInt(KEY_ASR_DEV_PID, DEFAULT_ASR_DEV_PID)
+        set(value) = prefs.edit().putInt(KEY_ASR_DEV_PID, value).apply()
+
+    /** 供语音链路使用的不可变配置快照，隔离 SharedPreferences 依赖 */
+    fun asrSettings(): AsrSettings = AsrSettings(
+        enabled = asrEnabled,
+        providerId = AsrProviderId.fromStorage(asrProvider),
+        baiduApiKey = baiduApiKey,
+        baiduSecretKey = baiduSecretKey,
+        language = AsrLanguage.fromDevPid(asrDevPid)
+    )
+
     fun resetAll() {
         prefs.edit().clear().apply()
+    }
+
+    companion object {
+        const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
+
+        const val KEY_ASR_ENABLED = "asr_enabled"
+        const val KEY_ASR_PROVIDER = "asr_provider"
+        const val KEY_ASR_BAIDU_API_KEY = "asr_baidu_api_key"
+        const val KEY_ASR_BAIDU_SECRET_KEY = "asr_baidu_secret_key"
+        const val KEY_ASR_DEV_PID = "asr_dev_pid"
+
+        const val DEFAULT_ASR_ENABLED = false
+        const val DEFAULT_ASR_PROVIDER = "SYSTEM"
+        const val DEFAULT_ASR_DEV_PID = 1537
+        const val DEFAULT_ASR_KEY = ""
     }
 }

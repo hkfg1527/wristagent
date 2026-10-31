@@ -16,11 +16,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -89,6 +92,7 @@ fun SessionDrawer(
     sessions: List<ChatSession>,
     activeSessionId: String,
     currentModelName: String = "",
+    availableModels: List<String> = emptyList(),
     onSelectModel: ((String) -> Unit)? = null,
     onSelectSession: (String) -> Unit,
     onCreateSession: () -> Unit,
@@ -223,43 +227,57 @@ fun SessionDrawer(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF38BDF8)
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf(
-                                "gemini-2.5-flash" to "Flash",
-                                "gemini-2.5-pro" to "Pro",
-                                "deepseek-chat" to "DeepSeek"
-                            ).forEach { (modelKey, label) ->
-                                val isSel = currentModelName == modelKey
-                                Box(
+                        if (ModelLabels.isEmpty(availableModels)) {
+                            Text(
+                                text = "未发现可用模型，请在设置中拉取模型列表",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        } else {
+                            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                                val spacing = 4.dp
+                                val columns = availableModels.size.coerceIn(1, 3)
+                                val chipWidth = ((maxWidth - spacing * (columns - 1)) / columns)
+                                    .coerceAtLeast(56.dp)
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .height(34.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSel) Color(0xFF0284C7) else Color(0xFF1E2536))
-                                        .border(
-                                            0.6.dp,
-                                            if (isSel) Color(0xFF38BDF8) else Color(0xFF333E54),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable {
-                                            context.getSystemService(Vibrator::class.java)?.let { vib ->
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                                }
-                                            }
-                                            onSelectModel?.invoke(modelKey)
-                                        },
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing)
                                 ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSel) Color.White else Color(0xFFCBD5E1)
-                                    )
+                                    availableModels.forEach { modelKey ->
+                                        val isSel = currentModelName == modelKey
+                                        Box(
+                                            modifier = Modifier
+                                                .width(chipWidth)
+                                                .height(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF1E2536))
+                                                .border(
+                                                    0.6.dp,
+                                                    if (isSel) Color(0xFF38BDF8) else Color(0xFF333E54),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable {
+                                                    context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                            vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                                        }
+                                                    }
+                                                    onSelectModel?.invoke(modelKey)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = ModelLabels.label(modelKey),
+                                                fontSize = 11.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
