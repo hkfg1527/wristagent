@@ -1,0 +1,144 @@
+package com.example.myapplication.presentation.ui.chat
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.AgentToolRegistry
+import com.example.myapplication.presentation.ChatViewModel
+import com.example.myapplication.presentation.ExternalPrompt
+import com.example.myapplication.presentation.ui.OnboardingScreen
+import com.example.myapplication.presentation.ui.SettingsScreen
+import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.voice.AudioRecordWavCapture
+import com.example.myapplication.voice.VoiceAsrGateway
+import com.example.myapplication.voice.VoiceInputManager
+
+enum class AppScreen {
+    ONBOARDING,
+    MAIN,
+    SETTINGS
+}
+
+/**
+ * 应用根容器：三个页面的切换、点阵密度与省电偏好的回写、语音引擎的生命周期都留在这里。
+ * 聊天页只做展示与回调，状态全部来自 [ChatViewModel]。
+ */
+@Composable
+fun WearAgentApp(
+    viewModel: ChatViewModel,
+    preferences: AgentPreferences,
+    toolRegistry: AgentToolRegistry,
+    externalPrompt: ExternalPrompt? = null,
+    onClearExternalPrompt: () -> Unit = {}
+) {
+    val context = LocalContext.current
+
+    val voiceInputManager = remember {
+        VoiceInputManager(context, VoiceAsrGateway(capture = AudioRecordWavCapture(context)))
+    }
+
+    var currentScreen by remember {
+        mutableStateOf(if (preferences.hasCompletedOnboarding) AppScreen.MAIN else AppScreen.ONBOARDING)
+    }
+
+    var liveSpacingDp by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
+
+    // 主键输入方式提示只在本次启动播报一次：从设置页返回主界面不重复打扰
+    var announceInputMode by remember { mutableStateOf(true) }
+
+    DisposableEffect(Unit) {
+        toolRegistry.onMatrixDensityChange = { spacing ->
+            liveSpacingDp = spacing
+            preferences.matrixSpacingDp = spacing
+        }
+        toolRegistry.onPowerModeChange = { ultra ->
+            preferences.ultraSaving = ultra
+        }
+        onDispose {
+            voiceInputManager.destroy()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Wear.Palette.Bg)
+    ) {
+        AnimatedContent(
+            targetState = currentScreen,
+            transitionSpec = {
+                if (targetState == AppScreen.SETTINGS) {
+                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
+                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeOut(tween(180)))
+                } else {
+                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
+                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180)))
+                }
+            },
+            label = "screenTransition"
+        ) { screen ->
+            when (screen) {
+                AppScreen.ONBOARDING -> {
+                    OnboardingScreen(
+                        preferences = preferences,
+                        onFinish = {
+                            liveSpacingDp = preferences.matrixSpacingDp
+                            currentScreen = AppScreen.MAIN
+                        }
+                    )
+                }
+
+                AppScreen.SETTINGS -> {
+                    BackHandler {
+                        liveSpacingDp = preferences.matrixSpacingDp
+                        currentScreen = AppScreen.MAIN
+                    }
+                    SettingsScreen(
+                        preferences = preferences,
+                        onBack = {
+                            liveSpacingDp = preferences.matrixSpacingDp
+                            currentScreen = AppScreen.MAIN
+                        },
+                        onRestartOnboarding = {
+                            preferences.hasCompletedOnboarding = false
+                            currentScreen = AppScreen.ONBOARDING
+                        }
+                    )
+                }
+
+                AppScreen.MAIN -> {
+                    ChatScreen(
+                        viewModel = viewModel,
+                        preferences = preferences,
+                        voiceInputManager = voiceInputManager,
+                        liveSpacingDp = liveSpacingDp,
+                        onOpenSettings = { currentScreen = AppScreen.SETTINGS },
+                        announceInputMode = announceInputMode,
+                        onInputModeAnnounced = { announceInputMode = false },
+                        externalPrompt = externalPrompt,
+                        onClearExternalPrompt = onClearExternalPrompt
+                    )
+                }
+            }
+        }
+    }
+}
