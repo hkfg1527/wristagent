@@ -96,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentDispatcher
@@ -134,6 +135,8 @@ import com.example.myapplication.voice.VoiceInputManager
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.withFrameMillis
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
@@ -338,6 +341,35 @@ private fun AnimatedMessageCard(
 
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
+
+/**
+ * 弹性滚到列表末端：用 Animatable 驱动"累计位移"，再把每帧增量交给 scroll { scrollBy }。
+ * 末端由 contentPadding.bottom 夹住，因此弹簧的"冲过头 → 收敛"过程肉眼可见，
+ * 不再是一刀切到位的硬跳。流式吐字仍走瞬时跟随，避免动画把逐字节奏拖慢。
+ */
+private suspend fun ScalingLazyListState.springScrollToEnd() = coroutineScope {
+    // animateTo 的 block 不是挂起上下文，不能在里面 scroll；
+    // 因此用一个协程跑弹簧动画，主协程逐帧读取动画值、把增量交给 scroll。
+    val anim = Animatable(0f)
+    val driver = launch {
+        anim.animateTo(
+            targetValue = BOTTOM_FOLLOW_SCROLL_PX,
+            animationSpec = spring(dampingRatio = 0.72f, stiffness = 220f)
+        )
+    }
+    var delivered = 0f
+    while (driver.isActive) {
+        withFrameMillis { }
+        val current = anim.value
+        val delta = current - delivered
+        if (delta != 0f) {
+            delivered = current
+            scroll { scrollBy(delta) }
+        }
+    }
+    val rest = anim.value - delivered
+    if (rest != 0f) scroll { scrollBy(rest) }
+}
 
 /** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
 private const val TEMP_TOOL_TEST_COMMAND =
@@ -1035,7 +1067,8 @@ private fun MainAgentDashboard(
             // animateScrollToItem 只做"项顶部对齐视口顶部"，卡片高于一屏时会一直伸到屏幕外，
             // 必须再补一次滚到末端，最后一条卡片的底边才会落在 contentPadding.bottom 处（≈128dp 圆心带）。
             listState.animateScrollToItem(lastIndex)
-            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+            // 归位用弹簧而不是硬切：视觉上是"滑过去并轻轻收住"
+            listState.springScrollToEnd()
         }
     }
 
@@ -1043,7 +1076,7 @@ private fun MainAgentDashboard(
     // 所以必须在执行结束的那一刻补一次，否则最后一条仍会伸到屏幕外。
     LaunchedEffect(isExecutingAgent) {
         if (!isExecutingAgent) {
-            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+            listState.springScrollToEnd()
         }
     }
 
