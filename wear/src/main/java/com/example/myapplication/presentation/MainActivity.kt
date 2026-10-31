@@ -1060,9 +1060,12 @@ private fun MainAgentDashboard(
     // 列表已关掉 autoCentering（锚点不再是第 0 项），scrollToItem 顶对齐后被 contentPadding.bottom =
     // ListCenterReach 夹到内容末端：最后一条卡片底边稳定落在 240 − 112 = 128dp，正是圆心附近那一带。
     // 审批态进入/退出不碰这里，滚动位置在整段审批塌缩动画期间保持不变。
-    LaunchedEffect(conversationItems.size) {
+    // 只有真正开始对话（出现了用户消息）才做自动归位：
+    // 否则空会话只有一条问候语时也会被"滚到末端"顶到屏幕最上面，表现为开屏先往下弹一下又回上去。
+    val hasUserTurn = conversationItems.any { it is RenderableConversationItem.UserPrompt }
+    LaunchedEffect(conversationItems.size, hasUserTurn) {
         val lastIndex = conversationItems.lastIndex
-        if (lastIndex >= 0) {
+        if (hasUserTurn && lastIndex >= 0) {
             // 先把最后一项拉进视口，再滚到真正的末端：
             // animateScrollToItem 只做"项顶部对齐视口顶部"，卡片高于一屏时会一直伸到屏幕外，
             // 必须再补一次滚到末端，最后一条卡片的底边才会落在 contentPadding.bottom 处（≈128dp 圆心带）。
@@ -1074,8 +1077,8 @@ private fun MainAgentDashboard(
 
     // 一轮回答结束时再滚到末端：卡片在流式过程中会持续变高，而上面的 effect 只在"条目数变化"时触发，
     // 所以必须在执行结束的那一刻补一次，否则最后一条仍会伸到屏幕外。
-    LaunchedEffect(isExecutingAgent) {
-        if (!isExecutingAgent) {
+    LaunchedEffect(isExecutingAgent, hasUserTurn) {
+        if (!isExecutingAgent && hasUserTurn) {
             listState.springScrollToEnd()
         }
     }
@@ -1149,8 +1152,13 @@ private fun MainAgentDashboard(
             // 本项目曾写死 itemIndex = 0，于是"第 0 项能滚到圆心"变成滚动锚点 —— 每轮新消息到达后
             // 视图被拉回列表开头，新内容落在视口外。关掉后位置控制完全交给上面的"最后一条居中"逻辑。
             autoCentering = null,
-            // top 与 T1 的 14dp 遮罩同宽；bottom 让最后一项能滚到圆屏中心（见 Wear.Size.ListCenterReach）
-            contentPadding = PaddingValues(top = 14.dp, bottom = Wear.Size.ListCenterReach),
+            // top 必须让开顶部曲面时钟：14dp 时首条卡片会直接压到时钟上（真表 192dp 屏上尤其明显）；
+            // 取 TopContentInset(34dp) + Space.Md(12dp) = 46dp，既在时钟下方、又只让掉一点点高度。
+            // bottom 让最后一项能滚到圆屏中心（见 Wear.Size.ListCenterReach）
+            contentPadding = PaddingValues(
+                top = Wear.Size.TopContentInset + Wear.Space.Md,
+                bottom = Wear.Size.ListCenterReach
+            ),
             modifier = Modifier
                 .fillMaxSize()
                 // 审批沉浸：整列正文退到 35% 并轻度模糊（只糊列表图层，点阵画布保持清晰）；
