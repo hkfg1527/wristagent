@@ -16,20 +16,19 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,19 +44,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.components.WearCard
+import com.example.myapplication.presentation.ui.components.WearChip
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 
 /**
@@ -91,7 +87,7 @@ fun OnboardingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF000000))
+            .background(Wear.Palette.Bg)
     ) {
         // ================= 1. 背景点阵画布 (随引导阶段呼吸与发散) =================
         UnifiedMatrixCanvas(
@@ -112,14 +108,14 @@ fun OnboardingScreen(
 
                 // 中心发光原点
                 drawCircle(
-                    color = Color.White.copy(alpha = alpha),
+                    color = Wear.Palette.TextPrimary.copy(alpha = alpha),
                     radius = 4.dp.toPx() * (1f + explosionProgress.value * 2f),
                     center = Offset(cx, cy)
                 )
 
                 // 物理扩散光环 (唤醒点阵)
                 drawCircle(
-                    color = Color.White.copy(alpha = alpha * 0.7f),
+                    color = Wear.Palette.TextPrimary.copy(alpha = alpha * 0.7f),
                     radius = currentRadius,
                     center = Offset(cx, cy),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
@@ -137,56 +133,41 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                // 中间大白圆 (直径 180dp)
+                // 中间大白圆 (直径 180dp，引导页识别符号)
                 Box(
                     modifier = Modifier
                         .size(180.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF8FAFC)),
+                        .background(Wear.Palette.TextPrimary),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp, vertical = 20.dp),
+                            .padding(horizontal = Wear.Space.Lg, vertical = Wear.Space.Lg),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm, Alignment.CenterVertically)
                     ) {
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "你好",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "欢迎使用穿戴智能助手",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF334155),
+                        BasicText(
+                            text = "你好",
+                            style = Wear.TextTitle.copy(color = Wear.Palette.Bg),
+                            maxLines = 1
+                        )
+                        BasicText(
+                            text = "欢迎使用穿戴智能助手",
+                            modifier = Modifier.fillMaxWidth(),
+                            style = Wear.TextCaption.copy(
+                                color = Wear.Palette.TextMuted,
                                 textAlign = TextAlign.Center
-                            )
-                        }
-
-                        // 下方 [继续] 胶囊按键
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF0F172A))
-                                .clickable { phase = 3 }
-                                .padding(horizontal = 20.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "继续",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
+                            ),
+                            maxLines = 2
+                        )
+                        // 下方 [继续] 胶囊按键 (触控高度 ≥ 44dp)
+                        WearChip(
+                            label = "继续",
+                            selected = false,
+                            onClick = { phase = 3 }
+                        )
                     }
                 }
             }
@@ -244,64 +225,69 @@ private fun OnboardingConfigPhase(
                     }
                     true
                 },
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Lg),
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 中心原点与欢迎徽章
             item {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                    verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
+                    modifier = Modifier.padding(top = Wear.Space.Xs, bottom = Wear.Space.Xs)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(7.dp)
+                            .size(Wear.Space.Sm)
                             .clip(CircleShape)
-                            .background(Color.White)
+                            .background(Wear.Palette.TextPrimary)
                     )
-                    Text(
+                    BasicText(
                         text = "配置 AI 模型",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF8FAFC)
+                        style = Wear.TextTitle,
+                        maxLines = 1
                     )
-                    Text(
+                    BasicText(
                         text = "设置 API 端点与密钥后即可开始使用",
-                        fontSize = 8.sp,
-                        color = Color(0xFF94A3B8)
+                        modifier = Modifier.fillMaxWidth(),
+                        style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
+                        maxLines = 2
                     )
                 }
             }
 
             // Base URL 输入框
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF11141C))
-                        .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Column {
-                        Text("API Base URL", fontSize = 7.5.sp, color = Color(0xFF94A3B8))
+                val baseUrlFocus = remember { FocusRequester() }
+                WearCard(modifier = Modifier.fillMaxWidth()) {
+                    BasicText(
+                        text = "API Base URL",
+                        style = Wear.TextCaption,
+                        maxLines = 1
+                    )
+                    // 单行输入 + 12sp 等宽令牌：整串域名一行放下，超长时横向滚动而非折行
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Wear.Size.Touch)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { baseUrlFocus.requestFocus() },
+                        contentAlignment = Alignment.CenterStart
+                    ) {
                         BasicTextField(
                             value = inputBaseUrl,
                             onValueChange = {
                                 inputBaseUrl = it
                                 preferences.baseUrl = it
                             },
-                            textStyle = TextStyle(
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            cursorBrush = SolidColor(Color.White),
+                            textStyle = Wear.TextMono.copy(color = Wear.Palette.TextPrimary),
+                            cursorBrush = SolidColor(Wear.Palette.TextPrimary),
+                            singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 2.dp)
+                                .focusRequester(baseUrlFocus)
                         )
                     }
                 }
@@ -309,31 +295,36 @@ private fun OnboardingConfigPhase(
 
             // API Key 输入框
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF11141C))
-                        .border(0.6.dp, Color(0xFF262D3D), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Column {
-                        Text("API Key", fontSize = 7.5.sp, color = Color(0xFF94A3B8))
+                val apiKeyFocus = remember { FocusRequester() }
+                WearCard(modifier = Modifier.fillMaxWidth()) {
+                    BasicText(
+                        text = "API Key",
+                        style = Wear.TextCaption,
+                        maxLines = 1
+                    )
+                    // 同 Base URL：单行 + 12sp 等宽令牌，密钥永不折行
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Wear.Size.Touch)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { apiKeyFocus.requestFocus() },
+                        contentAlignment = Alignment.CenterStart
+                    ) {
                         BasicTextField(
                             value = inputApiKey,
                             onValueChange = {
                                 inputApiKey = it
                                 preferences.apiKey = it
                             },
-                            textStyle = TextStyle(
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            cursorBrush = SolidColor(Color.White),
+                            textStyle = Wear.TextMono.copy(color = Wear.Palette.TextPrimary),
+                            cursorBrush = SolidColor(Wear.Palette.TextPrimary),
+                            singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 2.dp)
+                                .focusRequester(apiKeyFocus)
                         )
                     }
                 }
@@ -341,24 +332,19 @@ private fun OnboardingConfigPhase(
 
             // 完成并进入智能体按键
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White)
-                        .clickable {
-                            preferences.baseUrl = inputBaseUrl
-                            preferences.apiKey = inputApiKey
-                            onFinish()
-                        }
-                        .padding(vertical = 7.dp),
-                    contentAlignment = Alignment.Center
+                WearCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        preferences.baseUrl = inputBaseUrl
+                        preferences.apiKey = inputApiKey
+                        onFinish()
+                    }
                 ) {
-                    Text(
+                    BasicText(
                         text = "完成并进入主界面",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        style = Wear.TextBody.copy(color = Wear.Palette.Accent),
+                        maxLines = 1
                     )
                 }
             }

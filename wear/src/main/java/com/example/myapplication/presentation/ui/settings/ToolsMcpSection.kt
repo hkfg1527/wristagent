@@ -1,36 +1,27 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.components.WearSectionHeader
+import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
- * 工具集细粒度权限控制与 MCP 协议探针
+ * 工具集细粒度放行控制与 MCP 协议探针。
  */
 @Composable
 fun ToolsMcpContent(
@@ -53,8 +44,7 @@ fun ToolsMcpContent(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
         val toolItems = listOf(
             Triple("get_device_status", "电量与温度感知", toolDeviceStatus) to {
@@ -83,84 +73,41 @@ fun ToolsMcpContent(
             }
         )
 
+        WearSectionHeader(text = "端侧工具放行")
+
         toolItems.forEach { (meta, toggle) ->
             val (name, label, enabled) = meta
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF161A24))
-                    .border(0.8.dp, Color(0xFF2C3548), RoundedCornerShape(12.dp))
-                    .clickable {
-                        context.vibrateTick()
-                        toggle()
-                    }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimaryColor)
-                        Text(name, fontSize = 11.sp, color = TextSecondaryColor)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (enabled) Color(0xFF10B981) else Color(0xFF334155))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = if (enabled) "放行" else "拦截",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+            SettingsChoiceRow(
+                title = label,
+                subtitle = name,
+                value = if (enabled) "放行" else "拦截",
+                selected = enabled,
+                onClick = {
+                    context.vibrateTick()
+                    toggle()
                 }
-            }
+            )
         }
 
-        // MCP 协议控制项 (52dp 大尺寸触控)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF161A24))
-                .border(0.8.dp, Color(0xFF2C3548), RoundedCornerShape(12.dp))
-                .clickable {
-                    context.vibrateTick()
-                    onToggleMcp(!isMcpEnabled, mcpEndpoint)
-                }
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("MCP 协议探针", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimaryColor)
-                    Text(mcpEndpoint, fontSize = 11.sp, color = TextSecondaryColor)
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isMcpEnabled) Color(0xFF10B981) else Color(0xFF334155))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (isMcpEnabled) "已连接" else "未启用",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+        WearSectionHeader(text = "MCP 协议")
+
+        SettingsChoiceRow(
+            title = "MCP 协议探针",
+            value = if (isMcpEnabled) "已连接" else "未启用",
+            selected = isMcpEnabled,
+            onClick = {
+                context.vibrateTick()
+                onToggleMcp(!isMcpEnabled, mcpEndpoint)
             }
-        }
+        )
+
+        BasicText(
+            text = mcpEndpoint,
+            style = Wear.TextMono,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

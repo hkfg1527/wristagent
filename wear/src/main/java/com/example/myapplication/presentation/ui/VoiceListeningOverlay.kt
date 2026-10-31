@@ -9,29 +9,26 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.wear.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.myapplication.presentation.ui.components.WearCard
+import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
  * 语音倾听悬浮层 (圆屏自适应，居中动态声波波浪)
@@ -63,13 +60,13 @@ fun VoiceListeningOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.94f))
+            .background(Wear.Palette.Bg.copy(alpha = 0.94f))
             .clickable(onClick = onCancel),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Md)
         ) {
             Box(
                 modifier = Modifier.size(72.dp),
@@ -78,9 +75,9 @@ fun VoiceListeningOverlay(
                 // 外层呼吸光环
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
-                        color = Color(0xFF38BDF8).copy(alpha = ringAlpha),
+                        color = Wear.Palette.Accent.copy(alpha = ringAlpha),
                         radius = (size.minDimension / 2f) * waveScale,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                        style = Stroke(width = 2.dp.toPx())
                     )
                 }
 
@@ -89,45 +86,40 @@ fun VoiceListeningOverlay(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF38BDF8))
+                        .background(Wear.Palette.Accent)
                         .shadow(elevation = 6.dp, shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     MinimalistSoundwaveIcon(
-                        tint = Color(0xFF0F172A),
+                        tint = Wear.Palette.Bg,
                         isRecording = true,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Text(
+            BasicText(
                 text = "正在倾听...",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                style = Wear.TextBody.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1
             )
 
-            Text(
+            BasicText(
                 text = "请对准手表说话",
-                fontSize = 9.sp,
-                color = Color(0xFF94A3B8)
+                style = Wear.TextCaption,
+                maxLines = 1
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF1E2430))
-                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(12.dp))
-                    .clickable(onClick = onCancel)
-                    .padding(horizontal = 14.dp, vertical = 5.dp)
+            // 取消目标：整层可点 + 卡片本体 ≥ 44dp
+            WearCard(
+                onClick = onCancel,
+                modifier = Modifier.padding(top = Wear.Space.Xs)
             ) {
-                Text(
+                BasicText(
                     text = "取消",
-                    fontSize = 10.sp,
-                    color = Color(0xFF94A3B8)
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
+                    maxLines = 1
                 )
             }
         }

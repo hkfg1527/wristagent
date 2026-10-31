@@ -9,14 +9,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.ui.draw.shadow
-import com.example.myapplication.presentation.ui.MinimalistSoundwaveIcon
 
 import android.content.pm.PackageManager
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.RenderEffect
-import android.graphics.Shader
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -60,6 +54,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -84,22 +79,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.wear.compose.material3.Text
@@ -117,8 +107,6 @@ import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.ConversationGrouping
-import com.example.myapplication.presentation.ui.FrostedPhysicalMaskCard
-import com.example.myapplication.presentation.ui.FrostedTextMaskContainer
 import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SessionDrawer
@@ -128,6 +116,9 @@ import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
+import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.components.WearBanner
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
 import com.example.myapplication.presentation.ui.UserChatBubble
 import com.example.myapplication.voice.AsrProviderId
@@ -235,7 +226,7 @@ fun WearAgentUnifiedApp(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Wear.Palette.Bg)
     ) {
         AnimatedContent(
             targetState = currentScreen,
@@ -331,6 +322,58 @@ private fun AnimatedMessageCard(
             }
     ) {
         content()
+    }
+}
+
+/** 对话框快捷指令胶囊：令牌底 + 描边，触达高度不小于 44dp。 */
+@Composable
+private fun QuickPromptChip(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .height(Wear.Size.Touch)
+            .clip(RoundedCornerShape(Wear.Radius.Chip))
+            .background(Wear.Palette.SurfaceAlt)
+            .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Chip))
+            .clickable { onClick() }
+            .padding(horizontal = Wear.Space.Xs),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = label,
+            style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** 对话框操作按钮：主操作 Accent 实底，次操作 SurfaceAlt；触达高度不小于 44dp。 */
+@Composable
+private fun DialogActionButton(
+    label: String,
+    isPrimary: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .height(Wear.Size.Touch)
+            .clip(RoundedCornerShape(Wear.Radius.Chip))
+            .background(if (isPrimary) Wear.Palette.Accent else Wear.Palette.SurfaceAlt)
+            .clickable { onClick() }
+            .padding(horizontal = Wear.Space.Lg),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = label,
+            style = Wear.TextTitle.copy(
+                color = if (isPrimary) Wear.Palette.Bg else Wear.Palette.TextSecondary
+            ),
+            maxLines = 1
+        )
     }
 }
 
@@ -668,7 +711,7 @@ private fun MainAgentDashboard(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF000000))
+            .background(Wear.Palette.Bg)
             .pointerInput(bottomBlockMode, isExecutingAgent, inputState.isOpen, isSessionDrawerOpen) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -720,7 +763,7 @@ private fun MainAgentDashboard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 28.dp, end = 28.dp)
+                .padding(horizontal = Wear.Space.Edge)
                 .focusRequester(mainFocusRequester)
                 .focusable()
                 .onRotaryScrollEvent {
@@ -763,8 +806,8 @@ private fun MainAgentDashboard(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 顶部时间与会话胶囊留白
-            Spacer(modifier = Modifier.height(58.dp))
+            // 顶部时间留白
+            Spacer(modifier = Modifier.height(Wear.Size.TopContentInset))
 
             // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形毛玻璃框，工具调用完整内嵌)
             val conversationItems = remember(agentState.conversationBlocks) {
@@ -785,20 +828,17 @@ private fun MainAgentDashboard(
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             UserChatBubble {
-                                Text(
+                                BasicText(
                                     text = item.block.content,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFE0F2FE),
-                                    lineHeight = 16.sp
+                                    style = Wear.TextBody
                                 )
                             }
                         }
                     }
 
                     is RenderableConversationItem.AssistantTurn -> {
-                        // 2.2 Agent 回复：绝不用聊天气泡，纯正方形框 + API 33 原生硬件 RenderEffect 高斯模糊
-                        // 思考胶囊、彩色工具调用与逐字流式文本 100% 完整包含在方框内部！
+                        // 2.2 Agent 回复：绝不用聊天气泡，Surface 实底卡片 + 1dp 描边
+                        // 思考胶囊、工具调用与逐字流式文本 100% 完整包含在卡片内部
                         AgentSquareBlurBox(
                             modifier = Modifier.fillMaxWidth(),
                             approvalVisualState = agentState.approvalVisualState,
@@ -843,25 +883,11 @@ private fun MainAgentDashboard(
             // 错误提示 (随手势一体滑动)
             val err = agentState.errorMessage
             if (!err.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF261216).copy(alpha = 0.92f))
-                        .border(0.8.dp, Color(0xFFEF4444), RoundedCornerShape(8.dp))
-                        .padding(6.dp)
-                ) {
-                    Text(
-                        text = "[ALERT] $err",
-                        fontSize = 10.sp,
-                        color = Color(0xFFF87171),
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                WearBanner(text = "[ALERT] $err", tone = Tone.DANGER)
             }
 
             // 底部留白，保证文字能完全滑过底栏
-            Spacer(modifier = Modifier.height(78.dp))
+            Spacer(modifier = Modifier.height(Wear.Size.BottomBarReserve))
         }
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
@@ -955,31 +981,17 @@ private fun MainAgentDashboard(
         // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================
         val inlineNotice = noticeText
         if (!inlineNotice.isNullOrBlank()) {
-            Box(
+            WearBanner(
+                text = inlineNotice,
+                tone = if (noticeIsError) Tone.DANGER else Tone.ACCENT,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 104.dp)
-                    .fillMaxWidth(0.88f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (noticeIsError) Color(0xFF261216).copy(alpha = 0.92f)
-                        else Color(0xFF0F172A).copy(alpha = 0.94f)
+                    .padding(
+                        start = Wear.Space.Edge,
+                        end = Wear.Space.Edge,
+                        bottom = Wear.Size.BottomBarReserve
                     )
-                    .border(
-                        0.8.dp,
-                        if (noticeIsError) Color(0xFFEF4444) else Color(0xFF38BDF8),
-                        RoundedCornerShape(8.dp)
-                    )
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = inlineNotice,
-                    fontSize = 10.sp,
-                    color = if (noticeIsError) Color(0xFFF87171) else Color(0xFF38BDF8),
-                    maxLines = 3
-                )
-            }
+            )
         }
 
         // ================= 6. 自定义文本输入弹窗 (避让输入法 / 返回键只关弹窗) =================
@@ -1008,7 +1020,12 @@ private fun MainAgentDashboard(
                     .background(Color.Black.copy(alpha = 0.92f))
                     // 外层承接口感遮罩，内容整体抬到输入法上沿之上
                     .imePadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(
+                        start = Wear.Space.Edge,
+                        end = Wear.Space.Edge,
+                        top = Wear.Space.Sm,
+                        bottom = Wear.Space.Sm
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -1025,86 +1042,59 @@ private fun MainAgentDashboard(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("输入文字指令", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        BasicText(text = "输入文字指令", style = Wear.TextTitle)
                         BasicTextField(
                             value = inputState.text,
                             onValueChange = { inputState = inputState.reduce(TextInputEvent.Change(it)) },
-                            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                            cursorBrush = SolidColor(Color.White),
+                            textStyle = Wear.TextBody,
+                            cursorBrush = SolidColor(Wear.Palette.TextPrimary),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                             keyboardActions = KeyboardActions(onSend = { submitInput() }),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(dialogFocusRequester)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF141720))
-                                .border(0.8.dp, Color(0xFF333D4F), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
+                                .clip(RoundedCornerShape(Wear.Radius.Chip))
+                                .background(Wear.Palette.SurfaceAlt)
+                                .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Chip))
+                                .padding(Wear.Space.Md)
                         )
                         // 预置快捷指令胶囊 (极简纯净纯色无 Emoji，纯黑白冷灰体系)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
                         ) {
-                            Text(
-                                text = "时间天气与资讯",
-                                fontSize = 9.sp,
-                                color = Color(0xFFE2E8F0),
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF181D26))
-                                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
-                                    .clickable {
-                                        val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
-                                        inputState = inputState.reduce(TextInputEvent.Cancel)
-                                        triggerAgent(send)
-                                    }
-                                    .padding(vertical = 5.dp, horizontal = 4.dp)
+                            QuickPromptChip(
+                                label = "时间天气与资讯",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
+                                    inputState = inputState.reduce(TextInputEvent.Cancel)
+                                    triggerAgent(send)
+                                }
                             )
-                            Text(
-                                text = "诊断电量与马达",
-                                fontSize = 9.sp,
-                                color = Color(0xFFE2E8F0),
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF181D26))
-                                    .border(0.6.dp, Color(0xFF333D4F), RoundedCornerShape(6.dp))
-                                    .clickable {
-                                        val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
-                                        inputState = inputState.reduce(TextInputEvent.Cancel)
-                                        triggerAgent(send)
-                                    }
-                                    .padding(vertical = 5.dp, horizontal = 4.dp)
+                            QuickPromptChip(
+                                label = "诊断电量与马达",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
+                                    inputState = inputState.reduce(TextInputEvent.Cancel)
+                                    triggerAgent(send)
+                                }
                             )
                         }
                     }
 
                     // 操作按钮固定在可视区底部：键盘展开时始终可见可点
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "取消",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF1E2430))
-                                .clickable { inputState = inputState.reduce(TextInputEvent.Cancel) }
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(Wear.Space.Md)) {
+                        DialogActionButton(
+                            label = "取消",
+                            isPrimary = false,
+                            onClick = { inputState = inputState.reduce(TextInputEvent.Cancel) }
                         )
-                        Text(
-                            text = "发送",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFF8FAFC))
-                                .clickable { submitInput() }
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        DialogActionButton(
+                            label = "发送",
+                            isPrimary = true,
+                            onClick = { submitInput() }
                         )
                     }
                 }

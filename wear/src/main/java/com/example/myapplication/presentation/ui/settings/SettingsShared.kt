@@ -7,7 +7,6 @@ import android.os.Vibrator
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,12 +15,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,29 +32,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Card
-import androidx.wear.compose.material3.CardDefaults
-import androidx.wear.compose.material3.Text
+import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
-// 调色板与材质规范
-val SettingsCardBg = Color(0xFF161922)
-val SettingsCardBorder = Color(0xFF2B3446)
-val SettingsSubBg = Color(0xFF0F1219)
-val SettingsSubBorder = Color(0xFF333F54)
-val AccentCyan = Color(0xFF38BDF8)
-val AccentCyanDark = Color(0xFF0284C7)
-val TextPrimaryColor = Color(0xFFF8FAFC)
-val TextSecondaryColor = Color(0xFF94A3B8)
+/** 子页滚动区底部预留高度：底部固定"完成返回"键不遮挡滚动内容。 */
+val SubPageBottomReserve = 72.dp
 
 fun Context.vibrateTick() {
     try {
@@ -82,83 +75,149 @@ enum class SettingsSubDialog {
 }
 
 /**
- * 现代 Wear OS 卡片封装 (大触控区域与高清晰度排版)
+ * 单行可选条目：标题 + 可选副行说明 + 可选右侧状态值，最小 44dp 可点。
  */
 @Composable
-fun AgentConsoleCard(
+fun SettingsChoiceRow(
     title: String,
-    statusBadge: String,
-    valueText: String,
-    descText: String,
-    onClick: () -> Unit
+    selected: Boolean,
+    onClick: () -> Unit,
+    value: String? = null,
+    subtitle: String? = null,
 ) {
-    val context = LocalContext.current
-    Card(
-        onClick = {
-            context.vibrateTick()
-            onClick()
-        },
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = SettingsCardBg,
-            contentColor = TextPrimaryColor
-        ),
-        border = BorderStroke(0.8.dp, SettingsCardBorder),
-        shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = Wear.Size.Touch)
+            .clip(shape)
+            .background(if (selected) Wear.Palette.AccentDim else Wear.Palette.Surface)
+            .border(1.dp, if (selected) Wear.Palette.Accent else Wear.Palette.Border, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimaryColor
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF222938))
-                        .border(0.6.dp, Color(0xFF3A475E), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = statusBadge,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AccentCyan
-                    )
-                }
-            }
-
-            Text(
-                text = valueText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimaryColor
+            BasicText(
+                text = title,
+                style = Wear.TextBody,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-
-            Text(
-                text = descText,
-                fontSize = 11.sp,
-                color = TextSecondaryColor,
-                lineHeight = 14.sp,
-                maxLines = 2
+            if (subtitle != null) {
+                BasicText(
+                    text = subtitle,
+                    style = Wear.TextCaption,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (value != null) {
+            BasicText(
+                text = value,
+                style = Wear.TextCaption.copy(
+                    textAlign = TextAlign.End,
+                    color = if (selected) Wear.Palette.Accent else Wear.Palette.TextSecondary,
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
 /**
- * 全屏二级配置遮罩面板 (支持物理手势右滑返回与丝滑展开动效，手势停驻绝对无闪烁)
+ * 44dp 实底动作按钮，色调取自 [Tone]。
+ */
+@Composable
+fun SettingsActionButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tone: Tone = Tone.MUTED,
+) {
+    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val container = when (tone) {
+        Tone.ACCENT -> Wear.Palette.AccentDim
+        Tone.DANGER -> Wear.Palette.DangerSurface
+        Tone.MUTED -> Wear.Palette.SurfaceAlt
+    }
+    val content = when (tone) {
+        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.DANGER -> Wear.Palette.Danger
+        Tone.MUTED -> Wear.Palette.TextPrimary
+    }
+    val stroke = when (tone) {
+        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.DANGER -> Wear.Palette.Danger
+        Tone.MUTED -> Wear.Palette.Border
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = Wear.Size.Touch)
+            .clip(shape)
+            .background(container)
+            .border(1.dp, stroke, shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(
+            text = label,
+            style = Wear.TextBody.copy(textAlign = TextAlign.Center, color = content),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * 单行文本输入框：最小 44dp 高度，令牌配色与光标色。
+ */
+@Composable
+fun SettingsInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+) {
+    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = Wear.TextBody.copy(color = Wear.Palette.TextPrimary),
+        cursorBrush = SolidColor(Wear.Palette.Accent),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = Wear.Size.Touch)
+            .clip(shape)
+            .background(Wear.Palette.Surface)
+            .border(1.dp, Wear.Palette.Border, shape)
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Md),
+        decorationBox = { innerTextField ->
+            if (value.isEmpty() && placeholder.isNotEmpty()) {
+                BasicText(
+                    text = placeholder,
+                    style = Wear.TextCaption,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            innerTextField()
+        },
+    )
+}
+
+/**
+ * 全屏二级配置面板：顶部固定标题，中部滚动内容，底部固定"完成返回"键（支持右滑返回与入场淡入）。
  */
 @Composable
 fun SubSettingsModal(
@@ -171,16 +230,10 @@ fun SubSettingsModal(
     val context = LocalContext.current
 
     val dragOffsetX = remember { Animatable(0f) }
-    val entryScale = remember { Animatable(0.86f) }
     val entryAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        launch {
-            entryScale.animateTo(1f, spring(0.72f, 300f))
-        }
-        launch {
-            entryAlpha.animateTo(1f, tween(160))
-        }
+        entryAlpha.animateTo(1f, tween(160))
     }
 
     var screenWidthPx by remember { mutableFloatStateOf(480f) }
@@ -189,14 +242,12 @@ fun SubSettingsModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.92f * entryAlpha.value))
+            .background(Wear.Palette.Bg)
             .onGloballyPositioned { coords ->
                 screenWidthPx = coords.size.width.toFloat()
             }
             .graphicsLayer {
                 translationX = dragOffsetX.value
-                scaleX = entryScale.value
-                scaleY = entryScale.value
                 alpha = (1f - (dragOffsetX.value / (screenWidthPx * 1.5f))).coerceIn(0f, 1f) * entryAlpha.value
             }
             .pointerInput(Unit) {
@@ -229,64 +280,40 @@ fun SubSettingsModal(
                         }
                     }
                 )
-            },
-        contentAlignment = Alignment.Center
+            }
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize(0.94f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(SettingsSubBg)
-                .border(0.8.dp, SettingsSubBorder, RoundedCornerShape(20.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .padding(horizontal = Wear.Space.Edge),
         ) {
-            // 顶部标题栏
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimaryColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-            }
+            BasicText(
+                text = title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
+                style = Wear.TextTitle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
 
-            // 中间主体
             Box(
                 modifier = Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f)
                     .fillMaxWidth(),
-                contentAlignment = Alignment.Center
             ) {
                 content()
             }
 
-            // 统一底部大尺寸完成确认键 (高度 42dp，圆角 14dp)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.88f)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF263143))
-                    .border(0.8.dp, Color(0xFF3F4F6B), RoundedCornerShape(14.dp))
-                    .clickable {
-                        context.vibrateTick()
-                        onDismiss()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "完成返回",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimaryColor
-                )
-            }
+            SettingsActionButton(
+                label = "完成返回",
+                tone = Tone.ACCENT,
+                onClick = {
+                    context.vibrateTick()
+                    onDismiss()
+                },
+                modifier = Modifier.padding(bottom = Wear.Space.Md),
+            )
         }
     }
 }

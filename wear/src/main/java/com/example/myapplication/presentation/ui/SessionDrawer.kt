@@ -12,18 +12,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,12 +29,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,45 +45,40 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Card
-import androidx.wear.compose.material3.CardDefaults
-import androidx.wear.compose.material3.ListHeader
-import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.ChatSession
+import com.example.myapplication.presentation.ui.components.WearChip
+import com.example.myapplication.presentation.ui.components.WearRow
+import com.example.myapplication.presentation.ui.components.WearSectionHeader
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
- * 谷歌 Wear OS Material Design 3 风格居中会话切换器
- * - 纯横条卡片排布：每一条会话均为一个横向 Squircle 小横条
+ * 会话抽屉：不透明实底，无重影
+ * - 模型切换为 WearChip 横向滚动，会话条目为 WearRow 风格双行信息 + 44dp 删除键
  * - 屏幕曲率变形挤压：依托 ScalingLazyColumn，在圆屏上下边缘随物理边界平滑挤压缩放
- * - 右滑跟手阻尼退出：手势向左划自右推入，向右轻划跟手推回退出
- * - 硬件物理表冠联动：旋转表冠顺滑滚动并伴随轻微齿轮触觉微震
+ * - 右滑跟手阻尼退出，硬件表冠联动滚动并伴随轻微触觉微震
  */
 @Composable
 fun SessionDrawer(
@@ -123,7 +117,7 @@ fun SessionDrawer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF000000).copy(alpha = 0.94f))
+                .background(Wear.Palette.Bg)
                 .onGloballyPositioned { coords ->
                     screenWidthPx = coords.size.width.toFloat()
                 }
@@ -183,181 +177,90 @@ fun SessionDrawer(
                         }
                         true
                     },
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Lg),
+                verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 顶部标题横条
+                // 顶部标题与关闭键
                 item(key = "header_title") {
-                    ListHeader(modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "模型与会话管理",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFF8FAFC)
-                            )
-                            Text(
-                                text = "右滑退出 →",
-                                fontSize = 11.sp,
-                                color = Color(0xFF94A3B8)
-                            )
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BasicText(
+                            text = "模型与会话管理",
+                            modifier = Modifier.weight(1f),
+                            style = Wear.TextTitle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        CloseButton(onClick = onClose)
                     }
                 }
 
-                // 快捷模型调试切换按钮行 (满足用户右滑快捷切换模型与调试需求)
+                // 快捷模型切换行 (保留横向滚动与 availableModels 入参)
                 item(key = "model_switch_row") {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF141824))
-                            .border(0.8.dp, Color(0xFF2C3548), RoundedCornerShape(14.dp))
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
                     ) {
-                        Text(
-                            text = "当前模型调试",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF38BDF8)
-                        )
+                        WearSectionHeader(text = "当前模型")
                         if (ModelLabels.isEmpty(availableModels)) {
-                            Text(
+                            BasicText(
                                 text = "未发现可用模型，请在设置中拉取模型列表",
-                                fontSize = 10.sp,
-                                color = Color(0xFF94A3B8)
+                                style = Wear.TextCaption,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         } else {
-                            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                                val spacing = 4.dp
-                                val columns = availableModels.size.coerceIn(1, 3)
-                                val chipWidth = ((maxWidth - spacing * (columns - 1)) / columns)
-                                    .coerceAtLeast(56.dp)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(spacing)
-                                ) {
-                                    availableModels.forEach { modelKey ->
-                                        val isSel = currentModelName == modelKey
-                                        Box(
-                                            modifier = Modifier
-                                                .width(chipWidth)
-                                                .height(34.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isSel) Color(0xFF0284C7) else Color(0xFF1E2536))
-                                                .border(
-                                                    0.6.dp,
-                                                    if (isSel) Color(0xFF38BDF8) else Color(0xFF333E54),
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                                .clickable {
-                                                    context.getSystemService(Vibrator::class.java)?.let { vib ->
-                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                                            vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                                        }
-                                                    }
-                                                    onSelectModel?.invoke(modelKey)
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = ModelLabels.label(modelKey),
-                                                fontSize = 11.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSel) Color.White else Color(0xFFCBD5E1)
-                                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                            ) {
+                                availableModels.forEach { modelKey ->
+                                    WearChip(
+                                        label = ModelLabels.label(modelKey),
+                                        selected = currentModelName == modelKey,
+                                        onClick = {
+                                            context.getSystemService(Vibrator::class.java)?.let { vib ->
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                                }
+                                            }
+                                            onSelectModel?.invoke(modelKey)
                                         }
-                                    }
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                // 1. "+ 新开对话" 居中白色/银色横条 (高度 44dp 规范)
+                // 新开对话：单行列表项
                 item(key = "action_new_session") {
-                    Card(
+                    WearRow(
+                        title = "＋ 新开对话",
                         onClick = onCreateSession,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF8FAFC),
-                            contentColor = Color(0xFF0F172A)
-                        ),
-                        shape = RoundedCornerShape(22.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF0F172A)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "新开对话",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0F172A)
-                            )
-                        }
-                    }
+                        showChevron = false
+                    )
                 }
 
-                // 2. 一条一条平滑变形挤压的 M3 会话横条 (参考微信 C100 / QQ Next 紧致风格)
+                // 会话列表：标题 14sp + 次行 12sp + 44dp 删除键
                 items(sessions, key = { it.id }) { session ->
-                    val isSelected = session.id == activeSessionId
-                    M3SessionStrip(
+                    SessionRow(
                         session = session,
-                        isSelected = isSelected,
+                        isSelected = session.id == activeSessionId,
                         onClick = { onSelectSession(session.id) },
                         onDelete = { onDeleteSession(session.id) }
                     )
                 }
 
-                // 底部轻触返回药丸
-                item(key = "action_dismiss") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.72f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF141824))
-                            .border(0.6.dp, Color(0xFF2B3446), RoundedCornerShape(16.dp))
-                            .clickable(onClick = onClose)
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "向右轻划退出",
-                            fontSize = 8.5.sp,
-                            color = Color(0xFFCBD5E1)
-                        )
-                    }
+                // 圆屏底部预留：保证滚到底时最后一行会话完整可见（不被圆形裁切）
+                item(key = "bottom_reserve") {
+                    Spacer(modifier = Modifier.height(Wear.Size.BottomBarReserve))
                 }
             }
         }
@@ -365,10 +268,10 @@ fun SessionDrawer(
 }
 
 /**
- * 遵循 Google Material Design 3 规范的单个会话扁平横条
+ * 单个会话条目：状态点 + 标题 + 时间 + 独立删除键
  */
 @Composable
-private fun M3SessionStrip(
+private fun SessionRow(
     session: ChatSession,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -377,77 +280,95 @@ private fun M3SessionStrip(
     val timeStr = remember(session.createdAt) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(session.createdAt))
     }
+    val shape = RoundedCornerShape(Wear.Radius.Chip)
 
-    Card(
-        onClick = onClick,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFF1E2433) else Color(0xFF11141C),
-            contentColor = Color(0xFFF1F5F9)
-        ),
-        border = BorderStroke(
-            0.6.dp,
-            if (isSelected) Color(0xFF94A3B8) else Color(0xFF262D3D)
-        ),
-        shape = RoundedCornerShape(14.dp)
+            .heightIn(min = Wear.Size.Touch)
+            .clip(shape)
+            .background(if (isSelected) Wear.Palette.SurfaceAlt else Wear.Palette.Surface)
+            .border(1.dp, if (isSelected) Wear.Palette.Accent else Wear.Palette.Border, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(start = Wear.Space.Md, end = Wear.Space.Xs, top = Wear.Space.Xs, bottom = Wear.Space.Xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // 左侧状态点与标题
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) Color.White else Color(0xFF475569))
-                )
+                .size(Wear.Space.Sm)
+                .clip(CircleShape)
+                .background(if (isSelected) Wear.Palette.Accent else Wear.Palette.TextMuted)
+        )
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = session.title,
-                        fontSize = 10.5.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else Color(0xFFE2E8F0),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = timeStr,
-                        fontSize = 7.5.sp,
-                        color = Color(0xFF94A3B8),
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            // 右侧独立删除键 (触摸防护)
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1C222E))
-                    .border(0.5.dp, Color(0xFF333E50), CircleShape)
-                    .clickable(onClick = onDelete),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕",
-                    fontSize = 8.sp,
-                    color = Color(0xFF94A3B8),
-                    fontFamily = FontFamily.Monospace
-                )
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            BasicText(
+                text = session.title,
+                style = Wear.TextBody.copy(
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) Wear.Palette.TextPrimary else Wear.Palette.TextSecondary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            BasicText(
+                text = timeStr,
+                style = Wear.TextMono,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+
+        DeleteButton(onClick = onDelete)
+    }
+}
+
+/** 44dp Canvas 叉号删除键。 */
+@Composable
+private fun DeleteButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        CrossMark(color = Wear.Palette.Danger)
+    }
+}
+
+/** 44dp Canvas 叉号关闭键。 */
+@Composable
+private fun CloseButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        CrossMark(color = Wear.Palette.TextSecondary)
+    }
+}
+
+@Composable
+private fun CrossMark(color: androidx.compose.ui.graphics.Color) {
+    Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+        val inset = size.minDimension * 0.25f
+        val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
+        drawLine(
+            color = color,
+            start = Offset(inset, inset),
+            end = Offset(size.width - inset, size.height - inset),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width - inset, inset),
+            end = Offset(inset, size.height - inset),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
     }
 }

@@ -1,19 +1,13 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,26 +15,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ModelCycle
 import com.example.myapplication.presentation.ui.ModelLabels
+import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.components.WearChip
+import com.example.myapplication.presentation.ui.components.WearSectionHeader
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
 /**
- * 模型与端点配置内容 (纯按钮化直观调试面板)
+ * 模型与端点配置内容：模型直选、端点切换、自定义 BaseUrl/Key 与握手自检。
  */
 @Composable
 fun ModelConfigContent(
@@ -64,216 +53,127 @@ fun ModelConfigContent(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        // 1. 模型一键调试切换按钮矩阵 (2x2 大按钮，一键调试)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF161A24))
-                .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text("模型直选调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
+        WearSectionHeader(text = "模型直选")
 
-            val models = ModelCycle.parse(preferences.cachedRemoteModels)
-            if (ModelLabels.isEmpty(models)) {
-                Text(
-                    text = "未发现可用模型，请先点击下方按钮拉取模型列表",
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
-                )
-            } else {
-                ModelLabels.rows(models, perRow = 2).forEach { rowModels ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        rowModels.forEach { modelId ->
-                            val isSel = currentModel == modelId
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSel) Color(0xFF0284C7) else Color(0xFF222B3C))
-                                    .border(
-                                        1.dp,
-                                        if (isSel) AccentCyan else Color(0xFF384661),
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable {
-                                        context.vibrateTick()
-                                        onSelect(modelId, inputBaseUrl)
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = ModelLabels.label(modelId),
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSel) Color.White else Color(0xFFCBD5E1)
-                                )
-                            }
-                        }
-                        if (rowModels.size < 2) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-
-        // 2. 端点一键切换按钮组
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF161A24))
-                .border(0.8.dp, Color(0xFF2B3448), RoundedCornerShape(14.dp))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text("API 端点调试", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentCyan)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(
-                    "https://api.deepseek.com" to "DeepSeek",
-                    "https://generativelanguage.googleapis.com" to "Google"
-                ).forEach { (url, name) ->
-                    val isSel = inputBaseUrl == url
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSel) Color(0xFF1E3A5F) else Color(0xFF222B3C))
-                            .border(
-                                0.8.dp,
-                                if (isSel) AccentCyan else Color(0xFF384661),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable {
+        val models = ModelCycle.parse(preferences.cachedRemoteModels)
+        if (ModelLabels.isEmpty(models)) {
+            BasicText(
+                text = "未发现可用模型，请先点击下方按钮拉取模型列表",
+                style = Wear.TextCaption,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        } else {
+            ModelLabels.rows(models, perRow = 2).forEach { rowModels ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                ) {
+                    rowModels.forEach { modelId ->
+                        WearChip(
+                            label = ModelLabels.label(modelId),
+                            selected = currentModel == modelId,
+                            onClick = {
                                 context.vibrateTick()
-                                inputBaseUrl = url
-                                preferences.baseUrl = url
-                                onSelect(currentModel, url)
+                                onSelect(modelId, inputBaseUrl)
                             },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = name,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSel) Color.White else Color(0xFFCBD5E1)
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                }
-            }
-
-            // 自定义输入切换按钮
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1E2430))
-                    .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(8.dp))
-                    .clickable {
-                        context.vibrateTick()
-                        showCustomInput = !showCustomInput
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (showCustomInput) "收起自定义输入" else "手动修改 BaseUrl / Key",
-                    fontSize = 11.5.sp,
-                    color = Color(0xFF94A3B8)
-                )
-            }
-
-            if (showCustomInput) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    BasicTextField(
-                        value = inputBaseUrl,
-                        onValueChange = {
-                            inputBaseUrl = it
-                            preferences.baseUrl = it
-                        },
-                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
-                        cursorBrush = SolidColor(AccentCyan),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF0F1219))
-                            .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(6.dp))
-                            .padding(6.dp)
-                    )
-
-                    BasicTextField(
-                        value = inputApiKey,
-                        onValueChange = {
-                            inputApiKey = it
-                            preferences.apiKey = it
-                        },
-                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
-                        cursorBrush = SolidColor(AccentCyan),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF0F1219))
-                            .border(0.6.dp, Color(0xFF333E54), RoundedCornerShape(6.dp))
-                            .padding(6.dp)
-                    )
+                    if (rowModels.size < 2) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
 
-        // 3. 测速与握手 Ping 调试按钮
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (isFetching) Color(0xFF222B3A) else Color(0xFF1E3A5F))
-                .border(0.8.dp, if (isFetching) Color(0xFF334155) else AccentCyan, RoundedCornerShape(12.dp))
-                .clickable(enabled = !isFetching) {
-                    context.vibrateTick()
-                    isFetching = true
-                    fetchResultText = "正在握手探测..."
-                    scope.launch {
-                        val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
-                        isFetching = false
-                        if (timeMs >= 0) {
-                            fetchResultText = "端点就绪 • 延迟 ${timeMs}ms (${models.size} 个可用模型)"
-                            if (models.isNotEmpty()) {
-                                preferences.cachedRemoteModels = models.joinToString(",")
-                            }
-                        } else {
-                            fetchResultText = "端点握手失败，网络超时"
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
+        WearSectionHeader(text = "API 端点")
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            Text(
-                text = if (isFetching) "正在 Ping 测试..." else "端点测速与实时握手 Ping",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isFetching) Color(0xFF94A3B8) else Color.White
+            listOf(
+                "https://api.deepseek.com" to "DeepSeek",
+                "https://generativelanguage.googleapis.com" to "Google"
+            ).forEach { (url, name) ->
+                WearChip(
+                    label = name,
+                    selected = inputBaseUrl == url,
+                    onClick = {
+                        context.vibrateTick()
+                        inputBaseUrl = url
+                        preferences.baseUrl = url
+                        onSelect(currentModel, url)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        SettingsActionButton(
+            label = if (showCustomInput) "收起自定义输入" else "手动修改 BaseUrl / Key",
+            onClick = {
+                context.vibrateTick()
+                showCustomInput = !showCustomInput
+            }
+        )
+
+        if (showCustomInput) {
+            WearSectionHeader(text = "BaseUrl")
+            SettingsInput(
+                value = inputBaseUrl,
+                onValueChange = {
+                    inputBaseUrl = it
+                    preferences.baseUrl = it
+                },
+                placeholder = "https://api.example.com"
+            )
+            WearSectionHeader(text = "API Key")
+            SettingsInput(
+                value = inputApiKey,
+                onValueChange = {
+                    inputApiKey = it
+                    preferences.apiKey = it
+                },
+                placeholder = "sk-..."
             )
         }
 
+        SettingsActionButton(
+            label = if (isFetching) "正在 Ping 测试..." else "端点测速与实时握手 Ping",
+            enabled = !isFetching,
+            tone = Tone.ACCENT,
+            onClick = {
+                context.vibrateTick()
+                isFetching = true
+                fetchResultText = "正在握手探测..."
+                scope.launch {
+                    val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
+                    isFetching = false
+                    if (timeMs >= 0) {
+                        fetchResultText = "端点就绪 • 延迟 ${timeMs}ms (${models.size} 个可用模型)"
+                        if (models.isNotEmpty()) {
+                            preferences.cachedRemoteModels = models.joinToString(",")
+                        }
+                    } else {
+                        fetchResultText = "端点握手失败，网络超时"
+                    }
+                }
+            }
+        )
+
         fetchResultText?.let {
-            Text(it, fontSize = 11.5.sp, color = AccentCyan)
+            BasicText(
+                text = it,
+                style = Wear.TextCaption,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+
+        Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

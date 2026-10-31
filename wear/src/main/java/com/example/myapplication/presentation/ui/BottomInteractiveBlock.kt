@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -35,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,13 +58,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.contract.RightButtonAction
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -128,7 +125,7 @@ fun BottomInteractiveBlock(
     val targetWidth = when (mode) {
         BottomBlockMode.ACTION_ALLOW -> 180.dp
         BottomBlockMode.THINKING_STOP -> 88.dp
-        else -> 44.dp
+        else -> Wear.Size.Orb
     }
 
     val capsuleWidth by animateDpAsState(
@@ -140,7 +137,40 @@ fun BottomInteractiveBlock(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(58.dp),
+            .height(58.dp)
+            // 主键之外起手的横向拖动同样弹出两翼，并独占指针流，避免被系统"右滑返回"抢走
+            .pointerInput(isBusy, mode, isSplitExpanded) {
+                if (isBusy || mode != BottomBlockMode.IDLE || isSplitExpanded) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val startX = down.position.x
+                    val startY = down.position.y
+                    val orbHalfPx = Wear.Size.Orb.toPx() / 2f
+                    // 主键内部的手势交给主键自己处理，这里只补主键外缘的空白区
+                    if (abs(startX - size.width / 2f) <= orbHalfPx) return@awaitEachGesture
+                    var isHorizontalDrag = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            if (isHorizontalDrag) {
+                                scope.launch {
+                                    isSplitExpanded = true
+                                    splitProgress.animateTo(1f, spring(0.65f, 260f))
+                                }
+                            }
+                            break
+                        }
+                        val deltaX = change.position.x - startX
+                        val deltaY = change.position.y - startY
+                        // 只消费横向位移：纵向仍按原样交给上层，避免系统把横向拖动判成"右滑返回"
+                        if (abs(deltaX) >= abs(deltaY)) change.consume()
+                        if (abs(deltaX) > 22.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.4f) {
+                            isHorizontalDrag = true
+                        }
+                    }
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         if (!isApproval && mode != BottomBlockMode.THINKING_STOP) {
@@ -157,10 +187,10 @@ fun BottomInteractiveBlock(
                             .offset(x = leftOffsetDp)
                             .scale(wingScale)
                             .alpha(wingAlpha)
-                            .size(32.dp)
+                            .size(Wear.Size.Touch)
                             .clip(CircleShape)
-                            .background(Color(0xFF141722))
-                            .border(1.dp, Color(0xFF333D56), CircleShape)
+                            .background(Wear.Palette.SurfaceAlt)
+                            .border(1.dp, Wear.Palette.Border, CircleShape)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -180,9 +210,9 @@ fun BottomInteractiveBlock(
                         contentAlignment = Alignment.Center
                     ) {
                         if (mainInputType == MainInputType.VOICE) {
-                            MinimalistKeyboardIcon(tint = Color(0xFF94A3B8))
+                            MinimalistKeyboardIcon(tint = Wear.Palette.TextSecondary)
                         } else {
-                            MinimalistSoundwaveIcon(tint = Color(0xFF94A3B8), isRecording = false)
+                            MinimalistSoundwaveIcon(tint = Wear.Palette.TextSecondary, isRecording = false)
                         }
                     }
                 }
@@ -195,10 +225,10 @@ fun BottomInteractiveBlock(
                             .offset(x = rightOffsetDp)
                             .scale(wingScale)
                             .alpha(wingAlpha)
-                            .size(32.dp)
+                            .size(Wear.Size.Touch)
                             .clip(CircleShape)
-                            .background(Color(0xFF141722))
-                            .border(1.dp, Color(0xFF333D56), CircleShape)
+                            .background(Wear.Palette.SurfaceAlt)
+                            .border(1.dp, Wear.Palette.Border, CircleShape)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -213,14 +243,12 @@ fun BottomInteractiveBlock(
                         contentAlignment = Alignment.Center
                     ) {
                         when (rightButtonAction) {
-                            RightButtonAction.MODEL_SWITCH -> MinimalistLayersIcon(tint = Color(0xFF38BDF8))
-                            RightButtonAction.OPEN_SETTINGS -> MinimalistSlidersIcon(tint = Color(0xFF38BDF8))
-                            RightButtonAction.CLEAR_MEMORY -> Text(
+                            RightButtonAction.MODEL_SWITCH -> MinimalistLayersIcon(tint = Wear.Palette.Accent)
+                            RightButtonAction.OPEN_SETTINGS -> MinimalistSlidersIcon(tint = Wear.Palette.Accent)
+                            RightButtonAction.CLEAR_MEMORY -> BasicText(
                                 text = "CLR",
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF38BDF8)
+                                style = Wear.TextMono.copy(color = Wear.Palette.Accent),
+                                maxLines = 1
                             )
                         }
                     }
@@ -231,10 +259,11 @@ fun BottomInteractiveBlock(
             Box(
                 modifier = Modifier
                     .scale(orbScaleAnim)
-                    .size(capsuleWidth, 44.dp)
+                    .size(capsuleWidth, Wear.Size.Orb)
                     .shadow(elevation = 8.dp, shape = CircleShape)
                     .clip(CircleShape)
-                    .background(Color(0xFFE2E8F0)) // 高对比冷银白质感
+                    // 冷银白主键底色是品牌识别，允许保留此唯一色值字面量
+                    .background(Color(0xFFE8EDF5))
                     .pointerInput(isSplitExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -303,6 +332,9 @@ fun BottomInteractiveBlock(
                                 val deltaX = change.position.x - startX
                                 val deltaY = change.position.y - startY
 
+                                // 拖动期间独占指针流：不消费则 Wear 系统的"右滑返回"会把横向拖动抢成返回手势
+                                change.consume()
+
                                 if (!isDraggingX && !isDraggingY && !isLongPressActive) {
                                     if (abs(deltaX) > 22.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.4f) {
                                         isDraggingX = true
@@ -319,14 +351,14 @@ fun BottomInteractiveBlock(
             ) {
                 if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
                     MinimalistKeyboardIcon(
-                        tint = Color(0xFF0F172A),
-                        modifier = Modifier.size(15.dp, 11.dp)
+                        tint = Wear.Palette.Bg,
+                        modifier = Modifier.size(16.dp, 12.dp)
                     )
                 } else {
                     MinimalistSoundwaveIcon(
-                        tint = if (mode == BottomBlockMode.RECORDING) Color(0xFFEF4444) else Color(0xFF0F172A),
+                        tint = if (mode == BottomBlockMode.RECORDING) Wear.Palette.Danger else Wear.Palette.Bg,
                         isRecording = mode == BottomBlockMode.RECORDING,
-                        modifier = Modifier.size(13.dp, 13.dp)
+                        modifier = Modifier.size(16.dp, 16.dp)
                     )
                 }
             }
@@ -341,23 +373,25 @@ fun BottomInteractiveBlock(
             )
         } else {
             // ================= 思考中：微型停止按钮 =================
+            val stopShape = RoundedCornerShape(Wear.Radius.Chip)
             Box(
                 modifier = Modifier
-                    .size(capsuleWidth, 40.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF1E2433))
-                    .border(0.8.dp, Color(0xFF475569), RoundedCornerShape(20.dp))
+                    .size(capsuleWidth, Wear.Size.Touch)
+                    .clip(stopShape)
+                    .background(Wear.Palette.SurfaceAlt)
+                    .border(1.dp, Wear.Palette.Border, stopShape)
                     .clickable { onStopClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(7.dp).background(Color(0xFFEF4444), RoundedCornerShape(1.5.dp)))
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+                ) {
+                    Box(modifier = Modifier.size(8.dp).background(Wear.Palette.Danger, CircleShape))
+                    BasicText(
                         text = "停止",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE2E8F0)
+                        style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+                        maxLines = 1
                     )
                 }
             }
@@ -395,13 +429,14 @@ private fun ApprovalLeftSlider(
         }
     }
 
+    val sliderShape = RoundedCornerShape(Wear.Radius.Chip)
     Box(
         modifier = Modifier
             .width(capsuleWidth)
-            .height(42.dp)
-            .clip(RoundedCornerShape(21.dp))
-            .background(Color(0xFF1E1418))
-            .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.85f), RoundedCornerShape(21.dp))
+            .height(Wear.Size.Touch)
+            .clip(sliderShape)
+            .background(Wear.Palette.DangerSurface)
+            .border(1.dp, Wear.Palette.Danger, sliderShape)
             .onGloballyPositioned { coords ->
                 containerWidthPx = coords.size.width.toFloat()
             }
@@ -454,16 +489,17 @@ private fun ApprovalLeftSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
+            BasicText(
                 text = "点击拒绝",
-                fontSize = 9.sp,
-                color = Color(0xFFEF4444).copy(alpha = 0.8f)
+                style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
+                maxLines = 1
             )
-            Text(
+            BasicText(
                 text = if (remainingCooldown > 0) "锁定 (${remainingCooldown}s)" else "向左滑放行 <",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (remainingCooldown > 0) Color(0xFFFBBF24) else Color(0xFFE2E8F0)
+                style = Wear.TextCaption.copy(
+                    color = if (remainingCooldown > 0) Wear.Palette.Accent else Wear.Palette.TextPrimary
+                ),
+                maxLines = 1
             )
         }
 
@@ -472,17 +508,16 @@ private fun ApprovalLeftSlider(
             modifier = Modifier
                 .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
                 .padding(end = 4.dp)
-                .size(width = 44.dp, height = 34.dp)
-                .clip(RoundedCornerShape(17.dp))
-                .background(if (remainingCooldown > 0) Color(0xFF475569) else Color(0xFFEF4444)),
+                .size(width = Wear.Size.Touch, height = 34.dp)
+                .clip(RoundedCornerShape(Wear.Radius.Chip))
+                .background(if (remainingCooldown > 0) Wear.Palette.TextMuted else Wear.Palette.Danger),
             contentAlignment = Alignment.Center
         ) {
             if (remainingCooldown > 0) {
-                Text(
+                BasicText(
                     text = "${remainingCooldown}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+                    maxLines = 1
                 )
             } else {
                 Canvas(modifier = Modifier.size(7.dp, 9.dp)) {
@@ -492,7 +527,7 @@ private fun ApprovalLeftSlider(
                         lineTo(size.width, size.height)
                         close()
                     }
-                    drawPath(path, color = Color.White)
+                    drawPath(path, color = Wear.Palette.TextPrimary)
                 }
             }
         }

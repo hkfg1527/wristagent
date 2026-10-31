@@ -3,8 +3,8 @@ package com.example.myapplication.presentation.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -18,8 +18,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,45 +38,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.ListHeader
-import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
-import com.example.myapplication.presentation.ui.settings.AgentConsoleCard
+import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.components.WearBadge
+import com.example.myapplication.presentation.ui.components.WearDivider
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
 import com.example.myapplication.presentation.ui.settings.ModelConfigContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
+import com.example.myapplication.presentation.ui.settings.SubPageBottomReserve
 import com.example.myapplication.presentation.ui.settings.SubSettingsModal
 import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
 import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.WingShortcutContent
 import com.example.myapplication.presentation.ui.settings.vibrateTick
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
- * 谷歌 Wear OS 现代 Jetpack Compose 端侧 AI 设置中心
- * - 纯黑 OLED 沉浸基底，搭配微光超椭圆卡片
- * - ScalingLazyColumn 圆屏上下自适应贴合与物理表冠联动
- * - 全触控区域严格符合 40dp+ 穿戴规范，全按钮化直观调试
- * - 物理防抖水平手势，滑动停驻绝对零闪烁
+ * Wear OS 端侧 AI 设置中心
+ * - 扁平单行列表：每个分区一行（标题 + 当前值 + chevron），分区之间以分隔线切分
+ * - 所有取值来自 Wear 设计令牌，字号最小 12sp，可点区域不小于 44dp
+ * - ScalingLazyColumn 圆屏曲率自适应与物理表冠联动
  */
 @Composable
 fun SettingsScreen(
@@ -112,7 +118,7 @@ fun SettingsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Wear.Palette.Bg)
             .onGloballyPositioned { coords ->
                 screenWidthPx = coords.size.width.toFloat()
             }
@@ -158,6 +164,9 @@ fun SettingsScreen(
             settingsFocusRequester.requestFocus()
         }
 
+        // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
+        val apiKeyConfigured = preferences.apiKey.isNotBlank()
+
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -173,82 +182,57 @@ fun SettingsScreen(
                     true
                 },
             state = listState,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Sm),
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
         ) {
-            // 顶部返回与标题
+            // 顶部标题与返回键
             item {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .height(42.dp)
-                            .clip(RoundedCornerShape(21.dp))
-                            .background(Color(0xFF1E2533))
-                            .border(0.8.dp, Color(0xFF3B4860), RoundedCornerShape(21.dp))
-                            .clickable {
-                                context.vibrateTick()
-                                onBack()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "←",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "返回主界面",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFE2E8F0)
-                            )
-                        }
-                    }
-
-                    ListHeader(modifier = Modifier.padding(top = 4.dp)) {
-                        Text(
-                            text = "系统设置",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+                    BasicText(
+                        text = "系统设置",
+                        modifier = Modifier.weight(1f),
+                        style = Wear.TextTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    CloseButton(onClick = onBack)
                 }
             }
 
-            // 1. 模型与服务
+            // 1. 模型与服务：标题独占首行，值 + 徽章置于次行，徽章按真实 API Key 配置状态渲染
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "模型与服务",
-                    statusBadge = "已配置",
-                    valueText = currentModel,
-                    descText = currentBaseUrl,
-                    onClick = { activeDialog = SettingsSubDialog.MODEL_CONFIG }
+                    value = currentModel,
+                    badge = if (apiKeyConfigured) "已配置" to Tone.ACCENT else "未配置" to Tone.DANGER,
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.MODEL_CONFIG
+                    }
                 )
             }
 
+            item { WearDivider() }
+
             // 2. 模型参数
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "模型参数",
-                    statusBadge = "Temp %.1f".format(currentTemp),
-                    valueText = "最大输出 $currentMaxTokens Token",
-                    descText = if (currentStreamMode) "真实 SSE 流式传输已开启" else "非流式输出",
-                    onClick = { activeDialog = SettingsSubDialog.HYPER_PARAMS }
+                    value = "Temp %.1f".format(currentTemp),
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.HYPER_PARAMS
+                    }
                 )
             }
+
+            item { WearDivider() }
 
             // 3. 内置工具与 MCP
             item {
@@ -260,118 +244,115 @@ fun SettingsScreen(
                     preferences.toolWeatherEnabled,
                     preferences.toolWebSearchEnabled
                 ).count { it }
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "端侧工具与 MCP",
-                    statusBadge = "$activeCount/6 已启用",
-                    valueText = if (activeCount == 6) "全部 6 项工具已就绪" else "已启用 $activeCount 项工具",
-                    descText = "电量感知 • 振动 • 点阵 • 省电 • 天气 • 真实搜索",
-                    onClick = { activeDialog = SettingsSubDialog.TOOLS_MCP }
+                    value = "$activeCount/6 已启用",
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.TOOLS_MCP
+                    }
                 )
             }
+
+            item { WearDivider() }
 
             // 4. 系统提示词
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "系统提示词",
-                    statusBadge = if (customPrompt.isBlank()) "预置默认" else "自定义",
-                    valueText = "穿戴端侧 AI 助手",
-                    descText = "指令偏好与工具调用基准设定",
-                    onClick = { activeDialog = SettingsSubDialog.PROMPT_VIEWER }
+                    value = if (customPrompt.isBlank()) "预置默认" else "自定义",
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.PROMPT_VIEWER
+                    }
                 )
             }
+
+            item { WearDivider() }
 
             // 5. 会话与上下文
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "会话记忆管理",
-                    statusBadge = "${preferences.maxContextTurns} 轮",
-                    valueText = "单会话保留 ${preferences.maxContextTurns} 轮历史",
-                    descText = "超出后自动滑窗淘汰早期对话",
-                    onClick = { activeDialog = SettingsSubDialog.MEMORY_MANAGER }
+                    value = "${preferences.maxContextTurns} 轮",
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.MEMORY_MANAGER
+                    }
                 )
             }
+
+            item { WearDivider() }
 
             // 6. 快捷操作
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "底栏副键绑定",
-                    statusBadge = "右侧副键",
-                    valueText = when (currentRightAction) {
+                    value = when (currentRightAction) {
                         RightButtonAction.MODEL_SWITCH -> "切换大模型"
-                        RightButtonAction.OPEN_SETTINGS -> "打开系统设置"
-                        RightButtonAction.CLEAR_MEMORY -> "一键清空长记忆"
+                        RightButtonAction.OPEN_SETTINGS -> "打开设置"
+                        RightButtonAction.CLEAR_MEMORY -> "清空记忆"
                     },
-                    descText = "长滑展开底栏时右侧按钮的功能",
-                    onClick = { activeDialog = SettingsSubDialog.WING_SHORTCUT }
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.WING_SHORTCUT
+                    }
                 )
             }
 
+            item { WearDivider() }
+
             // 7. 操作安全防线
             item {
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "操作安全策略",
-                    statusBadge = when (currentSecurityMode) {
+                    value = when (currentSecurityMode) {
                         SecurityMode.NOVICE -> "严格确认"
                         SecurityMode.STANDARD -> "标准提示"
                         SecurityMode.EXPERT -> "自动执行"
                     },
-                    valueText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "严格确认 (倒计时防误触)"
-                        SecurityMode.STANDARD -> "标准提示 (高危需确认)"
-                        SecurityMode.EXPERT -> "自动执行 (跳过确认)"
-                    },
-                    descText = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "所有敏感与系统操作均弹出确认详情"
-                        SecurityMode.STANDARD -> "只读查询自动放行，修改系统需确认"
-                        SecurityMode.EXPERT -> "除致命危险指令外直接执行"
-                    },
-                    onClick = { activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL }
+                    onClick = {
+                        context.vibrateTick()
+                        activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                    }
                 )
             }
+
+            item { WearDivider() }
 
             // 8. 语音转写
             item {
                 val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
-                AgentConsoleCard(
+                SettingsEntry(
                     title = "语音转写",
-                    statusBadge = if (!asrEnabled) "已关闭" else asrProvider.displayName,
-                    valueText = when {
-                        !asrEnabled -> "语音转写未开启"
-                        asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "百度语音：密钥未填写"
-                        asrProvider == AsrProviderId.BAIDU -> "百度短语音已配置"
-                        else -> "系统语音识别"
+                    value = when {
+                        !asrEnabled -> "已关闭"
+                        asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "密钥未填写"
+                        asrProvider == AsrProviderId.BAIDU -> "百度短语音"
+                        else -> "系统识别"
                     },
-                    descText = "厂商切换 • AK/SK • 识别语言 • 测试转写",
-                    onClick = { showVoiceAsr = true }
+                    onClick = {
+                        context.vibrateTick()
+                        showVoiceAsr = true
+                    }
                 )
             }
 
+            item { WearDivider() }
+
             // 9. 重新观看新手引导
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF1E2533))
-                        .border(0.8.dp, Color(0xFF3B4860), RoundedCornerShape(14.dp))
-                        .clickable {
-                            context.vibrateTick()
-                            onRestartOnboarding()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "重新观看操作引导",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFCBD5E1)
-                    )
-                }
+                SettingsEntry(
+                    title = "重新观看操作引导",
+                    onClick = {
+                        context.vibrateTick()
+                        onRestartOnboarding()
+                    }
+                )
             }
 
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(SubPageBottomReserve))
             }
         }
 
@@ -497,5 +478,116 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+/**
+ * 扁平列表项：标题独占首行（右手侧只有 chevron），值文本与徽章统一放到次行，
+ * 标题可用宽度恒为「行内宽 − chevron − 间距」，不会被值挤压成省略号。
+ */
+@Composable
+private fun SettingsEntry(
+    title: String,
+    onClick: () -> Unit,
+    value: String? = null,
+    badge: Pair<String, Tone>? = null,
+) {
+    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = Wear.Size.Touch)
+            .clip(shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
+        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+        ) {
+            BasicText(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = Wear.TextBody,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            ChevronMark()
+        }
+        if (value != null || badge != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+            ) {
+                if (value != null) {
+                    BasicText(
+                        text = value,
+                        modifier = Modifier.weight(1f),
+                        style = Wear.TextCaption,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (badge != null) {
+                    WearBadge(text = badge.first, tone = badge.second)
+                }
+            }
+        }
+    }
+}
+
+/** 44dp Canvas 叉号关闭键。 */
+@Composable
+private fun CloseButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+            val inset = size.minDimension * 0.25f
+            val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(inset, inset),
+                end = Offset(size.width - inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(size.width - inset, inset),
+                end = Offset(inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+/** 右向折线箭头，与列表行一致。 */
+@Composable
+private fun ChevronMark() {
+    Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+        val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
+        drawLine(
+            color = Wear.Palette.TextMuted,
+            start = Offset(size.width * 0.3f, size.height * 0.2f),
+            end = Offset(size.width * 0.7f, size.height * 0.5f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Wear.Palette.TextMuted,
+            start = Offset(size.width * 0.7f, size.height * 0.5f),
+            end = Offset(size.width * 0.3f, size.height * 0.8f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
     }
 }
