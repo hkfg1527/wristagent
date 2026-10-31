@@ -137,6 +137,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.withFrameMillis
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
@@ -341,35 +342,6 @@ private fun AnimatedMessageCard(
 
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
-
-/**
- * 弹性滚到列表末端：用 Animatable 驱动"累计位移"，再把每帧增量交给 scroll { scrollBy }。
- * 末端由 contentPadding.bottom 夹住，因此弹簧的"冲过头 → 收敛"过程肉眼可见，
- * 不再是一刀切到位的硬跳。流式吐字仍走瞬时跟随，避免动画把逐字节奏拖慢。
- */
-private suspend fun ScalingLazyListState.springScrollToEnd() = coroutineScope {
-    // animateTo 的 block 不是挂起上下文，不能在里面 scroll；
-    // 因此用一个协程跑弹簧动画，主协程逐帧读取动画值、把增量交给 scroll。
-    val anim = Animatable(0f)
-    val driver = launch {
-        anim.animateTo(
-            targetValue = BOTTOM_FOLLOW_SCROLL_PX,
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = 220f)
-        )
-    }
-    var delivered = 0f
-    while (driver.isActive) {
-        withFrameMillis { }
-        val current = anim.value
-        val delta = current - delivered
-        if (delta != 0f) {
-            delivered = current
-            scroll { scrollBy(delta) }
-        }
-    }
-    val rest = anim.value - delivered
-    if (rest != 0f) scroll { scrollBy(rest) }
-}
 
 /** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
 private const val TEMP_TOOL_TEST_COMMAND =
@@ -1049,37 +1021,26 @@ private fun MainAgentDashboard(
         ConversationGrouping.groupBlocks(agentState.conversationBlocks)
     }
 
-    // 执行中每有新块到达，跟随到列表末端，保证流式正文的最新一句始终可见
-    LaunchedEffect(agentState.conversationBlocks.size) {
-        if (isExecutingAgent) {
-            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
-        }
-    }
-
-    // 每轮新增/更新对话块后，把最后一条拉进视口并停在圆屏中心附近。
-    // 列表已关掉 autoCentering（锚点不再是第 0 项），scrollToItem 顶对齐后被 contentPadding.bottom =
-    // ListCenterReach 夹到内容末端：最后一条卡片底边稳定落在 240 − 112 = 128dp，正是圆心附近那一带。
-    // 审批态进入/退出不碰这里，滚动位置在整段审批塌缩动画期间保持不变。
-    // 只有真正开始对话（出现了用户消息）才做自动归位：
-    // 否则空会话只有一条问候语时也会被"滚到末端"顶到屏幕最上面，表现为开屏先往下弹一下又回上去。
+    // ================= 唯一滚动所有者 =================
+    // 之前这里有三条 LaunchedEffect 各自驱动同一个 ScalingLazyListState：
+    //   ① 流式阶段瞬时 scrollBy 跟随  ② 条目变化时 animateScrollToItem（动画）
+    //   ③ 一轮结束 springScrollToEnd（还是逐帧 scroll 的动画）
+    // 三者互相取消、又与"内容边涨边滚"叠加，于是发完消息列表会持续弹来弹去。
+    // 现在收敛成一条链路：同一时刻只有一个滚动协程，且两种状态互斥。
     val hasUserTurn = conversationItems.any { it is RenderableConversationItem.UserPrompt }
-    LaunchedEffect(conversationItems.size, hasUserTurn) {
-        val lastIndex = conversationItems.lastIndex
-        if (hasUserTurn && lastIndex >= 0) {
-            // 先把最后一项拉进视口，再滚到真正的末端：
-            // animateScrollToItem 只做"项顶部对齐视口顶部"，卡片高于一屏时会一直伸到屏幕外，
-            // 必须再补一次滚到末端，最后一条卡片的底边才会落在 contentPadding.bottom 处（≈128dp 圆心带）。
-            listState.animateScrollToItem(lastIndex)
-            // 归位用弹簧而不是硬切：视觉上是"滑过去并轻轻收住"
-            listState.springScrollToEnd()
-        }
-    }
-
-    // 一轮回答结束时再滚到末端：卡片在流式过程中会持续变高，而上面的 effect 只在"条目数变化"时触发，
-    // 所以必须在执行结束的那一刻补一次，否则最后一条仍会伸到屏幕外。
-    LaunchedEffect(isExecutingAgent, hasUserTurn) {
-        if (!isExecutingAgent && hasUserTurn) {
-            listState.springScrollToEnd()
+    LaunchedEffect(isExecutingAgent, hasUserTurn, conversationItems.size) {
+        // 空会话（只有问候语）不滚动：否则首条会被顶到屏幕最上面，开屏像"往下弹了一下又回去"
+        if (!hasUserTurn) return@LaunchedEffect
+        if (isExecutingAgent) {
+            // 流式阶段：逐帧贴底，瞬时位移、单调前进、被末端夹住 —— 不做任何动画，避免和内容增长互相追
+            while (isActive) {
+                withFrameMillis { }
+                listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+            }
+        } else {
+            // 一轮结束：只做一次动画归位，然后再瞬时钉住末端（两步串行，不再有第二个动画抢锁）
+            listState.animateScrollToItem(conversationItems.lastIndex)
+            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
         }
     }
 
@@ -1167,18 +1128,27 @@ private fun MainAgentDashboard(
                     alpha = listAlpha
                     renderEffect = if (isApprovalFocus) listBlurEffect else null
                 }
-                // 最外圈 14dp 轻度淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉
+                // 边缘淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉。
+                // 顶部渐隐必须盖住整个曲面时钟带（TopContentInset=34dp），
+                // 否则长回复向上滚动时正文会从时钟底下穿出来、和 "22:57" 叠字（真表 192dp 屏上尤其明显）；
+                // 底部只需让开一点点，给底栏留白的边缘收口。
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
-                    val edgePx = 14.dp.toPx()
+                    val clockBandPx = Wear.Size.TopContentInset.toPx()   // 34dp：曲面时钟占的高度
+                    val rampPx = 8.dp.toPx()                              // 收口用得很短，避免"半透明半可见"
+                    val bottomEdgePx = 14.dp.toPx()
                     val heightPx = size.height
-                    if (heightPx > edgePx * 2f) {
+                    if (heightPx > clockBandPx + bottomEdgePx) {
+                        // 关键：不是从 0 线性拉到 34dp（那样这段里只是半透明、字仍可见），
+                        // 而是"先整段抹干净，最后 8dp 快速收口"，这样正文绝不会压在时钟上。
+                        val solidUntilPx = (clockBandPx - rampPx).coerceAtLeast(0f)
                         drawRect(
                             brush = Brush.verticalGradient(
                                 0f to Color.Transparent,
-                                edgePx / heightPx to Wear.Palette.Bg,
-                                (heightPx - edgePx) / heightPx to Wear.Palette.Bg,
+                                (solidUntilPx / heightPx).coerceIn(0f, 1f) to Color.Transparent,
+                                (clockBandPx / heightPx).coerceIn(0f, 1f) to Wear.Palette.Bg,
+                                ((heightPx - bottomEdgePx) / heightPx).coerceIn(0f, 1f) to Wear.Palette.Bg,
                                 1f to Color.Transparent
                             ),
                             blendMode = BlendMode.DstIn
