@@ -9,6 +9,7 @@ import android.util.Log
 import com.example.myapplication.agent.contract.AgentMemory
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
+import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.agent.contract.SecurityGuardrail
 import com.example.myapplication.agent.contract.SecurityMode
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,7 @@ import java.util.UUID
  * 穿戴原生交错流 Agent 调度引擎
  * 1. 宿主原生 Wear OS 契约注入与长记忆持久化锁定
  * 2. 支持交错流：先说再调、边说边调、调后反思 (中间 content 实时流式上屏)
- * 3. 动态三级安全护栏审查 (硬黑名单、严格确认 3s 倒计时锁、风险后果说明)
+ * 3. 动态三级安全护栏审查 (硬黑名单、严格确认 3s 倒计时锁、风险后果说明) + AI 风险等级分级闸门
  * 4. 彻底免疫孤立 tool_call 导致的 HTTP 400 自愈中枢
  */
 class AgentDispatcher(
@@ -44,8 +45,8 @@ class AgentDispatcher(
     private val guardrail = SecurityGuardrail()
     private val conversationHistory = mutableListOf<ChatMessage>()
 
-    // 审批挂起函数：返回 true 为允许，false 为拒绝。参数包含动作说明、风险评估
-    var onRequireConfirmation: (suspend (actionText: String, risk: RiskAssessment) -> Boolean)? = null
+    // 审批挂起函数：返回 true 为允许，false 为拒绝。参数包含工具名、动作说明、风险评估
+    var onRequireConfirmation: (suspend (toolName: String, actionText: String, risk: RiskAssessment) -> Boolean)? = null
 
     @Volatile
     private var isCancelled = false
@@ -282,14 +283,20 @@ class AgentDispatcher(
                         continue
                     }
 
-                    // B. 审批判断
-                    val needApproval = when (preferences.securityMode) {
-                        SecurityMode.NOVICE -> true // 严格确认模式全部审批
-                        SecurityMode.STANDARD -> risk.isHighRisk // 标准模式仅高危审批
-                        SecurityMode.EXPERT -> false // 自动执行模式免审批
+                    // B. 分级审批闸门：AI 风险等级 + 安全模式共同决定是否弹审批
+                    val actionDesc = "执行 [${call.name}]"
+                    val gate = ApprovalGate.decide(risk, preferences.securityMode)
+                    val autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
+                        Log.i(
+                            TAG,
+                            "分级闸门自动放行：tool=${call.name} level=${risk.aiRiskLevel} mode=${preferences.securityMode}"
+                        )
+                        buildAutoAllowNote(call.name, actionDesc, risk)
+                    } else {
+                        null
                     }
 
-                    if (needApproval) {
+                    if (gate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
                         // 触发审批态与红瀑光相变
                         currentState = currentState.copy(
                             approvalVisualState = ApprovalVisualState.PENDING_CASCADE,
@@ -297,12 +304,11 @@ class AgentDispatcher(
                         )
                         onStateUpdate(currentState)
 
-                        val actionDesc = "执行 [${call.name}]"
                         // AI 三段说明：超时/异常/解析失败一律回退启发式，绝不影响审批弹出
                         val narratedRisk = applyNarration(call.name, actionDesc, risk)
                         currentState = currentState.copy(pendingRiskAssessment = narratedRisk)
                         onStateUpdate(currentState)
-                        val allowed = onRequireConfirmation?.invoke(actionDesc, narratedRisk) ?: true
+                        val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, narratedRisk) ?: true
 
                         if (allowed) {
                             // 批准转绿
@@ -353,6 +359,7 @@ class AgentDispatcher(
                         id = toolBlockId,
                         toolName = call.name,
                         argsJson = call.arguments,
+                        resultSummary = autoAllowNote,
                         isExecuting = true
                     )
                     blocks.add(executingBlock)
@@ -386,7 +393,8 @@ class AgentDispatcher(
                             id = toolBlockId,
                             toolName = call.name,
                             argsJson = call.arguments,
-                            resultSummary = summaryText,
+                            resultSummary = listOfNotNull(autoAllowNote, summaryText)
+                                .joinToString(" · "),
                             isExecuting = false
                         )
                     }
@@ -429,6 +437,18 @@ class AgentDispatcher(
             isFinished = true
         )
         onStateUpdate(currentState)
+    }
+
+    /**
+     * 自动放行时的说明：把"调用了什么 / 改了什么"与最坏情况落进会话状态（工具小胶囊），
+     * 走启发式而不额外发一次 LLM 请求，只读工具自动放行不该多等一个网络往返。
+     */
+    private fun buildAutoAllowNote(toolName: String, actionText: String, risk: RiskAssessment): String? {
+        val narration = RiskNarrator.fallback(toolName, actionText, risk)
+        return listOfNotNull(
+            narration.whatItDoes.takeIf { it.isNotBlank() },
+            narration.worstCase.takeIf { it.isNotBlank() }?.let { "最坏 $it" }
+        ).joinToString(" · ").takeIf { it.isNotBlank() }
     }
 
     private fun extractToolSummary(toolName: String, outputJson: String): String {
@@ -862,5 +882,37 @@ private data class ToolCallAccumulator(
                 -1L to emptyList()
             }
         }
+    }
+}
+
+/**
+ * 分级审批闸门：AI 风险等级决定要不要弹审批，安全模式决定无风险操作能否自动放行。
+ * 判定顺序固定为 硬拦截 > 安全底线 > 风险等级，安全底线永远压过"低风险自动放行"。
+ */
+object ApprovalGate {
+    enum class Decision {
+        HARD_BLOCK,      // 命中硬黑名单：拦截且不执行，没有审批可谈
+        AUTO_ALLOW,      // 无风险且当前模式允许：不弹审批直接执行
+        REQUIRE_APPROVAL // 弹审批，由人滑动决定
+    }
+
+    fun decide(risk: RiskAssessment, mode: SecurityMode): Decision {
+        // 1. 硬黑名单优先级最高：任何模式、任何等级一律拦截
+        if (risk.isHardBlocked) return Decision.HARD_BLOCK
+
+        // 2. 无风险操作：LOW 且护栏没判高危
+        if (risk.aiRiskLevel == RiskLevel.LOW && !risk.isHighRisk) {
+            // 安全底线：严格确认模式（SecurityMode 未命名 STRICT，严格模式即 NOVICE）不允许自动放行
+            return when (mode) {
+                SecurityMode.NOVICE -> Decision.REQUIRE_APPROVAL
+                SecurityMode.STANDARD, SecurityMode.EXPERT -> Decision.AUTO_ALLOW
+            }
+        }
+
+        // 3. 自动执行模式沿用原契约：除硬黑名单与护栏高危外不弹审批
+        if (mode == SecurityMode.EXPERT && !risk.isHighRisk) return Decision.AUTO_ALLOW
+
+        // 4. 其余情况（MEDIUM/HIGH/CRITICAL 或护栏判了高危）：照常弹审批
+        return Decision.REQUIRE_APPROVAL
     }
 }

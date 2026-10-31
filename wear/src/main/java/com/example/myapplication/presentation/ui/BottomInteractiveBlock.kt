@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -132,7 +133,8 @@ fun BottomInteractiveBlock(
     onAllow: () -> Unit,
     onReject: () -> Unit,
     onSwipeUpSettings: () -> Unit,           // 阻尼跟手上滑进设置
-    onApprovalProgress: (Float) -> Unit = {} // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
+    onApprovalProgress: (Float) -> Unit = {}, // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
+    approvalTone: Color = Wear.Palette.Danger // 审批强调色：随 AI 风险等级变化（调用方传入等级色）
 ) {
     val scope = rememberCoroutineScope()
     val isApproval = mode == BottomBlockMode.ACTION_ALLOW
@@ -442,6 +444,7 @@ fun BottomInteractiveBlock(
                 trackWidth = capsuleWidth,
                 trackHeight = capsuleHeight,
                 cooldownSeconds = cooldownSeconds,
+                approvalTone = approvalTone,
                 onAllow = onAllow,
                 onReject = onReject,
                 onApprovalProgress = onApprovalProgress
@@ -477,9 +480,9 @@ fun BottomInteractiveBlock(
 /**
  * 审批滑块：整行唯一控件，白色主键底条拉长成占满弦长的扁胶囊（视觉 36dp，热区仍是 44dp），
  * 30dp 拇指自右端向左拖动。胶囊内"点击拒绝"与"放行"两个 label 叠在同一位置随进度交叉淡化。
- * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
- * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
- * 未滑过的右侧区域保留 0.34 的红调，已滑过区域取 0.72 的绿调；
+ * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是当前等级的强调色（[approvalTone]）、
+ * 1 恒为放行绿，中间由 [ApprovalTrackTone.colorOf] 连续插值，于是越往左越绿、滑回去退回等级色。
+ * 未滑过区域保留 0.34 的等级色调，已滑过区域取 0.72 的插值调；
  * 交互只有两种结局：位移都在 [ApprovalSliderLogic.TAP_SLOP_PX] 内是单击（拒绝），
  * 左滑松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才放行，滑不够则弹簧回弹且什么都不发生。
  */
@@ -489,6 +492,7 @@ private fun ApprovalTrack(
     trackWidth: Dp,
     trackHeight: Dp,
     cooldownSeconds: Int,
+    approvalTone: Color,
     onAllow: () -> Unit,
     onReject: () -> Unit,
     onApprovalProgress: (Float) -> Unit
@@ -597,17 +601,18 @@ private fun ApprovalTrack(
                 .onGloballyPositioned { coords -> trackPx = coords.size.width.toFloat() },
             contentAlignment = Alignment.Center
         ) {
-            // 着色层：未滑过区淡红 + 已滑过区 lerp(拒绝红 → 放行绿)
+            // 着色层：未滑过区该等级的淡调 + 已滑过区 等级色 → 放行绿 的连续插值
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val p = dragProgress.value
                 val thumbLeftPx = (size.width - thumbSlotPx + insetPx - p * travelPx)
                     .coerceIn(0f, size.width)
                 drawRect(
-                    color = Wear.Palette.Danger.copy(alpha = 0.34f),
+                    color = approvalTone.copy(alpha = ApprovalTrackUnswipedAlpha),
                     size = Size(thumbLeftPx, size.height)
                 )
                 drawRect(
-                    color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.72f),
+                    color = ApprovalTrackTone.colorOf(approvalTone, p)
+                        .copy(alpha = ApprovalTrackSwipedAlpha),
                     topLeft = Offset(thumbLeftPx, 0f),
                     size = Size(size.width - thumbLeftPx, size.height)
                 )
@@ -655,6 +660,21 @@ private fun ApprovalTrack(
             }
         }
     }
+}
+
+/** 滑轨未滑过区的着色不透明度：等级色的淡调，足够看出等级又不抢拇指。 */
+private const val ApprovalTrackUnswipedAlpha = 0.34f
+
+/** 滑轨已滑过区的着色不透明度：拖动痕迹要压过未滑过区。 */
+private const val ApprovalTrackSwipedAlpha = 0.72f
+
+/**
+ * 审批滑轨的着色逻辑：已滑过区从当前等级色连续插值到放行绿，progress 到底恒为绿。
+ * 纯函数，无 Compose 运行时依赖，JVM 单测可直接覆盖。
+ */
+internal object ApprovalTrackTone {
+    fun colorOf(tone: Color, progress: Float): Color =
+        lerp(tone, Wear.Palette.Success, progress.coerceIn(0f, 1f))
 }
 
 /**

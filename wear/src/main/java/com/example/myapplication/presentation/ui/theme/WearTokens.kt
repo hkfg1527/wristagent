@@ -22,6 +22,10 @@ object Wear {
         val TextMuted = Color(0xFF5F6B7A)
         val Accent = Color(0xFF4FC3F7)
         val AccentDim = Color(0xFF0E3A4E)
+        /** 中度风险黄：审批页中风险等级的标题、危险条与滑轨强调色。 */
+        val Warning = Color(0xFFF5B942)
+        /** 重度风险黄红：审批页高风险等级的强调色，红之前先亮黄。 */
+        val Critical = Color(0xFFFB6B4B)
         val Danger = Color(0xFFFF6B6B)
         val DangerSurface = Color(0xFF2A1215)
         val Success = Color(0xFF4ADE80)

@@ -28,8 +28,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -123,8 +121,8 @@ import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
+import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
@@ -341,25 +339,23 @@ private fun AnimatedMessageCard(
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
 
-/** AI 风险等级 -> 徽标与等级文字。 */
-private fun riskLabelOf(level: RiskLevel): String = when (level) {
-    RiskLevel.LOW -> "低"
-    RiskLevel.MEDIUM -> "中"
-    RiskLevel.HIGH -> "高"
-    RiskLevel.CRITICAL -> "致命"
-}
+/**
+ * 审批页强调色与标题：随 AI 风险等级变化 —— 低风险绿、中度黄、重度黄红、致命红。
+ * 标题、危险条点亮段与滑块着色共用同一套映射，避免各处重复写等级到颜色的分支。
+ */
+internal object ApprovalTone {
+    fun accentOf(level: RiskLevel): Color = when (level) {
+        RiskLevel.LOW -> Wear.Palette.Success
+        RiskLevel.MEDIUM -> Wear.Palette.Warning
+        RiskLevel.HIGH -> Wear.Palette.Critical
+        RiskLevel.CRITICAL -> Wear.Palette.Danger
+    }
 
-/** AI 风险等级 -> 徽标色调：中低风险走强调色，高风险以上走危险色。 */
-private fun riskToneOf(level: RiskLevel): Tone = when (level) {
-    RiskLevel.LOW, RiskLevel.MEDIUM -> Tone.ACCENT
-    RiskLevel.HIGH, RiskLevel.CRITICAL -> Tone.DANGER
-}
-
-/** 语义色调 -> 令牌色：等级文字与危险条共用，避免各处重复写颜色映射。 */
-private fun toneColorOf(tone: Tone): Color = when (tone) {
-    Tone.ACCENT -> Wear.Palette.Accent
-    Tone.DANGER -> Wear.Palette.Danger
-    Tone.MUTED -> Wear.Palette.TextSecondary
+    fun headlineOf(level: RiskLevel): String = when (level) {
+        RiskLevel.LOW -> "低风险"
+        RiskLevel.MEDIUM -> "需要确认"
+        RiskLevel.HIGH, RiskLevel.CRITICAL -> "高风险操作"
+    }
 }
 
 /** AI 风险等级 -> 危险条点亮段数：中低风险 1 段、高风险 2 段、致命 3 段。 */
@@ -427,23 +423,32 @@ private fun DialogActionButton(
     }
 }
 
-/** 审批卡片宽度：240dp 圆屏上固定 200dp，两侧各留 20dp，整行落在圆心处弦长 235dp 之内。 */
-private val ApprovalCardWidth = 200.dp
+/** 审批文案宽度：240dp 圆屏上固定 190dp，两侧各留 25dp，正文不会碰到圆周。 */
+private val ApprovalTextWidth = 190.dp
 
 /**
- * 卡片垂直抬升：屏幕高 240dp，取 48dp 抬升后卡片中心落在 (240−48)/2 = 96dp，整体压在圆心上方；
- * 三段文案各两行时卡片高约 140dp，底边 166dp 仍压在滑块胶囊 170dp 之上。
+ * 文案块垂直抬升：屏幕高 240dp，取 48dp 抬升后文案中心落在 (240−48)/2 = 96dp，
+ * 整列文案因此压在圆心上方，底边不会挤进 164dp 起的滑轨区。
  */
-private val ApprovalCardCenterLift = 48.dp
+private val ApprovalTextCenterLift = 48.dp
 
-/** 磨砂卡片底色不透明度：0.88 让身后点阵隐约透出，又不至于糊住三段文案。 */
-private const val ApprovalCardSurfaceAlpha = 0.88f
+/** 文案块间距：靠 10dp 间距分段，不用任何线框。 */
+private val ApprovalTextBlockGap = 10.dp
 
-/** 卡片内边距：14dp 让文案与 1dp 描边之间留出呼吸。 */
-private val ApprovalCardPadding = 14.dp
+/** 审批态只做极轻压暗（0.22）：点阵必须仍然看得见，也没有任何整屏绿/红蒙色层。 */
+private const val ApprovalScrimAlpha = 0.22f
 
-/** 审批态只做极轻压暗（0.28）：点阵保持可见，不再有任何整屏绿/红蒙色层。 */
-private const val ApprovalScrimAlpha = 0.28f
+/** 文字底下径向暗晕：中心 0.82 的 Bg，150dp 处已经透明，于是没有边界也没有轮廓。 */
+private const val ApprovalHaloCenterAlpha = 0.82f
+private val ApprovalHaloRadius = 150.dp
+
+/** 文案入场：每块从 +48dp 浮上来并淡入，四块依次错开 60ms（标题 → 调用 → 改动 → 最坏情况）。 */
+private val ApprovalTextFloatDistance = 48.dp
+private const val ApprovalTextStaggerMs = 60L
+
+/** 危险条：3 段 32×8dp，按等级点亮。 */
+private val ApprovalBarWidth = 32.dp
+private val ApprovalBarHeight = 8.dp
 
 /** 审批态对话列表的残留不透明度：退到 35%，仍能辨认"这些内容还没走"。 */
 private const val ApprovalListAlpha = 0.35f
@@ -457,9 +462,9 @@ private val ApprovalCollapseDrop = 60.dp
 private const val ApprovalCollapseDurationMs = 220
 
 /**
- * 三段 AI 文案的行内排版：12sp [Wear.Palette.TextMuted] 标签做引子，正文接在同一段落里。
- * 竖排标签每块要多占一行（三块合计 48dp），而滑轨上方只有 132dp，
- * 行内引子把这行高度让给正文，三块信息一条不少。
+ * 审批文案的行内排版：12sp [Wear.Palette.TextMuted] 标签做引子，正文接在同一段落里。
+ * 竖排标签每块要多占一行（四块合计 64dp），而滑轨上方只有 164dp，
+ * 行内引子把这行高度让给正文，四块信息一条不少。
  */
 private fun approvalParagraph(label: String, body: String, bodyStyle: TextStyle): AnnotatedString =
     buildAnnotatedString {
@@ -479,19 +484,22 @@ private fun approvalParagraph(label: String, body: String, bodyStyle: TextStyle)
     }
 
 /**
- * 审批磨砂卡片：居中浮在点阵与对话之上，宽 [ApprovalCardWidth]、[Wear.Radius.Card] 圆角，
- * 半透 Surface 底 + 1dp 描边 + 14dp 内边距做出磨砂感（不用 RenderEffect 糊背景，成本高）。
- * 卡片内固定三段：会做什么 / 风险等级（危险条 + 等级文字同行）/ 最坏情况，空文案整块隐藏，不留空行。
- * 中心停在圆心上方的 [ApprovalCardCenterLift] 处，放行时按 [collapse] 塌缩成工具胶囊尺度。
+ * 审批浮层：故意不带任何框 —— 没有 Surface 底、没有 1dp 描边、没有圆角、没有内边距盒，
+ * 文字直接浮在屏幕中央。文案正下方铺一层 [ApprovalHaloRadius] 的径向暗晕
+ * （中心 [ApprovalHaloCenterAlpha] 的 Bg → 半径处透明），暗晕没有边界也没有轮廓，
+ * 于是文字是从背景里浮出来的，而不是被框住；暗晕之外的点阵依旧清晰可见。
+ * 内容自上而下：等级标题 + 3 段危险条 / 调用 / 改动 / 最坏情况（空文案整块不占位），
+ * 每块从 +48dp 浮上来并错开 60ms 启动；放行时整层按 [collapse] 塌缩成工具胶囊尺度。
  */
 @Composable
-private fun ApprovalCard(
+private fun ApprovalFloatingLayer(
     visible: Boolean,
+    toolName: String,
     risk: RiskAssessment?,
     collapse: Float,
     modifier: Modifier = Modifier
 ) {
-    // 只压暗 0.28：点阵保持可见，绿/红一律交给点阵自身的颜色插值，不再有整屏蒙色层
+    // 只压暗 0.22：点阵保持可见，绿/红一律交给点阵自身的颜色插值，不再有整屏蒙色层
     val scrimAlpha by animateFloatAsState(
         targetValue = if (visible) ApprovalScrimAlpha else 0f,
         animationSpec = tween(140),
@@ -499,27 +507,29 @@ private fun ApprovalCard(
     )
 
     val level = risk?.aiRiskLevel ?: RiskLevel.MEDIUM
-    val levelColor = toneColorOf(riskToneOf(level))
+    val accent = ApprovalTone.accentOf(level)
+    val toolDisplayName = ToolVisualMeta.resolve(toolName).displayName
     val whatItDoes = risk?.whatItDoes.orEmpty()
     val worstCase = risk?.worstCase.orEmpty()
-    val cardShape = RoundedCornerShape(Wear.Radius.Card)
-    // 12sp / 16sp 行高：两行正文只占 32dp，三段文案加标题也压得住 200dp 宽的卡片
+    // 12sp / 16sp 行高：两行正文只占 32dp，四块文案加标题也压得住 190dp 宽
     val bodyStyle = Wear.TextBody.copy(
         fontSize = Wear.TextCaption.fontSize,
         lineHeight = Wear.TextCaption.lineHeight
     )
+    val centeredBody = bodyStyle.copy(textAlign = TextAlign.Center)
     val worstCaseStyle = bodyStyle.copy(color = Wear.Palette.Danger)
+    val centeredWorstCase = worstCaseStyle.copy(textAlign = TextAlign.Center)
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(140)) + scaleIn(tween(140), initialScale = 0.92f),
-        exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 1.06f),
+        enter = fadeIn(tween(140)),
+        exit = fadeOut(tween(120)),
         modifier = modifier.fillMaxSize()
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // 放行塌缩：压暗层与卡片一起淡出
+                // 放行塌缩：压暗层与文案一起淡出
                 .graphicsLayer { alpha = 1f - collapse }
         ) {
             Box(
@@ -527,90 +537,130 @@ private fun ApprovalCard(
                     .fillMaxSize()
                     .background(Wear.Palette.Bg.copy(alpha = scrimAlpha))
             )
-            // 卡片居中偏上：底部留出 [ApprovalCardCenterLift]，卡片中心才落在 96dp 而不是屏心
+            // 文案居中偏上：底部留出 [ApprovalTextCenterLift]，文案中心才落在 96dp 而不是屏心
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = ApprovalCardCenterLift),
+                    .padding(bottom = ApprovalTextCenterLift),
                 contentAlignment = Alignment.Center
             ) {
+                // 径向暗晕：中心浓、150dp 处已透明，没有边界没有轮廓，文字像从背景里浮出来
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Wear.Palette.Bg.copy(alpha = ApprovalHaloCenterAlpha),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = ApprovalHaloRadius.toPx()
+                        )
+                    )
+                }
                 Column(
                     modifier = Modifier
-                        .width(ApprovalCardWidth)
-                        // 塌缩只作用于卡片：缩到工具胶囊尺度并下移，动画走完才退出审批态
+                        .width(ApprovalTextWidth)
+                        // 塌缩只作用于文案：缩到工具胶囊尺度并下移，动画走完才退出审批态
                         .graphicsLayer {
                             scaleX = 1f - (1f - ApprovalCollapseScale) * collapse
                             scaleY = 1f - (1f - ApprovalCollapseScale) * collapse
                             translationY = ApprovalCollapseDrop.toPx() * collapse
-                        }
-                        .clip(cardShape)
-                        .background(Wear.Palette.Surface.copy(alpha = ApprovalCardSurfaceAlpha))
-                        .border(1.dp, Wear.Palette.Border, cardShape)
-                        .padding(ApprovalCardPadding),
-                    verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
+                        },
+                    verticalArrangement = Arrangement.spacedBy(ApprovalTextBlockGap),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 标题行：许可请求 + AI 风险等级徽标
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                    ) {
-                        BasicText(text = "需要你的许可", style = Wear.TextTitle, maxLines = 1)
-                        WearBadge(text = riskLabelOf(level), tone = riskToneOf(level))
-                    }
-
-                    // 块一：会做什么（空文案整块隐藏，不留空行）
-                    if (whatItDoes.isNotBlank()) {
-                        BasicText(
-                            text = approvalParagraph("会做什么", whatItDoes, bodyStyle),
-                            style = bodyStyle,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    // 块二：风险等级 —— 3 段危险条与等级文字同行
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                    ) {
-                        BasicText(
-                            text = "风险等级",
-                            style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
-                            maxLines = 1
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            repeat(3) { index ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = Wear.Size.ChipHeight, height = Wear.Space.Sm)
-                                        .clip(RoundedCornerShape(Wear.Space.Xs))
-                                        .background(
-                                            if (index < riskBarsLit(level)) Wear.Palette.Danger
-                                            else Wear.Palette.Border
-                                        )
-                                )
+                    // 块一：等级标题 + 3 段危险条（标题定调，危险条按等级点亮几段）
+                    FloatingApprovalText(slot = 0) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                        ) {
+                            BasicText(
+                                text = ApprovalTone.headlineOf(level),
+                                style = Wear.TextTitle.copy(color = accent),
+                                maxLines = 1
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                repeat(3) { index ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(ApprovalBarWidth, ApprovalBarHeight)
+                                            .clip(RoundedCornerShape(Wear.Space.Xs))
+                                            .background(
+                                                if (index < riskBarsLit(level)) accent
+                                                else Wear.Palette.Border.copy(alpha = 0.45f)
+                                            )
+                                    )
+                                }
                             }
                         }
-                        BasicText(
-                            text = riskLabelOf(level),
-                            style = Wear.TextCaption.copy(color = levelColor),
-                            maxLines = 1
-                        )
                     }
 
-                    // 块三：最坏情况（12sp Danger，最多两行；空文案整块隐藏）
-                    if (worstCase.isNotBlank()) {
+                    // 块二：调用了什么（工具中文显示名，无 emoji）
+                    FloatingApprovalText(slot = 1) {
                         BasicText(
-                            text = approvalParagraph("最坏情况", worstCase, worstCaseStyle),
-                            style = worstCaseStyle,
+                            text = approvalParagraph("调用", toolDisplayName, centeredBody),
+                            style = centeredBody,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    // 块三：改了什么的直白说明（空文案整块不占位）
+                    if (whatItDoes.isNotBlank()) {
+                        FloatingApprovalText(slot = 2) {
+                            BasicText(
+                                text = approvalParagraph("改动", whatItDoes, centeredBody),
+                                style = centeredBody,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // 块四：最坏情况（空文案整块不占位）
+                    if (worstCase.isNotBlank()) {
+                        FloatingApprovalText(slot = 3) {
+                            BasicText(
+                                text = approvalParagraph(
+                                    "最坏情况",
+                                    worstCase,
+                                    centeredWorstCase
+                                ),
+                                style = centeredWorstCase,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * 一块审批文案的入场：同一个 [Animatable] 同时驱动 translationY（+48dp → 0）与 alpha（0 → 1），
+ * 走 spring(阻尼 0.82 / 刚度 260)；第 [slot] 块再延后 slot×60ms 启动，于是文字依次从底下浮上来排到上面。
+ */
+@Composable
+private fun FloatingApprovalText(
+    slot: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(enter) {
+        delay(ApprovalTextStaggerMs * slot)
+        enter.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 260f))
+    }
+    Box(
+        modifier = modifier.graphicsLayer {
+            alpha = enter.value
+            translationY = ApprovalTextFloatDistance.toPx() * (1f - enter.value)
+        }
+    ) {
+        content()
     }
 }
 
@@ -662,6 +712,8 @@ private fun MainAgentDashboard(
         )
     }
     var currentRiskAssessment by remember { mutableStateOf<RiskAssessment?>(null) }
+    // 待审批的工具名：审批页"调用"块用它解析中文显示名
+    var pendingToolName by remember { mutableStateOf("") }
     var pendingContinuation by remember { mutableStateOf<CancellableContinuation<Boolean>?>(null) }
     var delayedStretchJob by remember { mutableStateOf<Job?>(null) }
 
@@ -706,7 +758,7 @@ private fun MainAgentDashboard(
     var approvalCollapsing by remember { mutableStateOf(false) }
     val approvalCollapse = remember { Animatable(0f) }
 
-    // 审批沉浸态：居中磨砂卡片浮层接管，列表退到 35% 继续透出、点阵保持清晰
+    // 审批沉浸态：居中文字浮层接管，列表退到 35% 继续透出、点阵保持清晰
     val isApprovalFocus = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
 
     // 列表退场渐变：审批态 1f -> 35%，与遮罩同一条 180ms 曲线，不做硬切
@@ -831,7 +883,8 @@ private fun MainAgentDashboard(
     }
 
     DisposableEffect(agentDispatcher) {
-        agentDispatcher.onRequireConfirmation = { _, risk ->
+        agentDispatcher.onRequireConfirmation = { toolName, _, risk ->
+            pendingToolName = toolName
             currentRiskAssessment = risk
             // 新一轮审批从完整态开始：上一轮放行留下的塌缩进度必须归零
             // 回调来自 IO 调度（executeUserPrompt 的 withContext），状态改动交回主线程
@@ -1187,7 +1240,7 @@ private fun MainAgentDashboard(
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
         // 曲线坐标系取整屏圆形；绘制在内容列表之后，正文从时钟下方穿过时只被轻微压暗，不会被抹掉。
-        // 审批态由居中磨砂卡片接管，卡片顶边会扫到弧形时钟字形，
+        // 审批态由居中文字浮层接管，文字顶边会扫到弧形时钟字形，
         // 因此审批期间隐藏时钟：沉浸要的是干净，而不是留下一条状态栏残影。
         if (!isApprovalFocus) {
             TopClockBar(
@@ -1196,9 +1249,10 @@ private fun MainAgentDashboard(
             )
         }
 
-        // ================= 3.5 审批磨砂卡片：居中浮在点阵之上，绿/红只靠点阵自身变色 =================
-        ApprovalCard(
+        // ================= 3.5 审批浮层：没有卡片也没有描边，文字浮在径向暗晕之上 =================
+        ApprovalFloatingLayer(
             visible = isApprovalFocus,
+            toolName = pendingToolName,
             risk = currentRiskAssessment,
             collapse = approvalCollapse.value
         )
@@ -1275,7 +1329,11 @@ private fun MainAgentDashboard(
             onSwipeUpSettings = {
                 onOpenSettings() // 阻尼跟手上滑进入设置
             },
-            onApprovalProgress = { approvalProgress = it }
+            onApprovalProgress = { approvalProgress = it },
+            // 滑块着色跟着审批等级走：低风险绿、中度黄、重度黄红、致命红，滑到底仍是绿
+            approvalTone = ApprovalTone.accentOf(
+                currentRiskAssessment?.aiRiskLevel ?: RiskLevel.MEDIUM
+            )
         )
 
         // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================
