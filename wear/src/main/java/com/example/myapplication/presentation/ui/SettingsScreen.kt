@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -40,7 +40,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.agent.AgentPreferences
@@ -54,17 +57,22 @@ import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
 import com.example.myapplication.presentation.ui.settings.ModelConfigContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
+import com.example.myapplication.presentation.ui.settings.SettingsActionButton
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.settings.SubPageBottomReserve
 import com.example.myapplication.presentation.ui.settings.SubSettingsModal
 import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
 import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.WingShortcutContent
+import com.example.myapplication.presentation.ui.settings.PullDownDismissContainer
 import com.example.myapplication.presentation.ui.settings.vibrateTick
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+/** 圆屏内可用内容宽度上限：最宽处仍留出 36dp 边距，chevron 不贴屏幕外缘。 */
+private val SettingsContentMaxWidth = 168.dp
 
 /**
  * Wear OS 端侧 AI 设置中心
@@ -112,327 +120,353 @@ fun SettingsScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Wear.Palette.Bg)
+    val listState = rememberScalingLazyListState()
+
+    // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
+    PullDownDismissContainer(
+        modifier = modifier,
+        enabled = activeDialog == null && !showVoiceAsr,
+        // 到顶判定：列表已无法向后滚动（等价于 firstVisibleItemIndex==0 && ScrollOffset==0，
+        // ScalingLazyListState 只把这些量暴露为 canScrollBackward），再加首项正落在垂直中心兜底，
+        // 避免自动居中初始化时残留像素级偏移导致手势失效。
+        atTop = {
+            !listState.canScrollBackward ||
+                (listState.centerItemIndex == 0 && listState.centerItemScrollOffset == 0)
+        },
+        onDismiss = onBack
     ) {
-        val listState = rememberScalingLazyListState()
-        val settingsFocusRequester = remember { FocusRequester() }
-
-        LaunchedEffect(Unit) {
-            settingsFocusRequester.requestFocus()
-        }
-
-        // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
-        val apiKeyConfigured = preferences.apiKey.isNotBlank()
-
-        ScalingLazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .focusRequester(settingsFocusRequester)
-                .focusable()
-                .onRotaryScrollEvent {
-                    scope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
-                        if (abs(it.verticalScrollPixels) > 10f) {
+                .background(Wear.Palette.Bg)
+        ) {
+            val settingsFocusRequester = remember { FocusRequester() }
+
+            LaunchedEffect(Unit) {
+                settingsFocusRequester.requestFocus()
+            }
+
+            // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
+            val apiKeyConfigured = preferences.apiKey.isNotBlank()
+
+            ScalingLazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusRequester(settingsFocusRequester)
+                    .focusable()
+                    .onRotaryScrollEvent {
+                        scope.launch {
+                            listState.scrollBy(it.verticalScrollPixels)
+                            if (abs(it.verticalScrollPixels) > 10f) {
+                                context.vibrateTick()
+                            }
+                        }
+                        true
+                    },
+                state = listState,
+                contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Sm),
+                verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
+                // 圆屏官方做法：首项默认对齐视口垂直中心，上下边缘随曲率缩小淡出
+                autoCentering = AutoCenteringParams(itemIndex = 0)
+            ) {
+                // 顶部标题：水平居中，不再在圆屏最外圈放叉号（退出走下划 / 系统 BACK / 末尾完成返回）
+                item {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = SettingsContentMaxWidth)
+                            .fillMaxWidth()
+                            .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm)
+                            .height(Wear.Size.Touch),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BasicText(
+                            text = "系统设置",
+                            style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // 1. 模型与服务：标题独占首行，值 + 徽章置于次行，徽章按真实 API Key 配置状态渲染
+                item {
+                    SettingsEntry(
+                        title = "模型与服务",
+                        value = currentModel,
+                        badge = if (apiKeyConfigured) "已配置" to Tone.ACCENT else "未配置" to Tone.DANGER,
+                        onClick = {
                             context.vibrateTick()
+                            activeDialog = SettingsSubDialog.MODEL_CONFIG
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 2. 模型参数
+                item {
+                    SettingsEntry(
+                        title = "模型参数",
+                        value = "Temp %.1f".format(currentTemp),
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.HYPER_PARAMS
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 3. 内置工具与 MCP
+                item {
+                    val activeCount = listOf(
+                        preferences.toolDeviceStatusEnabled,
+                        preferences.toolVibrateEnabled,
+                        preferences.toolMatrixDensityEnabled,
+                        preferences.toolPowerModeEnabled,
+                        preferences.toolWeatherEnabled,
+                        preferences.toolWebSearchEnabled
+                    ).count { it }
+                    SettingsEntry(
+                        title = "端侧工具与 MCP",
+                        value = "$activeCount/6 已启用",
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.TOOLS_MCP
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 4. 系统提示词
+                item {
+                    SettingsEntry(
+                        title = "系统提示词",
+                        value = if (customPrompt.isBlank()) "预置默认" else "自定义",
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.PROMPT_VIEWER
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 5. 会话与上下文
+                item {
+                    SettingsEntry(
+                        title = "会话记忆管理",
+                        value = "${preferences.maxContextTurns} 轮",
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.MEMORY_MANAGER
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 6. 快捷操作
+                item {
+                    SettingsEntry(
+                        title = "底栏副键",
+                        // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
+                        value = "右翼固定打开会话抽屉",
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.WING_SHORTCUT
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 7. 操作安全防线
+                item {
+                    SettingsEntry(
+                        title = "操作安全策略",
+                        value = when (currentSecurityMode) {
+                            SecurityMode.NOVICE -> "严格确认"
+                            SecurityMode.STANDARD -> "标准提示"
+                            SecurityMode.EXPERT -> "自动执行"
+                        },
+                        onClick = {
+                            context.vibrateTick()
+                            activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 8. 语音转写
+                item {
+                    val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
+                    SettingsEntry(
+                        title = "语音转写",
+                        value = when {
+                            !asrEnabled -> "已关闭"
+                            asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "密钥未填写"
+                            asrProvider == AsrProviderId.BAIDU -> "百度短语音"
+                            else -> "系统识别"
+                        },
+                        onClick = {
+                            context.vibrateTick()
+                            showVoiceAsr = true
+                        }
+                    )
+                }
+
+                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+
+                // 9. 重新观看新手引导
+                item {
+                    SettingsEntry(
+                        title = "重新观看操作引导",
+                        onClick = {
+                            context.vibrateTick()
+                            onRestartOnboarding()
+                        }
+                    )
+                }
+
+                // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
+                item {
+                    SettingsActionButton(
+                        label = "完成返回",
+                        tone = Tone.ACCENT,
+                        modifier = Modifier.widthIn(max = SettingsContentMaxWidth),
+                        onClick = onBack
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(SubPageBottomReserve))
+                }
+            }
+
+            // ================= 二级配置对话弹窗 (展开动效与纯按钮调试) =================
+            activeDialog?.let { dialog ->
+                when (dialog) {
+                    SettingsSubDialog.MODEL_CONFIG -> {
+                        SubSettingsModal(
+                            title = "模型与端点设置",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            ModelConfigContent(
+                                preferences = preferences,
+                                currentModel = currentModel,
+                                currentBaseUrl = currentBaseUrl,
+                                onSelect = { model, base ->
+                                    currentModel = model
+                                    currentBaseUrl = base
+                                    preferences.modelName = model
+                                    preferences.baseUrl = base
+                                }
+                            )
                         }
                     }
-                    true
-                },
-            state = listState,
-            contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Sm),
-            verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
-        ) {
-            // 顶部标题与返回键
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                ) {
-                    BasicText(
-                        text = "系统设置",
-                        modifier = Modifier.weight(1f),
-                        style = Wear.TextTitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    CloseButton(onClick = onBack)
+                    SettingsSubDialog.HYPER_PARAMS -> {
+                        SubSettingsModal(
+                            title = "模型推理参数",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            HyperParamsContent(
+                                preferences = preferences,
+                                onParamsChanged = { temp, tokens, stream ->
+                                    currentTemp = temp
+                                    currentMaxTokens = tokens
+                                    currentStreamMode = stream
+                                }
+                            )
+                        }
+                    }
+                    SettingsSubDialog.TOOLS_MCP -> {
+                        SubSettingsModal(
+                            title = "端侧工具与 MCP",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            ToolsMcpContent(
+                                preferences = preferences,
+                                isMcpEnabled = isMcpEnabled,
+                                mcpEndpoint = mcpEndpoint,
+                                onToggleMcp = { enabled, ep ->
+                                    isMcpEnabled = enabled
+                                    mcpEndpoint = ep
+                                    preferences.isMcpEnabled = enabled
+                                    preferences.mcpEndpoint = ep
+                                }
+                            )
+                        }
+                    }
+                    SettingsSubDialog.PROMPT_VIEWER -> {
+                        SubSettingsModal(
+                            title = "系统提示词",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            PromptViewerContent(
+                                customPrompt = customPrompt,
+                                onSavePrompt = { prompt ->
+                                    customPrompt = prompt
+                                    preferences.customSystemPrompt = prompt
+                                }
+                            )
+                        }
+                    }
+                    SettingsSubDialog.MEMORY_MANAGER -> {
+                        SubSettingsModal(
+                            title = "会话记忆管理",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            MemoryManagerContent(preferences = preferences)
+                        }
+                    }
+                    SettingsSubDialog.WING_SHORTCUT -> {
+                        SubSettingsModal(
+                            title = "快捷操作绑定",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            WingShortcutContent(
+                                currentAction = currentRightAction,
+                                onSelect = { action ->
+                                    currentRightAction = action
+                                    preferences.rightButtonAction = action
+                                }
+                            )
+                        }
+                    }
+                    SettingsSubDialog.SECURITY_GUARDRAIL -> {
+                        SubSettingsModal(
+                            title = "操作安全策略",
+                            onDismiss = { activeDialog = null }
+                        ) {
+                            SecurityGuardrailContent(
+                                currentMode = currentSecurityMode,
+                                onSelect = { mode ->
+                                    currentSecurityMode = mode
+                                    preferences.securityMode = mode
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
-            // 1. 模型与服务：标题独占首行，值 + 徽章置于次行，徽章按真实 API Key 配置状态渲染
-            item {
-                SettingsEntry(
-                    title = "模型与服务",
-                    value = currentModel,
-                    badge = if (apiKeyConfigured) "已配置" to Tone.ACCENT else "未配置" to Tone.DANGER,
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.MODEL_CONFIG
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 2. 模型参数
-            item {
-                SettingsEntry(
-                    title = "模型参数",
-                    value = "Temp %.1f".format(currentTemp),
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.HYPER_PARAMS
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 3. 内置工具与 MCP
-            item {
-                val activeCount = listOf(
-                    preferences.toolDeviceStatusEnabled,
-                    preferences.toolVibrateEnabled,
-                    preferences.toolMatrixDensityEnabled,
-                    preferences.toolPowerModeEnabled,
-                    preferences.toolWeatherEnabled,
-                    preferences.toolWebSearchEnabled
-                ).count { it }
-                SettingsEntry(
-                    title = "端侧工具与 MCP",
-                    value = "$activeCount/6 已启用",
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.TOOLS_MCP
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 4. 系统提示词
-            item {
-                SettingsEntry(
-                    title = "系统提示词",
-                    value = if (customPrompt.isBlank()) "预置默认" else "自定义",
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.PROMPT_VIEWER
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 5. 会话与上下文
-            item {
-                SettingsEntry(
-                    title = "会话记忆管理",
-                    value = "${preferences.maxContextTurns} 轮",
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.MEMORY_MANAGER
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 6. 快捷操作
-            item {
-                SettingsEntry(
-                    title = "底栏副键",
-                    // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
-                    value = "右翼固定打开会话抽屉",
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.WING_SHORTCUT
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 7. 操作安全防线
-            item {
-                SettingsEntry(
-                    title = "操作安全策略",
-                    value = when (currentSecurityMode) {
-                        SecurityMode.NOVICE -> "严格确认"
-                        SecurityMode.STANDARD -> "标准提示"
-                        SecurityMode.EXPERT -> "自动执行"
-                    },
-                    onClick = {
-                        context.vibrateTick()
-                        activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 8. 语音转写
-            item {
-                val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
-                SettingsEntry(
+            if (showVoiceAsr) {
+                SubSettingsModal(
                     title = "语音转写",
-                    value = when {
-                        !asrEnabled -> "已关闭"
-                        asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "密钥未填写"
-                        asrProvider == AsrProviderId.BAIDU -> "百度短语音"
-                        else -> "系统识别"
-                    },
-                    onClick = {
-                        context.vibrateTick()
-                        showVoiceAsr = true
-                    }
-                )
-            }
-
-            item { WearDivider() }
-
-            // 9. 重新观看新手引导
-            item {
-                SettingsEntry(
-                    title = "重新观看操作引导",
-                    onClick = {
-                        context.vibrateTick()
-                        onRestartOnboarding()
-                    }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(SubPageBottomReserve))
-            }
-        }
-
-        // ================= 二级配置对话弹窗 (展开动效与纯按钮调试) =================
-        activeDialog?.let { dialog ->
-            when (dialog) {
-                SettingsSubDialog.MODEL_CONFIG -> {
-                    SubSettingsModal(
-                        title = "模型与端点设置",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        ModelConfigContent(
-                            preferences = preferences,
-                            currentModel = currentModel,
-                            currentBaseUrl = currentBaseUrl,
-                            onSelect = { model, base ->
-                                currentModel = model
-                                currentBaseUrl = base
-                                preferences.modelName = model
-                                preferences.baseUrl = base
-                            }
-                        )
-                    }
+                    onDismiss = { showVoiceAsr = false }
+                ) {
+                    VoiceAsrContent(
+                        preferences = preferences,
+                        onSettingsChanged = { settings ->
+                            asrEnabled = settings.enabled
+                            asrProviderKey = settings.providerId.storageKey
+                            asrKeyReady = settings.hasBaiduCredentials
+                        }
+                    )
                 }
-                SettingsSubDialog.HYPER_PARAMS -> {
-                    SubSettingsModal(
-                        title = "模型推理参数",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        HyperParamsContent(
-                            preferences = preferences,
-                            onParamsChanged = { temp, tokens, stream ->
-                                currentTemp = temp
-                                currentMaxTokens = tokens
-                                currentStreamMode = stream
-                            }
-                        )
-                    }
-                }
-                SettingsSubDialog.TOOLS_MCP -> {
-                    SubSettingsModal(
-                        title = "端侧工具与 MCP",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        ToolsMcpContent(
-                            preferences = preferences,
-                            isMcpEnabled = isMcpEnabled,
-                            mcpEndpoint = mcpEndpoint,
-                            onToggleMcp = { enabled, ep ->
-                                isMcpEnabled = enabled
-                                mcpEndpoint = ep
-                                preferences.isMcpEnabled = enabled
-                                preferences.mcpEndpoint = ep
-                            }
-                        )
-                    }
-                }
-                SettingsSubDialog.PROMPT_VIEWER -> {
-                    SubSettingsModal(
-                        title = "系统提示词",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        PromptViewerContent(
-                            customPrompt = customPrompt,
-                            onSavePrompt = { prompt ->
-                                customPrompt = prompt
-                                preferences.customSystemPrompt = prompt
-                            }
-                        )
-                    }
-                }
-                SettingsSubDialog.MEMORY_MANAGER -> {
-                    SubSettingsModal(
-                        title = "会话记忆管理",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        MemoryManagerContent(preferences = preferences)
-                    }
-                }
-                SettingsSubDialog.WING_SHORTCUT -> {
-                    SubSettingsModal(
-                        title = "快捷操作绑定",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        WingShortcutContent(
-                            currentAction = currentRightAction,
-                            onSelect = { action ->
-                                currentRightAction = action
-                                preferences.rightButtonAction = action
-                            }
-                        )
-                    }
-                }
-                SettingsSubDialog.SECURITY_GUARDRAIL -> {
-                    SubSettingsModal(
-                        title = "操作安全策略",
-                        onDismiss = { activeDialog = null }
-                    ) {
-                        SecurityGuardrailContent(
-                            currentMode = currentSecurityMode,
-                            onSelect = { mode ->
-                                currentSecurityMode = mode
-                                preferences.securityMode = mode
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (showVoiceAsr) {
-            SubSettingsModal(
-                title = "语音转写",
-                onDismiss = { showVoiceAsr = false }
-            ) {
-                VoiceAsrContent(
-                    preferences = preferences,
-                    onSettingsChanged = { settings ->
-                        asrEnabled = settings.enabled
-                        asrProviderKey = settings.providerId.storageKey
-                        asrKeyReady = settings.hasBaiduCredentials
-                    }
-                )
             }
         }
     }
@@ -452,6 +486,7 @@ private fun SettingsEntry(
     val shape = RoundedCornerShape(Wear.Radius.Chip)
     Column(
         modifier = Modifier
+            .widthIn(max = SettingsContentMaxWidth)
             .fillMaxWidth()
             .heightIn(min = Wear.Size.Touch)
             .clip(shape)
@@ -492,37 +527,6 @@ private fun SettingsEntry(
                     WearBadge(text = badge.first, tone = badge.second)
                 }
             }
-        }
-    }
-}
-
-/** 44dp Canvas 叉号关闭键。 */
-@Composable
-private fun CloseButton(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(Wear.Size.Touch)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(Wear.Space.Md)) {
-            val inset = size.minDimension * 0.25f
-            val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
-            drawLine(
-                color = Wear.Palette.TextSecondary,
-                start = Offset(inset, inset),
-                end = Offset(size.width - inset, size.height - inset),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = Wear.Palette.TextSecondary,
-                start = Offset(size.width - inset, inset),
-                end = Offset(inset, size.height - inset),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
-            )
         }
     }
 }

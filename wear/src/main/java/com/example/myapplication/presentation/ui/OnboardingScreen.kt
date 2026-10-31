@@ -20,13 +20,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -45,7 +49,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -55,6 +61,10 @@ import com.example.myapplication.presentation.ui.components.WearCard
 import com.example.myapplication.presentation.ui.components.WearChip
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
  * 点阵全动效极客新手引导
@@ -82,6 +92,12 @@ fun OnboardingScreen(
         )
         delay(150)
         phase = 2
+    }
+
+    // 两条出口共用同一个收尾：先写完成标记再交给上层，保证"跳过"与"完成并进入"都不会再回到引导页
+    val finishOnboarding: () -> Unit = {
+        preferences.hasCompletedOnboarding = true
+        onFinish()
     }
 
     Box(
@@ -162,12 +178,18 @@ fun OnboardingScreen(
                             ),
                             maxLines = 2
                         )
-                        // 下方 [继续] 胶囊按键 (触控高度 ≥ 44dp)
-                        WearChip(
-                            label = "继续",
-                            selected = false,
-                            onClick = { phase = 3 }
-                        )
+                        // 下方 [继续] 胶囊按键与纯文字 [跳过]：两键并排约 100dp 宽、44dp 高，均在 148dp 白圆内容区内
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                        ) {
+                            WearChip(
+                                label = "继续",
+                                selected = false,
+                                onClick = { phase = 3 }
+                            )
+                            SkipTextButton(onClick = finishOnboarding)
+                        }
                     }
                 }
             }
@@ -179,12 +201,10 @@ fun OnboardingScreen(
             enter = fadeIn(tween(280)) + slideInVertically(spring(dampingRatio = 0.8f, stiffness = 320f)) { it / 3 },
             exit = fadeOut(tween(200))
         ) {
+            // 阶段内的"完成并进入主界面"自行写回输入框后再调用 onFinish；顶部叉号"跳过"直接调用 onFinish
             OnboardingConfigPhase(
                 preferences = preferences,
-                onFinish = {
-                    preferences.hasCompletedOnboarding = true
-                    onFinish()
-                }
+                onFinish = finishOnboarding
             )
         }
     }
@@ -209,7 +229,7 @@ private fun OnboardingConfigPhase(
         focusRequester.requestFocus()
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
@@ -225,7 +245,13 @@ private fun OnboardingConfigPhase(
                     }
                     true
                 },
-            contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Lg),
+            // 顶部让出叉号行高度，滚动内容不会爬到叉号下面
+            contentPadding = PaddingValues(
+                start = Wear.Space.Edge,
+                end = Wear.Space.Edge,
+                top = Wear.Size.TopContentInset + Wear.Size.Touch,
+                bottom = Wear.Space.Lg
+            ),
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -348,6 +374,79 @@ private fun OnboardingConfigPhase(
                     )
                 }
             }
+        }
+
+        // 顶部右侧 44dp 叉号跳过键：宽度取该行上沿处的圆弦长（与设置子页同算法），整块落在圆周内
+        val radiusDp = min(maxWidth.value, maxHeight.value) / 2f
+        val centerYDp = maxHeight.value / 2f
+        val headerTopDp = Wear.Size.TopContentInset.value
+        val farEdgeDp = max(
+            abs(headerTopDp - centerYDp),
+            abs(headerTopDp + Wear.Size.Touch.value - centerYDp)
+        )
+        val chordHalfDp = sqrt((radiusDp * radiusDp - farEdgeDp * farEdgeDp).coerceAtLeast(0f)) -
+            Wear.Space.Sm.value
+        val headerWidth = (chordHalfDp.coerceAtLeast(0f) * 2f).dp.coerceAtLeast(Wear.Size.Touch)
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .width(headerWidth)
+                .padding(top = Wear.Size.TopContentInset)
+                .height(Wear.Size.Touch),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkipCrossButton(onClick = onFinish)
+        }
+    }
+}
+
+/** 阶段 2 白圆内的纯文字"跳过"：12sp，用 TextMuted 保证白底对比度 5.05:1（TextSecondary 只有 2.82:1）。 */
+@Composable
+private fun SkipTextButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = "跳过",
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+            maxLines = 1
+        )
+    }
+}
+
+/** 阶段 3 顶部的 44dp Canvas 叉号跳过键，画法与设置子页叉号一致。 */
+@Composable
+private fun SkipCrossButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+            val inset = size.minDimension * 0.25f
+            val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(inset, inset),
+                end = Offset(size.width - inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(size.width - inset, inset),
+                end = Offset(inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
         }
     }
 }
