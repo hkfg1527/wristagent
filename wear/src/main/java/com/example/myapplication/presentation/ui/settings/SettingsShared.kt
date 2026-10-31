@@ -13,12 +13,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
@@ -41,10 +43,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.sqrt
 
 /** 子页滚动区底部预留高度：底部固定"完成返回"键不遮挡滚动内容。 */
 val SubPageBottomReserve = 72.dp
@@ -282,38 +288,71 @@ fun SubSettingsModal(
                 )
             }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = Wear.Space.Edge),
-        ) {
-            BasicText(
-                text = title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
-                style = Wear.TextTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) {
-                content()
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val radiusDp = min(maxWidth.value, maxHeight.value) / 2f
+            val centerYDp = maxHeight.value / 2f
+            // 圆内可用宽度：取矩形离圆心更远的那条边所在的弦长，再各留 Wear.Space.Sm 安全余量
+            fun circleSafeWidth(topY: Float, boxHeight: Float): Dp {
+                val farEdge = maxOf(abs(topY - centerYDp), abs(topY + boxHeight - centerYDp))
+                val chordHalf = sqrt((radiusDp * radiusDp - farEdge * farEdge).coerceAtLeast(0f))
+                return ((chordHalf - Wear.Space.Sm.value).coerceAtLeast(0f) * 2f).dp
             }
 
-            SettingsActionButton(
-                label = "完成返回",
-                tone = Tone.ACCENT,
-                onClick = {
-                    context.vibrateTick()
-                    onDismiss()
-                },
-                modifier = Modifier.padding(bottom = Wear.Space.Md),
-            )
+            val titleY = Wear.Size.TopContentInset.value
+            val titleWidth = circleSafeWidth(titleY, Wear.Size.BadgeHeight.value)
+                .coerceAtLeast(Wear.Size.Touch)
+
+            val actionY = maxHeight.value - Wear.Space.Xl.value - Wear.Size.Touch.value
+            val actionWidth = circleSafeWidth(actionY, Wear.Size.Touch.value)
+                .coerceAtLeast(Wear.Size.Touch)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = Wear.Space.Edge),
+            ) {
+                // 标题整块落在圆周内：宽度取该高度处的弦长，水平居中
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    BasicText(
+                        text = title,
+                        modifier = Modifier.widthIn(max = titleWidth),
+                        style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    content()
+                }
+
+                // 底部动作键四角都在圆周内：宽度取按钮下沿处的弦长，水平居中
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Wear.Space.Xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    SettingsActionButton(
+                        label = "完成返回",
+                        tone = Tone.ACCENT,
+                        onClick = {
+                            context.vibrateTick()
+                            onDismiss()
+                        },
+                        modifier = Modifier.widthIn(max = actionWidth),
+                    )
+                }
+            }
         }
     }
 }
