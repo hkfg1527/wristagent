@@ -759,7 +759,7 @@ private fun MainAgentDashboard(
         )
 
         // ================= 2. 文字与原生高斯模糊简单框一体联动滚动流 =================
-        // 全屏纵向滑动，正文卡片微内缩 (24dp)，顶部与底部微自然遮罩，绝不遮挡底层点阵
+        // 全屏纵向滑动，正文左右内缩 Wear.Space.Edge，顶部时钟带与底部底栏保留区由 DstIn 遮罩完全抹掉
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -782,19 +782,21 @@ private fun MainAgentDashboard(
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
-                    // 遮罩只要给极微弱的一点点，只遮住时间下边缘一丁点地方，绝不遮盖底层背景点阵
-                    val topCutoffPx = 16.dp.toPx()
-                    val topFadePx = 24.dp.toPx()
-                    val bottomFadeStartPx = size.height - 76.dp.toPx()
-                    val bottomFadeEndPx = size.height - 14.dp.toPx()
+                    // DstIn 遮罩：alpha=0 处内容被抹掉，alpha=1 处内容完整保留
+                    // 顶部：0~38dp 全抹（时钟带 8~31dp 及上下缓冲），38~50dp 渐入，50dp 以下完整
+                    // 底部：距底 104dp 以上完整，104~92dp 渐出，距底 92dp 以下（底栏保留区 + 主键上方 24dp）全抹
+                    val topCutoffPx = (Wear.Size.TopContentInset + Wear.Space.Xs).toPx()
+                    val topFadePx = (topCutoffPx + Wear.Space.Md.toPx())
+                    val bottomFadeEndPx = size.height - Wear.Size.BottomBarReserve.toPx()
+                    val bottomFadeStartPx = bottomFadeEndPx - Wear.Space.Md.toPx()
 
                     drawRect(
                         brush = Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
                                 (topCutoffPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
-                                (topFadePx / size.height).coerceIn(0f, 1f) to Color.Black,
-                                (bottomFadeStartPx / size.height).coerceIn(0f, 1f) to Color.Black,
+                                (topFadePx / size.height).coerceIn(0f, 1f) to Wear.Palette.Bg,
+                                (bottomFadeStartPx / size.height).coerceIn(0f, 1f) to Wear.Palette.Bg,
                                 (bottomFadeEndPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
                                 1.0f to Color.Transparent
                             )
@@ -806,8 +808,8 @@ private fun MainAgentDashboard(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 顶部时间留白
-            Spacer(modifier = Modifier.height(Wear.Size.TopContentInset))
+            // 顶部时间留白：正文从顶部渐入结束处（50dp）开始，避免首条被遮罩吃掉
+            Spacer(modifier = Modifier.height(Wear.Size.TopContentInset + Wear.Space.Xs + Wear.Space.Md))
 
             // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形毛玻璃框，工具调用完整内嵌)
             val conversationItems = remember(agentState.conversationBlocks) {
@@ -886,8 +888,8 @@ private fun MainAgentDashboard(
                 WearBanner(text = "[ALERT] $err", tone = Tone.DANGER)
             }
 
-            // 底部留白，保证文字能完全滑过底栏
-            Spacer(modifier = Modifier.height(Wear.Size.BottomBarReserve))
+            // 底部留白：留到底部渐出结束处（104dp），保证末尾正文完整可读而不被遮罩抹掉
+            Spacer(modifier = Modifier.height(Wear.Size.BottomBarReserve + Wear.Space.Md))
         }
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
