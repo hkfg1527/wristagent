@@ -13,6 +13,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,8 +22,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -148,6 +151,10 @@ fun SpringColoredToolPill(
     val isExecuting = toolCall.isExecuting
     val meta = ToolVisualMeta.resolve(toolCall.toolName)
     val statusColor = toolStatusColor(toolCall)
+    // 工具专属染色：底色 14%、描边 60% 都由该工具的 tagColor 推导，和正文卡片的 Surface/Border 明确区分
+    val tagColor = Color(meta.tagColorHex)
+    val pillBackground = tagColor.copy(alpha = 0.14f)
+    val pillBorder = tagColor.copy(alpha = 0.6f)
     val shape = RoundedCornerShape(Wear.Radius.Chip)
 
     // 弹性展开箭头旋转
@@ -160,75 +167,74 @@ fun SpringColoredToolPill(
         label = "toolArrowSpring"
     )
 
-    // 旋转齿轮动画 (仅在执行中生效)
+    // 执行中：圆点呼吸 (替代原来的旋转齿轮字形，保持无 emoji)
     val infiniteTransition = rememberInfiniteTransition(label = "executingPulse")
-    val spinnerAngle by if (isExecuting) {
+    val dotScale by if (isExecuting) {
         infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
+            initialValue = 0.55f,
+            targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
+                animation = tween(620, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
             ),
-            label = "spin"
+            label = "dotPulse"
         )
     } else {
-        remember { mutableStateOf(0f) }
+        remember { mutableStateOf(1f) }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = Wear.Space.Xs)
-    ) {
-        // 工具主胶囊：SurfaceAlt 实底 + Border 描边，状态色只取令牌
-        Row(
+    Column(modifier = modifier.fillMaxWidth()) {
+        // 44dp 触控热区包住 26dp 视觉胶囊：一眼是"一粒小标签"，不是"一张卡片"
+        Box(
             modifier = Modifier
-                .clip(shape)
-                .background(Wear.Palette.SurfaceAlt)
-                .border(1.dp, Wear.Palette.Border, shape)
                 .heightIn(min = Wear.Size.Touch)
                 .clickable { isExpanded = !isExpanded }
-                .padding(horizontal = Wear.Space.Md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            // 工具专属图标或执行齿轮
-            BasicText(
-                text = if (isExecuting) "⚙" else meta.iconSymbol,
-                modifier = if (isExecuting) Modifier.rotate(spinnerAngle) else Modifier,
-                style = Wear.TextCaption.copy(color = statusColor),
-                maxLines = 1
-            )
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .height(Wear.Size.BadgeHeight + 6.dp)
+                    .clip(shape)
+                    .background(pillBackground)
+                    .border(1.dp, pillBorder, shape)
+                    .padding(horizontal = Wear.Space.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+            ) {
+                // 图标位：6dp 纯色几何圆点 (tagColor)，执行中呼吸
+                Canvas(modifier = Modifier.size(6.dp)) {
+                    drawCircle(color = tagColor, radius = size.minDimension / 2f * dotScale)
+                }
 
-            // 工具中文名
-            BasicText(
-                text = meta.displayName,
-                style = Wear.TextCaption.copy(color = statusColor),
-                maxLines = 1
-            )
+                // 工具中文名
+                BasicText(
+                    text = meta.displayName,
+                    style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+                    maxLines = 1
+                )
 
-            // 状态说明
-            val summaryLabel = if (isExecuting) {
-                "生成工具调用中..."
-            } else {
-                toolCall.resultSummary ?: "已执行"
+                // 状态说明 (running/success/failed 只点缀在文字颜色上)
+                val summaryLabel = if (isExecuting) {
+                    "生成中..."
+                } else {
+                    toolCall.resultSummary ?: "已执行"
+                }
+                BasicText(
+                    text = "· $summaryLabel",
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = Wear.TextCaption.copy(color = statusColor),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // 弹性箭头指示
+                BasicText(
+                    text = "›",
+                    modifier = Modifier.rotate(arrowRotation),
+                    style = Wear.TextCaption.copy(color = tagColor),
+                    maxLines = 1
+                )
             }
-            BasicText(
-                text = "· $summaryLabel",
-                modifier = Modifier.weight(1f, fill = false),
-                style = Wear.TextCaption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            // 弹性箭头指示
-            BasicText(
-                text = "›",
-                modifier = Modifier.rotate(arrowRotation),
-                style = Wear.TextCaption.copy(color = statusColor),
-                maxLines = 1
-            )
         }
 
         // 弹性展开详情卡片
@@ -243,7 +249,7 @@ fun SpringColoredToolPill(
                     .padding(top = Wear.Space.Xs)
                     .clip(shape)
                     .background(Wear.Palette.SurfaceAlt)
-                    .border(1.dp, Wear.Palette.Border, shape)
+                    .border(1.dp, tagColor.copy(alpha = 0.3f), shape)
                     .padding(Wear.Space.Md)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
@@ -288,7 +294,8 @@ fun SpringStreamingText(
     BasicText(
         modifier = modifier,
         text = buildAnnotatedString {
-            append(text)
+            // 渲染前做最小 Markdown 清洗：成对强调标记与反引号不外露，流式未闭合标记不闪烁
+            append(stripEmphasisMarkers(text, hideUnclosedTail = isStreaming))
             if (isStreaming) {
                 withStyle(SpanStyle(color = Wear.Palette.Accent.copy(alpha = cursorAlpha))) {
                     append(" ▌")

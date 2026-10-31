@@ -25,6 +25,9 @@ object Wear {
         val Danger = Color(0xFFFF6B6B)
         val DangerSurface = Color(0xFF2A1215)
         val Success = Color(0xFF4ADE80)
+
+        /** 主键冷银白：IDLE 单体键与审批胶囊底条共用，让审批态是同一颗键的延续，而不是另起一条深色胶囊。 */
+        val Orb = Color(0xFFE8EDF5)
     }
 
     /** 圆角令牌。 */
@@ -53,10 +56,17 @@ object Wear {
         val TopContentInset = 34.dp
         /** 底栏保留区：主键 52dp + 底距 12dp + 12dp 余量，尽量把高度让给正文 */
         val BottomBarReserve = 76.dp
+        /**
+         * 列表末端可达高度：让最后一项可滚到圆屏中心，避免被底栏遮挡。
+         * 480px/2.0 密度下屏高 240dp、圆心在 120dp；bottom padding 取 112dp 时，
+         * 滚到底的最后一条卡片底边停在 240-112=128dp，正好落在圆心附近而不是压进 76dp 底栏。
+         */
+        val ListCenterReach = 112.dp
     }
 
     // 字号阶梯：最小 12sp，禁止再出现更小字号
-    val TextDisplay = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextPrimary)
+    /** 顶部曲面时钟专用字号：18sp 让弧形表盘时间不顶到圆周，正文可用区更宽 */
+    val TextDisplay = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextPrimary)
     val TextTitle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextPrimary)
     val TextBody = TextStyle(
         fontSize = 14.sp,

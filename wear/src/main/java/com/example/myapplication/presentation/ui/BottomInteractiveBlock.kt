@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -32,11 +33,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -62,10 +65,12 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -101,7 +106,7 @@ fun BottomInteractiveBlock(
     mainInputType: MainInputType = MainInputType.VOICE,
     onMainInputTypeChange: (MainInputType) -> Unit = {},
     cooldownSeconds: Int = 0,               // 严格确认模式下的风险锁定倒计时
-    riskExplanation: String = "",           // 审批横条上方的最坏后果说明
+    riskExplanation: String = "",           // 最坏后果说明：审批改为滑块形态后不再单独成行，保留参数以兼容调用方
     onVoiceStartRecord: () -> Unit,
     onVoiceStopAndTrigger: () -> Unit,
     onLeftKeyboardClick: () -> Unit,
@@ -109,7 +114,8 @@ fun BottomInteractiveBlock(
     onStopClick: () -> Unit,
     onAllow: () -> Unit,
     onReject: () -> Unit,
-    onSwipeUpSettings: () -> Unit           // 阻尼跟手上滑进设置
+    onSwipeUpSettings: () -> Unit,           // 阻尼跟手上滑进设置
+    onApprovalProgress: (Float) -> Unit = {} // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
 ) {
     val scope = rememberCoroutineScope()
     val isApproval = mode == BottomBlockMode.ACTION_ALLOW
@@ -126,23 +132,71 @@ fun BottomInteractiveBlock(
         label = "orbRecordScale"
     )
 
-    // 胶囊宽度物理演变：待机 44dp -> 思考 88dp -> 审批 180dp
+    val density = LocalDensity.current
+    val windowSize = LocalWindowInfo.current.containerSize
+    var blockTopPx by remember { mutableFloatStateOf(0f) }
+
+    // 审批行 = 胶囊 + [Wear.Space.Sm] + 拒绝键 44dp。用该 y 处的圆弦长反推胶囊宽：
+    // 行顶贴齐底栏顶边，圆心取屏幕正中，R = min(w,h)/2，弦长一半 = sqrt(R² - farEdge²)，
+    // 因此整行四角到圆心必然 ≤ R。480px/2.0 密度下整行约 185dp、胶囊约 133dp。
+    val approvalCapsuleWidth = remember(blockTopPx, windowSize, density) {
+        val radiusPx = min(windowSize.width, windowSize.height) / 2f
+        val centerY = windowSize.height / 2f
+        val rowHeightPx = with(density) { Wear.Size.Touch.toPx() }
+        if (blockTopPx <= 0f || radiusPx <= 0f) {
+            Wear.Size.Orb
+        } else {
+            val farEdge = max(abs(blockTopPx - centerY), abs(blockTopPx + rowHeightPx - centerY))
+            if (farEdge >= radiusPx) {
+                Wear.Size.Orb
+            } else {
+                val halfChord = sqrt(radiusPx * radiusPx - farEdge * farEdge)
+                with(density) { (2f * halfChord).toDp() }
+                    .minus(Wear.Size.Touch + Wear.Space.Sm)
+                    .coerceAtLeast(Wear.Size.Orb)
+            }
+        }
+    }
+
+    // 胶囊形变：待机 52dp 圆 -> 思考 88dp -> 审批态拉长到弦安全宽度
     val targetWidth = when (mode) {
-        BottomBlockMode.ACTION_ALLOW -> 180.dp
+        BottomBlockMode.ACTION_ALLOW -> approvalCapsuleWidth
         BottomBlockMode.THINKING_STOP -> 88.dp
         else -> Wear.Size.Orb
     }
 
+    // 审批态按设计稿用 spring(0.7, 280) 变形；其余态保留原有弹簧参数
+    val morphSpring: AnimationSpec<Dp> = if (isApproval) {
+        spring(dampingRatio = 0.7f, stiffness = 280f)
+    } else {
+        spring(dampingRatio = 0.72f, stiffness = 260f)
+    }
+
     val capsuleWidth by animateDpAsState(
         targetValue = targetWidth,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = 260f),
+        animationSpec = morphSpring,
         label = "capsuleStretchWidth"
+    )
+
+    // 主键高度 52dp -> 44dp：变形成横向胶囊后与拒绝键同高
+    val capsuleHeight by animateDpAsState(
+        targetValue = if (isApproval) Wear.Size.Touch else Wear.Size.Orb,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
+        label = "capsuleStretchHeight"
+    )
+
+    // 底栏高度：常驻 58dp，审批态升到 [Wear.Size.BottomBarReserve] 换取更大弦长，仍不超出保留区
+    val blockHeight by animateDpAsState(
+        targetValue = if (isApproval) Wear.Size.BottomBarReserve else 58.dp,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
+        label = "bottomBlockHeight"
     )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(blockHeight)
+            .onGloballyPositioned { coords -> blockTopPx = coords.positionInRoot().y }
             // 主键之外起手的横向拖动同样弹出两翼，并独占指针流，避免被系统"右滑返回"抢走。
             // 两翼已展开时同一条手势改为反向收回，使"横滑打开"有对称的"横滑收起"。
             .pointerInput(isBusy, mode, isSplitExpanded) {
@@ -266,8 +320,8 @@ fun BottomInteractiveBlock(
                     .size(capsuleWidth, Wear.Size.Orb)
                     .shadow(elevation = 8.dp, shape = CircleShape)
                     .clip(CircleShape)
-                    // 冷银白主键底色是品牌识别，允许保留此唯一色值字面量
-                    .background(Color(0xFFE8EDF5))
+                    // 冷银白主键底色（品牌识别），与审批胶囊共用同一令牌
+                    .background(Wear.Palette.Orb)
                     .pointerInput(isSplitExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -367,19 +421,15 @@ fun BottomInteractiveBlock(
                 }
             }
         } else if (isApproval) {
-            // ================= 审批拦截：滑块向左滑放行 + 同排 44dp 拒绝键，整行收进圆周内 =================
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                // 顶对齐能把整行抬到弦长更大的位置，横向可用宽度随之上限更高
-                contentAlignment = Alignment.TopCenter
-            ) {
-                ApprovalBar(
-                    riskExplanation = riskExplanation,
-                    cooldownSeconds = cooldownSeconds,
-                    onAllow = onAllow,
-                    onReject = onReject
-                )
-            }
+            // ================= 审批拦截：主键自己拉长成滑块，右侧同排 44dp 显式拒绝键 =================
+            ApprovalMorphBar(
+                trackWidth = capsuleWidth,
+                trackHeight = capsuleHeight,
+                cooldownSeconds = cooldownSeconds,
+                onAllow = onAllow,
+                onReject = onReject,
+                onApprovalProgress = onApprovalProgress
+            )
         } else {
             // ================= 思考中：微型停止按钮 =================
             val stopShape = RoundedCornerShape(Wear.Radius.Chip)
@@ -409,107 +459,84 @@ fun BottomInteractiveBlock(
 }
 
 /**
- * 审批行：滑块 + 44dp 拒绝键同排。
- * 圆屏几何：容器按圆处理，圆心在正中、半径 R = min(w,h)/2；本行高 44dp，取它离圆心更远的那条边 farEdge，
- * 该高度上可用弦长的一半为 sqrt(R² - farEdge²)，两侧各留 [Wear.Space.Sm] 余量，得到整行宽度上限
- * 2*sqrt(R² - farEdge²) - 2*Sm，保证四角都在圆周内（与设置子页 circleSafeWidth 同一套算法）。
+ * 审批行：主键自己拉长成滑块胶囊 + 同排 44dp 拒绝键。
+ * 行顶贴齐底栏顶边，胶囊宽由调用方按该 y 处圆弦长反推（见 BottomInteractiveBlock 的 approvalCapsuleWidth），
+ * 整行 = 胶囊 + [Wear.Space.Sm] + [Wear.Size.Touch]，四角到圆心必然 ≤ R。
  */
 @Composable
-private fun ApprovalBar(
-    riskExplanation: String,
+private fun ApprovalMorphBar(
+    trackWidth: Dp,
+    trackHeight: Dp,
     cooldownSeconds: Int,
     onAllow: () -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    onApprovalProgress: (Float) -> Unit
 ) {
-    val density = LocalDensity.current
-    val windowSize = LocalWindowInfo.current.containerSize
-    var rowTopPx by remember { mutableFloatStateOf(0f) }
-    val rowHeightPx = with(density) { Wear.Size.Touch.toPx() }
-    val marginPx = with(density) { Wear.Space.Sm.toPx() }
-    // 拒绝键 44dp + 间距 8dp + 滑块至少一个 44dp 触控区
-    val minRowWidth = Wear.Size.Touch * 2 + Wear.Space.Sm
-
-    val rowWidth = remember(rowTopPx, windowSize, rowHeightPx) {
-        val radiusPx = (min(windowSize.width, windowSize.height) / 2f)
-        if (radiusPx < rowHeightPx) {
-            minRowWidth
-        } else {
-            val centerY = windowSize.height / 2f
-            val farEdge = max(abs(rowTopPx - centerY), abs(rowTopPx + rowHeightPx - centerY))
-            val halfChord = sqrt((radiusPx * radiusPx - farEdge * farEdge).coerceAtLeast(1f))
-            with(density) { (2f * halfChord - 2f * marginPx).toDp() }
-                .coerceIn(minRowWidth, Wear.Size.Orb * 4)
-        }
-    }
-
-    Row(
-        modifier = Modifier
-            .onGloballyPositioned { coords -> rowTopPx = coords.positionInRoot().y }
-            .widthIn(max = rowWidth)
-            .fillMaxWidth()
-            .height(Wear.Size.Touch),
-        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        // 顶对齐能把整行抬到弦长更大的位置，横向可用宽度随之上限更高
+        contentAlignment = Alignment.TopCenter
     ) {
-        ApprovalLeftSlider(
-            modifier = Modifier.weight(1f),
-            riskExplanation = riskExplanation,
-            cooldownSeconds = cooldownSeconds,
-            onAllow = onAllow
-        )
-        RejectButton(onClick = onReject)
+        Row(
+            modifier = Modifier
+                .height(Wear.Size.Touch)
+                .width(trackWidth + Wear.Space.Sm + Wear.Size.Touch),
+            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ApprovalTrack(
+                modifier = Modifier.weight(1f),
+                trackHeight = trackHeight,
+                cooldownSeconds = cooldownSeconds,
+                onAllow = onAllow,
+                onApprovalProgress = onApprovalProgress
+            )
+            RejectButton(onClick = onReject)
+        }
     }
 }
 
-/** 审批态 44dp 显式拒绝键：Danger 描边 + Danger 文字，点击即 [onReject]。 */
+/** 44dp 拒绝键：Danger 实底 + 白色 12sp 文字，点击即默认拒绝。 */
 @Composable
 private fun RejectButton(onClick: () -> Unit) {
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
     Box(
         modifier = Modifier
             .size(Wear.Size.Touch)
-            .clip(shape)
-            .background(Wear.Palette.DangerSurface)
-            .border(1.dp, Wear.Palette.Danger, shape)
+            .clip(CircleShape)
+            .background(Wear.Palette.Danger)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         BasicText(
             text = "拒绝",
-            style = Wear.TextBody.copy(color = Wear.Palette.Danger),
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
             maxLines = 1
         )
     }
 }
 
 /**
- * 审批态滑块：向左滑动放行 (Swipe Left to Allow)。
- * 拒绝改为右侧独立的 44dp 显式按钮，滑块自身不再暗含"点空白即拒绝"的隐藏路径：
- * 未拖动到位的点击一律视为无效操作并回弹，避免误触直接否决。
+ * 审批滑块：白色主键底条自己拉长成横向胶囊，拇指自右端向左拖动。
+ * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
+ * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
+ * 未滑过的左侧区域保留 0.30 的红调；松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才算放行，否则弹簧回弹。
  */
 @Composable
-private fun ApprovalLeftSlider(
+private fun ApprovalTrack(
     modifier: Modifier = Modifier,
+    trackHeight: Dp,
     cooldownSeconds: Int,
-    riskExplanation: String,
-    onAllow: () -> Unit
+    onAllow: () -> Unit,
+    onApprovalProgress: (Float) -> Unit
 ) {
     val density = LocalDensity.current
-    var containerWidthPx by remember { mutableFloatStateOf(1f) }
-    // 拇指是纯视觉件（触控区是整条滑块），宽度随滑块变窄自适应，给文案让出位置
-    val thumbWidth = with(density) { (containerWidthPx * 0.32f).toDp() }.coerceIn(22.dp, Wear.Size.Touch)
-    val thumbWidthPx = with(density) { thumbWidth.toPx() }
-    val maxDragLeftPx = remember(containerWidthPx, thumbWidthPx) {
-        (containerWidthPx - thumbWidthPx - with(density) { 6.dp.toPx() }).coerceAtLeast(1f)
-    }
-    val labelSpace = with(density) {
-        (containerWidthPx - thumbWidthPx - 12.dp.toPx()).toDp()
-    }
-
-    val dragOffsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val dragProgress = remember { Animatable(0f) }
+    var trackPx by remember { mutableFloatStateOf(0f) }
 
+    // 严格确认模式：倒计时结束前拇指锁定在右端，不可拖动
     var remainingCooldown by remember(cooldownSeconds) { mutableIntStateOf(cooldownSeconds) }
+    val isLocked = remainingCooldown > 0
     LaunchedEffect(cooldownSeconds) {
         remainingCooldown = cooldownSeconds
         while (remainingCooldown > 0) {
@@ -517,105 +544,113 @@ private fun ApprovalLeftSlider(
             remainingCooldown--
         }
     }
+    LaunchedEffect(isLocked) {
+        if (isLocked) dragProgress.snapTo(0f)
+    }
 
-    val sliderShape = RoundedCornerShape(Wear.Radius.Chip)
+    // 拖动进度逐帧回传（snapshotFlow 天然按帧合并），退出审批时归零，主界面可跟着变绿
+    LaunchedEffect(dragProgress) {
+        snapshotFlow { dragProgress.value }
+            .distinctUntilChanged()
+            .collect { onApprovalProgress(it) }
+    }
+    DisposableEffect(Unit) {
+        onDispose { onApprovalProgress(0f) }
+    }
+
+    val insetPx = with(density) { 4.dp.toPx() }
+    val thumbSlotPx = with(density) { trackHeight.toPx() }
+    val thumbDiameter = (trackHeight - 8.dp).coerceAtLeast(20.dp)
+    val travelPx = (trackPx - thumbSlotPx).coerceAtLeast(1f)
+
     Box(
         modifier = modifier
-            .height(Wear.Size.Touch)
-            .clip(sliderShape)
-            .background(Wear.Palette.DangerSurface)
-            .border(1.dp, Wear.Palette.Danger, sliderShape)
-            .onGloballyPositioned { coords ->
-                containerWidthPx = coords.size.width.toFloat()
-            }
-            .pointerInput(remainingCooldown, maxDragLeftPx) {
+            .height(trackHeight)
+            .clip(CircleShape)
+            // 审批态底条沿用主键冷银白（同一颗键的延续），红/绿由着色层叠加
+            .background(Wear.Palette.Orb)
+            .onGloballyPositioned { coords -> trackPx = coords.size.width.toFloat() }
+            .pointerInput(isLocked, trackPx, thumbSlotPx) {
+                if (isLocked) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val startX = down.position.x
                     var hasDragged = false
-
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
                         if (!change.pressed) {
-                            if (hasDragged) {
-                                val current = abs(dragOffsetX.value)
-                                if (current > maxDragLeftPx * 0.45f && remainingCooldown == 0) {
-                                    scope.launch {
-                                        dragOffsetX.animateTo(-maxDragLeftPx, tween(100))
-                                        onAllow()
-                                    }
-                                } else {
-                                    scope.launch { dragOffsetX.animateTo(0f, spring(0.72f, 280f)) }
+                            if (hasDragged && ApprovalSliderLogic.shouldAllow(dragProgress.value)) {
+                                scope.launch {
+                                    dragProgress.snapTo(1f)
+                                    onAllow()
                                 }
                             } else {
-                                // 未拖动到位的点击不构成任何决定，直接回弹
-                                scope.launch { dragOffsetX.animateTo(0f, spring(0.72f, 280f)) }
+                                scope.launch {
+                                    dragProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 280f))
+                                }
                             }
                             break
                         }
-
-                        val deltaX = change.position.x - startX
-                        // 仅允许向左滑动 (deltaX < 0)
-                        if (deltaX < -10.dp.toPx()) {
-                            hasDragged = true
-                            if (remainingCooldown == 0) {
-                                change.consume()
-                                val clamped = deltaX.coerceIn(-maxDragLeftPx, 0f)
-                                scope.launch { dragOffsetX.snapTo(clamped) }
-                            }
-                        }
+                        // 独占指针流：不消费则 Wear 系统的"右滑返回"会把横向拖动抢成返回手势
+                        change.consume()
+                        hasDragged = true
+                        val nextProgress = ApprovalSliderLogic.progress(
+                            startX = startX,
+                            currentX = change.position.x,
+                            trackWidthPx = trackPx,
+                            thumbWidthPx = thumbSlotPx
+                        )
+                        scope.launch { dragProgress.snapTo(nextProgress) }
                     }
                 }
             },
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = Alignment.Center
     ) {
-        // 提示文本：只保留"如何放行"这一条真实存在的操作；宽度不够时宁可不显示也不显示半截字
-        if (labelSpace >= 34.dp) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = thumbWidth + 4.dp),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicText(
-                    text = if (remainingCooldown > 0) "锁定" else "← 放行",
-                    style = Wear.TextCaption.copy(
-                        color = if (remainingCooldown > 0) Wear.Palette.Accent else Wear.Palette.TextPrimary
-                    ),
-                    maxLines = 1
-                )
-            }
+        // 着色层：未滑过区淡红 + 已滑过区 lerp(拒绝红 → 放行绿)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val p = dragProgress.value
+            val thumbLeftPx = (size.width - thumbSlotPx + insetPx - p * travelPx)
+                .coerceIn(0f, size.width)
+            drawRect(
+                color = Wear.Palette.Danger.copy(alpha = 0.30f),
+                size = Size(thumbLeftPx, size.height)
+            )
+            drawRect(
+                color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.5f),
+                topLeft = Offset(thumbLeftPx, 0f),
+                size = Size(size.width - thumbLeftPx, size.height)
+            )
         }
 
-        // 滑块手柄 (初始在最右侧，向左滑动)
+        // 文案：锁定倒计时优先，其次按进度在"滑向放行 / 松开即放行"之间切换
+        BasicText(
+            text = if (isLocked) "锁定" else ApprovalSliderLogic.labelFor(dragProgress.value),
+            // 白键底叠红/绿后仍偏亮，用深色文字（对比≈13:1），近白字反而只有 1.4:1
+            style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = Wear.Space.Md)
+        )
+
+        // 拇指：白色圆，自右端起步向左推进；锁定时停在右端并显示剩余秒数
         Box(
             modifier = Modifier
-                .offset { IntOffset(dragOffsetX.value.roundToInt(), 0) }
+                .align(Alignment.CenterEnd)
+                .offset { IntOffset(-(dragProgress.value * travelPx).roundToInt(), 0) }
                 .padding(end = 4.dp)
-                .size(width = thumbWidth, height = 34.dp)
-                .clip(RoundedCornerShape(Wear.Radius.Chip))
-                .background(if (remainingCooldown > 0) Wear.Palette.TextMuted else Wear.Palette.Danger),
+                .size(thumbDiameter)
+                .clip(CircleShape)
+                .background(Wear.Palette.TextPrimary),
             contentAlignment = Alignment.Center
         ) {
-            if (remainingCooldown > 0) {
+            if (isLocked) {
                 BasicText(
                     text = "${remainingCooldown}",
-                    style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+                    style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                     maxLines = 1
                 )
-            } else {
-                Canvas(modifier = Modifier.size(7.dp, 9.dp)) {
-                    val path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(size.width, 0f)
-                        lineTo(0f, size.height / 2f)
-                        lineTo(size.width, size.height)
-                        close()
-                    }
-                    drawPath(path, color = Wear.Palette.TextPrimary)
-                }
             }
         }
     }

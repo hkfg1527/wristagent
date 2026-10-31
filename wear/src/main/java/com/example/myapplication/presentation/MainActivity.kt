@@ -37,20 +37,20 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,19 +78,25 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentExecutionState
@@ -114,6 +120,7 @@ import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
+import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -133,6 +140,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
     private var externalPromptSeq = 0L
@@ -327,6 +338,30 @@ private fun AnimatedMessageCard(
     }
 }
 
+/** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
+private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
+
+/** 审批卡片危险等级：只由风险评估的现有字段推导，点亮 1/2/3 段。 */
+private fun riskLevelOf(risk: RiskAssessment?): Int = when {
+    risk == null -> 1
+    risk.isHardBlocked -> 3
+    risk.isHighRisk -> 2
+    else -> 1
+}
+
+/** 审批卡片的工具名：取时间线上最后一个工具调用并解析成中文展示名；取不到返回 null。 */
+private fun lastToolDisplayName(blocks: List<ConversationBlock>): String? =
+    blocks.lastOrNull { it is ConversationBlock.ToolCall }
+        ?.let { (it as ConversationBlock.ToolCall).toolName }
+        ?.takeIf { it.isNotBlank() }
+        ?.let { ToolVisualMeta.resolve(it).displayName }
+
+/** 列表条目 key：用户气泡用 block id，助手回合用回合 key，保证滚动位置稳定。 */
+private fun itemKeyOf(item: RenderableConversationItem): String = when (item) {
+    is RenderableConversationItem.UserPrompt -> item.block.id
+    is RenderableConversationItem.AssistantTurn -> item.key
+}
+
 /** 对话框快捷指令胶囊：令牌底 + 描边，触达高度不小于 44dp。 */
 @Composable
 private fun QuickPromptChip(
@@ -379,15 +414,70 @@ private fun DialogActionButton(
     }
 }
 
+/**
+ * 审批内容卡片：标题 / 工具名 / 风险说明 / 三等分危险条。
+ * 危险条用 Accent(常态) 与 Danger(中高风险及硬黑名单) 两种令牌着色，未点亮的段用 Border。
+ */
+@Composable
+private fun ApprovalRequestCard(
+    toolDisplayName: String,
+    riskExplanation: String,
+    riskLevel: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(Wear.Radius.Card))
+            .background(Wear.Palette.Surface)
+            .border(
+                width = 1.dp,
+                color = Wear.Palette.Danger.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(Wear.Radius.Card)
+            )
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
+        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+    ) {
+        BasicText(text = "需要你的许可", style = Wear.TextTitle)
+        BasicText(
+            text = toolDisplayName,
+            style = Wear.TextBody,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (riskExplanation.isNotBlank()) {
+            BasicText(
+                text = riskExplanation,
+                style = Wear.TextCaption,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
+            repeat(3) { index ->
+                val litColor = if (riskLevel >= 2) Wear.Palette.Danger else Wear.Palette.Accent
+                Box(
+                    modifier = Modifier
+                        .size(width = 18.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (index < riskLevel) litColor else Wear.Palette.Border)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 对话卡片宽度上限：240dp 圆屏减去两侧 [Wear.Space.Edge] 后四周仍留 20dp，
+ * 长回复不再贴着圆屏边缘被裁；用户气泡同样收在此宽度内保持右对齐。
+ */
+private val ConversationCardMaxWidth = 200.dp
+
+/** 底栏底距：与 [BottomInteractiveBlock] 调用处的 padding(bottom = 12.dp) 对齐，审批卡片据此换算自身底边。 */
+private val BottomBarBottomInset = 12.dp
+
 /** 主键输入方式的中文提示：模式切换与启动播报共用同一文案，避免用户靠小图标猜主键行为。 */
 private const val NOTICE_INPUT_KEYBOARD = "已切换到键盘输入，点主键打开输入框"
 private const val NOTICE_INPUT_VOICE = "已切换到语音输入，点主键或长按说话"
-
-// 内容区横滑手势参数：横向判定阈值、开抽屉位移阈值、内容区上下边界（避开时钟带与底栏保留区）
-private val ContentSwipeSlopDp = 22.dp
-private val ContentSwipeOpenDp = 24.dp
-private val ContentSwipeTopBoundDp = 42.dp
-private val ContentSwipeBottomBoundDp = 96.dp
 
 @Composable
 private fun MainAgentDashboard(
@@ -427,7 +517,7 @@ private fun MainAgentDashboard(
     var pendingContinuation by remember { mutableStateOf<CancellableContinuation<Boolean>?>(null) }
     var delayedStretchJob by remember { mutableStateOf<Job?>(null) }
 
-    val scrollState = rememberScrollState()
+    val listState = rememberScalingLazyListState()
     val mainFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         mainFocusRequester.requestFocus()
@@ -459,6 +549,32 @@ private fun MainAgentDashboard(
                 isFinished = true
             )
         )
+    }
+
+    // 审批滑块进度：0=拒绝红屏，1=放行绿屏，由底栏回调驱动全屏绿光与卡片
+    var approvalProgress by remember { mutableFloatStateOf(0f) }
+
+    // 审批卡片实测位置：底边贴保留区上沿向上生长，宽度取离圆心更远的横边所在弦长
+    var approvalCardTopPx by remember { mutableFloatStateOf(0f) }
+    var approvalCardHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val windowSize = LocalWindowInfo.current.containerSize
+    val approvalCardWidth = remember(approvalCardTopPx, approvalCardHeightPx, windowSize) {
+        val radiusPx = min(windowSize.width, windowSize.height) / 2f
+        val centerY = windowSize.height / 2f
+        val farEdge = max(
+            abs(approvalCardTopPx - centerY),
+            abs(approvalCardTopPx + approvalCardHeightPx - centerY)
+        )
+        if (radiusPx <= 0f || farEdge >= radiusPx) {
+            // 首帧尚无实测位置：先给圆屏中段的安全宽度，第二帧再按弦长收窄
+            200.dp
+        } else {
+            val halfChord = sqrt(radiusPx * radiusPx - farEdge * farEdge)
+            with(density) { (2f * halfChord).toDp() }
+                .minus(Wear.Space.Sm * 2f)
+                .coerceAtLeast(Wear.Size.Orb * 3f)
+        }
     }
 
     fun switchToSession(id: String) {
@@ -683,9 +799,30 @@ private fun MainAgentDashboard(
         onDispose { }
     }
 
+    val conversationItems = remember(agentState.conversationBlocks) {
+        ConversationGrouping.groupBlocks(agentState.conversationBlocks)
+    }
+
+    // 执行中每有新块到达，跟随到列表末端，保证流式正文的最新一句始终可见
     LaunchedEffect(agentState.conversationBlocks.size) {
         if (isExecutingAgent) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+            listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+        }
+    }
+
+    // 审批待确认：助手卡片（含工具胶囊）若被滑块挤出可视区，就把它滚回可视区顶部。
+    // 以 bottomBlockMode 为 key，进入审批态只触发一次；已在可视区时不动，用户手动滚动也不会被拉回。
+    LaunchedEffect(bottomBlockMode) {
+        if (bottomBlockMode != BottomBlockMode.ACTION_ALLOW || conversationItems.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val lastIndex = conversationItems.lastIndex
+        val layoutInfo = listState.layoutInfo
+        val alreadyVisible = layoutInfo.visibleItemsInfo.any { item ->
+            item.index == lastIndex && item.offset + item.size <= layoutInfo.viewportEndOffset
+        }
+        if (!alreadyVisible) {
+            listState.animateScrollToItem(lastIndex)
         }
     }
 
@@ -748,109 +885,66 @@ private fun MainAgentDashboard(
             gridSpacingDp = liveSpacingDp
         )
 
-        // ================= 2. 文字与原生高斯模糊简单框一体联动滚动流 =================
-        // 全屏纵向滑动，正文左右内缩 Wear.Space.Edge，顶部时钟带与底部底栏保留区由 DstIn 遮罩完全抹掉
-        Column(
+        // ================= 1.5 审批绿光：点阵之上、内容之下，随滑块进度淡入，0 时完全不可见 =================
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Wear.Palette.Success.copy(alpha = 0.10f * approvalProgress))
+        )
+
+        // ================= 2. 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除) =================
+        // 全屏纵向滑动，正文左右内缩 Wear.Space.Edge；靠近上下边缘时按位置自动缩小淡出，正文可与时钟/主键重叠
+        ScalingLazyColumn(
+            state = listState,
+            autoCentering = AutoCenteringParams(itemIndex = 0),
+            // top 与 T1 的 14dp 遮罩同宽；bottom 让最后一项能滚到圆屏中心（见 Wear.Size.ListCenterReach）
+            contentPadding = PaddingValues(top = 14.dp, bottom = Wear.Size.ListCenterReach),
+            modifier = Modifier
+                .fillMaxSize()
+                // 最外圈 14dp 轻度淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val edgePx = 14.dp.toPx()
+                    val heightPx = size.height
+                    if (heightPx > edgePx * 2f) {
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                edgePx / heightPx to Wear.Palette.Bg,
+                                (heightPx - edgePx) / heightPx to Wear.Palette.Bg,
+                                1f to Color.Transparent
+                            ),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+                }
                 .padding(horizontal = Wear.Space.Edge)
                 .focusRequester(mainFocusRequester)
                 .focusable()
-                .onRotaryScrollEvent {
-                    scope.launch {
-                        scrollState.scrollBy(it.verticalScrollPixels)
-                        if (kotlin.math.abs(it.verticalScrollPixels) > 8f) {
-                            context.getSystemService(Vibrator::class.java)?.let { vib ->
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                }
+                .onRotaryScrollEvent { event ->
+                    // 圆屏列表自带"靠近边缘缩小淡出"，滚轮只负责位移，不再有任何整块抹除遮罩
+                    scope.launch { listState.scroll { scrollBy(event.verticalScrollPixels) } }
+                    if (kotlin.math.abs(event.verticalScrollPixels) > 8f) {
+                        context.getSystemService(Vibrator::class.java)?.let { vib ->
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
                             }
                         }
                     }
                     true
-                }
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    // DstIn 遮罩：alpha=0 处内容被抹掉，alpha=1 处内容完整保留
-                    // 顶部：0~38dp 全抹（时钟带 8~31dp 及上下缓冲），38~50dp 渐入，50dp 以下完整
-                    // 底部：距底 104dp 以上完整，104~92dp 渐出，距底 92dp 以下（底栏保留区 + 主键上方 24dp）全抹
-                    val topCutoffPx = (Wear.Size.TopContentInset + Wear.Space.Xs).toPx()
-                    val topFadePx = (topCutoffPx + Wear.Space.Md.toPx())
-                    val bottomFadeEndPx = size.height - Wear.Size.BottomBarReserve.toPx()
-                    val bottomFadeStartPx = bottomFadeEndPx - Wear.Space.Md.toPx()
-
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color.Transparent,
-                                (topCutoffPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
-                                (topFadePx / size.height).coerceIn(0f, 1f) to Wear.Palette.Bg,
-                                (bottomFadeStartPx / size.height).coerceIn(0f, 1f) to Wear.Palette.Bg,
-                                (bottomFadeEndPx / size.height).coerceIn(0f, 1f) to Color.Transparent,
-                                1.0f to Color.Transparent
-                            )
-                        ),
-                        blendMode = BlendMode.DstIn
-                    )
-                }
-                .verticalScroll(scrollState)
-                // 内容区横滑打开会话抽屉：只认横向，越过阈值立刻 consume()，纵向位移完整留给 verticalScroll
-                .pointerInput(bottomBlockMode, isExecutingAgent, inputState.isOpen) {
-                    if (bottomBlockMode != BottomBlockMode.IDLE || isExecutingAgent || inputState.isOpen) {
-                        return@pointerInput
-                    }
-                    val horizontalSlopPx = ContentSwipeSlopDp.toPx()
-                    val openThresholdPx = ContentSwipeOpenDp.toPx()
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val startX = down.position.x
-                        val startY = down.position.y
-                        // 只在底栏保留区之上、顶部时钟带之下的内容区生效
-                        if (startY <= ContentSwipeTopBoundDp.toPx() ||
-                            startY >= size.height - ContentSwipeBottomBoundDp.toPx()
-                        ) {
-                            return@awaitEachGesture
-                        }
-                        var deltaX = 0f
-                        var isHorizontalDrag = false
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            deltaX = change.position.x - startX
-                            val deltaY = change.position.y - startY
-                            // 横向压倒纵向越过阈值即刻锁定为横滑，此后逐帧 consume 独占指针流
-                            if (!isHorizontalDrag &&
-                                kotlin.math.abs(deltaX) > kotlin.math.abs(deltaY) * 1.4f &&
-                                kotlin.math.abs(deltaX) > horizontalSlopPx
-                            ) {
-                                isHorizontalDrag = true
-                            }
-                            if (isHorizontalDrag) change.consume()
-                            if (!change.pressed) break
-                        }
-                        // 左右两个方向都开抽屉
-                        if (isHorizontalDrag && kotlin.math.abs(deltaX) > openThresholdPx) {
-                            isSessionDrawerOpen = true
-                        }
-                    }
                 },
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            // 顶部时间留白：正文从顶部渐入结束处（50dp）开始，避免首条被遮罩吃掉
-            Spacer(modifier = Modifier.height(Wear.Size.TopContentInset + Wear.Space.Xs + Wear.Space.Md))
-
-            // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形毛玻璃框，工具调用完整内嵌)
-            val conversationItems = remember(agentState.conversationBlocks) {
-                ConversationGrouping.groupBlocks(agentState.conversationBlocks)
-            }
-
-            conversationItems.forEach { item ->
-                val itemKey = when (item) {
-                    is RenderableConversationItem.UserPrompt -> item.block.id
-                    is RenderableConversationItem.AssistantTurn -> item.key
-                }
+            // 顶部不再保留大留白：正文允许与弧形时钟重叠，只由列表自身的边缘缩放淡出收敛
+            // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形框，工具调用完整内嵌)
+            items(
+                count = conversationItems.size,
+                key = { index -> itemKeyOf(conversationItems[index]) }
+            ) { index ->
+                val item = conversationItems[index]
+                val itemKey = itemKeyOf(item)
                 AnimatedMessageCard(key = itemKey) {
                     when (item) {
                     is RenderableConversationItem.UserPrompt -> {
@@ -859,7 +953,7 @@ private fun MainAgentDashboard(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.CenterEnd
                         ) {
-                            UserChatBubble {
+                            UserChatBubble(modifier = Modifier.widthIn(max = ConversationCardMaxWidth)) {
                                 BasicText(
                                     text = item.block.content,
                                     style = Wear.TextBody
@@ -871,37 +965,42 @@ private fun MainAgentDashboard(
                     is RenderableConversationItem.AssistantTurn -> {
                         // 2.2 Agent 回复：绝不用聊天气泡，Surface 实底卡片 + 1dp 描边
                         // 思考胶囊、工具调用与逐字流式文本 100% 完整包含在卡片内部
-                        AgentSquareBlurBox(
+                        Box(
                             modifier = Modifier.fillMaxWidth(),
-                            approvalVisualState = agentState.approvalVisualState,
-                            isTaskCompletedTrigger = isTaskCompletedTrigger,
-                            thinkingIntensity = thinkingIntensity,
-                            isRecordingVoice = isRecordingVoice,
-                            shockwaveProgress = shockwaveAnim.value,
-                            gridSpacingDp = liveSpacingDp
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            AgentSquareBlurBox(
+                                modifier = Modifier.widthIn(max = ConversationCardMaxWidth),
+                                approvalVisualState = agentState.approvalVisualState,
+                                isTaskCompletedTrigger = isTaskCompletedTrigger,
+                                thinkingIntensity = thinkingIntensity,
+                                isRecordingVoice = isRecordingVoice,
+                                shockwaveProgress = shockwaveAnim.value,
+                                gridSpacingDp = liveSpacingDp
                             ) {
-                                item.blocks.forEach { block ->
-                                    when (block) {
-                                        is ConversationBlock.Thought -> {
-                                            // 思考微型小胶囊 (带弹性收展动画，内嵌在方框内)
-                                            ThoughtPill(thought = block)
-                                        }
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    item.blocks.forEach { block ->
+                                        when (block) {
+                                            is ConversationBlock.Thought -> {
+                                                // 思考微型小胶囊 (带弹性收展动画，内嵌在方框内)
+                                                ThoughtPill(thought = block)
+                                            }
 
-                                        is ConversationBlock.ToolCall -> {
-                                            // 彩色工具调用小胶囊 (专属颜色、状态干了什么、弹性展开，内嵌在方框内)
-                                            SpringColoredToolPill(toolCall = block)
-                                        }
+                                            is ConversationBlock.ToolCall -> {
+                                                // 彩色工具调用小胶囊 (专属颜色、状态干了什么、弹性展开，内嵌在方框内)
+                                                SpringColoredToolPill(toolCall = block)
+                                            }
 
-                                        is ConversationBlock.Text -> {
-                                            // 弹性逐字生成流式文本 (带弹簧微晶跃动与呼吸跳动光标)
-                                            SpringStreamingText(
-                                                text = block.content,
-                                                isStreaming = block.isStreaming
-                                            )
+                                            is ConversationBlock.Text -> {
+                                                // 弹性逐字生成流式文本 (带弹簧微晶跃动与呼吸跳动光标)
+                                                SpringStreamingText(
+                                                    text = block.content,
+                                                    isStreaming = block.isStreaming
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -912,29 +1011,51 @@ private fun MainAgentDashboard(
                 }
             }
 
-            // 错误提示 (随手势一体滑动)
+            // 错误提示 (随列表一体滚动)
             val err = agentState.errorMessage
             if (!err.isNullOrBlank()) {
-                WearBanner(text = "[ALERT] $err", tone = Tone.DANGER)
+                item { WearBanner(text = "[ALERT] $err", tone = Tone.DANGER) }
             }
-
-            // 底部留白：留到底部渐出结束处（104dp），保证末尾正文完整可读而不被遮罩抹掉
-            Spacer(modifier = Modifier.height(Wear.Size.BottomBarReserve + Wear.Space.Md))
         }
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
-        // 曲线坐标系取整屏圆形，且绘制在内容列 DstIn 遮罩作用域之外，永不被正文压住或抹掉
+        // 曲线坐标系取整屏圆形；绘制在内容列表之后，正文从时钟下方穿过时只被轻微压暗，不会被抹掉
         TopClockBar(
             timeText = currentTime,
             modifier = Modifier.fillMaxSize()
         )
+
+        // ================= 3.5 审批内容卡片：底栏上方浮出，宽度按该 y 处圆弦长收窄 =================
+        // 画在底栏之前，滑块永远压在卡片之上；出现时允许覆盖列表内容
+        AnimatedVisibility(
+            visible = bottomBlockMode == BottomBlockMode.ACTION_ALLOW,
+            enter = fadeIn(tween(140)) + slideInVertically(tween(180)) { it / 3 },
+            exit = fadeOut(tween(120)),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                // 底边 = 屏幕高度 - (保留区 + 底栏底距 + 间距)：底栏审批行顶边贴在保留区上沿，
+                // 因此卡片底边正好落在胶囊顶部之上 [Wear.Space.Sm]，绝不重叠，三段式危险条完整露出
+                .padding(bottom = Wear.Size.BottomBarReserve + BottomBarBottomInset + Wear.Space.Sm)
+        ) {
+            ApprovalRequestCard(
+                toolDisplayName = lastToolDisplayName(agentState.conversationBlocks) ?: "执行高风险操作",
+                riskExplanation = currentRiskAssessment?.riskSummary ?: "",
+                riskLevel = riskLevelOf(currentRiskAssessment),
+                modifier = Modifier
+                    .width(approvalCardWidth)
+                    .onGloballyPositioned { coords ->
+                        approvalCardTopPx = coords.positionInRoot().y
+                        approvalCardHeightPx = coords.size.height.toFloat()
+                    }
+            )
+        }
 
         // ================= 4. 单体演变底栏控制器 =================
         BottomInteractiveBlock(
             mode = bottomBlockMode,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp),
+                .padding(bottom = BottomBarBottomInset),
             mainInputType = mainInputType,
             onMainInputTypeChange = { newType ->
                 mainInputType = newType
@@ -992,7 +1113,8 @@ private fun MainAgentDashboard(
             },
             onSwipeUpSettings = {
                 onOpenSettings() // 阻尼跟手上滑进入设置
-            }
+            },
+            onApprovalProgress = { approvalProgress = it }
         )
 
         // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================

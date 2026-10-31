@@ -19,15 +19,13 @@ sealed class RenderableConversationItem {
 }
 
 /**
- * 工具视觉元数据 (色彩系统、中文展示名、状态文案)
+ * 工具视觉元数据 (色彩系统 + 中文展示名)。
+ * 图标位不使用 emoji 或任何外链字形，只由 [tagColorHex] 驱动一个 6dp 纯色圆点。
  */
 data class ToolVisualMeta(
     val toolName: String,
     val displayName: String,
-    val iconSymbol: String,
-    val tagColorHex: Long,       // 主题色 ARGB Long
-    val lightBgColorHex: Long,
-    val borderColorHex: Long
+    val tagColorHex: Long        // 主题色 ARGB Long
 ) {
     companion object {
         fun resolve(toolName: String): ToolVisualMeta {
@@ -35,58 +33,37 @@ data class ToolVisualMeta(
                 "web_search" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "联网搜索",
-                    iconSymbol = "🌐",
-                    tagColorHex = 0xFF06B6D4,      // 霓虹青蓝
-                    lightBgColorHex = 0xFF082F49,
-                    borderColorHex = 0xFF22D3EE
+                    tagColorHex = 0xFF06B6D4       // 霓虹青蓝
                 )
                 "query_time_weather" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "时间天气",
-                    iconSymbol = "🌤️",
-                    tagColorHex = 0xFFF59E0B,      // 琥珀金
-                    lightBgColorHex = 0xFF451A03,
-                    borderColorHex = 0xFFFBBF24
+                    tagColorHex = 0xFFF59E0B       // 琥珀金
                 )
                 "get_device_status" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "设备状态",
-                    iconSymbol = "🔋",
-                    tagColorHex = 0xFF10B981,      // 翡翠绿
-                    lightBgColorHex = 0xFF064E3B,
-                    borderColorHex = 0xFF34D399
+                    tagColorHex = 0xFF10B981       // 翡翠绿
                 )
                 "vibrate_device" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "马达振动",
-                    iconSymbol = "📳",
-                    tagColorHex = 0xFF8B5CF6,      // 紫罗兰
-                    lightBgColorHex = 0xFF2E1065,
-                    borderColorHex = 0xFFA78BFA
+                    tagColorHex = 0xFF8B5CF6       // 紫罗兰
                 )
                 "set_system_power_mode" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "电源模式",
-                    iconSymbol = "⚡",
-                    tagColorHex = 0xFFF97316,      // 珊瑚橙
-                    lightBgColorHex = 0xFF431407,
-                    borderColorHex = 0xFFFB923C
+                    tagColorHex = 0xFFF97316       // 珊瑚橙
                 )
                 "adjust_matrix_density" -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = "点阵网格",
-                    iconSymbol = "▦",
-                    tagColorHex = 0xFF38BDF8,      // 极客天蓝
-                    lightBgColorHex = 0xFF0C4A6E,
-                    borderColorHex = 0xFF7DD3FC
+                    tagColorHex = 0xFF38BDF8       // 极客天蓝
                 )
                 else -> ToolVisualMeta(
                     toolName = toolName,
                     displayName = toolName,
-                    iconSymbol = "⚙",
-                    tagColorHex = 0xFF94A3B8,      // 工业冷灰
-                    lightBgColorHex = 0xFF1E293B,
-                    borderColorHex = 0xFFCBD5E1
+                    tagColorHex = 0xFF94A3B8       // 工业冷灰
                 )
             }
         }
