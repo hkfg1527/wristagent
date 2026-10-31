@@ -339,6 +339,11 @@ private fun AnimatedMessageCard(
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
 
+/** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
+private const val TEMP_TOOL_TEST_COMMAND =
+    "测试模式请求：请只调用一次 test_noop 工具（note 随便填），然后输出一段约 180 字的中文说明，" +
+        "内容是描述流式输出观察用的填充文字，不要调用其它任何工具，不要向我提问。"
+
 /**
  * 审批页强调色与标题：随 AI 风险等级变化 —— 低风险绿、中度黄、重度黄红、致命红。
  * 标题、危险条点亮段与滑块着色共用同一套映射，避免各处重复写等级到颜色的分支。
@@ -1288,7 +1293,9 @@ private fun MainAgentDashboard(
                 voiceInputManager.stopListening()
             },
             onLeftKeyboardClick = {
-                inputState = inputState.reduce(TextInputEvent.Open)
+                // TEMP：左翼临时改为"点一下直接发测试指令"，用于验证单次工具调用 + 流式输出。
+                // 恢复时改回 inputState = inputState.reduce(TextInputEvent.Open) 即可。
+                triggerAgent(TEMP_TOOL_TEST_COMMAND)
             },
             onRightActionClick = {
                 // 右翼固定打开会话抽屉：横向手势已被 Wear 系统占用，入口只走显式按钮

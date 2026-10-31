@@ -288,6 +288,9 @@ fun BottomInteractiveBlock(
                                     } else {
                                         onMainInputTypeChange(MainInputType.VOICE)
                                     }
+                                    // TEMP 测试钩子：连续两次左翼点击会触发一次测试指令（MainActivity 侧已改为 triggerAgent）。
+                                    // 恢复原状时删掉这一行即可。
+                                    onLeftKeyboardClick()
                                 }
                             ),
                         contentAlignment = Alignment.Center

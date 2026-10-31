@@ -283,15 +283,27 @@ class AgentDispatcher(
                         continue
                     }
 
-                    // B. 分级审批闸门：AI 风险等级 + 安全模式共同决定是否弹审批
+                    // B. 分级审批闸门：AI 风险等级 + 安全模式共同决定是否弹审批。
+                    // 先用启发式判一次：硬拦截/本来就不需要审批的快路径不必花 4 秒去请 AI 定级；
+                    // 只有"可能要人来批"时才请 AI 定级，定级结果可能把操作降为自动放行（例如 LOW）。
                     val actionDesc = "执行 [${call.name}]"
-                    val gate = ApprovalGate.decide(risk, preferences.securityMode)
+                    val heuristicGate = ApprovalGate.decide(risk, preferences.securityMode)
+                    val evaluatedRisk = if (heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
+                        applyNarration(call.name, actionDesc, risk)
+                    } else {
+                        risk
+                    }
+                    val gate = if (heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
+                        ApprovalGate.decide(evaluatedRisk, preferences.securityMode)
+                    } else {
+                        heuristicGate
+                    }
                     val autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
                         Log.i(
                             TAG,
-                            "分级闸门自动放行：tool=${call.name} level=${risk.aiRiskLevel} mode=${preferences.securityMode}"
+                            "分级闸门自动放行：tool=${call.name} level=${evaluatedRisk.aiRiskLevel} mode=${preferences.securityMode}"
                         )
-                        buildAutoAllowNote(call.name, actionDesc, risk)
+                        buildAutoAllowNote(call.name, actionDesc, evaluatedRisk)
                     } else {
                         null
                     }
@@ -300,15 +312,10 @@ class AgentDispatcher(
                         // 触发审批态与红瀑光相变
                         currentState = currentState.copy(
                             approvalVisualState = ApprovalVisualState.PENDING_CASCADE,
-                            pendingRiskAssessment = risk
+                            pendingRiskAssessment = evaluatedRisk
                         )
                         onStateUpdate(currentState)
-
-                        // AI 三段说明：超时/异常/解析失败一律回退启发式，绝不影响审批弹出
-                        val narratedRisk = applyNarration(call.name, actionDesc, risk)
-                        currentState = currentState.copy(pendingRiskAssessment = narratedRisk)
-                        onStateUpdate(currentState)
-                        val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, narratedRisk) ?: true
+                        val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: true
 
                         if (allowed) {
                             // 批准转绿
