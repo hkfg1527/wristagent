@@ -43,7 +43,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -361,11 +363,6 @@ private fun ScalingLazyListState.remainingToEndPx(bottomPaddingPx: Float): Float
     )
 }
 
-/** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
-private const val TEMP_TOOL_TEST_COMMAND =
-    "测试模式请求：请只调用一次 test_noop 工具（note 随便填），然后输出一段约 180 字的中文说明，" +
-        "内容是描述流式输出观察用的填充文字，不要调用其它任何工具，不要向我提问。"
-
 /**
  * 审批页强调色与标题：随 AI 风险等级变化 —— 低风险绿、中度黄、重度黄红、致命红。
  * 标题、危险条点亮段与滑块着色共用同一套映射，避免各处重复写等级到颜色的分支。
@@ -429,15 +426,17 @@ private fun QuickPromptChip(
 private fun DialogActionButton(
     label: String,
     isPrimary: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .height(Wear.Size.Touch)
             .clip(RoundedCornerShape(Wear.Radius.Chip))
-            .background(if (isPrimary) Wear.Palette.Accent else Wear.Palette.SurfaceAlt)
+            // 主操作与主键同色（Orb 冷银白 + 深字），次操作留空只用文字，视觉上只留一个实心按钮
+            .background(if (isPrimary) Wear.Palette.Orb else Color.Transparent)
             .clickable { onClick() }
-            .padding(horizontal = Wear.Space.Lg),
+            .padding(horizontal = Wear.Space.Sm),
         contentAlignment = Alignment.Center
     ) {
         BasicText(
@@ -449,6 +448,9 @@ private fun DialogActionButton(
         )
     }
 }
+
+/** 文字输入弹窗的浮起距离：与审批文案同源的入场手感。 */
+private val TextDialogFloatDistance = 36.dp
 
 /** 审批文案宽度：240dp 圆屏上固定 190dp，两侧各留 25dp，正文不会碰到圆周。 */
 private val ApprovalTextWidth = 190.dp
@@ -1362,7 +1364,8 @@ private fun MainAgentDashboard(
         )
 
         // ================= 4. 单体演变底栏控制器 =================
-        BottomInteractiveBlock(
+        // 文字输入弹窗是模态：打开时底栏整体退场，避免卡片与主键互相压叠
+        if (!inputState.isOpen) BottomInteractiveBlock(
             mode = bottomBlockMode,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -1392,9 +1395,7 @@ private fun MainAgentDashboard(
                 voiceInputManager.stopListening()
             },
             onLeftKeyboardClick = {
-                // TEMP：左翼临时改为"点一下直接发测试指令"，用于验证单次工具调用 + 流式输出。
-                // 恢复时改回 inputState = inputState.reduce(TextInputEvent.Open) 即可。
-                triggerAgent(TEMP_TOOL_TEST_COMMAND)
+                inputState = inputState.reduce(TextInputEvent.Open)
             },
             onRightActionClick = {
                 // 右翼固定打开会话抽屉：横向手势已被 Wear 系统占用，入口只走显式按钮
@@ -1467,9 +1468,8 @@ private fun MainAgentDashboard(
                 inputState = inputState.reduce(TextInputEvent.Cancel)
             }
 
-            LaunchedEffect(Unit) {
-                dialogFocusRequester.requestFocus()
-            }
+            // 不再自动聚���：Wear 的软键盘是全屏 Activity，自动唤起会立刻把卡片和按钮顶掉。
+            // 先在手表上把"输入框 + 取消/发送"完整露出来，用户点输入框时再唤起键盘。
 
             // 提交：屏幕按钮与输入法 Action 键共用同一条路径（Wear 输入法整屏时按钮够不到）
             val submitInput: () -> Unit = {
@@ -1478,10 +1478,18 @@ private fun MainAgentDashboard(
                 afterSubmit.lastSent?.let { triggerAgent(it) }
             }
 
+            // 与审批页同源的入场：从下方浮起 + 淡入 + 轻微放大（不再直接硬切出现）
+            val dialogEnter = remember { Animatable(0f) }
+            val dialogFloatPx = with(LocalDensity.current) { TextDialogFloatDistance.toPx() }
+            LaunchedEffect(Unit) {
+                dialogEnter.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 250f))
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f))
+                    // 遮罩随入场一起淡入，观感与审批页一致（半透，能看见背后的点阵）
+                    .background(Wear.Palette.Bg.copy(alpha = 0.9f * dialogEnter.value))
                     // 外层承接口感遮罩，内容整体抬到输入法上沿之上
                     .imePadding()
                     .padding(
@@ -1492,72 +1500,58 @@ private fun MainAgentDashboard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
+                val dialogShape = RoundedCornerShape(Wear.Radius.Card)
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // 输入区可滚动：高度不足时只压缩这一块，操作按钮永不被挤出圆屏
-                    Column(
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        BasicText(text = "输入文字指令", style = Wear.TextTitle)
-                        BasicTextField(
-                            value = inputState.text,
-                            onValueChange = { inputState = inputState.reduce(TextInputEvent.Change(it)) },
-                            textStyle = Wear.TextBody,
-                            cursorBrush = SolidColor(Wear.Palette.TextPrimary),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { submitInput() }),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(dialogFocusRequester)
-                                .clip(RoundedCornerShape(Wear.Radius.Chip))
-                                .background(Wear.Palette.SurfaceAlt)
-                                .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Chip))
-                                .padding(Wear.Space.Md)
-                        )
-                        // 预置快捷指令胶囊 (极简纯净纯色无 Emoji，纯黑白冷灰体系)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                        ) {
-                            QuickPromptChip(
-                                label = "时间天气与资讯",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    val send = "查询当前本地时间与天气环境，并联网检索最新科技动态。"
-                                    inputState = inputState.reduce(TextInputEvent.Cancel)
-                                    triggerAgent(send)
-                                }
-                            )
-                            QuickPromptChip(
-                                label = "诊断电量与马达",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    val send = "诊断当前手表电量与硬件温度，并触发双击触觉马达。"
-                                    inputState = inputState.reduce(TextInputEvent.Cancel)
-                                    triggerAgent(send)
-                                }
-                            )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            translationY = dialogFloatPx * (1f - dialogEnter.value)
+                            val enterScale = 0.92f + 0.08f * dialogEnter.value
+                            scaleX = enterScale
+                            scaleY = enterScale
+                            alpha = dialogEnter.value
                         }
-                    }
+                        .clip(dialogShape)
+                        .background(Wear.Palette.Surface)
+                        .border(1.dp, Wear.Palette.Border, dialogShape)
+                        .padding(Wear.Space.Md),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // 只有三样东西：输入框、取消、发送。不再有标题与快捷示例胶囊。
+                    // 输入框限制最大高度并内部滚动，长文本不会把按钮挤出圆屏。
+                    BasicTextField(
+                        value = inputState.text,
+                        onValueChange = { inputState = inputState.reduce(TextInputEvent.Change(it)) },
+                        textStyle = Wear.TextBody,
+                        cursorBrush = SolidColor(Wear.Palette.TextPrimary),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { submitInput() }),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Wear.Size.Touch, max = 120.dp)
+                            .focusRequester(dialogFocusRequester)
+                            .clip(RoundedCornerShape(Wear.Radius.Chip))
+                            .background(Wear.Palette.SurfaceAlt)
+                            .padding(Wear.Space.Md)
+                    )
 
-                    // 操作按钮固定在可视区底部：键盘展开时始终可见可点
-                    Row(horizontalArrangement = Arrangement.spacedBy(Wear.Space.Md)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         DialogActionButton(
                             label = "取消",
                             isPrimary = false,
+                            modifier = Modifier.weight(1f),
                             onClick = { inputState = inputState.reduce(TextInputEvent.Cancel) }
                         )
+                        Spacer(Modifier.width(Wear.Space.Sm))
                         DialogActionButton(
                             label = "发送",
                             isPrimary = true,
+                            modifier = Modifier.weight(1f),
                             onClick = { submitInput() }
                         )
                     }

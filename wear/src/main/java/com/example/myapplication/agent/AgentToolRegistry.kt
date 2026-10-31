@@ -146,27 +146,6 @@ class AgentToolRegistry(
             )
         }
 
-        // TEMP 测试工具：永远注册、什么都不做，专门用来验证"单次工具调用 + 流式输出"链路。
-        // 需要恢复原状时删掉这一段与 executeTool 里的 test_noop 分支即可。
-        all.add(
-            ToolDefinition(
-                name = "test_noop",
-                description = "测试专用空工具：不做任何实际操作，仅用于验证工具调用链路。可随意传入 note 参数",
-                parametersSchema = JSONObject().apply {
-                    put("type", "object")
-                    val props = JSONObject()
-                    props.put(
-                        "note",
-                        JSONObject().apply {
-                            put("type", "string")
-                            put("description", "任意说明，工具不会使用")
-                        }
-                    )
-                    put("properties", props)
-                }
-            )
-        )
-
         return all
     }
 
@@ -185,7 +164,6 @@ class AgentToolRegistry(
                 "set_system_power_mode" -> executeSetPowerMode(args.optBoolean("ultraSaving", true))
                 "query_time_weather" -> executeQueryTimeWeather(args.optString("location", "本地"))
                 "web_search" -> executeWebSearch(args.optString("query", ""))
-                "test_noop" -> executeTestNoop()
                 else -> {
                     JSONObject().apply {
                         put("status", "error")
@@ -210,13 +188,6 @@ class AgentToolRegistry(
                 isError = true
             )
         }
-    }
-
-    /** TEMP 测试工具实现：空操作，只回一个固定结果，方便验证流式渲染。 */
-    private fun executeTestNoop(): JSONObject = JSONObject().apply {
-        put("status", "ok")
-        put("tool", "test_noop")
-        put("message", "测试工具已执行（没有任何实际副作用）")
     }
 
     private fun executeGetDeviceStatus(): JSONObject {
