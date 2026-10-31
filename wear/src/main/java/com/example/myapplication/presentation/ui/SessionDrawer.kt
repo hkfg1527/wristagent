@@ -65,6 +65,7 @@ import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.presentation.ui.components.WearChip
+import com.example.myapplication.presentation.ui.components.WearDivider
 import com.example.myapplication.presentation.ui.components.WearRow
 import com.example.myapplication.presentation.ui.components.WearSectionHeader
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -91,6 +92,7 @@ fun SessionDrawer(
     onSelectSession: (String) -> Unit,
     onCreateSession: () -> Unit,
     onDeleteSession: (String) -> Unit,
+    onOpenSettings: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -256,6 +258,21 @@ fun SessionDrawer(
                         onClick = { onSelectSession(session.id) },
                         onDelete = { onDeleteSession(session.id) }
                     )
+                }
+
+                // 系统设置入口：抽屉底部的稳定入口，不再依赖"主键上滑且必须够快"这一易被判成长按的手势
+                item(key = "action_settings") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+                    ) {
+                        WearDivider()
+                        WearRow(
+                            title = "系统设置",
+                            showChevron = true,
+                            onClick = onOpenSettings
+                        )
+                    }
                 }
 
                 // 圆屏底部预留：保证滚到底时最后一行会话完整可见（不被圆形裁切）

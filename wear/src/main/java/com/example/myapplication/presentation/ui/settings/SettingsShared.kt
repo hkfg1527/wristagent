@@ -5,13 +5,11 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,11 +29,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,10 +38,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,7 +46,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -231,7 +221,8 @@ fun SettingsInput(
 }
 
 /**
- * 全屏二级配置面板：顶部固定标题，中部滚动内容，底部固定"完成返回"键（支持右滑返回与入场淡入）。
+ * 全屏二级配置面板：顶部固定标题，中部滚动内容，底部固定"完成返回"键（入场淡入）。
+ * 退出只有两条路径：右上角 44dp 叉号与系统 BACK（经外层 BackHandler），不响应横向拖拽。
  */
 @Composable
 fun SubSettingsModal(
@@ -239,62 +230,17 @@ fun SubSettingsModal(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val context = LocalContext.current
-
-    val dragOffsetX = remember { Animatable(0f) }
     val entryAlpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
         entryAlpha.animateTo(1f, tween(160))
     }
 
-    var screenWidthPx by remember { mutableFloatStateOf(480f) }
-    val dismissThresholdPx = with(density) { 50.dp.toPx() }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg)
-            .onGloballyPositioned { coords ->
-                screenWidthPx = coords.size.width.toFloat()
-            }
-            .graphicsLayer {
-                translationX = dragOffsetX.value
-                alpha = (1f - (dragOffsetX.value / (screenWidthPx * 1.5f))).coerceIn(0f, 1f) * entryAlpha.value
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (dragOffsetX.value >= dismissThresholdPx) {
-                            scope.launch {
-                                dragOffsetX.animateTo(screenWidthPx, tween(140))
-                                onDismiss()
-                            }
-                        } else {
-                            scope.launch {
-                                dragOffsetX.animateTo(0f, spring(0.75f, 320f))
-                            }
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            dragOffsetX.animateTo(0f, spring(0.75f, 320f))
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        // 增量驱动，手指停止滑动时 dragAmount=0，位移保持不变，彻底杜绝闪烁抽搐
-                        if (dragAmount > 0f || dragOffsetX.value > 0f) {
-                            change.consume()
-                            val next = (dragOffsetX.value + dragAmount).coerceAtLeast(0f)
-                            scope.launch {
-                                dragOffsetX.snapTo(next)
-                            }
-                        }
-                    }
-                )
-            }
+            .graphicsLayer { alpha = entryAlpha.value }
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val radiusDp = min(maxWidth.value, maxHeight.value) / 2f

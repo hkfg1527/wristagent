@@ -1,13 +1,10 @@
 package com.example.myapplication.presentation.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,15 +37,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.agent.AgentPreferences
@@ -88,7 +80,6 @@ fun SettingsScreen(
     onRestartOnboarding: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
     val context = LocalContext.current
 
     var currentModel by remember { mutableStateOf(preferences.modelName) }
@@ -110,52 +101,21 @@ fun SettingsScreen(
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
     var showVoiceAsr by remember { mutableStateOf(false) }
 
-    // 右滑返回手势 (基于增量物理位移防抖，停止滑动绝对无闪烁)
-    val dragOffsetX = remember { Animatable(0f) }
-    var screenWidthPx by remember { mutableFloatStateOf(480f) }
-    val dismissThresholdPx = with(density) { 50.dp.toPx() }
+    // 系统 BACK 三层化：子页打开时只关子页并留在设置列表，不退出整个设置页。
+    // 顺序保证：本回调在 SettingsScreen 组合体内注册，MainActivity 的 SETTINGS 分支 BackHandler
+    // 早于 SettingsScreen 调用（即更早注册），OnBackPressedDispatcher 后注册者优先，故 BACK 先命中这里。
+    BackHandler(enabled = activeDialog != null || showVoiceAsr) {
+        if (showVoiceAsr) {
+            showVoiceAsr = false
+        } else {
+            activeDialog = null
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg)
-            .onGloballyPositioned { coords ->
-                screenWidthPx = coords.size.width.toFloat()
-            }
-            .graphicsLayer {
-                translationX = dragOffsetX.value
-                alpha = (1f - (dragOffsetX.value / (screenWidthPx * 1.5f))).coerceIn(0f, 1f)
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (dragOffsetX.value >= dismissThresholdPx) {
-                            scope.launch {
-                                dragOffsetX.animateTo(screenWidthPx, tween(140))
-                                onBack()
-                            }
-                        } else {
-                            scope.launch {
-                                dragOffsetX.animateTo(0f, spring(0.75f, 320f))
-                            }
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            dragOffsetX.animateTo(0f, spring(0.75f, 320f))
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        if (dragAmount > 0f || dragOffsetX.value > 0f) {
-                            change.consume()
-                            val next = (dragOffsetX.value + dragAmount).coerceAtLeast(0f)
-                            scope.launch {
-                                dragOffsetX.snapTo(next)
-                            }
-                        }
-                    }
-                )
-            }
     ) {
         val listState = rememberScalingLazyListState()
         val settingsFocusRequester = remember { FocusRequester() }
@@ -287,12 +247,9 @@ fun SettingsScreen(
             // 6. 快捷操作
             item {
                 SettingsEntry(
-                    title = "底栏副键绑定",
-                    value = when (currentRightAction) {
-                        RightButtonAction.MODEL_SWITCH -> "切换大模型"
-                        RightButtonAction.OPEN_SETTINGS -> "打开设置"
-                        RightButtonAction.CLEAR_MEMORY -> "清空记忆"
-                    },
+                    title = "底栏副键",
+                    // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
+                    value = "右翼固定打开会话抽屉",
                     onClick = {
                         context.vibrateTick()
                         activeDialog = SettingsSubDialog.WING_SHORTCUT

@@ -37,8 +37,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +48,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -83,12 +83,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -100,7 +99,6 @@ import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.contract.ConversationBlock
-import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
 import com.example.myapplication.presentation.ui.BottomBlockMode
@@ -133,7 +131,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.abs
 import java.util.UUID
 import kotlin.coroutines.resume
 
@@ -210,6 +207,9 @@ fun WearAgentUnifiedApp(
 
     var liveSpacingDp by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
 
+    // 主键输入方式提示只在本次启动播报一次：从设置页返回主界面不重复打扰
+    var announceInputMode by remember { mutableStateOf(true) }
+
     DisposableEffect(Unit) {
         toolRegistry.onMatrixDensityChange = { spacing ->
             liveSpacingDp = spacing
@@ -277,6 +277,8 @@ fun WearAgentUnifiedApp(
                         voiceInputManager = voiceInputManager,
                         liveSpacingDp = liveSpacingDp,
                         onOpenSettings = { currentScreen = AppScreen.SETTINGS },
+                        announceInputMode = announceInputMode,
+                        onInputModeAnnounced = { announceInputMode = false },
                         externalPrompt = externalPrompt,
                         onClearExternalPrompt = onClearExternalPrompt
                     )
@@ -377,6 +379,16 @@ private fun DialogActionButton(
     }
 }
 
+/** 主键输入方式的中文提示：模式切换与启动播报共用同一文案，避免用户靠小图标猜主键行为。 */
+private const val NOTICE_INPUT_KEYBOARD = "已切换到键盘输入，点主键打开输入框"
+private const val NOTICE_INPUT_VOICE = "已切换到语音输入，点主键或长按说话"
+
+// 内容区横滑手势参数：横向判定阈值、开抽屉位移阈值、内容区上下边界（避开时钟带与底栏保留区）
+private val ContentSwipeSlopDp = 22.dp
+private val ContentSwipeOpenDp = 24.dp
+private val ContentSwipeTopBoundDp = 42.dp
+private val ContentSwipeBottomBoundDp = 96.dp
+
 @Composable
 private fun MainAgentDashboard(
     preferences: AgentPreferences,
@@ -384,6 +396,8 @@ private fun MainAgentDashboard(
     voiceInputManager: VoiceInputManager,
     liveSpacingDp: Float,
     onOpenSettings: () -> Unit,
+    announceInputMode: Boolean = false,
+    onInputModeAnnounced: () -> Unit = {},
     externalPrompt: ExternalPrompt? = null,
     onClearExternalPrompt: () -> Unit = {}
 ) {
@@ -511,6 +525,16 @@ private fun MainAgentDashboard(
         if (noticeSeq > 0) {
             delay(2600)
             noticeText = null
+        }
+    }
+
+    // 持久化的模式若是键盘，启动时主动说明主键当前会做文本输入（切换是静默保留的）
+    LaunchedEffect(Unit) {
+        if (announceInputMode) {
+            if (mainInputType == MainInputType.KEYBOARD) {
+                showNotice(NOTICE_INPUT_KEYBOARD, false)
+            }
+            onInputModeAnnounced()
         }
     }
 
@@ -712,40 +736,6 @@ private fun MainAgentDashboard(
         modifier = Modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg)
-            .pointerInput(bottomBlockMode, isExecutingAgent, inputState.isOpen, isSessionDrawerOpen) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    val startX = down.position.x
-                    val startY = down.position.y
-
-                    // 空间严格隔离：仅在中部正文区监听，完全避开顶部 42dp 状态栏与底部 96dp 交互栏
-                    val inContentZone = startY > 42.dp.toPx() && startY < (size.height - 96.dp.toPx())
-                    // 状态严格隔离：仅在底栏空闲、未在录音、未在执行智能体、未在文本输入时才允许手势
-                    val canGesture = inContentZone &&
-                            bottomBlockMode == BottomBlockMode.IDLE &&
-                            !isExecutingAgent &&
-                            !inputState.isOpen
-
-                    while (true) {
-                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
-                        if (!change.pressed) {
-                            if (canGesture) {
-                                val deltaX = change.position.x - startX
-                                val deltaY = change.position.y - startY
-                                // 仅手势明确向左轻划时唤出抽屉 (从右侧顺手推入，手势与动效完全一致)
-                                if (abs(deltaX) > 24.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.2f) {
-                                    if (!isSessionDrawerOpen) {
-                                        isSessionDrawerOpen = true
-                                    }
-                                }
-                            }
-                            break
-                        }
-                    }
-                }
-            }
     ) {
         // ================= 1. 全局唯一点阵坐标系 (通体清晰方阵，覆盖全圆屏) =================
         UnifiedMatrixCanvas(
@@ -804,7 +794,47 @@ private fun MainAgentDashboard(
                         blendMode = BlendMode.DstIn
                     )
                 }
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
+                // 内容区横滑打开会话抽屉：只认横向，越过阈值立刻 consume()，纵向位移完整留给 verticalScroll
+                .pointerInput(bottomBlockMode, isExecutingAgent, inputState.isOpen) {
+                    if (bottomBlockMode != BottomBlockMode.IDLE || isExecutingAgent || inputState.isOpen) {
+                        return@pointerInput
+                    }
+                    val horizontalSlopPx = ContentSwipeSlopDp.toPx()
+                    val openThresholdPx = ContentSwipeOpenDp.toPx()
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startX = down.position.x
+                        val startY = down.position.y
+                        // 只在底栏保留区之上、顶部时钟带之下的内容区生效
+                        if (startY <= ContentSwipeTopBoundDp.toPx() ||
+                            startY >= size.height - ContentSwipeBottomBoundDp.toPx()
+                        ) {
+                            return@awaitEachGesture
+                        }
+                        var deltaX = 0f
+                        var isHorizontalDrag = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            deltaX = change.position.x - startX
+                            val deltaY = change.position.y - startY
+                            // 横向压倒纵向越过阈值即刻锁定为横滑，此后逐帧 consume 独占指针流
+                            if (!isHorizontalDrag &&
+                                kotlin.math.abs(deltaX) > kotlin.math.abs(deltaY) * 1.4f &&
+                                kotlin.math.abs(deltaX) > horizontalSlopPx
+                            ) {
+                                isHorizontalDrag = true
+                            }
+                            if (isHorizontalDrag) change.consume()
+                            if (!change.pressed) break
+                        }
+                        // 左右两个方向都开抽屉
+                        if (isHorizontalDrag && kotlin.math.abs(deltaX) > openThresholdPx) {
+                            isSessionDrawerOpen = true
+                        }
+                    }
+                },
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -893,14 +923,11 @@ private fun MainAgentDashboard(
         }
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            TopClockBar(timeText = currentTime)
-        }
+        // 曲线坐标系取整屏圆形，且绘制在内容列 DstIn 遮罩作用域之外，永不被正文压住或抹掉
+        TopClockBar(
+            timeText = currentTime,
+            modifier = Modifier.fillMaxSize()
+        )
 
         // ================= 4. 单体演变底栏控制器 =================
         BottomInteractiveBlock(
@@ -912,8 +939,14 @@ private fun MainAgentDashboard(
             onMainInputTypeChange = { newType ->
                 mainInputType = newType
                 preferences.mainInputType = newType.name
+                showNotice(
+                    when (newType) {
+                        MainInputType.KEYBOARD -> NOTICE_INPUT_KEYBOARD
+                        MainInputType.VOICE -> NOTICE_INPUT_VOICE
+                    },
+                    false
+                )
             },
-            rightButtonAction = preferences.rightButtonAction,
             cooldownSeconds = currentRiskAssessment?.requireCooldownSeconds ?: 0,
             riskExplanation = currentRiskAssessment?.riskSummary ?: "",
             onVoiceStartRecord = {
@@ -930,31 +963,13 @@ private fun MainAgentDashboard(
                 inputState = inputState.reduce(TextInputEvent.Open)
             },
             onRightActionClick = {
-                when (preferences.rightButtonAction) {
-                    RightButtonAction.MODEL_SWITCH -> {
-                        // 只在后端已缓存的模型清单内循环，绝不切到与 baseUrl 不匹配的模型
-                        val next = ModelCycle.next(preferences.modelName, preferences.cachedRemoteModels)
-                        if (next == null) {
-                            showNotice("未发现可用模型，请先在设置中拉取模型列表", true)
-                        } else {
-                            preferences.modelName = next
-                            showNotice("模型已切换: $next", false)
-                        }
-                    }
-                    RightButtonAction.CLEAR_MEMORY -> {
-                        agentDispatcher.resetConversation()
-                        agentState = AgentExecutionState(
-                            prompt = "记忆已重置",
-                            conversationBlocks = listOf(
-                                ConversationBlock.Text(id = UUID.randomUUID().toString(), content = "会话记忆已清空，系统就绪。")
-                            ),
-                            isFinished = true
-                        )
-                    }
-                    RightButtonAction.OPEN_SETTINGS -> {
-                        onOpenSettings()
+                // 右翼固定打开会话抽屉：横向手势已被 Wear 系统占用，入口只走显式按钮
+                context.getSystemService(Vibrator::class.java)?.let { vib ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
                     }
                 }
+                isSessionDrawerOpen = true
             },
             onStopClick = {
                 agentDispatcher.cancelCurrentExecution()
@@ -1116,6 +1131,10 @@ private fun MainAgentDashboard(
             onSelectSession = { id -> switchToSession(id) },
             onCreateSession = { createNewSession() },
             onDeleteSession = { id -> deleteSession(id) },
+            onOpenSettings = {
+                isSessionDrawerOpen = false
+                onOpenSettings()
+            },
             onClose = { isSessionDrawerOpen = false }
         )
 

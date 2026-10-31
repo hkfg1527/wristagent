@@ -60,7 +60,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -94,7 +93,6 @@ fun BottomInteractiveBlock(
     modifier: Modifier = Modifier,
     mainInputType: MainInputType = MainInputType.VOICE,
     onMainInputTypeChange: (MainInputType) -> Unit = {},
-    rightButtonAction: RightButtonAction = RightButtonAction.MODEL_SWITCH,
     cooldownSeconds: Int = 0,               // 严格确认模式下的风险锁定倒计时
     riskExplanation: String = "",           // 审批横条上方的最坏后果说明
     onVoiceStartRecord: () -> Unit,
@@ -199,9 +197,9 @@ fun BottomInteractiveBlock(
                                         isSplitExpanded = false
                                         splitProgress.animateTo(0f, spring(0.72f, 280f))
                                     }
+                                    // 左副键只负责切换输入方式；"打开输入框"统一归主键，避免一按就被 IME 盖住提示
                                     if (mainInputType == MainInputType.VOICE) {
                                         onMainInputTypeChange(MainInputType.KEYBOARD)
-                                        onLeftKeyboardClick()
                                     } else {
                                         onMainInputTypeChange(MainInputType.VOICE)
                                     }
@@ -217,7 +215,7 @@ fun BottomInteractiveBlock(
                     }
                 }
 
-                // 右副键：模型/设置/清空 (MDL/SET/CLR)
+                // 右副键：固定打开会话抽屉 (横向手势已被系统占用，不再按偏好渲染三种图标)
                 if (wingAlpha > 0.02f) {
                     val rightOffsetDp = (50.dp * splitProgress.value)
                     Box(
@@ -242,15 +240,7 @@ fun BottomInteractiveBlock(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        when (rightButtonAction) {
-                            RightButtonAction.MODEL_SWITCH -> MinimalistLayersIcon(tint = Wear.Palette.Accent)
-                            RightButtonAction.OPEN_SETTINGS -> MinimalistSlidersIcon(tint = Wear.Palette.Accent)
-                            RightButtonAction.CLEAR_MEMORY -> BasicText(
-                                text = "CLR",
-                                style = Wear.TextMono.copy(color = Wear.Palette.Accent),
-                                maxLines = 1
-                            )
-                        }
+                        MinimalistLayersIcon(tint = Wear.Palette.Accent)
                     }
                 }
             }

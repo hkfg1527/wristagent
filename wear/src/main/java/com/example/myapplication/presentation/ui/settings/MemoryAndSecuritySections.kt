@@ -21,6 +21,7 @@ import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearChip
+import com.example.myapplication.presentation.ui.components.WearRow
 import com.example.myapplication.presentation.ui.components.WearSectionHeader
 import com.example.myapplication.presentation.ui.theme.Wear
 
@@ -81,14 +82,14 @@ fun MemoryManagerContent(
 }
 
 /**
- * 两翼快捷键定义。
+ * 两翼副键说明。
+ * 横向手势已被 Wear 系统占用，右副键固定为打开会话抽屉，不再提供可绑定项。
  */
 @Composable
 fun WingShortcutContent(
     currentAction: RightButtonAction,
     onSelect: (RightButtonAction) -> Unit
 ) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     Column(
@@ -99,24 +100,10 @@ fun WingShortcutContent(
     ) {
         WearSectionHeader(text = "右侧副键绑定")
 
-        val actions = listOf(
-            RightButtonAction.MODEL_SWITCH to "绑定：切换大模型",
-            RightButtonAction.OPEN_SETTINGS to "绑定：打开系统设置",
-            RightButtonAction.CLEAR_MEMORY to "绑定：一键清空长记忆"
+        WearRow(
+            title = "底栏副键",
+            value = "右翼固定打开会话抽屉"
         )
-
-        actions.forEach { (act, label) ->
-            val isSelected = currentAction == act
-            SettingsChoiceRow(
-                title = label,
-                value = if (isSelected) "已生效" else null,
-                selected = isSelected,
-                onClick = {
-                    context.vibrateTick()
-                    onSelect(act)
-                }
-            )
-        }
 
         SubPageDoneRow()
 

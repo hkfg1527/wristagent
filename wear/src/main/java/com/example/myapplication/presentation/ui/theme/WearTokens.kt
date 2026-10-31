@@ -51,7 +51,8 @@ object Wear {
         val BadgeHeight = 20.dp
         val Orb = 52.dp
         val TopContentInset = 34.dp
-        val BottomBarReserve = 92.dp
+        /** 底栏保留区：主键 52dp + 底距 12dp + 12dp 余量，尽量把高度让给正文 */
+        val BottomBarReserve = 76.dp
     }
 
     // 字号阶梯：最小 12sp，禁止再出现更小字号
