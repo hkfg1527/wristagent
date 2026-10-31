@@ -9,8 +9,12 @@ package com.example.myapplication.presentation.ui
  */
 object StreamingThrottle {
 
-    /** 相邻两次 UI 更新的最小间隔：70ms ≈ 12~16fps，稳定且不丢字。 */
-    const val DEFAULT_INTERVAL_MS = 70L
+    /**
+     * 相邻两次 UI 更新的最小间隔：32ms ≈ 30fps。
+     * 太长（如 70ms）会让"卡片长高"和"列表跟随"之间出现肉眼可见的滞后，
+     * 表现为文字被往下顶一下再跳回来；太快又会逐 token 重排导致抖动。
+     */
+    const val DEFAULT_INTERVAL_MS = 32L
 
     /** 单次刷新增量超过该字数即视为"突发"（模型一次吐出很大一段），此时不做逐字动画。 */
     const val DEFAULT_CHARS_PER_EMIT_THRESHOLD = 12

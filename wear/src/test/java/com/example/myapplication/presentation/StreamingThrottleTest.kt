@@ -19,17 +19,17 @@ class StreamingThrottleTest {
 
     @Test
     fun shouldEmit_belowInterval_isFalse() {
-        assertFalse(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_069L))
+        assertFalse(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_069L, intervalMs = 70L))
     }
 
     @Test
     fun shouldEmit_exactlyAtInterval_isTrue() {
-        assertTrue(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_070L))
+        assertTrue(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_070L, intervalMs = 70L))
     }
 
     @Test
     fun shouldEmit_aboveInterval_isTrue() {
-        assertTrue(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_071L))
+        assertTrue(StreamingThrottle.shouldEmit(lastEmitMs = 1_000L, nowMs = 1_071L, intervalMs = 70L))
     }
 
     @Test
@@ -95,7 +95,7 @@ class StreamingThrottleTest {
 
     @Test
     fun state_acceptInsideInterval_isDroppedAndKeepsBaseline() {
-        val state = StreamingThrottleState()
+        val state = StreamingThrottleState(intervalMs = 70L) // 显式固定间隔，不受默认值调整影响
         assertTrue(state.accept(newText = chars(3), nowMs = 1_000L))
         assertFalse(state.accept(newText = chars(9), nowMs = 1_069L))
         assertEquals(chars(3), state.lastText)

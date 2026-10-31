@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -345,6 +346,13 @@ private fun AnimatedMessageCard(
 
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
+
+/**
+ * 流式跟随时每帧最多前进的距离（约 4dp/帧 ≈ 240dp/s）。
+ * 不设成"直接滚到末端"是因为：模型吐字有时一秒几行，镜头全速追赶会让整块文字持续抖动；
+ * 限速后跟不上就先让它跑，新字从底部冒出来，观感更像"文字在写"而不是"画面在追"。
+ */
+private val StreamFollowStepDp = 4.dp
 
 /** TEMP 测试指令：强制只调用一次 test_noop（空实现），再输出一段废话用于观察流式吐字。 */
 private const val TEMP_TOOL_TEST_COMMAND =
@@ -1065,14 +1073,18 @@ private fun MainAgentDashboard(
     // 三者互相取消、又与"内容边涨边滚"叠加，于是发完消息列表会持续弹来弹去。
     // 现在收敛成一条链路：同一时刻只有一个滚动协程，且两种状态互斥。
     val hasUserTurn = conversationItems.any { it is RenderableConversationItem.UserPrompt }
+    val density = LocalDensity.current
     LaunchedEffect(isExecutingAgent, hasUserTurn, conversationItems.size) {
         // 空会话（只有问候语）不滚动：否则首条会被顶到屏幕最上面，开屏像"往下弹了一下又回去"
         if (!hasUserTurn) return@LaunchedEffect
         if (isExecutingAgent) {
-            // 流式阶段：逐帧贴底，瞬时位移、单调前进、被末端夹住 —— 不做任何动画，避免和内容增长互相追
+            // 流式阶段：**限速跟随**。每帧最多前进 StreamFollowStepDp，
+            // 内容长得比这快就让它先跑（新字从可见区底部冒出来），镜头不再死追光标；
+            // 到末端时 scrollBy 自然被夹住，于是自动停下。
+            val stepPx = with(density) { StreamFollowStepDp.toPx() }
             while (isActive) {
                 withFrameMillis { }
-                listState.scroll { scrollBy(BOTTOM_FOLLOW_SCROLL_PX) }
+                listState.scroll { scrollBy(stepPx) }
             }
         } else {
             // 一轮结束：只做一次动画归位，然后再瞬时钉住末端（两步串行，不再有第二个动画抢锁）
