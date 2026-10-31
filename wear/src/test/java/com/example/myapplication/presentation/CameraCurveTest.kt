@@ -30,9 +30,9 @@ class CameraCurveTest {
 
     @Test
     fun `起步时每帧速度增量被加速度限制`() {
-        // 16ms 内最多加速 6000*0.016 = 96 px/s
-        val next = CameraCurve.nextSpeed(currentSpeed = 0f, targetSpeed = 1400f, dtSeconds = 0.016f)
-        assertEquals(96f, next, 0.001f)
+        // 一帧(16ms)内的最大速度增量 = ACCEL * dt，与具体加速度值解耦
+        val next = CameraCurve.nextSpeed(currentSpeed = 0f, targetSpeed = CameraCurve.MAX_SPEED, dtSeconds = 0.016f)
+        assertEquals(CameraCurve.ACCEL * 0.016f, next, 0.001f)
     }
 
     @Test

@@ -14,16 +14,16 @@ import kotlin.math.abs
 object CameraCurve {
 
     /** 每 1px 剩余距离对应的目标速度（px/s per px）。 */
-    const val SPEED_PER_PX = 5.5f
+    const val SPEED_PER_PX = 9.0f
 
     /** 最慢速度（px/s）：很近的距离也保持缓慢挪动，避免最后一像素抖动。 */
     const val MIN_SPEED = 45f
 
     /** 最快速度（px/s）：只有非常远的距离才会跑到这个上限。 */
-    const val MAX_SPEED = 1400f
+    const val MAX_SPEED = 2600f
 
-    /** 加速度上限（px/s²）：起步渐进的来源。 */
-    const val ACCEL = 6000f
+    /** 加速度上限（px/s²）：起步渐进的来源；调大则更快到达目标速度。 */
+    const val ACCEL = 12000f
 
     /** 由剩余距离算目标速度：远快近慢，并夹在 [MIN_SPEED] 与 [MAX_SPEED] 之间。 */
     fun targetSpeed(remainingPx: Float): Float {

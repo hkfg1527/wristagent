@@ -61,11 +61,13 @@ object Wear {
         /** 底栏保留区：主键 52dp + 底距 12dp + 12dp 余量，尽量把高度让给正文 */
         val BottomBarReserve = 76.dp
         /**
-         * 列表末端可达高度：让最后一项可滚到圆屏中心，避免被底栏遮挡。
-         * 480px/2.0 密度下屏高 240dp、圆心在 120dp；bottom padding 取 112dp 时，
-         * 滚到底的最后一条卡片底边停在 240-112=128dp，正好落在圆心附近而不是压进 76dp 底栏。
+         * 列表末端可达高度（bottom padding）：底栏保留区 + 一点余量。
+         * 旧值 112dp 是照 240dp 模拟器调的（240-112=128dp 正好圆心），
+         * 但真表只有 192dp，112dp 留白会吃掉 58% 的高度 —— 实测最后一行下方空了 247px(64% 屏高)。
+         * 取 BottomBarReserve(76dp) + 12dp = 88dp：192-88=104dp，正文底边落在主键上方 24dp 处；
+         * 240dp 屏上则是 240-88=152dp，同样不会压进底栏。
          */
-        val ListCenterReach = 112.dp
+        val ListCenterReach = BottomBarReserve + 12.dp
     }
 
     // 字号阶梯：最小 12sp，禁止再出现更小字号
