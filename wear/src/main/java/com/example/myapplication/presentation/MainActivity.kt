@@ -61,7 +61,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -125,7 +124,6 @@ import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.StreamingThrottleState
-import com.example.myapplication.presentation.ui.rememberEdgeOverscroll
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
@@ -743,13 +741,6 @@ private fun MainAgentDashboard(
     val listState = rememberScalingLazyListState()
     val mainFocusRequester = remember { FocusRequester() }
 
-    // 到底继续上滑 → tick → 过阈值切设置页；越界期间列表最多拉开 24dp×0.4，松手回弹
-    val edgeOverscroll = rememberEdgeOverscroll(
-        overflowSign = -1f,
-        atEdge = { !listState.canScrollForward },
-        onCross = { onOpenSettings() }
-    )
-
     // 流式刷新节流：70ms 一帧（≈12~16fps）+ 突发增量时关掉逐字光标动画
     val streamingThrottle = remember { StreamingThrottleState() }
     var isStreamingBurst by remember { mutableStateOf(false) }
@@ -1173,14 +1164,11 @@ private fun MainAgentDashboard(
             ),
             modifier = Modifier
                 .fillMaxSize()
-                // 越界"拉住"：列表没吃下的位移不进滚动，只换成最多 24dp×0.4 的弹性位移，松手回弹
-                .nestedScroll(edgeOverscroll.connection)
                 // 审批沉浸：整列正文退到 35% 并轻度模糊（只糊列表图层，点阵画布保持清晰）；
                 // 图层被缓存，模糊只在列表内容真正变化时重算，不是每帧全屏后处理
                 .graphicsLayer {
                     alpha = listAlpha
                     renderEffect = if (isApprovalFocus) listBlurEffect else null
-                    translationY = edgeOverscroll.pullOffsetPx
                 }
                 // 边缘淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉。
                 // 顶部渐隐必须盖住整个曲面时钟带（TopContentInset=34dp），
@@ -1216,10 +1204,7 @@ private fun MainAgentDashboard(
                 .onRotaryScrollEvent { event ->
                     // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与"贴底跟随"抢同一把 scroll 互斥锁，
                     // 每格刻度都立刻生效（scope.launch + scroll{} 在高频刻度下会被逐帧滚动挤掉，真表上就像没接上）
-                    val consumed = listState.dispatchRawDelta(event.verticalScrollPixels)
-                    // 已到边界还继续转：剩余位移交给越界手感累计（震动 / 过阈值切设置页）
-                    val leftover = event.verticalScrollPixels - consumed
-                    if (leftover != 0f) edgeOverscroll.push(leftover, rotary = true)
+                    listState.dispatchRawDelta(event.verticalScrollPixels)
                     if (kotlin.math.abs(event.verticalScrollPixels) > 8f) {
                         context.getSystemService(Vibrator::class.java)?.let { vib ->
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {

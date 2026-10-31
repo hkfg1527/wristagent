@@ -37,7 +37,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -121,16 +120,6 @@ fun SettingsScreen(
 
     val listState = rememberScalingLazyListState()
 
-    // 到顶继续下滑越界 → tick → 过阈值回主界面；阈值/震动与主界面底部越界共用同一份常量
-    val topOverscroll = rememberEdgeOverscroll(
-        overflowSign = 1f,
-        atEdge = {
-            !listState.canScrollBackward ||
-                (listState.centerItemIndex == 0 && listState.centerItemScrollOffset == 0)
-        },
-        onCross = onBack
-    )
-
     // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
     PullDownDismissContainer(
         modifier = modifier,
@@ -163,18 +152,13 @@ fun SettingsScreen(
             ScalingLazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    // 到顶继续下滑的越界位移不进滚动，只做震动与过阈值返回
-                    .nestedScroll(topOverscroll.connection)
                     // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                     .onRotaryScrollEvent {
                         // 表冠：同步吃位移（dispatchRawDelta 不受 scroll 互斥锁排队影响，每格刻度都生效）
-                        val consumed = listState.dispatchRawDelta(it.verticalScrollPixels)
+                        listState.dispatchRawDelta(it.verticalScrollPixels)
                         if (abs(it.verticalScrollPixels) > 10f) {
                             context.vibrateTick()
                         }
-                        // 已到顶还继续向下转：剩余位移交给越界手感累计
-                        val leftover = it.verticalScrollPixels - consumed
-                        if (leftover != 0f) topOverscroll.push(leftover, rotary = true)
                         true
                     }
                     .focusRequester(settingsFocusRequester)
