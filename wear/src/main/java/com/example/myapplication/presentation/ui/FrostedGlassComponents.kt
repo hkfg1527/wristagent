@@ -129,6 +129,15 @@ fun ThoughtPill(
 /** 工具调用无独立错误字段，按结果摘要判定失败态，用于状态取色。 */
 private val toolFailureKeywords = listOf("失败", "错误", "异常", "error", "failed", "exception")
 
+/**
+ * 小胶囊里只放一条最关键的信息：摘要以 "·" 分段时只取第一段，其余细节留给展开态。
+ * 首段为空（摘要以 "·" 开头）时回退到整条摘要，避免胶囊里只剩一个点。
+ */
+private fun primarySummary(summary: String?): String? {
+    val first = summary?.substringBefore('·')?.trim()
+    return first?.takeIf { it.isNotEmpty() } ?: summary?.trim()?.takeIf { it.isNotEmpty() }
+}
+
 private fun toolStatusColor(toolCall: ConversationBlock.ToolCall): Color {
     val summary = toolCall.resultSummary
     return when {
@@ -214,14 +223,15 @@ fun SpringColoredToolPill(
                 )
 
                 // 状态说明 (running/success/failed 只点缀在文字颜色上)
+                // 摘要只留第一段，宽度不足时缩略摘要而不是工具名，完整信息在展开态
                 val summaryLabel = if (isExecuting) {
                     "生成中..."
                 } else {
-                    toolCall.resultSummary ?: "已执行"
+                    primarySummary(toolCall.resultSummary) ?: "已执行"
                 }
                 BasicText(
                     text = "· $summaryLabel",
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.weight(1f),
                     style = Wear.TextCaption.copy(color = statusColor),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

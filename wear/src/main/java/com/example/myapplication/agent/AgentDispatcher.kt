@@ -14,6 +14,7 @@ import com.example.myapplication.agent.contract.SecurityMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -297,7 +298,11 @@ class AgentDispatcher(
                         onStateUpdate(currentState)
 
                         val actionDesc = "执行 [${call.name}]"
-                        val allowed = onRequireConfirmation?.invoke(actionDesc, risk) ?: true
+                        // AI 三段说明：超时/异常/解析失败一律回退启发式，绝不影响审批弹出
+                        val narratedRisk = applyNarration(call.name, actionDesc, risk)
+                        currentState = currentState.copy(pendingRiskAssessment = narratedRisk)
+                        onStateUpdate(currentState)
+                        val allowed = onRequireConfirmation?.invoke(actionDesc, narratedRisk) ?: true
 
                         if (allowed) {
                             // 批准转绿
@@ -499,6 +504,81 @@ private data class ToolCallAccumulator(
         val reasoning: String,
         val toolCalls: List<ToolCall>
     )
+
+    /**
+     * 为审批页生成 AI 三段说明（做什么 / 最坏情况 / 风险等级）。
+     * 任何异常、超时或解析失败都回退到启发式；riskSummary 与 requireCooldownSeconds 原样保留。
+     */
+    private suspend fun applyNarration(
+        toolName: String,
+        actionText: String,
+        risk: RiskAssessment
+    ): RiskAssessment {
+        val fallbackNarration = RiskNarrator.fallback(toolName, actionText, risk)
+        val narration = if (preferences.apiKey.isBlank()) {
+            fallbackNarration
+        } else {
+            try {
+                val raw = withTimeoutOrNull(NARRATION_TIMEOUT_MS) {
+                    requestNarration(RiskNarrator.buildPrompt(toolName, actionText))
+                }
+                raw?.let { RiskNarrator.parse(it) } ?: fallbackNarration
+            } catch (e: Exception) {
+                Log.w(TAG, "AI 风险说明生成失败，回退启发式: ${e.javaClass.simpleName}")
+                fallbackNarration
+            }
+        }
+        return risk.copy(
+            whatItDoes = narration.whatItDoes,
+            worstCase = narration.worstCase,
+            aiRiskLevel = narration.level
+        )
+    }
+
+    /** 轻量非流式补全：temperature 0、max_tokens 200、不携带工具定义，避免模型转去调工具。 */
+    private suspend fun requestNarration(prompt: String): String? = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
+        try {
+            val endpoint = if (preferences.baseUrl.endsWith("/")) {
+                preferences.baseUrl + "chat/completions"
+            } else {
+                preferences.baseUrl + "/chat/completions"
+            }
+            conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
+                connectTimeout = NARRATION_SOCKET_TIMEOUT_MS
+                readTimeout = NARRATION_SOCKET_TIMEOUT_MS
+                doOutput = true
+            }
+            val body = JSONObject().apply {
+                put("model", preferences.modelName)
+                put("temperature", 0)
+                put("max_tokens", 200)
+                put("stream", false)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }
+            OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body.toString()) }
+            if (conn.responseCode !in 200..299) return@withContext null
+            val payload = conn.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(payload).optJSONArray("choices")
+                ?.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?.optString("content")
+        } catch (e: Exception) {
+            Log.w(TAG, "AI 风险说明请求失败: ${e.javaClass.simpleName}")
+            null
+        } finally {
+            conn?.disconnect()
+        }
+    }
 
     private suspend fun streamChatCompletions(
         blocks: MutableList<ConversationBlock>,
@@ -740,6 +820,10 @@ private data class ToolCallAccumulator(
     }
 
     companion object {
+        // 审批说明的轻量调用上限：整体 4 秒，套接字单次 3.5 秒，超时即回退启发式
+        private const val NARRATION_TIMEOUT_MS = 4000L
+        private const val NARRATION_SOCKET_TIMEOUT_MS = 3500
+
         suspend fun fetchRemoteModels(baseUrl: String, apiKey: String): Pair<Long, List<String>> = withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
             val cleanBase = baseUrl.trim().trimEnd('/')

@@ -59,6 +59,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -94,6 +95,23 @@ enum class MainInputType {
     VOICE,
     KEYBOARD
 }
+
+/** 审批扁胶囊的视觉高度：44dp 主键收成 36dp 的扁横条，可点热区仍取 [ApprovalTrackTouchHeight]。 */
+internal val ApprovalCapsuleHeight = 36.dp
+
+/** 审批滑轨的触控热区高度：视觉只有 [ApprovalCapsuleHeight]，热区保持 44dp 令牌不缩水。 */
+internal val ApprovalTrackTouchHeight = Wear.Size.Touch
+
+/** 扁胶囊内拇指与胶囊边缘的留白：36dp 胶囊留 3dp 边距，拇指直径 30dp。 */
+private val ApprovalThumbInset = 3.dp
+
+/**
+ * 审批态底栏高度：轨道贴顶、[Wear.Size.BottomBarReserve] 再收 [Wear.Space.Md]。
+ * 480px/2.0 密度下屏高 240dp、圆心 120dp，底栏顶边落在 240−12−64=164dp，
+ * 36dp 胶囊居中于 44dp 热区后占 168dp..204dp，弦长 2√(120²−88²)≈163dp；
+ * 于是正文底边最高可到 156dp，三段 AI 文案拿到 24dp..156dp 的 y 区间。
+ */
+internal val ApprovalBlockHeight = Wear.Size.BottomBarReserve - Wear.Space.Md
 
 /**
  * 单体形态演变底栏控制器 (左右滑动弹性弹射两翼 · 点击弹性收回 · 绝无 Emoji)
@@ -175,16 +193,16 @@ fun BottomInteractiveBlock(
         label = "capsuleStretchWidth"
     )
 
-    // 主键高度 52dp -> 44dp：变形成横向胶囊后与拒绝键同高
+    // 主键高度 52dp -> 36dp：变形成横向扁胶囊，比触控热区更扁
     val capsuleHeight by animateDpAsState(
-        targetValue = if (isApproval) Wear.Size.Touch else Wear.Size.Orb,
+        targetValue = if (isApproval) ApprovalCapsuleHeight else Wear.Size.Orb,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
         label = "capsuleStretchHeight"
     )
 
-    // 底栏高度：常驻 58dp，审批态升到 [Wear.Size.BottomBarReserve] 换取更大弦长，仍不超出保留区
+    // 底栏高度：常驻 58dp；审批态取 [ApprovalBlockHeight]，让滑块落在圆心下方约 48dp 处
     val blockHeight by animateDpAsState(
-        targetValue = if (isApproval) Wear.Size.BottomBarReserve else 58.dp,
+        targetValue = if (isApproval) ApprovalBlockHeight else 58.dp,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
         label = "bottomBlockHeight"
     )
@@ -457,7 +475,8 @@ fun BottomInteractiveBlock(
 }
 
 /**
- * 审批滑块：整行唯一控件，白色主键底条拉长成占满弦长的横向胶囊，拇指自右端向左拖动。
+ * 审批滑块：整行唯一控件，白色主键底条拉长成占满弦长的扁胶囊（视觉 36dp，热区仍是 44dp），
+ * 30dp 拇指自右端向左拖动。胶囊内"点击拒绝"与"放行"两个 label 叠在同一位置随进度交叉淡化。
  * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
  * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
  * 未滑过的右侧区域保留 0.34 的红调，已滑过区域取 0.72 的绿调；
@@ -489,8 +508,7 @@ private fun ApprovalTrack(
             remainingCooldown--
         }
     }
-    // 进入审批态（或进入锁定态）时进度必须归零：否则上一轮拖动残留会让文案一进审批就显示"松开即放行"
-    // 进入审批态（ApprovalTrack 重新组合）时进度必须归零：否则残留会让文案一进审批就显示"松开即放行"
+    // 进入审批态（ApprovalTrack 重新组合）时进度必须归零：否则上一轮残留会让文案一进审批就显示"松开即放行"
     LaunchedEffect(Unit) {
         dragProgress.snapTo(0f)
     }
@@ -508,21 +526,18 @@ private fun ApprovalTrack(
         onDispose { onApprovalProgress(0f) }
     }
 
-    val insetPx = with(density) { 4.dp.toPx() }
+    val insetPx = with(density) { ApprovalThumbInset.toPx() }
     val thumbSlotPx = with(density) { trackHeight.toPx() }
-    val thumbDiameter = (trackHeight - 8.dp).coerceAtLeast(20.dp)
+    val thumbDiameter = (trackHeight - ApprovalThumbInset * 2).coerceAtLeast(20.dp)
     val travelPx = (trackPx - thumbSlotPx).coerceAtLeast(1f)
     // 单击容差：设计值 22dp，按本机密度换算成 px 后交给纯逻辑判定
     val tapSlopPx = with(density) { ApprovalSliderLogic.TAP_SLOP_PX.dp.toPx() }
 
+    // 44dp 触控热区包住 36dp 扁胶囊：热区不缩水，外观更扁；指针坐标与轨道同宽，进度换算语义不变
     Box(
         modifier = modifier
             .width(trackWidth)
-            .height(trackHeight)
-            .clip(CircleShape)
-            // 审批态底条沿用主键冷银白（同一颗键的延续），红/绿由着色层叠加
-            .background(Wear.Palette.Orb)
-            .onGloballyPositioned { coords -> trackPx = coords.size.width.toFloat() }
+            .height(ApprovalTrackTouchHeight)
             .pointerInput(isLocked, trackPx, thumbSlotPx, tapSlopPx) {
                 // 锁定倒计时内单击与滑动都无效
                 if (isLocked) return@pointerInput
@@ -569,53 +584,79 @@ private fun ApprovalTrack(
                         scope.launch { dragProgress.snapTo(nextProgress) }
                     }
                 }
-            },
-        contentAlignment = Alignment.Center
+            }
     ) {
-        // 着色层：未滑过区淡红 + 已滑过区 lerp(拒绝红 → 放行绿)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val p = dragProgress.value
-            val thumbLeftPx = (size.width - thumbSlotPx + insetPx - p * travelPx)
-                .coerceIn(0f, size.width)
-            drawRect(
-                color = Wear.Palette.Danger.copy(alpha = 0.34f),
-                size = Size(thumbLeftPx, size.height)
-            )
-            drawRect(
-                color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.72f),
-                topLeft = Offset(thumbLeftPx, 0f),
-                size = Size(size.width - thumbLeftPx, size.height)
-            )
-        }
-
-        // 文案三态：锁定倒计时优先，其次按进度在"点拒绝 · 左滑放行 / 松开即放行"之间切换
-        BasicText(
-            text = ApprovalSliderLogic.labelFor(dragProgress.value, isLocked),
-            // 白键底叠红/绿后仍偏亮，用深色文字（对比≈13:1），近白字反而只有 1.4:1
-            style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
-            maxLines = 1,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = Wear.Space.Md)
-        )
-
-        // 拇指：白色圆，自右端起步向左推进；锁定时停在右端并显示剩余秒数
         Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset { IntOffset(-(dragProgress.value * travelPx).roundToInt(), 0) }
-                .padding(end = 4.dp)
-                .size(thumbDiameter)
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .height(trackHeight)
                 .clip(CircleShape)
-                .background(Wear.Palette.TextPrimary),
+                // 审批态底条沿用主键冷银白（同一颗键的延续），红/绿由着色层叠加
+                .background(Wear.Palette.Orb)
+                .onGloballyPositioned { coords -> trackPx = coords.size.width.toFloat() },
             contentAlignment = Alignment.Center
         ) {
+            // 着色层：未滑过区淡红 + 已滑过区 lerp(拒绝红 → 放行绿)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val p = dragProgress.value
+                val thumbLeftPx = (size.width - thumbSlotPx + insetPx - p * travelPx)
+                    .coerceIn(0f, size.width)
+                drawRect(
+                    color = Wear.Palette.Danger.copy(alpha = 0.34f),
+                    size = Size(thumbLeftPx, size.height)
+                )
+                drawRect(
+                    color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.72f),
+                    topLeft = Offset(thumbLeftPx, 0f),
+                    size = Size(size.width - thumbLeftPx, size.height)
+                )
+            }
+
+            // 文案：锁定倒计时优先；解锁后两个 label 叠在同一位置，随进度交叉淡化
             if (isLocked) {
                 BasicText(
-                    text = "${remainingCooldown}",
+                    text = ApprovalSliderLogic.labelFor(dragProgress.value, isLocked = true),
                     style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                     maxLines = 1
                 )
+            } else {
+                Box(contentAlignment = Alignment.Center) {
+                    // alpha 走图形层：拖动时只重绘图层，不触发重组
+                    // 两个文案都用深色：胶囊底是白键色（叠红/绿后仍偏亮），红/绿字在上面只有 ~2:1，等于看不清
+                    BasicText(
+                        text = "点击拒绝",
+                        style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
+                        maxLines = 1,
+                        modifier = Modifier.graphicsLayer { alpha = 1f - dragProgress.value }
+                    )
+                    BasicText(
+                        text = "放行",
+                        style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
+                        maxLines = 1,
+                        modifier = Modifier.graphicsLayer { alpha = dragProgress.value }
+                    )
+                }
+            }
+
+            // 拇指：白色圆，自右端起步向左推进；锁定时停在右端并显示剩余秒数
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset { IntOffset(-(dragProgress.value * travelPx).roundToInt(), 0) }
+                    .padding(end = ApprovalThumbInset)
+                    .size(thumbDiameter)
+                    .clip(CircleShape)
+                    .background(Wear.Palette.TextPrimary),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLocked) {
+                    BasicText(
+                        text = "${remainingCooldown}",
+                        style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

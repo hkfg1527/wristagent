@@ -55,11 +55,19 @@ enum class RightButtonAction {
 }
 
 /**
+ * AI 判定的风险等级（审批页危险条与文案共用）
+ */
+enum class RiskLevel { LOW, MEDIUM, HIGH, CRITICAL }
+
+/**
  * 安全审查评估结果
  */
 data class RiskAssessment(
     val isHardBlocked: Boolean = false,       // 是否命中硬黑名单
     val isHighRisk: Boolean = false,          // 是否属于中高风险操作
     val riskSummary: String = "",             // 大白话风险描述/最严重后果说明
-    val requireCooldownSeconds: Int = 0       // 审批滑块强制冷却倒计时 (秒)
+    val requireCooldownSeconds: Int = 0,      // 审批滑块强制冷却倒计时 (秒)
+    val whatItDoes: String = "",              // 这条命令会做什么（AI 生成，<=40 汉字）
+    val worstCase: String = "",               // 最坏情况（AI 生成，<=40 汉字）
+    val aiRiskLevel: RiskLevel = RiskLevel.MEDIUM
 )

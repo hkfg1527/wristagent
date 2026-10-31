@@ -78,16 +78,23 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,7 +113,11 @@ import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
+import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
+import com.example.myapplication.presentation.ui.ApprovalBlockHeight
+import com.example.myapplication.presentation.ui.ApprovalCapsuleHeight
+import com.example.myapplication.presentation.ui.ApprovalTrackTouchHeight
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.MainInputType
@@ -120,8 +131,8 @@ import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
-import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
@@ -341,20 +352,33 @@ private fun AnimatedMessageCard(
 /** 跟随流式正文到底部用的位移量：远超一屏内容，滚动到末端会被自动截断。 */
 private const val BOTTOM_FOLLOW_SCROLL_PX = 48_000f
 
-/** 审批卡片危险等级：只由风险评估的现有字段推导，点亮 1/2/3 段。 */
-private fun riskLevelOf(risk: RiskAssessment?): Int = when {
-    risk == null -> 1
-    risk.isHardBlocked -> 3
-    risk.isHighRisk -> 2
-    else -> 1
+/** AI 风险等级 -> 徽标与等级文字。 */
+private fun riskLabelOf(level: RiskLevel): String = when (level) {
+    RiskLevel.LOW -> "低"
+    RiskLevel.MEDIUM -> "中"
+    RiskLevel.HIGH -> "高"
+    RiskLevel.CRITICAL -> "致命"
 }
 
-/** 审批卡片的工具名：取时间线上最后一个工具调用并解析成中文展示名；取不到返回 null。 */
-private fun lastToolDisplayName(blocks: List<ConversationBlock>): String? =
-    blocks.lastOrNull { it is ConversationBlock.ToolCall }
-        ?.let { (it as ConversationBlock.ToolCall).toolName }
-        ?.takeIf { it.isNotBlank() }
-        ?.let { ToolVisualMeta.resolve(it).displayName }
+/** AI 风险等级 -> 徽标色调：中低风险走强调色，高风险以上走危险色。 */
+private fun riskToneOf(level: RiskLevel): Tone = when (level) {
+    RiskLevel.LOW, RiskLevel.MEDIUM -> Tone.ACCENT
+    RiskLevel.HIGH, RiskLevel.CRITICAL -> Tone.DANGER
+}
+
+/** 语义色调 -> 令牌色：等级文字与危险条共用，避免各处重复写颜色映射。 */
+private fun toneColorOf(tone: Tone): Color = when (tone) {
+    Tone.ACCENT -> Wear.Palette.Accent
+    Tone.DANGER -> Wear.Palette.Danger
+    Tone.MUTED -> Wear.Palette.TextSecondary
+}
+
+/** AI 风险等级 -> 危险条点亮段数：中低风险 1 段、高风险 2 段、致命 3 段。 */
+private fun riskBarsLit(level: RiskLevel): Int = when (level) {
+    RiskLevel.LOW, RiskLevel.MEDIUM -> 1
+    RiskLevel.HIGH -> 2
+    RiskLevel.CRITICAL -> 3
+}
 
 /** 列表条目 key：用户气泡用 block id，助手回合用回合 key，保证滚动位置稳定。 */
 private fun itemKeyOf(item: RenderableConversationItem): String = when (item) {
@@ -417,18 +441,56 @@ private fun DialogActionButton(
 /** 全屏审批内容块宽度上限：内容块中心处弦长约 225dp，190dp 让两侧始终留余量。 */
 private val ApprovalContentMaxWidth = 190.dp
 
+/** 审批遮罩不透明度：半透明让身后的点阵阵列与正文透出来，而不是把整屏盖死。 */
+private const val ApprovalScrimAlpha = 0.55f
+
+/** 审批态对话列表的残留不透明度：退到 35%，仍能辨认"这些内容还没走"。 */
+private const val ApprovalListAlpha = 0.35f
+
+/** 列表图层的模糊半径（px）：只糊列表、不糊点阵，密度 2.0 下约 4dp 的轻微虚化。 */
+private const val ApprovalListBlurRadiusPx = 8f
+
+/** 内容底边与滑块视觉顶边的间距：三段文案永远压不到滑块。 */
+private val ApprovalSliderClearance = Wear.Space.Md
+
+/** 放行塌缩：整页缩到工具胶囊尺度、下移淡出，动画结束后才真正退出审批态。 */
+private const val ApprovalCollapseScale = 0.18f
+private val ApprovalCollapseDrop = 60.dp
+private const val ApprovalCollapseDurationMs = 220
+
 /**
- * 全屏审批视图：审批态整屏接管，不再以卡片形式浮在对话之上。
- * 底色 [Wear.Palette.Bg] + 10% Danger 叠色（危险态但不亮红）+ 自下而上的微弱渐变；
- * 内容没有 Surface 底、没有描边、没有圆角边界：标题 / 工具名 / 风险说明 / 加大的危险条。
- * 宽度按内容块中心处的圆弦长收窄（≈190dp），底边与底栏滑块之间留 [Wear.Space.Lg]。
+ * 三段 AI 文案的行内排版：12sp [Wear.Palette.TextMuted] 标签做引子，正文接在同一段落里。
+ * 竖排标签每块要多占一行（三块合计 48dp），而滑轨上方只有 132dp，
+ * 行内引子把这行高度让给正文，三块信息一条不少。
+ */
+private fun approvalParagraph(label: String, body: String, bodyStyle: TextStyle): AnnotatedString =
+    buildAnnotatedString {
+        withStyle(SpanStyle(fontSize = Wear.TextCaption.fontSize, color = Wear.Palette.TextMuted)) {
+            append(label)
+            append("  ")
+        }
+        withStyle(
+            SpanStyle(
+                fontSize = bodyStyle.fontSize,
+                color = bodyStyle.color,
+                fontWeight = bodyStyle.fontWeight
+            )
+        ) {
+            append(body)
+        }
+    }
+
+/**
+ * 全屏沉浸审批视图：半透明遮罩 + 列表模糊，身后的点阵阵列与正文仍然透出来。
+ * 内容块按圆弦长收窄到 190dp 居中，自上而下是标题行（含 AI 风险等级徽标）与三段 AI 文案：
+ * 会做什么 / 风险等级（危险条 + 等级文字同行）/ 最坏情况；空文案整块隐藏，不留空行。
+ * 底边永远停在滑块视觉顶边 [ApprovalSliderClearance] 之上，放行时按 [collapse] 塌缩成工具胶囊尺度。
  */
 @Composable
 private fun ApprovalFullScreen(
     visible: Boolean,
-    toolDisplayName: String,
-    riskExplanation: String,
-    riskLevel: Int,
+    risk: RiskAssessment?,
+    collapse: Float,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -454,6 +516,24 @@ private fun ApprovalFullScreen(
         }
     }
 
+    // 遮罩渐变进入：硬切会让点阵突然消失，180ms 渐变保留"整屏接管"的时间线索
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (visible) ApprovalScrimAlpha else 0f,
+        animationSpec = tween(180),
+        label = "approvalScrimAlpha"
+    )
+
+    val level = risk?.aiRiskLevel ?: RiskLevel.MEDIUM
+    val levelColor = toneColorOf(riskToneOf(level))
+    val whatItDoes = risk?.whatItDoes.orEmpty()
+    val worstCase = risk?.worstCase.orEmpty()
+    // 12sp 正文沿用 Caption 的 16sp 行高：两行共 32dp，正好塞进滑轨上方的 132dp
+    val worstCaseStyle = Wear.TextBody.copy(
+        fontSize = Wear.TextCaption.fontSize,
+        lineHeight = Wear.TextCaption.lineHeight,
+        color = Wear.Palette.Danger
+    )
+
     AnimatedVisibility(
         visible = visible,
         // 整屏淡入 + 轻微放大，而不是卡片滑入
@@ -464,28 +544,36 @@ private fun ApprovalFullScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Wear.Palette.Bg)
+                // 放行塌缩：整页缩成工具胶囊的尺度并下移淡出，动画走完才真正退出审批态
+                .graphicsLayer {
+                    alpha = 1f - collapse
+                    scaleX = 1f - (1f - ApprovalCollapseScale) * collapse
+                    scaleY = 1f - (1f - ApprovalCollapseScale) * collapse
+                    translationY = ApprovalCollapseDrop.toPx() * collapse
+                }
         ) {
+            // 半透明暗场：不再整屏盖死，身后的点阵阵列与正文继续透出来
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Wear.Palette.Danger.copy(alpha = 0.10f))
+                    .background(Wear.Palette.Bg.copy(alpha = scrimAlpha))
             )
+            // 自下而上的极弱危险底光，随遮罩一起渐入
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            1f to Wear.Palette.Danger.copy(alpha = 0.06f)
+                            1f to Wear.Palette.Danger.copy(alpha = 0.06f * (scrimAlpha / ApprovalScrimAlpha))
                         )
                     )
             )
-            // 内容垂直居中偏上：底边停在底栏保留区之上，整块落在圆心中线上方
+            // 内容自下而上排布：底边停在滑块视觉顶边之上，整块落在圆心中线上方
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = Wear.Size.BottomBarReserve + BottomBarBottomInset + Wear.Space.Lg),
+                    .padding(bottom = ApprovalContentBottomInset),
                 verticalArrangement = Arrangement.Bottom,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -499,39 +587,67 @@ private fun ApprovalFullScreen(
                     verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    BasicText(
-                        text = "需要你的许可",
-                        style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
-                        maxLines = 1
-                    )
-                    BasicText(
-                        text = toolDisplayName,
-                        style = Wear.TextBody.copy(
-                            color = Wear.Palette.Danger,
-                            textAlign = TextAlign.Center
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (riskExplanation.isNotBlank()) {
+                    // 标题行：许可请求 + AI 风险等级徽标（行宽只占内容宽度的一段，避开圆弧）
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                    ) {
                         BasicText(
-                            text = riskExplanation,
-                            style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
-                            maxLines = 3,
+                            text = "需要你的许可",
+                            style = Wear.TextTitle,
+                            maxLines = 1
+                        )
+                        WearBadge(text = riskLabelOf(level), tone = riskToneOf(level))
+                    }
+
+                    // 块一：会做什么（空文案整块隐藏，不留空行）
+                    if (whatItDoes.isNotBlank()) {
+                        BasicText(
+                            text = approvalParagraph("会做什么", whatItDoes, Wear.TextBody),
+                            style = Wear.TextBody,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    // 加大的危险条：3 段 40×8dp、圆角 4dp、间距 6dp
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        repeat(3) { index ->
-                            val litColor = if (riskLevel >= 2) Wear.Palette.Danger else Wear.Palette.Accent
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 40.dp, height = 8.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (index < riskLevel) litColor else Wear.Palette.Border)
-                            )
+
+                    // 块二：风险等级 —— 3 段危险条与等级文字同行
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+                    ) {
+                        BasicText(
+                            text = "风险等级",
+                            style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+                            maxLines = 1
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            repeat(3) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = Wear.Size.ChipHeight, height = Wear.Space.Sm)
+                                        .clip(RoundedCornerShape(Wear.Space.Xs))
+                                        .background(
+                                            if (index < riskBarsLit(level)) Wear.Palette.Danger
+                                            else Wear.Palette.Border
+                                        )
+                                )
+                            }
                         }
+                        BasicText(
+                            text = riskLabelOf(level),
+                            style = Wear.TextCaption.copy(color = levelColor),
+                            maxLines = 1
+                        )
+                    }
+
+                    // 块三：最坏情况（12sp Danger，最多两行；空文案整块隐藏）
+                    if (worstCase.isNotBlank()) {
+                        BasicText(
+                            text = approvalParagraph("最坏情况", worstCase, worstCaseStyle),
+                            style = worstCaseStyle,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -547,6 +663,15 @@ private val ConversationCardMaxWidth = 200.dp
 
 /** 底栏底距：与 [BottomInteractiveBlock] 调用处的 padding(bottom = 12.dp) 对齐，审批卡片据此换算自身底边。 */
 private val BottomBarBottomInset = 12.dp
+
+/**
+ * 审批内容底距：底栏顶边离屏底 = 底距 + 底栏高；滑块视觉顶边再往上收
+ * (44dp 热区 − 36dp 胶囊)/2，内容底边再上抬 [ApprovalSliderClearance]。
+ * 480px/2.0 密度下得 12 + 64 − 4 + 12 = 84dp，内容底边落在屏高 156dp 处。
+ */
+private val ApprovalContentBottomInset =
+    BottomBarBottomInset + ApprovalBlockHeight -
+        (ApprovalTrackTouchHeight - ApprovalCapsuleHeight) / 2 + ApprovalSliderClearance
 
 /** 主键输入方式的中文提示：模式切换与启动播报共用同一文案，避免用户靠小图标猜主键行为。 */
 private const val NOTICE_INPUT_KEYBOARD = "已切换到键盘输入，点主键打开输入框"
@@ -627,8 +752,24 @@ private fun MainAgentDashboard(
     // 审批滑块进度：0=拒绝红屏，1=放行绿屏，由底栏回调驱动全屏绿光
     var approvalProgress by remember { mutableFloatStateOf(0f) }
 
-    // 审批沉浸态：整屏交给 ApprovalFullScreen，对话列表彻底退场（不留半透明残影）
+    // 放行塌缩：先播 220ms 塌缩动画，动画走完才把结论交回 Agent
+    var approvalCollapsing by remember { mutableStateOf(false) }
+    val approvalCollapse = remember { Animatable(0f) }
+
+    // 审批沉浸态：整屏交给 ApprovalFullScreen，列表退到 35% 继续透出、点阵保持清晰
     val isApprovalFocus = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
+
+    // 列表退场渐变：审批态 1f -> 35%，与遮罩同一条 180ms 曲线，不做硬切
+    val listAlpha by animateFloatAsState(
+        targetValue = if (isApprovalFocus) ApprovalListAlpha else 1f,
+        animationSpec = tween(180),
+        label = "conversationListAlpha"
+    )
+
+    // 模糊效果只建一次：图形层每帧都会跑 lambda，不能在里面反复 new RenderEffect
+    val listBlurEffect = remember {
+        BlurEffect(ApprovalListBlurRadiusPx, ApprovalListBlurRadiusPx, TileMode.Clamp)
+    }
 
     fun switchToSession(id: String) {
         val target = sessions.find { it.id == id } ?: return
@@ -742,6 +883,18 @@ private fun MainAgentDashboard(
     DisposableEffect(agentDispatcher) {
         agentDispatcher.onRequireConfirmation = { _, risk ->
             currentRiskAssessment = risk
+            // 新一轮审批从完整态开始：上一轮放行留下的塌缩进度必须归零
+            // 回调来自 IO 调度（executeUserPrompt 的 withContext），状态改动交回主线程
+            scope.launch {
+                approvalCollapse.snapTo(0f)
+                approvalCollapsing = false
+            }
+            // 审批弹出的瞬间给一次触觉反馈：全屏接管需要腕上的一记"咔"
+            context.getSystemService(Vibrator::class.java)?.let { vib ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                }
+            }
             bottomBlockMode = BottomBlockMode.ACTION_ALLOW
             suspendCancellableCoroutine { cont ->
                 pendingContinuation = cont
@@ -947,8 +1100,12 @@ private fun MainAgentDashboard(
             contentPadding = PaddingValues(top = 14.dp, bottom = Wear.Size.ListCenterReach),
             modifier = Modifier
                 .fillMaxSize()
-                // 审批沉浸：整列正文彻底退场（alpha 0），不留半透明残影
-                .graphicsLayer { alpha = if (isApprovalFocus) 0f else 1f }
+                // 审批沉浸：整列正文退到 35% 并轻度模糊（只糊列表图层，点阵画布保持清晰）；
+                // 图层被缓存，模糊只在列表内容真正变化时重算，不是每帧全屏后处理
+                .graphicsLayer {
+                    alpha = listAlpha
+                    renderEffect = if (isApprovalFocus) listBlurEffect else null
+                }
                 // 最外圈 14dp 轻度淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
@@ -1080,9 +1237,8 @@ private fun MainAgentDashboard(
         // ================= 3.5 全屏审批视图：审批态整屏接管对话，不再以卡片浮层呈现 =================
         ApprovalFullScreen(
             visible = isApprovalFocus,
-            toolDisplayName = lastToolDisplayName(agentState.conversationBlocks) ?: "执行高风险操作",
-            riskExplanation = currentRiskAssessment?.riskSummary ?: "",
-            riskLevel = riskLevelOf(currentRiskAssessment)
+            risk = currentRiskAssessment,
+            collapse = approvalCollapse.value
         )
 
         // ================= 3.8 审批绿光：压在全屏审批视图之上、底栏之下，随滑块进度淡入，0 时完全不可见 =================
@@ -1144,9 +1300,17 @@ private fun MainAgentDashboard(
                 isThinkingActive = false
             },
             onAllow = {
-                pendingContinuation?.resume(true)
-                pendingContinuation = null
-                bottomBlockMode = BottomBlockMode.IDLE
+                // 放行不立刻退出：先让整页塌缩成工具胶囊尺度，动画走完再交回结论
+                if (!approvalCollapsing) {
+                    approvalCollapsing = true
+                    scope.launch {
+                        approvalCollapse.animateTo(1f, tween(ApprovalCollapseDurationMs))
+                        approvalCollapsing = false
+                        pendingContinuation?.resume(true)
+                        pendingContinuation = null
+                        bottomBlockMode = BottomBlockMode.IDLE
+                    }
+                }
             },
             onReject = {
                 pendingContinuation?.resume(false)
