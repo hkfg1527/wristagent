@@ -17,9 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.agent.ApprovalVisualState
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -132,7 +134,8 @@ private fun buildMatrixGrid(
  * 1. 方形阵列：严格基于直角坐标系 (x, y) 均匀栅格排布，以圆心为基准对称排布；
  * 2. 覆盖全圆：完全铺满圆形表盘的所有区域（包括四周圆弧月半弧），无任何方形裁剪框；
  * 3. 几何预缓存：所有点位与距离在组合期一次性算入 FloatArray，绘制期不再分配对象、不再求平方根；
- * 4. 动态行波节流：闲置待机时停止思考波动帧驱动，杜绝后台空转耗电。
+ * 4. 动态行波节流：闲置待机时停止思考波动帧驱动，杜绝后台空转耗电；
+ * 5. 审批进度着色：approvalProgress 让点阵自身从基色插值到放行绿，不额外叠加任何整屏色层。
  */
 @Composable
 fun UnifiedMatrixCanvas(
@@ -142,7 +145,8 @@ fun UnifiedMatrixCanvas(
     thinkingIntensity: Float = 0f,           // 0f ~ 1f 思考引擎强度
     isRecordingVoice: Boolean = false,       // 录音状态
     shockwaveProgress: Float = -1f,          // 底栏激荡冲击波 (0f ~ 1f)
-    gridSpacingDp: Float = 16f               // 网格物理间距 (dp)
+    gridSpacingDp: Float = 16f,              // 网格物理间距 (dp)
+    approvalProgress: Float = 0f             // 审批滑块进度 (0f 拒绝 ~ 1f 放行)：点阵本身由基色渐变到放行绿
 ) {
     // 3.0s 沉稳深邃呼吸过渡 (加大呼吸振幅)
     val infiniteTransition = rememberInfiniteTransition(label = "matrixBreathTransition")
@@ -254,6 +258,16 @@ fun UnifiedMatrixCanvas(
             val approvedGreen = approvalVisualState == ApprovalVisualState.APPROVED_GREEN
             val breathBase = 0.24f + 0.28f * breathCycle
 
+            // 审批进度：每个点自己的颜色从冷白基色连续插值到放行绿，而不是在整屏上盖一层绿膜；
+            // 亮度与半径随进度轻微增强，滑块越往左推，整屏点阵越绿越亮。
+            val approvalT = approvalProgress.coerceIn(0f, 1f)
+            val baseDotColor = lerp(COLOR_DOT_BASE, Wear.Palette.Success, approvalT)
+            val approvalRadiusScale = 1f + 0.35f * approvalT
+            // 审批态下点阵必须"看得见的绿"：除了按比例提亮，再给一条随进度上升的最低亮度，
+            // 否则基色点本来就暗（alpha≈0.25），插值成绿也肉眼无感。
+            val approvalAlphaBoost = 0.9f * approvalT
+            val approvalAlphaFloor = 0.22f * approvalT
+
             var i = 0
             while (i < count) {
                 val edgeFade = edgeFadeArr[i]
@@ -309,16 +323,24 @@ fun UnifiedMatrixCanvas(
 
                 // 颜色与混合决定
                 val particleColor = when {
+                    // 审批滑块一旦开始推进，点阵进度的绿必须压过"待确认红瀑"，否则红会把绿盖掉、用户看不到反馈
+                    approvalT > 0.01f -> baseDotColor.copy(
+                        alpha = (baseAlpha * (1f + approvalAlphaBoost) + rippleAlpha + approvalAlphaFloor)
+                            .coerceIn(0f, 1f)
+                    )
                     approvedGreen -> COLOR_DOT_GREEN.copy(alpha = (0.85f * edgeFade).coerceIn(0f, 1f))
                     isParticleInCascade -> COLOR_DOT_CASCADE.copy(
                         alpha = ((0.46f + 0.54f * cascadeRatio) * edgeFade).coerceIn(0f, 1f)
                     )
                     glintAlpha > 0.05f -> COLOR_DOT_WHITE.copy(alpha = (baseAlpha + glintAlpha).coerceIn(0f, 1f))
                     shockAlpha > 0.05f -> COLOR_DOT_SHOCK.copy(alpha = (baseAlpha + shockAlpha).coerceIn(0f, 1f))
-                    else -> COLOR_DOT_BASE.copy(alpha = (baseAlpha + rippleAlpha).coerceIn(0f, 1f))
+                    else -> baseDotColor.copy(
+                        alpha = (baseAlpha * (1f + approvalAlphaBoost) + rippleAlpha + approvalAlphaFloor)
+                            .coerceIn(0f, 1f)
+                    )
                 }
 
-                val dynamicRadius = baseRadius +
+                val dynamicRadius = baseRadius * approvalRadiusScale +
                     (rippleScale * 1.0f + glintScale * 1.2f + shockScale * 1.5f) * dynamicUnit
 
                 drawCircle(

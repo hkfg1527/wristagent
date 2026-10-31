@@ -96,20 +96,20 @@ enum class MainInputType {
     KEYBOARD
 }
 
-/** 审批扁胶囊的视觉高度：44dp 主键收成 36dp 的扁横条，可点热区仍取 [ApprovalTrackTouchHeight]。 */
-internal val ApprovalCapsuleHeight = 36.dp
+/** 审批扁胶囊的视觉高度：44dp 主键收成 32dp 的扁横条，可点热区仍取 [ApprovalTrackTouchHeight]。 */
+internal val ApprovalCapsuleHeight = 32.dp
 
 /** 审批滑轨的触控热区高度：视觉只有 [ApprovalCapsuleHeight]，热区保持 44dp 令牌不缩水。 */
 internal val ApprovalTrackTouchHeight = Wear.Size.Touch
 
-/** 扁胶囊内拇指与胶囊边缘的留白：36dp 胶囊留 3dp 边距，拇指直径 30dp。 */
+/** 扁胶囊内拇指与胶囊边缘的留白：32dp 胶囊留 3dp 边距，拇指直径 26dp。 */
 private val ApprovalThumbInset = 3.dp
 
 /**
  * 审批态底栏高度：轨道贴顶、[Wear.Size.BottomBarReserve] 再收 [Wear.Space.Md]。
  * 480px/2.0 密度下屏高 240dp、圆心 120dp，底栏顶边落在 240−12−64=164dp，
- * 36dp 胶囊居中于 44dp 热区后占 168dp..204dp，弦长 2√(120²−88²)≈163dp；
- * 于是正文底边最高可到 156dp，三段 AI 文案拿到 24dp..156dp 的 y 区间。
+ * 32dp 胶囊居中于 44dp 热区后占 170dp..202dp，弦长 2√(120²−82²)≈175dp；
+ * 于是正文底边最高可到 164dp，磨砂审批卡片（中心 96dp）拿到 26dp..166dp 的 y 区间。
  */
 internal val ApprovalBlockHeight = Wear.Size.BottomBarReserve - Wear.Space.Md
 
@@ -622,32 +622,27 @@ private fun ApprovalTrack(
                 )
             } else {
                 Box(contentAlignment = Alignment.Center) {
-                    // alpha 走图形层：拖动时只重绘图层，不触发重组
-                    // 两个文案都用深色：胶囊底是白键色（叠红/绿后仍偏亮），红/绿字在上面只有 ~2:1，等于看不清
+                    // 只放一个文案，在 50% 处换词：两个 label 叠放交叉淡化会在中途糊成"点放行绝"。
+                    // 颜色渐变由图层的红→绿着色表达，文字保持深色以保证对比度。
                     BasicText(
-                        text = "点击拒绝",
+                        text = if (dragProgress.value < 0.5f) "点击拒绝" else "放行",
                         style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
-                        maxLines = 1,
-                        modifier = Modifier.graphicsLayer { alpha = 1f - dragProgress.value }
-                    )
-                    BasicText(
-                        text = "放行",
-                        style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
-                        maxLines = 1,
-                        modifier = Modifier.graphicsLayer { alpha = dragProgress.value }
+                        maxLines = 1
                     )
                 }
             }
 
-            // 拇指：白色圆，自右端起步向左推进；锁定时停在右端并显示剩余秒数
+            // 拇指：白色圆，1.5dp 白描边 + 3dp 阴影把它从着色的滑轨上托起来；锁定时停在右端并显示剩余秒数
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .offset { IntOffset(-(dragProgress.value * travelPx).roundToInt(), 0) }
                     .padding(end = ApprovalThumbInset)
                     .size(thumbDiameter)
+                    .shadow(elevation = 3.dp, shape = CircleShape)
                     .clip(CircleShape)
-                    .background(Wear.Palette.TextPrimary),
+                    .background(Wear.Palette.Orb)
+                    .border(1.5.dp, Wear.Palette.TextPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLocked) {
