@@ -46,9 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.presentation.ui.settings.SettingsStatusTextRes
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.components.WearDivider
@@ -183,7 +186,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         BasicText(
-                            text = "系统设置",
+                            text = stringResource(R.string.settings_title),
                             style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -194,9 +197,9 @@ fun SettingsScreen(
                 // 1. 模型与服务：标题独占首行，值 + 徽章置于次行，徽章按真实 API Key 配置状态渲染
                 item {
                     SettingsEntry(
-                        title = "模型与服务",
+                        title = stringResource(R.string.settings_model_and_service),
                         value = currentModel,
-                        badge = if (apiKeyConfigured) "已配置" to Tone.ACCENT else "未配置" to Tone.DANGER,
+                        badge = SettingsStatusTextRes.modelServiceBadge(apiKeyConfigured).let { (res, tone) -> stringResource(res) to tone },
                         onClick = {
                             context.vibrateTick()
                             activeDialog = SettingsSubDialog.MODEL_CONFIG
@@ -209,7 +212,7 @@ fun SettingsScreen(
                 // 2. 模型参数
                 item {
                     SettingsEntry(
-                        title = "模型参数",
+                        title = stringResource(R.string.settings_model_params),
                         value = "Temp %.1f".format(currentTemp),
                         onClick = {
                             context.vibrateTick()
@@ -231,8 +234,8 @@ fun SettingsScreen(
                         preferences.toolWebSearchEnabled
                     ).count { it }
                     SettingsEntry(
-                        title = "端侧工具与 MCP",
-                        value = "$activeCount/6 已启用",
+                        title = stringResource(R.string.settings_tools_and_mcp),
+                        value = stringResource(R.string.settings_tools_enabled_count, activeCount),
                         onClick = {
                             context.vibrateTick()
                             activeDialog = SettingsSubDialog.TOOLS_MCP
@@ -245,8 +248,8 @@ fun SettingsScreen(
                 // 4. 系统提示词
                 item {
                     SettingsEntry(
-                        title = "系统提示词",
-                        value = if (customPrompt.isBlank()) "预置默认" else "自定义",
+                        title = stringResource(R.string.settings_system_prompt),
+                        value = if (customPrompt.isBlank()) stringResource(R.string.settings_prompt_default) else stringResource(R.string.settings_prompt_custom),
                         onClick = {
                             context.vibrateTick()
                             activeDialog = SettingsSubDialog.PROMPT_VIEWER
@@ -259,8 +262,8 @@ fun SettingsScreen(
                 // 5. 会话与上下文
                 item {
                     SettingsEntry(
-                        title = "会话记忆管理",
-                        value = "${preferences.maxContextTurns} 轮",
+                        title = stringResource(R.string.settings_memory_management),
+                        value = stringResource(R.string.settings_memory_turns, preferences.maxContextTurns),
                         onClick = {
                             context.vibrateTick()
                             activeDialog = SettingsSubDialog.MEMORY_MANAGER
@@ -273,9 +276,9 @@ fun SettingsScreen(
                 // 6. 快捷操作
                 item {
                     SettingsEntry(
-                        title = "底栏副键",
+                        title = stringResource(R.string.settings_side_key),
                         // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
-                        value = "右翼固定打开会话抽屉",
+                        value = stringResource(R.string.settings_side_key_value),
                         onClick = {
                             context.vibrateTick()
                             activeDialog = SettingsSubDialog.WING_SHORTCUT
@@ -288,11 +291,11 @@ fun SettingsScreen(
                 // 7. 操作安全防线
                 item {
                     SettingsEntry(
-                        title = "操作安全策略",
+                        title = stringResource(R.string.settings_security_policy),
                         value = when (currentSecurityMode) {
-                            SecurityMode.NOVICE -> "严格确认"
-                            SecurityMode.STANDARD -> "标准提示"
-                            SecurityMode.EXPERT -> "自动执行"
+                            SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
+                            SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
+                            SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
                         },
                         onClick = {
                             context.vibrateTick()
@@ -307,12 +310,12 @@ fun SettingsScreen(
                 item {
                     val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                     SettingsEntry(
-                        title = "语音转写",
+                        title = stringResource(R.string.settings_asr),
                         value = when {
-                            !asrEnabled -> "已关闭"
-                            asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> "密钥未填写"
-                            asrProvider == AsrProviderId.BAIDU -> "百度短语音"
-                            else -> "系统识别"
+                            !asrEnabled -> stringResource(R.string.settings_asr_off)
+                            asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> stringResource(R.string.settings_asr_key_missing)
+                            asrProvider == AsrProviderId.BAIDU -> stringResource(R.string.settings_asr_baidu)
+                            else -> stringResource(R.string.settings_asr_system)
                         },
                         onClick = {
                             context.vibrateTick()
@@ -326,7 +329,7 @@ fun SettingsScreen(
                 // 9. 重新观看新手引导
                 item {
                     SettingsEntry(
-                        title = "重新观看操作引导",
+                        title = stringResource(R.string.settings_replay_onboarding),
                         onClick = {
                             context.vibrateTick()
                             onRestartOnboarding()
@@ -337,7 +340,7 @@ fun SettingsScreen(
                 // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
                 item {
                     SettingsActionButton(
-                        label = "完成返回",
+                        label = stringResource(R.string.settings_done_back),
                         tone = Tone.ACCENT,
                         modifier = Modifier.widthIn(max = SettingsContentMaxWidth),
                         onClick = onBack
@@ -354,7 +357,7 @@ fun SettingsScreen(
                 when (dialog) {
                     SettingsSubDialog.MODEL_CONFIG -> {
                         SubSettingsModal(
-                            title = "模型与端点设置",
+                            title = stringResource(R.string.settings_sub_model_config),
                             onDismiss = { activeDialog = null }
                         ) {
                             ModelConfigContent(
@@ -372,7 +375,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.HYPER_PARAMS -> {
                         SubSettingsModal(
-                            title = "模型推理参数",
+                            title = stringResource(R.string.settings_sub_hyper_params),
                             onDismiss = { activeDialog = null }
                         ) {
                             HyperParamsContent(
@@ -387,7 +390,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.TOOLS_MCP -> {
                         SubSettingsModal(
-                            title = "端侧工具与 MCP",
+                            title = stringResource(R.string.settings_tools_and_mcp),
                             onDismiss = { activeDialog = null }
                         ) {
                             ToolsMcpContent(
@@ -405,7 +408,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.PROMPT_VIEWER -> {
                         SubSettingsModal(
-                            title = "系统提示词",
+                            title = stringResource(R.string.settings_system_prompt),
                             onDismiss = { activeDialog = null }
                         ) {
                             PromptViewerContent(
@@ -419,7 +422,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.MEMORY_MANAGER -> {
                         SubSettingsModal(
-                            title = "会话记忆管理",
+                            title = stringResource(R.string.settings_memory_management),
                             onDismiss = { activeDialog = null }
                         ) {
                             MemoryManagerContent(preferences = preferences)
@@ -427,7 +430,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.WING_SHORTCUT -> {
                         SubSettingsModal(
-                            title = "快捷操作绑定",
+                            title = stringResource(R.string.settings_sub_wing_shortcut),
                             onDismiss = { activeDialog = null }
                         ) {
                             WingShortcutContent(
@@ -441,7 +444,7 @@ fun SettingsScreen(
                     }
                     SettingsSubDialog.SECURITY_GUARDRAIL -> {
                         SubSettingsModal(
-                            title = "操作安全策略",
+                            title = stringResource(R.string.settings_security_policy),
                             onDismiss = { activeDialog = null }
                         ) {
                             SecurityGuardrailContent(
@@ -458,7 +461,7 @@ fun SettingsScreen(
 
             if (showVoiceAsr) {
                 SubSettingsModal(
-                    title = "语音转写",
+                    title = stringResource(R.string.settings_asr),
                     onDismiss = { showVoiceAsr = false }
                 ) {
                     VoiceAsrContent(

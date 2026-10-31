@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.WearChip
 import com.example.myapplication.presentation.ui.components.WearSectionHeader
@@ -56,7 +58,7 @@ fun HyperParamsContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            WearSectionHeader(text = "采样温度 (Temperature)", modifier = Modifier.weight(1f))
+            WearSectionHeader(text = stringResource(R.string.settings_temperature), modifier = Modifier.weight(1f))
             BasicText(
                 text = "%.1f".format(temp),
                 style = Wear.TextTitle,
@@ -98,9 +100,9 @@ fun HyperParamsContent(
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
             listOf(
-                0.2f to "极速 0.2",
-                0.7f to "平衡 0.7",
-                1.2f to "发散 1.2"
+                0.2f to stringResource(R.string.settings_temp_fast),
+                0.7f to stringResource(R.string.settings_temp_balanced),
+                1.2f to stringResource(R.string.settings_temp_creative)
             ).forEach { (presetTemp, label) ->
                 WearChip(
                     label = label,
@@ -116,13 +118,13 @@ fun HyperParamsContent(
             }
         }
 
-        WearSectionHeader(text = "最大输出 Token")
+        WearSectionHeader(text = stringResource(R.string.settings_max_tokens))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            listOf(150 to "150 节能", 300 to "300 适中").forEach { (tokens, label) ->
+            listOf(150 to stringResource(R.string.settings_tokens_150), 300 to stringResource(R.string.settings_tokens_300)).forEach { (tokens, label) ->
                 WearChip(
                     label = label,
                     selected = maxTokens == tokens,
@@ -141,7 +143,7 @@ fun HyperParamsContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            listOf(600 to "600 完整", 1200 to "1200 深度", 2048 to "2048 满额").forEach { (tokens, label) ->
+            listOf(600 to stringResource(R.string.settings_tokens_600), 1200 to stringResource(R.string.settings_tokens_1200), 2048 to stringResource(R.string.settings_tokens_2048)).forEach { (tokens, label) ->
                 WearChip(
                     label = label,
                     selected = maxTokens == tokens,
@@ -156,14 +158,14 @@ fun HyperParamsContent(
             }
         }
 
-        WearSectionHeader(text = "传输协议")
+        WearSectionHeader(text = stringResource(R.string.settings_transport))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
             WearChip(
-                label = "开启 SSE 流式",
+                label = stringResource(R.string.settings_sse_on),
                 selected = isStream,
                 onClick = {
                     context.vibrateTick()
@@ -174,7 +176,7 @@ fun HyperParamsContent(
                 modifier = Modifier.weight(1f)
             )
             WearChip(
-                label = "关闭流式",
+                label = stringResource(R.string.settings_sse_off),
                 selected = !isStream,
                 onClick = {
                     context.vibrateTick()

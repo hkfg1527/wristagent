@@ -1,0 +1,8 @@
+<resources>
+    <string name="tools_name_web_search">联网搜索</string>
+    <string name="tools_name_time_weather">时间天气</string>
+    <string name="tools_name_device_status">设备状态</string>
+    <string name="tools_name_vibrate">马达振动</string>
+    <string name="tools_name_power_mode">电源模式</string>
+    <string name="tools_name_matrix">点阵网格</string>
+</resources>

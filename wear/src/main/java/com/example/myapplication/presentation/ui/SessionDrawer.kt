@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.presentation.ui.components.WearChip
 import com.example.myapplication.presentation.ui.components.WearDivider
@@ -202,7 +204,7 @@ fun SessionDrawer(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             BasicText(
-                                text = "模型与会话管理",
+                                text = stringResource(R.string.ui_drawer_title),
                                 modifier = Modifier.weight(1f),
                                 style = Wear.TextTitle,
                                 maxLines = 1,
@@ -218,10 +220,10 @@ fun SessionDrawer(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
                         ) {
-                            WearSectionHeader(text = "当前模型")
+                            WearSectionHeader(text = stringResource(R.string.ui_drawer_current_model))
                             if (ModelLabels.isEmpty(availableModels)) {
                                 BasicText(
-                                    text = "未发现可用模型，请在设置中拉取模型列表",
+                                    text = stringResource(R.string.ui_drawer_no_models),
                                     style = Wear.TextCaption,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
@@ -255,7 +257,7 @@ fun SessionDrawer(
                     // 新开对话：单行列表项
                     item(key = "action_new_session") {
                         WearRow(
-                            title = "＋ 新开对话",
+                            title = stringResource(R.string.ui_drawer_new_chat),
                             onClick = onCreateSession,
                             showChevron = false
                         )
@@ -279,7 +281,7 @@ fun SessionDrawer(
                         ) {
                             WearDivider()
                             WearRow(
-                                title = "系统设置",
+                                title = stringResource(R.string.ui_drawer_settings),
                                 showChevron = true,
                                 onClick = onOpenSettings
                             )
@@ -347,14 +349,14 @@ private fun SessionRow(
     ) {
         if (confirmingDelete) {
             BasicText(
-                text = "删除该会话？",
+                text = stringResource(R.string.ui_drawer_delete_confirm),
                 modifier = Modifier.weight(1f),
                 style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             ConfirmDeleteButton(
-                label = "删除",
+                label = stringResource(R.string.ui_common_delete),
                 color = Wear.Palette.Danger,
                 onClick = {
                     confirmingDelete = false
@@ -362,7 +364,7 @@ private fun SessionRow(
                 }
             )
             ConfirmDeleteButton(
-                label = "取消",
+                label = stringResource(R.string.ui_common_cancel),
                 color = Wear.Palette.TextSecondary,
                 onClick = { confirmingDelete = false }
             )

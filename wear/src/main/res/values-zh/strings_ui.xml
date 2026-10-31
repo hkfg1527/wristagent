@@ -1,0 +1,48 @@
+<resources>
+    <!-- 会话抽屉、引导页、底栏、审批滑块与共享小部件文案。 -->
+    <string name="ui_common_cancel">取消</string>
+    <string name="ui_common_delete">删除</string>
+    <string name="ui_common_continue">继续</string>
+    <string name="ui_common_skip">跳过</string>
+    <string name="ui_common_collapse">收起</string>
+    <string name="ui_common_expand">展开</string>
+
+    <!-- 会话抽屉。 -->
+    <string name="ui_drawer_title">模型与会话管理</string>
+    <string name="ui_drawer_current_model">当前模型</string>
+    <string name="ui_drawer_no_models">未发现可用模型，请在设置中拉取模型列表</string>
+    <string name="ui_drawer_new_chat">＋ 新开对话</string>
+    <string name="ui_drawer_settings">系统设置</string>
+    <string name="ui_drawer_delete_confirm">删除该会话？</string>
+
+    <!-- 引导页。 -->
+    <string name="ui_onboarding_greeting">你好</string>
+    <string name="ui_onboarding_welcome">欢迎使用穿戴智能助手</string>
+    <string name="ui_onboarding_config_title">配置 AI 模型</string>
+    <string name="ui_onboarding_config_subtitle">设置 API 端点与密钥后即可开始使用</string>
+    <string name="ui_onboarding_finish">完成并进入主界面</string>
+
+    <!-- 底栏交互块。 -->
+    <string name="ui_bottom_stop">停止</string>
+
+    <!-- 审批滑块与等级标题。 -->
+    <string name="ui_approval_reject_tap">点击拒绝</string>
+    <string name="ui_approval_allow">放行</string>
+    <string name="ui_approval_locked">锁定</string>
+    <string name="ui_approval_slider_hint">点拒绝 · 左滑放行</string>
+    <string name="ui_approval_release_to_allow">松开即放行</string>
+    <string name="ui_approval_headline_low">低风险</string>
+    <string name="ui_approval_headline_confirm">需要确认</string>
+    <string name="ui_approval_headline_high">高风险操作</string>
+
+    <!-- 工具胶囊与思考胶囊。 -->
+    <string name="ui_thought_process">思考过程</string>
+    <string name="ui_generating">生成中...</string>
+    <string name="ui_tool_executed">已执行</string>
+    <string name="ui_tool_args">参数: %1$s</string>
+    <string name="ui_tool_result">结果: %1$s</string>
+
+    <!-- 语音监听浮层。 -->
+    <string name="ui_listening">正在倾听...</string>
+    <string name="ui_listening_hint">请对准手表说话</string>
+</resources>

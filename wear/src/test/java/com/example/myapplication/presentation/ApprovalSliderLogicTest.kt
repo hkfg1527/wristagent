@@ -115,28 +115,6 @@ class ApprovalSliderLogicTest {
         assertTrue(ApprovalSliderLogic.shouldAllow(1f))
     }
 
-    /** 0.5 是文案切换点：未滑过是"点拒绝 · 左滑放行"，0.5 与 0.51 变"松开即放行"。 */
-    @Test
-    fun testLabelFor_switchesAtHalf() {
-        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0f))
-        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0.49f))
-        assertEquals("松开即放行", ApprovalSliderLogic.labelFor(0.5f))
-        assertEquals("松开即放行", ApprovalSliderLogic.labelFor(0.51f))
-        assertEquals("松开即放行", ApprovalSliderLogic.labelFor(1f))
-    }
-
-    /** 锁定倒计时是第三态：无论进度多少都显示"锁定"，优先于进度文案。 */
-    @Test
-    fun testLabelFor_lockedOverridesProgress() {
-        assertEquals("锁定", ApprovalSliderLogic.labelFor(0f, true))
-        assertEquals("锁定", ApprovalSliderLogic.labelFor(0.49f, true))
-        assertEquals("锁定", ApprovalSliderLogic.labelFor(0.5f, true))
-        assertEquals("锁定", ApprovalSliderLogic.labelFor(1f, true))
-        // 未锁定时必须回落到进度文案，锁定分支不能污染常态
-        assertEquals("点拒绝 · 左滑放行", ApprovalSliderLogic.labelFor(0f, false))
-        assertEquals("松开即放行", ApprovalSliderLogic.labelFor(1f, false))
-    }
-
     /** 单击拒绝的容差边界：0 / 21 / 22 都算单击，23 起算滑动。 */
     @Test
     fun testIsRejectTap_withinSlopBoundary_isTap() {

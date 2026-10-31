@@ -1,4 +1,4 @@
-﻿package com.example.myapplication.presentation.ui
+package com.example.myapplication.presentation.ui
 
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -57,6 +57,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -104,12 +106,12 @@ fun ThoughtPill(
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
             BasicText(
-                text = "思考过程",
+                text = stringResource(R.string.ui_thought_process),
                 style = Wear.TextCaption,
                 maxLines = 1
             )
             BasicText(
-                text = if (isExpanded) "收起" else "展开",
+                text = if (isExpanded) stringResource(R.string.ui_common_collapse) else stringResource(R.string.ui_common_expand),
                 style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
                 maxLines = 1
             )
@@ -234,9 +236,9 @@ fun SpringColoredToolPill(
                     drawCircle(color = tagColor, radius = size.minDimension / 2f * dotScale)
                 }
 
-                // 工具中文名
+                // 工具展示名（资源化，随系统语言切换；未知工具回落到工具名原文）
                 BasicText(
-                    text = meta.displayName,
+                    text = meta.displayNameRes?.let { stringResource(it) } ?: meta.toolName,
                     style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
                     maxLines = 1
                 )
@@ -244,9 +246,9 @@ fun SpringColoredToolPill(
                 // 状态说明 (running/success/failed 只点缀在文字颜色上)
                 // 摘要只留第一段，宽度不足时缩略摘要而不是工具名，完整信息在展开态
                 val summaryLabel = if (isExecuting) {
-                    "生成中..."
+                    stringResource(R.string.ui_generating)
                 } else {
-                    primarySummary(toolCall.resultSummary) ?: "已执行"
+                    primarySummary(toolCall.resultSummary) ?: stringResource(R.string.ui_tool_executed)
                 }
                 BasicText(
                     text = "· $summaryLabel",
@@ -283,13 +285,13 @@ fun SpringColoredToolPill(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
                     BasicText(
-                        text = "参数: ${toolCall.argsJson}",
+                        text = stringResource(R.string.ui_tool_args, toolCall.argsJson),
                         style = Wear.TextMono,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (toolCall.resultSummary != null) {
                         BasicText(
-                            text = "结果: ${toolCall.resultSummary}",
+                            text = stringResource(R.string.ui_tool_result, toolCall.resultSummary),
                             style = Wear.TextMono.copy(color = statusColor),
                             overflow = TextOverflow.Ellipsis
                         )

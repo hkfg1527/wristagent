@@ -1,0 +1,118 @@
+<resources>
+    <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
+    <string name="settings_title">系统设置</string>
+    <string name="settings_model_and_service">模型与服务</string>
+    <string name="settings_badge_configured">已配置</string>
+    <string name="settings_badge_unconfigured">未配置</string>
+    <string name="settings_model_params">模型参数</string>
+    <string name="settings_tools_and_mcp">端侧工具与 MCP</string>
+    <string name="settings_tools_enabled_count">%1$d/6 已启用</string>
+    <string name="settings_system_prompt">系统提示词</string>
+    <string name="settings_prompt_default">预置默认</string>
+    <string name="settings_prompt_custom">自定义</string>
+    <string name="settings_memory_management">会话记忆管理</string>
+    <string name="settings_memory_turns">%1$d 轮</string>
+    <string name="settings_side_key">底栏副键</string>
+    <string name="settings_side_key_value">右翼固定打开会话抽屉</string>
+    <string name="settings_security_policy">操作安全策略</string>
+    <string name="settings_mode_strict">严格确认</string>
+    <string name="settings_mode_standard">标准提示</string>
+    <string name="settings_mode_auto">自动执行</string>
+    <string name="settings_asr">语音转写</string>
+    <string name="settings_asr_off">已关闭</string>
+    <string name="settings_asr_key_missing">密钥未填写</string>
+    <string name="settings_asr_baidu">百度短语音</string>
+    <string name="settings_asr_system">系统识别</string>
+    <string name="settings_replay_onboarding">重新观看操作引导</string>
+    <string name="settings_done_back">完成返回</string>
+    <string name="settings_sub_model_config">模型与端点设置</string>
+    <string name="settings_sub_hyper_params">模型推理参数</string>
+    <string name="settings_sub_wing_shortcut">快捷操作绑定</string>
+
+    <!-- 推理参数。 -->
+    <string name="settings_temperature">采样温度</string>
+    <string name="settings_temp_fast">极速 0.2</string>
+    <string name="settings_temp_balanced">平衡 0.7</string>
+    <string name="settings_temp_creative">发散 1.2</string>
+    <string name="settings_max_tokens">最大输出 Token</string>
+    <string name="settings_tokens_150">150 节能</string>
+    <string name="settings_tokens_300">300 适中</string>
+    <string name="settings_tokens_600">600 完整</string>
+    <string name="settings_tokens_1200">1200 深度</string>
+    <string name="settings_tokens_2048">2048 满额</string>
+    <string name="settings_transport">传输协议</string>
+    <string name="settings_sse_on">开启 SSE 流式</string>
+    <string name="settings_sse_off">关闭流式</string>
+
+    <!-- 记忆与安全分区。 -->
+    <string name="settings_turns_header">单会话保留轮数</string>
+    <string name="settings_turns_4">4轮 节能</string>
+    <string name="settings_turns_10">10轮 标准</string>
+    <string name="settings_turns_30">30轮 深度</string>
+    <string name="settings_memory_clear_header">记忆清理</string>
+    <string name="settings_memory_cleared">已清空当前记忆与偏好</string>
+    <string name="settings_memory_clear_all">一键清空全部记忆与偏好</string>
+    <string name="settings_side_key_header">右侧副键绑定</string>
+    <string name="settings_activated">已激活</string>
+    <string name="settings_security_novice_title">严格安全模式</string>
+    <string name="settings_security_novice_desc">所有敏感与系统操作均需审批（3 秒倒计时防误触）</string>
+    <string name="settings_security_standard_title">标准提示模式</string>
+    <string name="settings_security_standard_desc">只读查询自动放行，修改系统配置需滑动确认</string>
+    <string name="settings_security_expert_title">极速放行模式</string>
+    <string name="settings_security_expert_desc">除致命危险指令外，跳过所有弹窗直接执行</string>
+
+    <!-- 模型配置分区。 -->
+    <string name="settings_model_pick">模型直选</string>
+    <string name="settings_no_models">未发现可用模型，请先点击下方按钮拉取模型列表</string>
+    <string name="settings_api_endpoint">API 端点</string>
+    <string name="settings_custom_input_hide">收起自定义输入</string>
+    <string name="settings_custom_input_show">手动修改 BaseUrl / Key</string>
+    <string name="settings_ping_running">正在 Ping 测试...</string>
+    <string name="settings_ping_idle">端点测速与实时握手 Ping</string>
+    <string name="settings_probe_running">正在握手探测...</string>
+    <string name="settings_probe_ready">端点就绪 • 延迟 %1$dms（%2$d 个可用模型）</string>
+    <string name="settings_probe_failed">端点握手失败，网络超时</string>
+
+    <!-- 系统提示词分区。 -->
+    <string name="settings_prompt_presets">预设角色</string>
+    <string name="settings_preset_minimal">极简助手</string>
+    <string name="settings_preset_architect">架构师</string>
+    <string name="settings_preset_secretary">生活秘书</string>
+    <string name="settings_preset_clear_test">清空测试</string>
+    <string name="settings_prompt_edit_hide">收起自定义编辑</string>
+    <string name="settings_prompt_edit_show">手动修改提示词文本</string>
+    <string name="settings_prompt_placeholder">输入系统提示词</string>
+
+    <!-- 端侧工具与 MCP 分区。 -->
+    <string name="settings_tool_device_status">电量与温度感知</string>
+    <string name="settings_tool_vibrate">马达振动提醒</string>
+    <string name="settings_tool_matrix_density">表盘点阵间距</string>
+    <string name="settings_tool_power_mode">省电模式设置</string>
+    <string name="settings_tool_time_weather">时间与天气感知</string>
+    <string name="settings_tool_web_search">真实网络搜索</string>
+    <string name="settings_tools_release_header">端侧工具放行</string>
+    <string name="settings_tool_allowed">放行</string>
+    <string name="settings_tool_blocked">拦截</string>
+    <string name="settings_mcp_protocol">MCP 协议</string>
+    <string name="settings_mcp_probe">MCP 协议探针</string>
+    <string name="settings_mcp_connected">已连接</string>
+    <string name="settings_mcp_disabled">未启用</string>
+
+    <!-- 语音转写分区。 -->
+    <string name="settings_asr_toggle_header">语音转写开关</string>
+    <string name="settings_switch_on">开启</string>
+    <string name="settings_switch_off">关闭</string>
+    <string name="settings_asr_service_header">识别服务</string>
+    <string name="settings_asr_baidu_desc">百度短语音：密钥缺失时自动回退系统识别</string>
+    <string name="settings_asr_system_desc">系统识别：依赖手表现有语音服务</string>
+    <string name="settings_baidu_keys_header">百度语音密钥</string>
+    <string name="settings_baidu_api_key_hint">请输入 API Key</string>
+    <string name="settings_baidu_secret_key_hint">请输入 Secret Key</string>
+    <string name="settings_asr_language_header">识别语言</string>
+    <string name="settings_asr_selftest_header">连通性自检</string>
+    <string name="settings_asr_testing">正在测试…</string>
+    <string name="settings_asr_test">测试转写</string>
+    <string name="settings_asr_recording">录音中，请说话…</string>
+    <string name="settings_asr_success">转写成功：%1$s</string>
+    <string name="settings_asr_failure">转写失败：%1$s</string>
+</resources>

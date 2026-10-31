@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.WearCard
 import com.example.myapplication.presentation.ui.components.WearChip
@@ -165,12 +167,12 @@ fun OnboardingScreen(
                         verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm, Alignment.CenterVertically)
                     ) {
                         BasicText(
-                            text = "你好",
+                            text = stringResource(R.string.ui_onboarding_greeting),
                             style = Wear.TextTitle.copy(color = Wear.Palette.Bg),
                             maxLines = 1
                         )
                         BasicText(
-                            text = "欢迎使用穿戴智能助手",
+                            text = stringResource(R.string.ui_onboarding_welcome),
                             modifier = Modifier.fillMaxWidth(),
                             style = Wear.TextCaption.copy(
                                 color = Wear.Palette.TextMuted,
@@ -184,7 +186,7 @@ fun OnboardingScreen(
                             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
                         ) {
                             WearChip(
-                                label = "继续",
+                                label = stringResource(R.string.ui_common_continue),
                                 selected = false,
                                 onClick = { phase = 3 }
                             )
@@ -269,12 +271,12 @@ private fun OnboardingConfigPhase(
                             .background(Wear.Palette.TextPrimary)
                     )
                     BasicText(
-                        text = "配置 AI 模型",
+                        text = stringResource(R.string.ui_onboarding_config_title),
                         style = Wear.TextTitle,
                         maxLines = 1
                     )
                     BasicText(
-                        text = "设置 API 端点与密钥后即可开始使用",
+                        text = stringResource(R.string.ui_onboarding_config_subtitle),
                         modifier = Modifier.fillMaxWidth(),
                         style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
                         maxLines = 2
@@ -367,7 +369,7 @@ private fun OnboardingConfigPhase(
                     }
                 ) {
                     BasicText(
-                        text = "完成并进入主界面",
+                        text = stringResource(R.string.ui_onboarding_finish),
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                         style = Wear.TextBody.copy(color = Wear.Palette.Accent),
                         maxLines = 1
@@ -413,7 +415,7 @@ private fun SkipTextButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         BasicText(
-            text = "跳过",
+            text = stringResource(R.string.ui_common_skip),
             style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
             maxLines = 1
         )

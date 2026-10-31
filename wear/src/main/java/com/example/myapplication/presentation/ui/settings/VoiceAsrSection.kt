@@ -18,6 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearChip
@@ -78,13 +80,13 @@ fun VoiceAsrContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        WearSectionHeader(text = "语音转写开关")
+        WearSectionHeader(text = stringResource(R.string.settings_asr_toggle_header))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            listOf(true to "开启", false to "关闭").forEach { (value, label) ->
+            listOf(true to stringResource(R.string.settings_switch_on), false to stringResource(R.string.settings_switch_off)).forEach { (value, label) ->
                 WearChip(
                     label = label,
                     selected = enabled == value,
@@ -98,7 +100,7 @@ fun VoiceAsrContent(
             }
         }
 
-        WearSectionHeader(text = "识别服务")
+        WearSectionHeader(text = stringResource(R.string.settings_asr_service_header))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -121,16 +123,16 @@ fun VoiceAsrContent(
 
         BasicText(
             text = if (providerId == AsrProviderId.BAIDU) {
-                "百度短语音：密钥缺失时自动回退系统识别"
+                stringResource(R.string.settings_asr_baidu_desc)
             } else {
-                "系统识别：依赖手表现有语音服务"
+                stringResource(R.string.settings_asr_system_desc)
             },
             style = Wear.TextCaption,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
 
-        WearSectionHeader(text = "百度语音密钥")
+        WearSectionHeader(text = stringResource(R.string.settings_baidu_keys_header))
         WearSectionHeader(text = "API Key (AK)")
 
         SettingsInput(
@@ -139,7 +141,7 @@ fun VoiceAsrContent(
                 apiKey = it
                 persist()
             },
-            placeholder = "请输入 API Key"
+            placeholder = stringResource(R.string.settings_baidu_api_key_hint)
         )
 
         WearSectionHeader(text = "Secret Key (SK)")
@@ -150,10 +152,10 @@ fun VoiceAsrContent(
                 secretKey = it
                 persist()
             },
-            placeholder = "请输入 Secret Key"
+            placeholder = stringResource(R.string.settings_baidu_secret_key_hint)
         )
 
-        WearSectionHeader(text = "识别语言")
+        WearSectionHeader(text = stringResource(R.string.settings_asr_language_header))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -173,17 +175,17 @@ fun VoiceAsrContent(
             }
         }
 
-        WearSectionHeader(text = "连通性自检")
+        WearSectionHeader(text = stringResource(R.string.settings_asr_selftest_header))
 
         SettingsActionButton(
-            label = if (isTesting) "正在测试…" else "测试转写",
+            label = if (isTesting) stringResource(R.string.settings_asr_testing) else stringResource(R.string.settings_asr_test),
             enabled = !isTesting,
             tone = Tone.ACCENT,
             onClick = {
                 context.vibrateTick()
                 if (isTesting) return@SettingsActionButton
                 isTesting = true
-                testStatus = "录音中，请说话…"
+                testStatus = context.getString(R.string.settings_asr_recording)
                 persist()
                 val gateway = VoiceAsrGateway(capture = AudioRecordWavCapture(context))
                 scope.launch {
@@ -193,8 +195,8 @@ fun VoiceAsrContent(
                     )
                     isTesting = false
                     testStatus = when (result) {
-                        is AsrResult.Success -> "转写成功：" + result.text
-                        is AsrResult.Failure -> "转写失败：" + result.reason
+                        is AsrResult.Success -> context.getString(R.string.settings_asr_success, result.text)
+                        is AsrResult.Failure -> context.getString(R.string.settings_asr_failure, result.reason)
                     }
                 }
             }

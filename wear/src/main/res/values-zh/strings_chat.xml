@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wearchat_approval_label_call">调用</string>
+    <string name="wearchat_approval_label_change">改动</string>
+    <string name="wearchat_approval_label_worst_case">最坏情况</string>
+    <string name="wearchat_dialog_cancel">取消</string>
+    <string name="wearchat_dialog_send">发送</string>
+    <string name="wearchat_recognizer_prompt">请说话，正在倾听...</string>
+    <string name="wearchat_notice_input_keyboard">已切换到键盘输入，点主键打开输入框</string>
+    <string name="wearchat_notice_input_voice">已切换到语音输入，点主键或长按说话</string>
+    <string name="wearchat_voice_error">语音输入出错：%1$s</string>
+</resources>

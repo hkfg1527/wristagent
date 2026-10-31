@@ -27,6 +27,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.WearCard
 import com.example.myapplication.presentation.ui.theme.Wear
 
@@ -99,13 +101,13 @@ fun VoiceListeningOverlay(
             }
 
             BasicText(
-                text = "正在倾听...",
+                text = stringResource(R.string.ui_listening),
                 style = Wear.TextBody.copy(fontWeight = FontWeight.Bold),
                 maxLines = 1
             )
 
             BasicText(
-                text = "请对准手表说话",
+                text = stringResource(R.string.ui_listening_hint),
                 style = Wear.TextCaption,
                 maxLines = 1
             )
@@ -116,7 +118,7 @@ fun VoiceListeningOverlay(
                 modifier = Modifier.padding(top = Wear.Space.Xs)
             ) {
                 BasicText(
-                    text = "取消",
+                    text = stringResource(R.string.ui_common_cancel),
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
                     maxLines = 1

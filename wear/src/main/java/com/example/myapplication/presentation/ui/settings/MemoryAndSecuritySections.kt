@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
@@ -43,13 +45,13 @@ fun MemoryManagerContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        WearSectionHeader(text = "单会话保留轮数")
+        WearSectionHeader(text = stringResource(R.string.settings_turns_header))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
-            listOf(4 to "4轮 节能", 10 to "10轮 标准", 30 to "30轮 深度").forEach { (count, label) ->
+            listOf(4 to stringResource(R.string.settings_turns_4), 10 to stringResource(R.string.settings_turns_10), 30 to stringResource(R.string.settings_turns_30)).forEach { (count, label) ->
                 WearChip(
                     label = label,
                     selected = turns == count,
@@ -63,10 +65,10 @@ fun MemoryManagerContent(
             }
         }
 
-        WearSectionHeader(text = "记忆清理")
+        WearSectionHeader(text = stringResource(R.string.settings_memory_clear_header))
 
         SettingsActionButton(
-            label = if (memoryCleared) "已清空当前记忆与偏好" else "一键清空全部记忆与偏好",
+            label = if (memoryCleared) stringResource(R.string.settings_memory_cleared) else stringResource(R.string.settings_memory_clear_all),
             tone = if (memoryCleared) Tone.MUTED else Tone.DANGER,
             onClick = {
                 context.vibrateTick()
@@ -98,11 +100,11 @@ fun WingShortcutContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        WearSectionHeader(text = "右侧副键绑定")
+        WearSectionHeader(text = stringResource(R.string.settings_side_key_header))
 
         WearRow(
-            title = "底栏副键",
-            value = "右翼固定打开会话抽屉"
+            title = stringResource(R.string.settings_side_key),
+            value = stringResource(R.string.settings_side_key_value)
         )
 
         SubPageDoneRow()
@@ -128,12 +130,12 @@ fun SecurityGuardrailContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        WearSectionHeader(text = "操作安全策略")
+        WearSectionHeader(text = stringResource(R.string.settings_security_policy))
 
         val modes = listOf(
-            Triple(SecurityMode.NOVICE, "严格安全模式", "所有敏感与系统操作均需审批 (3秒倒计时防误触)"),
-            Triple(SecurityMode.STANDARD, "标准提示模式", "只读查询自动放行，修改系统配置需滑动确认"),
-            Triple(SecurityMode.EXPERT, "极速放行模式", "除致命危险指令外，跳过所有弹窗直接执行")
+            Triple(SecurityMode.NOVICE, stringResource(R.string.settings_security_novice_title), stringResource(R.string.settings_security_novice_desc)),
+            Triple(SecurityMode.STANDARD, stringResource(R.string.settings_security_standard_title), stringResource(R.string.settings_security_standard_desc)),
+            Triple(SecurityMode.EXPERT, stringResource(R.string.settings_security_expert_title), stringResource(R.string.settings_security_expert_desc))
         )
 
         modes.forEach { (mode, label, desc) ->
@@ -141,7 +143,7 @@ fun SecurityGuardrailContent(
             SettingsChoiceRow(
                 title = label,
                 subtitle = desc,
-                value = if (isSelected) "已激活" else null,
+                value = if (isSelected) stringResource(R.string.settings_activated) else null,
                 selected = isSelected,
                 onClick = {
                     context.vibrateTick()

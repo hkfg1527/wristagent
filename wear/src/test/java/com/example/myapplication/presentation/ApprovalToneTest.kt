@@ -30,14 +30,6 @@ class ApprovalToneTest {
     }
 
     @Test
-    fun headlineFollowsRiskLevel() {
-        assertEquals("低风险", ApprovalTone.headlineOf(RiskLevel.LOW))
-        assertEquals("需要确认", ApprovalTone.headlineOf(RiskLevel.MEDIUM))
-        assertEquals("高风险操作", ApprovalTone.headlineOf(RiskLevel.HIGH))
-        assertEquals("高风险操作", ApprovalTone.headlineOf(RiskLevel.CRITICAL))
-    }
-
-    @Test
     fun trackStartsAtLevelToneAndAlwaysEndsGreen() {
         for (tone in listOf(Wear.Palette.Warning, Wear.Palette.Critical, Wear.Palette.Danger)) {
             assertEquals(tone, ApprovalTrackTone.colorOf(tone, 0f))

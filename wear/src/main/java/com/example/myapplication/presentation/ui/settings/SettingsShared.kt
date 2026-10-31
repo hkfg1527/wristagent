@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
@@ -321,7 +323,7 @@ fun SubPageDoneRow() {
     val dismiss = LocalSubPageDismiss.current ?: return
     val context = LocalContext.current
     SettingsActionButton(
-        label = "完成返回",
+        label = stringResource(R.string.settings_done_back),
         tone = Tone.ACCENT,
         onClick = {
             context.vibrateTick()
@@ -480,4 +482,15 @@ fun Modifier.pullDownToDismissOnScroll(
             alpha = (1f - dragY.value / (pageHeightPx * 1.5f)).coerceIn(0.25f, 1f)
         }
         .nestedScroll(connection)
+}
+
+/** 设置页状态徽章的资源映射：状态 -> 文案资源，纯函数便于单测。 */
+internal object SettingsStatusTextRes {
+    /** 模型与服务卡片的配置徽章：已配置走强调色，未配置走警示色。 */
+    fun modelServiceBadge(configured: Boolean): Pair<Int, Tone> =
+        if (configured) {
+            R.string.settings_badge_configured to Tone.ACCENT
+        } else {
+            R.string.settings_badge_unconfigured to Tone.DANGER
+        }
 }

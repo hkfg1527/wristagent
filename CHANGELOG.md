@@ -6,6 +6,23 @@
 
 ## [未发布]
 
+### 开源化准备
+- `applicationId` 由 `com.example.myapplication` 改为 `dev.ghr.wristagent`（`namespace` 保持不变）；应用名拆为中英两份资源（`Wrist Agent` / `腕上助手`）；
+- 启动图标换为自绘点阵主题（深底 `#0B0E14` + 5x5 白点阵矢量，无位图无文字）；
+- release 构建改用自建 keystore（凭据存 `keystore.properties`，与 `release.keystore` 一并忽略入库）；凭据缺失时自动退化为 debug 签名，保证他人克隆后可构建；
+- 从 `gradle.properties` 移除写死的本机 JDK 路径（原值会让其他机器 Gradle 直接启动失败）；
+- 新增 GitHub Actions：JDK 17 下运行 `:wear:testDebugUnitTest` 与 `:wear:lintDebug`，不涉及签名构建、无需任何仓库 Secrets。
+
+### 架构
+- `MainActivity` 由 1660 行收敛至 87 行：新增 `AgentRepository`（`AgentGateway` 契约 + 纯转发，引擎零改动）、`ChatViewModel`（`StateFlow<ChatUiState>` 承载会话/审批续体/草稿/提示）、`ChatUiState`；
+- 聊天界面拆分为 `ui/chat/`（`ChatScreen`/`ConversationList`/`ApprovalOverlay`/`TextInputDialog`/`AnimatedMessageCard`/`ChatApp`）；审批塌缩动画留在 Compose，续体在 ViewModel 内按同一常量延时后交回。
+
+### 国际化
+- 界面文案抽为资源并补齐中英两套（`strings_chat`/`strings_ui`/`strings_settings`/`strings_tools`，英文为默认语言、中文走 `values-zh`）；
+- `ChatNotice` 由携带中文文本改为携带字符串资源 id 与占位参数，语音错误话术同样资源化；
+- 工具展示名（联网搜索/时间天气/设备状态/马达振动/电源模式/点阵网格）改为资源 id，未知工具回落工具名原文；
+- 未抽取：系统提示词、工具描述、风险话术、ASR 原始错误文本、预设角色提示词正文（均属领域文本，参与模型请求或逻辑比较）。
+
 ### 新增与优化特性
 - **设计令牌化与全站视觉重构（手表圆屏）**：
   - 新增 `WearTokens`（颜色/圆角/间距/尺寸/字号阶梯唯一来源）与 `WearComponents`（`WearCard`/`WearRow`/`WearChip`/`WearBadge`/`WearBanner`/`WearDivider`）；全仓消灭 <12sp 字号（原设置子页最低 7.5sp）与散落的硬编码色值，可点区域统一 ≥44dp；

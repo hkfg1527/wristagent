@@ -1,11 +1,13 @@
 package com.example.myapplication.presentation
 
+import com.example.myapplication.R
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -82,24 +84,36 @@ class ConversationGroupingTest {
     }
 
     @Test
-    fun testToolVisualMeta_providesDistinctColorsAndNames() {
+    fun testToolVisualMeta_providesDistinctColorsAndNameResources() {
         val searchMeta = ToolVisualMeta.resolve("web_search")
-        assertEquals("联网搜索", searchMeta.displayName)
+        assertEquals(R.string.tools_name_web_search, searchMeta.displayNameRes)
         assertTrue(searchMeta.tagColorHex != 0L)
 
         val weatherMeta = ToolVisualMeta.resolve("query_time_weather")
-        assertEquals("时间天气", weatherMeta.displayName)
+        assertEquals(R.string.tools_name_time_weather, weatherMeta.displayNameRes)
 
         val batteryMeta = ToolVisualMeta.resolve("get_device_status")
-        assertEquals("设备状态", batteryMeta.displayName)
+        assertEquals(R.string.tools_name_device_status, batteryMeta.displayNameRes)
 
         val vibrateMeta = ToolVisualMeta.resolve("vibrate_device")
-        assertEquals("马达振动", vibrateMeta.displayName)
+        assertEquals(R.string.tools_name_vibrate, vibrateMeta.displayNameRes)
 
         val powerMeta = ToolVisualMeta.resolve("set_system_power_mode")
-        assertEquals("电源模式", powerMeta.displayName)
+        assertEquals(R.string.tools_name_power_mode, powerMeta.displayNameRes)
 
         val densityMeta = ToolVisualMeta.resolve("adjust_matrix_density")
-        assertEquals("点阵网格", densityMeta.displayName)
+        assertEquals(R.string.tools_name_matrix, densityMeta.displayNameRes)
+
+        // 六个工具不许共用同一个展示名资源，否则中英切换会出现两种工具同名
+        val ids = listOf(
+            searchMeta, weatherMeta, batteryMeta, vibrateMeta, powerMeta, densityMeta
+        ).mapNotNull { it.displayNameRes }
+        assertEquals(6, ids.size)
+        assertEquals(6, ids.toSet().size)
+
+        // 未知工具回落到工具名原文（displayNameRes 为 null）
+        val unknown = ToolVisualMeta.resolve("some_new_tool")
+        assertNull(unknown.displayNameRes)
+        assertEquals("some_new_tool", unknown.toolName)
     }
 }

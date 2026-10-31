@@ -46,10 +46,4 @@ object ApprovalSliderLogic {
     fun isRejectTap(totalDxPx: Float, totalDyPx: Float, slopPx: Float = TAP_SLOP_PX): Boolean =
         abs(totalDxPx) <= slopPx && abs(totalDyPx) <= slopPx
 
-    /** 胶囊内左侧的操作提示：锁定倒计时优先，其次在"点拒绝 · 左滑放行 / 松开即放行"之间切换。 */
-    fun labelFor(progress: Float, isLocked: Boolean = false): String = when {
-        isLocked -> "锁定"
-        progress < LABEL_SWITCH_PROGRESS -> "点拒绝 · 左滑放行"
-        else -> "松开即放行"
-    }
 }

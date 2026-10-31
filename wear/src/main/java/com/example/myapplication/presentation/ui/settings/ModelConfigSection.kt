@@ -18,6 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ModelCycle
@@ -55,12 +57,12 @@ fun ModelConfigContent(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        WearSectionHeader(text = "模型直选")
+        WearSectionHeader(text = stringResource(R.string.settings_model_pick))
 
         val models = ModelCycle.parse(preferences.cachedRemoteModels)
         if (ModelLabels.isEmpty(models)) {
             BasicText(
-                text = "未发现可用模型，请先点击下方按钮拉取模型列表",
+                text = stringResource(R.string.settings_no_models),
                 style = Wear.TextCaption,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -89,7 +91,7 @@ fun ModelConfigContent(
             }
         }
 
-        WearSectionHeader(text = "API 端点")
+        WearSectionHeader(text = stringResource(R.string.settings_api_endpoint))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -114,7 +116,7 @@ fun ModelConfigContent(
         }
 
         SettingsActionButton(
-            label = if (showCustomInput) "收起自定义输入" else "手动修改 BaseUrl / Key",
+            label = if (showCustomInput) stringResource(R.string.settings_custom_input_hide) else stringResource(R.string.settings_custom_input_show),
             onClick = {
                 context.vibrateTick()
                 showCustomInput = !showCustomInput
@@ -143,23 +145,23 @@ fun ModelConfigContent(
         }
 
         SettingsActionButton(
-            label = if (isFetching) "正在 Ping 测试..." else "端点测速与实时握手 Ping",
+            label = if (isFetching) stringResource(R.string.settings_ping_running) else stringResource(R.string.settings_ping_idle),
             enabled = !isFetching,
             tone = Tone.ACCENT,
             onClick = {
                 context.vibrateTick()
                 isFetching = true
-                fetchResultText = "正在握手探测..."
+                fetchResultText = context.getString(R.string.settings_probe_running)
                 scope.launch {
                     val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
                     isFetching = false
                     if (timeMs >= 0) {
-                        fetchResultText = "端点就绪 • 延迟 ${timeMs}ms (${models.size} 个可用模型)"
+                        fetchResultText = context.getString(R.string.settings_probe_ready, timeMs, models.size)
                         if (models.isNotEmpty()) {
                             preferences.cachedRemoteModels = models.joinToString(",")
                         }
                     } else {
-                        fetchResultText = "端点握手失败，网络超时"
+                        fetchResultText = context.getString(R.string.settings_probe_failed)
                     }
                 }
             }

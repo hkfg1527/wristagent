@@ -69,6 +69,10 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import com.example.myapplication.agent.contract.RiskLevel
+import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -467,7 +471,7 @@ fun BottomInteractiveBlock(
                 ) {
                     Box(modifier = Modifier.size(8.dp).background(Wear.Palette.Danger, CircleShape))
                     BasicText(
-                        text = "停止",
+                        text = stringResource(R.string.ui_bottom_stop),
                         style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                         maxLines = 1
                     )
@@ -621,7 +625,7 @@ private fun ApprovalTrack(
             // 文案：锁定倒计时优先；解锁后两个 label 叠在同一位置，随进度交叉淡化
             if (isLocked) {
                 BasicText(
-                    text = ApprovalSliderLogic.labelFor(dragProgress.value, isLocked = true),
+                    text = stringResource(ApprovalTextRes.sliderLabelResOf(dragProgress.value, isLocked = true)),
                     style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                     maxLines = 1
                 )
@@ -630,7 +634,7 @@ private fun ApprovalTrack(
                     // 只放一个文案，在 50% 处换词：两个 label 叠放交叉淡化会在中途糊成"点放行绝"。
                     // 颜色渐变由图层的红→绿着色表达，文字保持深色以保证对比度。
                     BasicText(
-                        text = if (dragProgress.value < 0.5f) "点击拒绝" else "放行",
+                        text = stringResource(ApprovalTextRes.actionLabelResOf(dragProgress.value)),
                         style = Wear.TextCaption.copy(color = Wear.Palette.Bg),
                         maxLines = 1
                     )
@@ -832,4 +836,32 @@ fun MinimalistLayersIcon(
             cap = StrokeCap.Round
         )
     }
+}
+
+/**
+ * 审批文案的资源映射：等级标题、滑块提示与操作词都以资源 id 返回，
+ * 让 [ApprovalTone]/[ApprovalSliderLogic] 里原本写死的中文随系统语言切换。
+ */
+internal object ApprovalTextRes {
+    /** 风险等级 -> 审批页标题：中风险只提示确认，高与致命共用高风险标题。 */
+    @StringRes
+    fun headlineResOf(level: RiskLevel): Int = when (level) {
+        RiskLevel.LOW -> R.string.ui_approval_headline_low
+        RiskLevel.MEDIUM -> R.string.ui_approval_headline_confirm
+        RiskLevel.HIGH, RiskLevel.CRITICAL -> R.string.ui_approval_headline_high
+    }
+
+    /** 胶囊内左侧提示：锁定倒计时优先，其次在"点拒绝 · 左滑放行 / 松开即放行"之间切换。 */
+    @StringRes
+    fun sliderLabelResOf(progress: Float, isLocked: Boolean): Int = when {
+        isLocked -> R.string.ui_approval_locked
+        progress < ApprovalSliderLogic.LABEL_SWITCH_PROGRESS -> R.string.ui_approval_slider_hint
+        else -> R.string.ui_approval_release_to_allow
+    }
+
+    /** 正中操作词：过半前是"点击拒绝"，过半后是"放行"。 */
+    @StringRes
+    fun actionLabelResOf(progress: Float): Int =
+        if (progress < ApprovalSliderLogic.LABEL_SWITCH_PROGRESS) R.string.ui_approval_reject_tap
+        else R.string.ui_approval_allow
 }

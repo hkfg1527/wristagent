@@ -1,0 +1,8 @@
+<resources>
+    <string name="tools_name_web_search">Web search</string>
+    <string name="tools_name_time_weather">Time &amp; weather</string>
+    <string name="tools_name_device_status">Device status</string>
+    <string name="tools_name_vibrate">Haptics</string>
+    <string name="tools_name_power_mode">Power mode</string>
+    <string name="tools_name_matrix">Matrix grid</string>
+</resources>

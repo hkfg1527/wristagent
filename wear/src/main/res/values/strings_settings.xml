@@ -1,0 +1,118 @@
+<resources>
+    <!-- Settings entry titles, sub-page titles and status text (SettingsScreen + settings/ sections). -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_model_and_service">Models &amp; Services</string>
+    <string name="settings_badge_configured">Configured</string>
+    <string name="settings_badge_unconfigured">Not configured</string>
+    <string name="settings_model_params">Model Parameters</string>
+    <string name="settings_tools_and_mcp">On-device Tools &amp; MCP</string>
+    <string name="settings_tools_enabled_count">%1$d/6 enabled</string>
+    <string name="settings_system_prompt">System Prompt</string>
+    <string name="settings_prompt_default">Built-in default</string>
+    <string name="settings_prompt_custom">Custom</string>
+    <string name="settings_memory_management">Session Memory</string>
+    <string name="settings_memory_turns">%1$d turns</string>
+    <string name="settings_side_key">Bottom Bar Side Key</string>
+    <string name="settings_side_key_value">Right wing opens the session drawer</string>
+    <string name="settings_security_policy">Security Policy</string>
+    <string name="settings_mode_strict">Strict confirm</string>
+    <string name="settings_mode_standard">Standard prompt</string>
+    <string name="settings_mode_auto">Auto execute</string>
+    <string name="settings_asr">Speech to Text</string>
+    <string name="settings_asr_off">Turned off</string>
+    <string name="settings_asr_key_missing">API key missing</string>
+    <string name="settings_asr_baidu">Baidu short speech</string>
+    <string name="settings_asr_system">System recognizer</string>
+    <string name="settings_replay_onboarding">Replay the guided tour</string>
+    <string name="settings_done_back">Done</string>
+    <string name="settings_sub_model_config">Model &amp; Endpoint Settings</string>
+    <string name="settings_sub_hyper_params">Inference Parameters</string>
+    <string name="settings_sub_wing_shortcut">Quick Action Binding</string>
+
+    <!-- Hyper parameters. -->
+    <string name="settings_temperature">Sampling temperature</string>
+    <string name="settings_temp_fast">Fast 0.2</string>
+    <string name="settings_temp_balanced">Balanced 0.7</string>
+    <string name="settings_temp_creative">Creative 1.2</string>
+    <string name="settings_max_tokens">Max output tokens</string>
+    <string name="settings_tokens_150">150 saver</string>
+    <string name="settings_tokens_300">300 balanced</string>
+    <string name="settings_tokens_600">600 complete</string>
+    <string name="settings_tokens_1200">1200 deep</string>
+    <string name="settings_tokens_2048">2048 maximum</string>
+    <string name="settings_transport">Transport protocol</string>
+    <string name="settings_sse_on">Enable SSE streaming</string>
+    <string name="settings_sse_off">Turn streaming off</string>
+
+    <!-- Memory and security sections. -->
+    <string name="settings_turns_header">Turns kept per session</string>
+    <string name="settings_turns_4">4 turns saver</string>
+    <string name="settings_turns_10">10 turns standard</string>
+    <string name="settings_turns_30">30 turns deep</string>
+    <string name="settings_memory_clear_header">Memory cleanup</string>
+    <string name="settings_memory_cleared">Current memory and preferences cleared</string>
+    <string name="settings_memory_clear_all">Clear all memory and preferences</string>
+    <string name="settings_side_key_header">Right Side Key Binding</string>
+    <string name="settings_activated">Active</string>
+    <string name="settings_security_novice_title">Strict safety mode</string>
+    <string name="settings_security_novice_desc">Every sensitive and system action needs approval, with a 3 second countdown against mis-taps</string>
+    <string name="settings_security_standard_title">Standard prompt mode</string>
+    <string name="settings_security_standard_desc">Read-only queries run right away, changing system settings needs a slide to confirm</string>
+    <string name="settings_security_expert_title">Fast-track mode</string>
+    <string name="settings_security_expert_desc">Runs without any dialog except for fatally dangerous commands</string>
+
+    <!-- Model configuration section. -->
+    <string name="settings_model_pick">Direct model pick</string>
+    <string name="settings_no_models">No models available yet, tap the button below to fetch the list</string>
+    <string name="settings_api_endpoint">API endpoint</string>
+    <string name="settings_custom_input_hide">Hide the custom input</string>
+    <string name="settings_custom_input_show">Edit BaseUrl / Key manually</string>
+    <string name="settings_ping_running">Pinging...</string>
+    <string name="settings_ping_idle">Endpoint speed test with a live handshake ping</string>
+    <string name="settings_probe_running">Handshaking...</string>
+    <string name="settings_probe_ready">Endpoint ready • %1$dms latency (%2$d models available)</string>
+    <string name="settings_probe_failed">Handshake failed, the network timed out</string>
+
+    <!-- Prompt viewer section. -->
+    <string name="settings_prompt_presets">Preset roles</string>
+    <string name="settings_preset_minimal">Minimal assistant</string>
+    <string name="settings_preset_architect">Architect</string>
+    <string name="settings_preset_secretary">Daily assistant</string>
+    <string name="settings_preset_clear_test">Clear test</string>
+    <string name="settings_prompt_edit_hide">Hide the custom editor</string>
+    <string name="settings_prompt_edit_show">Edit the prompt text manually</string>
+    <string name="settings_prompt_placeholder">Enter the system prompt</string>
+
+    <!-- Tools and MCP section. -->
+    <string name="settings_tool_device_status">Battery and temperature</string>
+    <string name="settings_tool_vibrate">Haptic alerts</string>
+    <string name="settings_tool_matrix_density">Watch face dot pitch</string>
+    <string name="settings_tool_power_mode">Power saving mode</string>
+    <string name="settings_tool_time_weather">Time and weather</string>
+    <string name="settings_tool_web_search">Live web search</string>
+    <string name="settings_tools_release_header">On-device tool allowlist</string>
+    <string name="settings_tool_allowed">Allowed</string>
+    <string name="settings_tool_blocked">Blocked</string>
+    <string name="settings_mcp_protocol">MCP protocol</string>
+    <string name="settings_mcp_probe">MCP protocol probe</string>
+    <string name="settings_mcp_connected">Connected</string>
+    <string name="settings_mcp_disabled">Not enabled</string>
+
+    <!-- Voice and ASR section. -->
+    <string name="settings_asr_toggle_header">Speech-to-text switch</string>
+    <string name="settings_switch_on">On</string>
+    <string name="settings_switch_off">Off</string>
+    <string name="settings_asr_service_header">Recognition service</string>
+    <string name="settings_asr_baidu_desc">Baidu short speech: falls back to the system recognizer when the key is missing</string>
+    <string name="settings_asr_system_desc">System recognizer: uses the speech service built into the watch</string>
+    <string name="settings_baidu_keys_header">Baidu speech keys</string>
+    <string name="settings_baidu_api_key_hint">Enter the API Key</string>
+    <string name="settings_baidu_secret_key_hint">Enter the Secret Key</string>
+    <string name="settings_asr_language_header">Recognition language</string>
+    <string name="settings_asr_selftest_header">Connectivity self-test</string>
+    <string name="settings_asr_testing">Testing...</string>
+    <string name="settings_asr_test">Test transcription</string>
+    <string name="settings_asr_recording">Recording, please speak...</string>
+    <string name="settings_asr_success">Transcribed: %1$s</string>
+    <string name="settings_asr_failure">Transcription failed: %1$s</string>
+</resources>
