@@ -251,8 +251,16 @@ fun UnifiedMatrixCanvas(
             val shockTravel = shockwaveProgress * maxRadius * 2.3f
             val shockEnergy = (1f - shockwaveProgress * 0.35f).coerceIn(0f, 1f)
             val hasRipple = thinkingIntensity > 0.01f
-            val rippleTravel = (thinkingWavePhase * maxRadius * 1.4f) % (maxRadius * 1.25f)
             val rippleReach = maxRadius * 1.25f
+            val rippleTravel = (thinkingWavePhase * maxRadius * 1.4f) % rippleReach
+            // 行波两端包络：出生时淡入、抵达边界时淡出。
+            // 没有它的话，travel≈0 时 |dist-travel| < band 覆盖的是半径 band 的实心圆盘，
+            // 而能量项在中心最大，于是每次波从圆心诞生都会"啪"地闪一下；
+            // 同时 travel 取模回绕是从 reach 瞬移回 0，也会闪。包络让这两处都变成不可见。
+            val rippleRamp = rippleReach * 0.18f
+            val rippleEnvelope =
+                ((rippleTravel / rippleRamp).coerceIn(0f, 1f) *
+                    ((rippleReach - rippleTravel) / rippleRamp).coerceIn(0f, 1f))
             val hasGlint = glintAnim.value in -0.3f..1.3f
             val hasCascade = cascadeAnim.value > 0.01f
             val approvedGreen = approvalVisualState == ApprovalVisualState.APPROVED_GREEN
@@ -295,8 +303,8 @@ fun UnifiedMatrixCanvas(
                     if (distDiff < rippleBandWidth) {
                         val falloff = cos((distDiff / rippleBandWidth) * HALF_PI).let { it * it }
                         val energy = (1f - distCenterArr[i] / rippleReach).coerceIn(0.1f, 1f)
-                        rippleAlpha = falloff * energy * 0.85f * thinkingIntensity * edgeFade
-                        rippleScale = falloff * energy * 1.6f * thinkingIntensity
+                        rippleAlpha = falloff * energy * 0.85f * thinkingIntensity * edgeFade * rippleEnvelope
+                        rippleScale = falloff * energy * 1.6f * thinkingIntensity * rippleEnvelope
                     }
                 }
 
