@@ -28,8 +28,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -68,7 +69,6 @@ import com.example.myapplication.presentation.ui.settings.PullDownDismissContain
 import com.example.myapplication.presentation.ui.settings.vibrateTick
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /** 圆屏内可用内容宽度上限：最宽处仍留出 36dp 边距，chevron 不贴屏幕外缘。 */
@@ -87,7 +87,6 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onRestartOnboarding: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     var currentModel by remember { mutableStateOf(preferences.modelName) }
@@ -122,6 +121,16 @@ fun SettingsScreen(
 
     val listState = rememberScalingLazyListState()
 
+    // 到顶继续下滑越界 → tick → 过阈值回主界面；阈值/震动与主界面底部越界共用同一份常量
+    val topOverscroll = rememberEdgeOverscroll(
+        overflowSign = 1f,
+        atEdge = {
+            !listState.canScrollBackward ||
+                (listState.centerItemIndex == 0 && listState.centerItemScrollOffset == 0)
+        },
+        onCross = onBack
+    )
+
     // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
     PullDownDismissContainer(
         modifier = modifier,
@@ -142,8 +151,10 @@ fun SettingsScreen(
         ) {
             val settingsFocusRequester = remember { FocusRequester() }
 
+            // 表冠要焦点：等节点真正挂上树的那一帧再请求，首帧直接请求会落到未初始化的 requester 上
             LaunchedEffect(Unit) {
-                settingsFocusRequester.requestFocus()
+                withFrameNanos { }
+                runCatching { settingsFocusRequester.requestFocus() }
             }
 
             // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
@@ -152,18 +163,26 @@ fun SettingsScreen(
             ScalingLazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .focusRequester(settingsFocusRequester)
-                    .focusable()
+                    // 到顶继续下滑的越界位移不进滚动，只做震动与过阈值返回
+                    .nestedScroll(topOverscroll.connection)
+                    // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                     .onRotaryScrollEvent {
-                        scope.launch {
-                            listState.scrollBy(it.verticalScrollPixels)
-                            if (abs(it.verticalScrollPixels) > 10f) {
-                                context.vibrateTick()
-                            }
+                        // 表冠：同步吃位移（dispatchRawDelta 不受 scroll 互斥锁排队影响，每格刻度都生效）
+                        val consumed = listState.dispatchRawDelta(it.verticalScrollPixels)
+                        if (abs(it.verticalScrollPixels) > 10f) {
+                            context.vibrateTick()
                         }
+                        // 已到顶还继续向下转：剩余位移交给越界手感累计
+                        val leftover = it.verticalScrollPixels - consumed
+                        if (leftover != 0f) topOverscroll.push(leftover, rotary = true)
                         true
-                    },
+                    }
+                    .focusRequester(settingsFocusRequester)
+                    .focusable(),
                 state = listState,
+                // 关掉库自带的 rotary 与系统拉伸越界：表冠/越界统一由上面的处理器与 nestedScroll 接管
+                rotaryScrollableBehavior = null,
+                overscrollEffect = null,
                 contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Sm),
                 verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
                 // 圆屏官方做法：首项默认对齐视口垂直中心，上下边缘随曲率缩小淡出

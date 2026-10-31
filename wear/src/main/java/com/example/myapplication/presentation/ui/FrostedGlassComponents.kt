@@ -1,6 +1,9 @@
 package com.example.myapplication.presentation.ui
 
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -30,15 +33,25 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +60,12 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.theme.Wear
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.min
 
 /**
  * 深度思考微型小胶囊 (带弹性展开动画)
@@ -283,23 +302,32 @@ fun SpringColoredToolPill(
 
 /**
  * 逐字流式文本渲染 (呼吸跳动光标)
+ *
+ * [animateCursor] = false 用于"模型一次吐出十几字以上"的突发刷新：光标留在原位不动、不呼吸，
+ * 只把文本直接换掉。突发时整段文字本来就是一跳一跳地长，再叠一层光标动画只会让手表更花。
  */
 @Composable
 fun SpringStreamingText(
     text: String,
     isStreaming: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    animateCursor: Boolean = true
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "cursorBlink")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(450, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cursorAlpha"
-    )
+    // 不需要呼吸时不创建无限动画：静止光标不占帧回调
+    val cursorAlpha by if (isStreaming && animateCursor) {
+        val infiniteTransition = rememberInfiniteTransition(label = "cursorBlink")
+        infiniteTransition.animateFloat(
+            initialValue = 0.2f,
+            targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(450, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "cursorAlpha"
+        )
+    } else {
+        remember { mutableStateOf(1f) }
+    }
 
     BasicText(
         modifier = modifier,
@@ -363,3 +391,158 @@ fun AgentSquareBlurBox(
         content()
     }
 }
+
+// ===================== 列表越界手感（主界面底部 / 设置页顶部共用同一套判定） =====================
+
+/**
+ * 越界手感常量：阈值、拉开量、回弹力度、震动强度都集中在这里，调手感只改这里。
+ */
+internal object ListOverscrollSpec {
+    /** 累积越界位移达到该距离才切页（主界面底部 → 设置页；设置页顶部 → 主界面）。 */
+    val SwitchThreshold = 48.dp
+
+    /** 越界期间列表最多拉开这么多，继续滑也不会真的滚出边界。 */
+    val MaxPull = 24.dp
+
+    /** 拉开量 = 越界量 × 该比例（24dp 越界 × 0.4 = 9.6dp）。 */
+    const val PullRatio = 0.4f
+
+    /** 表冠停转多久算"松手"：到时回弹归零并重置累计。 */
+    const val RotarySettleMs = 220L
+
+    /** 松手回弹的 spring：阻尼偏小，收尾带一点弹性。 */
+    const val ReleaseDamping = 0.62f
+    const val ReleaseStiffness = 460f
+
+    /** 首次触达边界的提示震动 / 越过阈值的确认震动。 */
+    const val TickEffect = VibrationEffect.EFFECT_TICK
+    const val SwitchEffect = VibrationEffect.EFFECT_CLICK
+}
+
+/**
+ * 列表越界状态机：到边界后继续滑 = 累计剩余位移 → 首次触达打一记 [ListOverscrollSpec.TickEffect]、
+ * 累计过 [ListOverscrollSpec.SwitchThreshold] 打更强的 [ListOverscrollSpec.SwitchEffect] 并回调切页；
+ * 越界期间给列表一层不超过 [ListOverscrollSpec.MaxPull] 的弹性位移，松手 spring 回弹。
+ *
+ * 触摸拖拽与表冠共用 [push]；触摸的"松手"由 [connection] 的 onPostFling 结算，
+ * 表冠没有松手事件，靠停转 [ListOverscrollSpec.RotarySettleMs] 判定。
+ */
+@Stable
+internal class EdgeOverscroll(
+    private val scope: CoroutineScope,
+    private val density: Density,
+    private val overflowSign: Float,
+    private val atEdge: () -> Boolean,
+    private val onCross: () -> Unit,
+    private val vibrate: (Int) -> Unit
+) {
+    private val pull = Animatable(0f)
+
+    /** 弹性位移（px，已夹到 [ListOverscrollSpec.MaxPull] 并乘过 [ListOverscrollSpec.PullRatio]），直接读进 graphicsLayer。 */
+    val pullOffsetPx: Float get() = pull.value
+
+    private var accumulatedPx = 0f
+    private var ticked = false
+    private var crossed = false
+    private var settleJob: Job? = null
+
+    /** 越界入口：[overflowPx] 是列表没吃下的剩余位移（符号由内部取绝对值）。 */
+    fun push(overflowPx: Float, rotary: Boolean = false) {
+        if (crossed) return
+        accumulatedPx += abs(overflowPx)
+        if (!ticked) {
+            ticked = true
+            vibrate(ListOverscrollSpec.TickEffect)
+        }
+        val maxPullPx = with(density) { ListOverscrollSpec.MaxPull.toPx() }
+        val target = min(accumulatedPx, maxPullPx) * ListOverscrollSpec.PullRatio * overflowSign
+        scope.launch { pull.snapTo(target) }
+        if (rotary) {
+            settleJob?.cancel()
+            settleJob = scope.launch {
+                delay(ListOverscrollSpec.RotarySettleMs)
+                release()
+            }
+        }
+        if (accumulatedPx >= with(density) { ListOverscrollSpec.SwitchThreshold.toPx() }) {
+            crossed = true
+            vibrate(ListOverscrollSpec.SwitchEffect)
+            onCross()
+        }
+    }
+
+    /** 松手：回弹到原位并重置累计，下一次越界重新计。 */
+    fun release() {
+        settleJob?.cancel()
+        settleJob = null
+        accumulatedPx = 0f
+        ticked = false
+        crossed = false
+        scope.launch {
+            pull.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    ListOverscrollSpec.ReleaseDamping,
+                    ListOverscrollSpec.ReleaseStiffness
+                )
+            )
+        }
+    }
+
+    /** 列表没吃下的位移就是越界：吃掉它（返回 consumed），列表本身不滚出边界。 */
+    val connection: NestedScrollConnection = object : NestedScrollConnection {
+        override fun onPostScroll(
+            consumed: Offset,
+            available: Offset,
+            source: NestedScrollSource
+        ): Offset {
+            // 只认手指真拖出来的越界：惯性甩到底后剩下的位移不该触发震动与切页
+            if (source != NestedScrollSource.UserInput) return Offset.Zero
+            val leftover = available.y
+            if (leftover != 0f && leftover * overflowSign > 0f && atEdge()) {
+                push(leftover)
+                return Offset(0f, leftover)
+            }
+            return Offset.Zero
+        }
+
+        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+            release()
+            return Velocity.Zero
+        }
+    }
+}
+
+/**
+ * 给列表接上越界手感（[EdgeOverscroll.connection] 交给 Modifier.nestedScroll，
+ * [EdgeOverscroll.push] 交给表冠处理器）。
+ *
+ * [overflowSign]：越界方向剩余位移的符号 —— 主界面"到底继续上滑"是负值（-1f），
+ * 设置页"到顶继续下滑"是正值（+1f）。
+ */
+@Composable
+internal fun rememberEdgeOverscroll(
+    overflowSign: Float,
+    atEdge: () -> Boolean,
+    onCross: () -> Unit
+): EdgeOverscroll {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val context = LocalContext.current
+    val currentAtEdge by rememberUpdatedState(atEdge)
+    val currentOnCross by rememberUpdatedState(onCross)
+    return remember(overflowSign, density) {
+        EdgeOverscroll(
+            scope = scope,
+            density = density,
+            overflowSign = overflowSign,
+            atEdge = { currentAtEdge() },
+            onCross = { currentOnCross() },
+            vibrate = { effect ->
+                context.getSystemService(Vibrator::class.java)
+                    ?.vibrate(VibrationEffect.createPredefined(effect))
+            }
+        )
+    }
+}
+

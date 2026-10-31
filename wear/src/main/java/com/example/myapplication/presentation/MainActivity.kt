@@ -12,6 +12,7 @@ import androidx.compose.ui.draw.shadow
 
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.ComponentActivity
@@ -60,6 +61,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -70,6 +72,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.LinearEasing
@@ -121,6 +124,8 @@ import com.example.myapplication.presentation.ui.TopClockBar
 import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
+import com.example.myapplication.presentation.ui.StreamingThrottleState
+import com.example.myapplication.presentation.ui.rememberEdgeOverscroll
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
@@ -682,6 +687,15 @@ private val ConversationCardMaxWidth = 200.dp
 /** 底栏底距：与 [BottomInteractiveBlock] 调用处的 padding(bottom = 12.dp) 对齐。 */
 private val BottomBarBottomInset = 12.dp
 
+/**
+ * 正在流式输出的那一段文本：突发判定的基准是"上一帧屏幕上的文字 → 本帧文字"，
+ * 而不是模型 token 之间的增量（token 增量被节流窗口合并后就失去了可比性）。
+ */
+private fun streamingTailText(blocks: List<ConversationBlock>): String {
+    val tail = blocks.lastOrNull { it is ConversationBlock.Text && it.isStreaming } as? ConversationBlock.Text
+    return tail?.content ?: ""
+}
+
 /** 主键输入方式的中文提示：模式切换与启动播报共用同一文案，避免用户靠小图标猜主键行为。 */
 private const val NOTICE_INPUT_KEYBOARD = "已切换到键盘输入，点主键打开输入框"
 private const val NOTICE_INPUT_VOICE = "已切换到语音输入，点主键或长按说话"
@@ -728,9 +742,17 @@ private fun MainAgentDashboard(
 
     val listState = rememberScalingLazyListState()
     val mainFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        mainFocusRequester.requestFocus()
-    }
+
+    // 到底继续上滑 → tick → 过阈值切设置页；越界期间列表最多拉开 24dp×0.4，松手回弹
+    val edgeOverscroll = rememberEdgeOverscroll(
+        overflowSign = -1f,
+        atEdge = { !listState.canScrollForward },
+        onCross = { onOpenSettings() }
+    )
+
+    // 流式刷新节流：70ms 一帧（≈12~16fps）+ 突发增量时关掉逐字光标动画
+    val streamingThrottle = remember { StreamingThrottleState() }
+    var isStreamingBurst by remember { mutableStateOf(false) }
 
     // 初始状态与多会话管理
     val defaultInitialPrompt = "主人，今天有什么需要解决的技术或生活问题？"
@@ -830,6 +852,15 @@ private fun MainAgentDashboard(
 
     var isExecutingAgent by remember { mutableStateOf(false) }
     var inputState by remember { mutableStateOf(TextInputState()) }
+
+    // 表冠只有在列表节点持有焦点时才收得到 rotary 事件：首帧、抽屉/输入弹窗/审批浮层关闭、
+    // 从设置页返回（整页重组）都要重新抢一次焦点。请求必须排到下一帧 —— 首帧里节点还没挂上树，
+    // 直接 requestFocus() 会落到未初始化的 requester 上（真表上表现为表冠彻底没反应）。
+    LaunchedEffect(isSessionDrawerOpen, inputState.isOpen, isApprovalFocus) {
+        if (isSessionDrawerOpen || inputState.isOpen || isApprovalFocus) return@LaunchedEffect
+        withFrameNanos { }
+        runCatching { mainFocusRequester.requestFocus() }
+    }
 
     // 瞬时提示：语音错误与模型切换反馈共用一条，短时可见后自动消失
     var noticeText by remember { mutableStateOf<String?>(null) }
@@ -945,21 +976,36 @@ private fun MainAgentDashboard(
                 currentSession.title
             }
 
+            // 新一轮从空基线起算：首帧立即可见，突发判定不看上一轮的残留文本
+            streamingThrottle.reset()
+            isStreamingBurst = false
+
             agentDispatcher.executeUserPrompt(
                 prompt = prompt,
                 existingBlocks = currentSession.conversationBlocks
             ) { newState ->
-                agentState = newState
+                // 逐 token 提交等于每来一个字就重排整列正文：只按 70ms 节拍提交。
+                // 终态（一轮结束 / 报错）强制落地，绝不能被节流窗口挡掉。
+                val emitNow = streamingThrottle.accept(
+                    newText = streamingTailText(newState.conversationBlocks),
+                    nowMs = SystemClock.uptimeMillis(),
+                    force = newState.isFinished
+                )
                 isThinkingActive = isExecutingAgent && !newState.isFinished && (newState.isThinking || newState.isExecutingTool)
 
-                sessions = sessions.map { s ->
-                    if (s.id == activeSessionId) {
-                        s.copy(
-                            title = updatedTitle,
-                            conversationBlocks = newState.conversationBlocks,
-                            history = agentDispatcher.getConversationHistory()
-                        )
-                    } else s
+                if (emitNow) {
+                    isStreamingBurst = streamingThrottle.isBurst
+                    agentState = newState
+
+                    sessions = sessions.map { s ->
+                        if (s.id == activeSessionId) {
+                            s.copy(
+                                title = updatedTitle,
+                                conversationBlocks = newState.conversationBlocks,
+                                history = agentDispatcher.getConversationHistory()
+                            )
+                        } else s
+                    }
                 }
 
                 if (newState.isFinished) {
@@ -1113,6 +1159,11 @@ private fun MainAgentDashboard(
             // 本项目曾写死 itemIndex = 0，于是"第 0 项能滚到圆心"变成滚动锚点 —— 每轮新消息到达后
             // 视图被拉回列表开头，新内容落在视口外。关掉后位置控制完全交给上面的"最后一条居中"逻辑。
             autoCentering = null,
+            // 库自带的 rotary（ScalingLazyColumn 默认装 requestFocusOnHierarchyActive + rotaryScrollable）
+            // 会自己抢焦点并把刻度全部吃掉，本文件的处理器就永远收不到事件 —— 关掉它，表冠只由下方
+            // onRotaryScrollEvent 独家接管；同理关掉系统拉伸越界，越界手感统一走 nestedScroll + graphicsLayer。
+            rotaryScrollableBehavior = null,
+            overscrollEffect = null,
             // top 必须让开顶部曲面时钟：14dp 时首条卡片会直接压到时钟上（真表 192dp 屏上尤其明显）；
             // 取 TopContentInset(34dp) + Space.Md(12dp) = 46dp，既在时钟下方、又只让掉一点点高度。
             // bottom 让最后一项能滚到圆屏中心（见 Wear.Size.ListCenterReach）
@@ -1122,11 +1173,14 @@ private fun MainAgentDashboard(
             ),
             modifier = Modifier
                 .fillMaxSize()
+                // 越界"拉住"：列表没吃下的位移不进滚动，只换成最多 24dp×0.4 的弹性位移，松手回弹
+                .nestedScroll(edgeOverscroll.connection)
                 // 审批沉浸：整列正文退到 35% 并轻度模糊（只糊列表图层，点阵画布保持清晰）；
                 // 图层被缓存，模糊只在列表内容真正变化时重算，不是每帧全屏后处理
                 .graphicsLayer {
                     alpha = listAlpha
                     renderEffect = if (isApprovalFocus) listBlurEffect else null
+                    translationY = edgeOverscroll.pullOffsetPx
                 }
                 // 边缘淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉。
                 // 顶部渐隐必须盖住整个曲面时钟带（TopContentInset=34dp），
@@ -1156,11 +1210,16 @@ private fun MainAgentDashboard(
                     }
                 }
                 .padding(horizontal = Wear.Space.Edge)
-                .focusRequester(mainFocusRequester)
-                .focusable()
+                // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
+                // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件
+                // （wear 自己的 Modifier.rotaryScrollable 也是 rotaryHandler(...).focusRequester(...).focusable 这个顺序）。
                 .onRotaryScrollEvent { event ->
-                    // 圆屏列表自带"靠近边缘缩小淡出"，滚轮只负责位移，不再有任何整块抹除遮罩
-                    scope.launch { listState.scroll { scrollBy(event.verticalScrollPixels) } }
+                    // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与"贴底跟随"抢同一把 scroll 互斥锁，
+                    // 每格刻度都立刻生效（scope.launch + scroll{} 在高频刻度下会被逐帧滚动挤掉，真表上就像没接上）
+                    val consumed = listState.dispatchRawDelta(event.verticalScrollPixels)
+                    // 已到边界还继续转：剩余位移交给越界手感累计（震动 / 过阈值切设置页）
+                    val leftover = event.verticalScrollPixels - consumed
+                    if (leftover != 0f) edgeOverscroll.push(leftover, rotary = true)
                     if (kotlin.math.abs(event.verticalScrollPixels) > 8f) {
                         context.getSystemService(Vibrator::class.java)?.let { vib ->
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
@@ -1169,7 +1228,9 @@ private fun MainAgentDashboard(
                         }
                     }
                     true
-                },
+                }
+                .focusRequester(mainFocusRequester)
+                .focusable(),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
@@ -1234,7 +1295,9 @@ private fun MainAgentDashboard(
                                                 // 弹性逐字生成流式文本 (带弹簧微晶跃动与呼吸跳动光标)
                                                 SpringStreamingText(
                                                     text = block.content,
-                                                    isStreaming = block.isStreaming
+                                                    isStreaming = block.isStreaming,
+                                                    // 单次刷新吐出十几字以上就是"过快"：不做逐字动画，只直接刷新文本
+                                                    animateCursor = !isStreamingBurst
                                                 )
                                             }
                                         }

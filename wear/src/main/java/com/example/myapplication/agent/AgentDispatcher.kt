@@ -117,6 +117,10 @@ class AgentDispatcher(
             【行动准则】
             - 目标明确时按需调用工具，工具返回结果后直接给出精简结论。
             - 涉及系统设置修改时简述操作目的。
+            
+            【回答风格】
+            回答风格：默认精简。普通问题控制在 60 字以内，一句话能说清就不要展开；
+            除非用户明确要求"详细/展开/列点"，否则不要输出长段落或长列表。
             """.trimIndent()
         }
         val systemPrompt = "$memoryHeader\n\n$telemetryBlock\n\n$basePrompt"
