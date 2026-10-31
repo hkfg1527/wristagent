@@ -14,6 +14,18 @@ val localProperties = Properties().apply {
 }
 val deepseekApiKey: String = localProperties.getProperty("DEEPSEEK_API_KEY") ?: ""
 
+// Release signing credentials come from keystore.properties, which is git-ignored.
+// Without it (CI, fresh clone) the release build type falls back to debug signing so
+// the project still builds.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
+}
+val releaseKeystoreFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+val hasReleaseSigning = releaseKeystoreFile != null && releaseKeystoreFile.exists()
+
 android {
     namespace = "com.example.myapplication"
     compileSdk {
@@ -21,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "dev.ghr.wristagent"
         minSdk = 33
         targetSdk = 37
         versionCode = 1
@@ -29,9 +41,23 @@ android {
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepseekApiKey\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
         }
     }
@@ -48,6 +74,10 @@ android {
         checkReleaseBuilds = false
         abortOnError = false
     }
+    testOptions {
+        // 单测直接构造 Application/AndroidViewModel：框架方法返回默认值而不是抛 Stub!
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -62,7 +92,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling)
     implementation(libs.play.services.wearable)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -25,6 +25,12 @@ build/
 local.properties
 /local.properties
 
+# Release signing material (never commit)
+release.keystore
+keystore.properties
+*.jks
+*.keystore
+
 # Log files
 *.log
 

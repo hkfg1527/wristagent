@@ -1,0 +1,64 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only token: no repository Secrets are required, the release keystore never
+# reaches CI (the release build type falls back to debug signing without it).
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Unit tests & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # compileSdk is 37 (Android 17). Its platform is published as "platforms;android-37",
+      # and newer SDK releases ship the same platform as "platforms;android-37.0", so try
+      # both (each also on the canary channel) and fall back to the API 36 packages when
+      # the 37 channel is unavailable. build-tools falls back to 36.0.0 for the same reason.
+      - name: Install Android SDK packages
+        run: |
+          set -e
+          install() {
+            for pkg in "$@"; do
+              if sdkmanager --install "$pkg" >/dev/null; then echo "installed $pkg"; return 0; fi
+              if sdkmanager --channel=3 --install "$pkg" >/dev/null; then echo "installed $pkg (canary channel)"; return 0; fi
+            done
+            echo "none of the requested packages could be installed: $*" >&2
+            return 1
+          }
+          install "platforms;android-37" "platforms;android-37.0" "platforms;android-36"
+          install "build-tools;37.0.0" "build-tools;36.0.0"
+
+      # git stores gradlew without the executable bit
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # No release/signed build in CI.
+      - name: Unit tests
+        run: ./gradlew :wear:testDebugUnitTest --console=plain
+
+      - name: Lint
+        run: ./gradlew :wear:lintDebug --console=plain
