@@ -136,9 +136,9 @@ fun BottomInteractiveBlock(
     val windowSize = LocalWindowInfo.current.containerSize
     var blockTopPx by remember { mutableFloatStateOf(0f) }
 
-    // 审批行 = 胶囊 + [Wear.Space.Sm] + 拒绝键 44dp。用该 y 处的圆弦长反推胶囊宽：
+    // 审批行 = 胶囊 + [Wear.Space.Md] + 拒绝键 44dp。用该 y 处的圆弦长反推胶囊宽：
     // 行顶贴齐底栏顶边，圆心取屏幕正中，R = min(w,h)/2，弦长一半 = sqrt(R² - farEdge²)，
-    // 因此整行四角到圆心必然 ≤ R。480px/2.0 密度下整行约 185dp、胶囊约 133dp。
+    // 因此整行四角到圆心必然 ≤ R。480px/2.0 密度下整行约 185dp、胶囊约 129dp。
     val approvalCapsuleWidth = remember(blockTopPx, windowSize, density) {
         val radiusPx = min(windowSize.width, windowSize.height) / 2f
         val centerY = windowSize.height / 2f
@@ -152,7 +152,7 @@ fun BottomInteractiveBlock(
             } else {
                 val halfChord = sqrt(radiusPx * radiusPx - farEdge * farEdge)
                 with(density) { (2f * halfChord).toDp() }
-                    .minus(Wear.Size.Touch + Wear.Space.Sm)
+                    .minus(Wear.Size.Touch + Wear.Space.Md)
                     .coerceAtLeast(Wear.Size.Orb)
             }
         }
@@ -461,7 +461,7 @@ fun BottomInteractiveBlock(
 /**
  * 审批行：主键自己拉长成滑块胶囊 + 同排 44dp 拒绝键。
  * 行顶贴齐底栏顶边，胶囊宽由调用方按该 y 处圆弦长反推（见 BottomInteractiveBlock 的 approvalCapsuleWidth），
- * 整行 = 胶囊 + [Wear.Space.Sm] + [Wear.Size.Touch]，四角到圆心必然 ≤ R。
+ * 整行 = 胶囊 + [Wear.Space.Md] + [Wear.Size.Touch]，四角到圆心必然 ≤ R。
  */
 @Composable
 private fun ApprovalMorphBar(
@@ -480,8 +480,8 @@ private fun ApprovalMorphBar(
         Row(
             modifier = Modifier
                 .height(Wear.Size.Touch)
-                .width(trackWidth + Wear.Space.Sm + Wear.Size.Touch),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+                .width(trackWidth + Wear.Space.Md + Wear.Size.Touch),
+            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ApprovalTrack(
@@ -496,20 +496,21 @@ private fun ApprovalMorphBar(
     }
 }
 
-/** 44dp 拒绝键：Danger 实底 + 白色 12sp 文字，点击即默认拒绝。 */
+/** 44dp 拒绝键：DangerSurface 底 + 1.5dp Danger 描边 + Danger 文字，不再实心亮红与胶囊争焦点。 */
 @Composable
 private fun RejectButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(Wear.Size.Touch)
             .clip(CircleShape)
-            .background(Wear.Palette.Danger)
+            .background(Wear.Palette.DangerSurface)
+            .border(1.5.dp, Wear.Palette.Danger, CircleShape)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         BasicText(
             text = "拒绝",
-            style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
+            style = Wear.TextCaption.copy(color = Wear.Palette.Danger),
             maxLines = 1
         )
     }
@@ -519,7 +520,8 @@ private fun RejectButton(onClick: () -> Unit) {
  * 审批滑块：白色主键底条自己拉长成横向胶囊，拇指自右端向左拖动。
  * 底座保持主键冷银白不变，只给"已滑过区域"上色：progress 0 是拒绝红、1 是放行绿，
  * 中间由 [ApprovalSliderLogic.colorFor] 连续插值，于是越往左越绿、滑回去越红。
- * 未滑过的左侧区域保留 0.30 的红调；松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才算放行，否则弹簧回弹。
+ * 未滑过的左侧区域保留 0.34 的红调，已滑过区域取 0.72 的绿调（更翠，不再是偏橄榄的绿）；
+ * 松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才算放行，否则弹簧回弹。
  */
 @Composable
 private fun ApprovalTrack(
@@ -613,11 +615,11 @@ private fun ApprovalTrack(
             val thumbLeftPx = (size.width - thumbSlotPx + insetPx - p * travelPx)
                 .coerceIn(0f, size.width)
             drawRect(
-                color = Wear.Palette.Danger.copy(alpha = 0.30f),
+                color = Wear.Palette.Danger.copy(alpha = 0.34f),
                 size = Size(thumbLeftPx, size.height)
             )
             drawRect(
-                color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.5f),
+                color = ApprovalSliderLogic.colorFor(p).copy(alpha = 0.72f),
                 topLeft = Offset(thumbLeftPx, 0f),
                 size = Size(size.width - thumbLeftPx, size.height)
             )

@@ -76,7 +76,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -92,6 +94,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
@@ -122,6 +125,7 @@ import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
@@ -415,8 +419,11 @@ private fun DialogActionButton(
 }
 
 /**
- * 审批内容卡片：标题 / 工具名 / 风险说明 / 三等分危险条。
- * 危险条用 Accent(常态) 与 Danger(中高风险及硬黑名单) 两种令牌着色，未点亮的段用 Border。
+ * 审批内容卡片：标题 / 工具名胶囊 / 风险说明 / 三段危险条。
+ * 底色 Surface + 左侧 3dp Danger 竖条（不再整圈红描边），内边距左右 Lg、上下 Xs/Sm，
+ * 行距压到 Xs(4dp)：240dp 圆屏上卡片顶边 56dp、两行说明时底边 156dp，危险条落在 142~148dp，
+ * 完整露在底栏审批行顶边（152dp）之上；行距回到 Sm(8dp) 会把危险条顶进胶囊底下。
+ * 危险条未点亮段用 Border，点亮：等级 1 → Accent，等级 2/3 → Danger。
  */
 @Composable
 private fun ApprovalRequestCard(
@@ -429,21 +436,29 @@ private fun ApprovalRequestCard(
         modifier = modifier
             .clip(RoundedCornerShape(Wear.Radius.Card))
             .background(Wear.Palette.Surface)
-            .border(
-                width = 1.dp,
-                color = Wear.Palette.Danger.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(Wear.Radius.Card)
-            )
-            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
+            // 左侧 3dp 危险竖条：被 Radius.Card 圆角裁切，替代原来的整圈红描边
+            .drawBehind {
+                drawRect(
+                    color = Wear.Palette.Danger,
+                    size = Size(width = 3.dp.toPx(), height = size.height)
+                )
+            }
+            .padding(
+                start = Wear.Space.Lg,
+                end = Wear.Space.Lg,
+                top = Wear.Space.Xs,
+                bottom = Wear.Space.Sm
+            ),
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        BasicText(text = "需要你的许可", style = Wear.TextTitle)
+        // 标题行高固定 18sp：CJK 默认行高约 1.57em 会把卡片多撑高 5dp，吃掉了危险条与底栏之间的安全距离
         BasicText(
-            text = toolDisplayName,
-            style = Wear.TextBody,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            text = "需要你的许可",
+            style = Wear.TextTitle.copy(lineHeight = 18.sp),
+            maxLines = 1
         )
+        // 工具名：WearBadge 胶囊（DangerSurface 底 + Danger 12sp 文字），不再是一行裸正文
+        WearBadge(text = toolDisplayName, tone = Tone.DANGER)
         if (riskExplanation.isNotBlank()) {
             BasicText(
                 text = riskExplanation,
@@ -452,13 +467,14 @@ private fun ApprovalRequestCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        // 三段危险条：每段 28×6dp、圆角 3dp、间距 4dp
         Row(horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
             repeat(3) { index ->
                 val litColor = if (riskLevel >= 2) Wear.Palette.Danger else Wear.Palette.Accent
                 Box(
                     modifier = Modifier
-                        .size(width = 18.dp, height = 4.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .size(width = 28.dp, height = 6.dp)
+                        .clip(RoundedCornerShape(3.dp))
                         .background(if (index < riskLevel) litColor else Wear.Palette.Border)
                 )
             }
@@ -554,7 +570,20 @@ private fun MainAgentDashboard(
     // 审批滑块进度：0=拒绝红屏，1=放行绿屏，由底栏回调驱动全屏绿光与卡片
     var approvalProgress by remember { mutableFloatStateOf(0f) }
 
-    // 审批卡片实测位置：底边贴保留区上沿向上生长，宽度取离圆心更远的横边所在弦长
+    // 审批聚焦模式：正文降到 0.28 + 全屏压暗层 0.45，两者都按 120ms 过渡进出，不做硬切
+    val isApprovalFocus = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
+    val approvalListAlpha by animateFloatAsState(
+        targetValue = if (isApprovalFocus) 0.28f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "approvalListAlpha"
+    )
+    val approvalScrimAlpha by animateFloatAsState(
+        targetValue = if (isApprovalFocus) 0.45f else 0f,
+        animationSpec = tween(durationMillis = 120),
+        label = "approvalScrimAlpha"
+    )
+
+    // 审批卡片实测位置：顶边固定在 56dp 向下生长，宽度取离圆心更远的横边（这里是顶边）所在弦长
     var approvalCardTopPx by remember { mutableFloatStateOf(0f) }
     var approvalCardHeightPx by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
@@ -889,7 +918,7 @@ private fun MainAgentDashboard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Wear.Palette.Success.copy(alpha = 0.10f * approvalProgress))
+                .background(Wear.Palette.Success.copy(alpha = 0.18f * approvalProgress))
         )
 
         // ================= 2. 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除) =================
@@ -901,6 +930,8 @@ private fun MainAgentDashboard(
             contentPadding = PaddingValues(top = 14.dp, bottom = Wear.Size.ListCenterReach),
             modifier = Modifier
                 .fillMaxSize()
+                // 审批聚焦：整列正文淡到 0.28，背景退到卡片之后
+                .graphicsLayer { alpha = approvalListAlpha }
                 // 最外圈 14dp 轻度淡出：DstIn 必须落在离屏图层里，否则会把下方已画的点阵一起抹掉
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
@@ -1025,17 +1056,25 @@ private fun MainAgentDashboard(
             modifier = Modifier.fillMaxSize()
         )
 
-        // ================= 3.5 审批内容卡片：底栏上方浮出，宽度按该 y 处圆弦长收窄 =================
-        // 画在底栏之前，滑块永远压在卡片之上；出现时允许覆盖列表内容
+        // ================= 3.2 审批聚焦压暗层：压在列表与时钟之上、审批卡片之下 =================
+        // 全屏铺一层 Bg，让被淡化的正文与时钟彻底退到后面，只有审批卡片和底栏留在前景
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Wear.Palette.Bg.copy(alpha = approvalScrimAlpha))
+        )
+
+        // ================= 3.5 审批内容卡片：屏幕中上部浮出，宽度按所在 y 处圆弦长收窄 =================
+        // 画在底栏之前，滑块永远压在卡片之上；卡片不再贴底栏，整块上移让视觉重心回到圆心附近
         AnimatedVisibility(
             visible = bottomBlockMode == BottomBlockMode.ACTION_ALLOW,
             enter = fadeIn(tween(140)) + slideInVertically(tween(180)) { it / 3 },
             exit = fadeOut(tween(120)),
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                // 底边 = 屏幕高度 - (保留区 + 底栏底距 + 间距)：底栏审批行顶边贴在保留区上沿，
-                // 因此卡片底边正好落在胶囊顶部之上 [Wear.Space.Sm]，绝不重叠，三段式危险条完整露出
-                .padding(bottom = Wear.Size.BottomBarReserve + BottomBarBottomInset + Wear.Space.Sm)
+                .align(Alignment.TopCenter)
+                // 顶距 44dp：与时钟字形下沿（25dp）仍有 19dp，且把卡片整体上移 12dp，
+                // 使三段式危险条与底栏审批胶囊之间留出真实可见的呼吸间隙（实测 56dp 时几乎贴住）
+                .padding(top = 44.dp)
         ) {
             ApprovalRequestCard(
                 toolDisplayName = lastToolDisplayName(agentState.conversationBlocks) ?: "执行高风险操作",
