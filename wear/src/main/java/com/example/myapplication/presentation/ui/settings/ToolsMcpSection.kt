@@ -108,6 +108,8 @@ fun ToolsMcpContent(
             overflow = TextOverflow.Ellipsis
         )
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

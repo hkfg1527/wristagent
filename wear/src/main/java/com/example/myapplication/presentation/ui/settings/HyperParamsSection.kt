@@ -186,6 +186,8 @@ fun HyperParamsContent(
             )
         }
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

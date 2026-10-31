@@ -74,6 +74,8 @@ fun MemoryManagerContent(
             }
         )
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }
@@ -115,6 +117,8 @@ fun WingShortcutContent(
                 }
             )
         }
+
+        SubPageDoneRow()
 
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
@@ -158,6 +162,8 @@ fun SecurityGuardrailContent(
                 }
             )
         }
+
+        SubPageDoneRow()
 
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }

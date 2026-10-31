@@ -174,6 +174,8 @@ fun ModelConfigContent(
             )
         }
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

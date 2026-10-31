@@ -118,6 +118,8 @@ fun PromptViewerContent(
             )
         }
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }

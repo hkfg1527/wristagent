@@ -7,6 +7,7 @@ import android.os.Vibrator
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,23 +19,30 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -298,61 +306,94 @@ fun SubSettingsModal(
                 return ((chordHalf - Wear.Space.Sm.value).coerceAtLeast(0f) * 2f).dp
             }
 
-            val titleY = Wear.Size.TopContentInset.value
-            val titleWidth = circleSafeWidth(titleY, Wear.Size.BadgeHeight.value)
-                .coerceAtLeast(Wear.Size.Touch)
+            // 标题行（标题 + 44dp 叉号）整块落在圆周内：宽度取该行上沿处的弦长
+            val headerTop = Wear.Size.TopContentInset + Wear.Space.Xs
+            val headerWidth = circleSafeWidth(headerTop.value, Wear.Size.Touch.value)
+                .coerceAtLeast(Wear.Size.Touch * 2)
 
-            val actionY = maxHeight.value - Wear.Space.Xl.value - Wear.Size.Touch.value
-            val actionWidth = circleSafeWidth(actionY, Wear.Size.Touch.value)
-                .coerceAtLeast(Wear.Size.Touch)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = Wear.Space.Edge),
-            ) {
-                // 标题整块落在圆周内：宽度取该高度处的弦长，水平居中
-                Box(
+            CompositionLocalProvider(LocalSubPageDismiss provides onDismiss) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm),
-                    contentAlignment = Alignment.Center,
+                        .fillMaxSize()
+                        .padding(horizontal = Wear.Space.Edge),
                 ) {
-                    BasicText(
-                        text = title,
-                        modifier = Modifier.widthIn(max = titleWidth),
-                        style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .widthIn(max = headerWidth)
+                            .padding(top = headerTop, bottom = Wear.Space.Xs)
+                            .height(Wear.Size.Touch),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
+                    ) {
+                        BasicText(
+                            text = title,
+                            modifier = Modifier.weight(1f),
+                            style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        SubPageCloseButton(onClick = onDismiss)
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                ) {
-                    content()
-                }
-
-                // 底部动作键四角都在圆周内：宽度取按钮下沿处的弦长，水平居中
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = Wear.Space.Xl),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    SettingsActionButton(
-                        label = "完成返回",
-                        tone = Tone.ACCENT,
-                        onClick = {
-                            context.vibrateTick()
-                            onDismiss()
-                        },
-                        modifier = Modifier.widthIn(max = actionWidth),
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    ) {
+                        content()
+                    }
                 }
             }
+        }
+    }
+}
+
+/** 子页内容末尾的"完成返回"：关闭回调由 [SubSettingsModal] 注入，避免改动各子页签名。 */
+private val LocalSubPageDismiss = staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/** 子页滚动内容的最后一项：44dp"完成返回"键。 */
+@Composable
+fun SubPageDoneRow() {
+    val dismiss = LocalSubPageDismiss.current ?: return
+    val context = LocalContext.current
+    SettingsActionButton(
+        label = "完成返回",
+        tone = Tone.ACCENT,
+        onClick = {
+            context.vibrateTick()
+            dismiss()
+        },
+    )
+}
+
+/** 44dp Canvas 叉号关闭键，与设置首页一致。 */
+@Composable
+private fun SubPageCloseButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.Touch)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+            val inset = size.minDimension * 0.25f
+            val stroke = Wear.Size.BadgeHeight.toPx() * 0.1f
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(inset, inset),
+                end = Offset(size.width - inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = Wear.Palette.TextSecondary,
+                start = Offset(size.width - inset, inset),
+                end = Offset(inset, size.height - inset),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

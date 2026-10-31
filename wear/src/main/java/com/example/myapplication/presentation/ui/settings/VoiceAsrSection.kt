@@ -209,6 +209,8 @@ fun VoiceAsrContent(
             )
         }
 
+        SubPageDoneRow()
+
         Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }
