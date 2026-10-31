@@ -407,8 +407,15 @@ internal object ListOverscrollSpec {
     /** 拉开量 = 越界量 × 该比例（24dp 越界 × 0.4 = 9.6dp）。 */
     const val PullRatio = 0.4f
 
-    /** 表冠停转多久算"松手"：到时回弹归零并重置累计。 */
+    /** 表冠停转多久算"松手"：到时进入"保持期"。 */
     const val RotarySettleMs = 220L
+
+    /**
+     * 松手后的"蓄力保持期"：这段时间内累计量不清零、列表也维持被拉住的样子，
+     * 于是"推一点、松手、再推一点"可以叠加到阈值，而不是必须一口气推过头。
+     * 超过这段时间没有新的推入，才衰减回弹并清零。
+     */
+    const val HoldBeforeDecayMs = 900L
 
     /** 松手回弹的 spring：阻尼偏小，收尾带一点弹性。 */
     const val ReleaseDamping = 0.62f
@@ -441,21 +448,35 @@ internal class EdgeOverscroll(
     /** 弹性位移（px，已夹到 [ListOverscrollSpec.MaxPull] 并乘过 [ListOverscrollSpec.PullRatio]），直接读进 graphicsLayer。 */
     val pullOffsetPx: Float get() = pull.value
 
-    private var accumulatedPx = 0f
+    /** 蓄力值（跨手势保留一小段时间）：决定什么时候切页。 */
+    private var chargePx = 0f
+
+    /** 本次手势内的越界量：只决定"拉开多少"这个视觉量。 */
+    private var gesturePx = 0f
+
     private var ticked = false
     private var crossed = false
     private var settleJob: Job? = null
 
+    /** 待执行的"蓄力衰减"任务：任何新推入都会取消它。 */
+    private var decayJob: Job? = null
+
     /** 越界入口：[overflowPx] 是列表没吃下的剩余位移（符号由内部取绝对值）。 */
     fun push(overflowPx: Float, rotary: Boolean = false) {
+        // 新的推入取消待衰减：蓄力在保持期内可以跨手势叠加
+        decayJob?.cancel()
+        decayJob = null
         if (crossed) return
-        accumulatedPx += abs(overflowPx)
+        val blocked = abs(overflowPx)
+        chargePx += blocked
+        gesturePx += blocked
         if (!ticked) {
             ticked = true
             vibrate(ListOverscrollSpec.TickEffect)
         }
+        // 视觉只跟"本次手势"的越界量走：松手就弹回 0，所以手感是弹簧而不是一直夹着
         val maxPullPx = with(density) { ListOverscrollSpec.MaxPull.toPx() }
-        val target = min(accumulatedPx, maxPullPx) * ListOverscrollSpec.PullRatio * overflowSign
+        val target = min(gesturePx, maxPullPx) * ListOverscrollSpec.PullRatio * overflowSign
         scope.launch { pull.snapTo(target) }
         if (rotary) {
             settleJob?.cancel()
@@ -464,20 +485,22 @@ internal class EdgeOverscroll(
                 release()
             }
         }
-        if (accumulatedPx >= with(density) { ListOverscrollSpec.SwitchThreshold.toPx() }) {
+        if (chargePx >= with(density) { ListOverscrollSpec.SwitchThreshold.toPx() }) {
             crossed = true
             vibrate(ListOverscrollSpec.SwitchEffect)
             onCross()
         }
     }
 
-    /** 松手：回弹到原位并重置累计，下一次越界重新计。 */
+    /**
+     * 松手：**不立刻清零**。进入 [ListOverscrollSpec.HoldBeforeDecayMs] 的保持期，
+     * 期间累计量与"被拉住"的视觉都保留，用户可以再推一次继续叠加；
+     * 保持期内没有新的推入，才衰减回弹并清零（下一次越界重新计）。
+     */
     fun release() {
         settleJob?.cancel()
         settleJob = null
-        accumulatedPx = 0f
-        ticked = false
-        crossed = false
+        // 1. 视觉立刻弹簧归零（手感是"弹回去"，不是一直夹着）
         scope.launch {
             pull.animateTo(
                 targetValue = 0f,
@@ -486,6 +509,15 @@ internal class EdgeOverscroll(
                     ListOverscrollSpec.ReleaseStiffness
                 )
             )
+        }
+        gesturePx = 0f
+        ticked = false
+        // 2. 蓄力保留一个保持期：期间再推还能叠加上去；超时才清零
+        decayJob?.cancel()
+        decayJob = scope.launch {
+            delay(ListOverscrollSpec.HoldBeforeDecayMs)
+            chargePx = 0f
+            crossed = false
         }
     }
 
