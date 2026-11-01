@@ -12,7 +12,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
@@ -137,27 +137,33 @@ internal fun ConversationList(
             // 否则长回复向上滚动时正文会从时钟底下穿出来、和 "22:57" 叠字（真表 192dp 屏上尤其明显）；
             // 底部只需让开一点点，给底栏留白的边缘收口。
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
+            // drawWithCache 只在**尺寸变化**时重建渐变，滚动时直接复用同一个 Brush。
+            // 原来放在 drawWithContent 里，等于每次重绘都 new 一个 verticalGradient（滚动时每帧一次）。
+            .drawWithCache {
                 val clockBandPx = Wear.Size.TopContentInset.toPx()   // 34dp：曲面时钟占的高度
                 val rampPx = 8.dp.toPx()                              // 收口用得很短，避免"半透明半可见"
                 val bottomEdgePx = 14.dp.toPx()
                 val heightPx = size.height
-                if (heightPx > clockBandPx + bottomEdgePx) {
-                    // 关键：不是从 0 线性拉到 34dp（那样这段里只是半透明、字仍可见），
+                val brush = if (heightPx > clockBandPx + bottomEdgePx) {
+                    // 不是从 0 线性拉到 34dp（那样这段里只是半透明、字仍可见），
                     // 而是"先整段抹干净，最后 8dp 快速收口"，这样正文绝不会压在时钟上。
                     val solidUntilPx = (clockBandPx - rampPx).coerceAtLeast(0f)
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            (solidUntilPx / heightPx).coerceIn(0f, 1f) to Color.Transparent,
-                            // 不再 100% 抹黑：留约 14% 透出，让时钟带里能隐约看到内容而不是一块死黑
-                            (clockBandPx / heightPx).coerceIn(0f, 1f) to MatMaskColor,
-                            ((heightPx - bottomEdgePx) / heightPx).coerceIn(0f, 1f) to MatMaskColor,
-                            1f to Color.Transparent
-                        ),
-                        blendMode = BlendMode.DstIn
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        (solidUntilPx / heightPx).coerceIn(0f, 1f) to Color.Transparent,
+                        // 不再 100% 抹黑：留约 14% 透出，让时钟带里能隐约看到内容而不是一块死黑
+                        (clockBandPx / heightPx).coerceIn(0f, 1f) to MatMaskColor,
+                        ((heightPx - bottomEdgePx) / heightPx).coerceIn(0f, 1f) to MatMaskColor,
+                        1f to Color.Transparent
                     )
+                } else {
+                    null
+                }
+                onDrawWithContent {
+                    drawContent()
+                    if (brush != null) {
+                        drawRect(brush = brush, blendMode = BlendMode.DstIn)
+                    }
                 }
             }
             .padding(horizontal = Wear.Space.Edge)

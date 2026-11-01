@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.agent.ApprovalVisualState
@@ -58,13 +63,117 @@ private val EMPTY_GRID = MatrixGrid(
     projCoord = EMPTY_FLOATS,
 )
 
+/**
+ * 逐帧复用的批绘制缓冲：分桶计数、游标、点坐标、Paint 只在网格尺寸变化时分配一次。
+ * points 按「每组的连续段」交错存放 (x, y)，直接喂给 Skia 的 drawPoints(FloatArray, offset, count)，
+ * 绘制期不产生任何临时对象，也不出现 List/ArrayList。
+ */
+private class MatrixBatches(val dotCount: Int) {
+    val groupOfDot = IntArray(dotCount)
+    val groupSize = IntArray(DOT_GROUP_COUNT)
+    val groupStart = IntArray(DOT_GROUP_COUNT)
+    val groupCursor = IntArray(DOT_GROUP_COUNT)
+    val points = FloatArray(dotCount * 2)
+    // 组内代表值 = 成员均值：桶只保证成员方差有界，均值让整组像素误差无偏（并让顶部半径档的吸收无损）
+    val alphaSum = FloatArray(DOT_GROUP_COUNT)
+    val radiusSum = FloatArray(DOT_GROUP_COUNT)
+    val categoryRgb = IntArray(DOT_CATEGORY_COUNT)
+    val paint = Paint().apply {
+        isAntiAlias = true
+        strokeCap = StrokeCap.Round
+    }
+}
+
 private val COLOR_DOT_BASE = Color(0xFFE2E8F0)
 private val COLOR_DOT_SHOCK = Color(0xFFFFFFFF) // 纯净亮白微晶光芒，彻底消除廉价土味蓝
 private val COLOR_DOT_GREEN = Color(0xFF10B981)
 private val COLOR_DOT_CASCADE = Color(0xFFEF4444)
 private val COLOR_DOT_WHITE = Color.White
 
+// 组绘制只改 Paint 的 alpha 通道，颜色通道按类别预先取好，绘制期只做一次位或
+private val RGB_DOT_GREEN = COLOR_DOT_GREEN.toArgb() and 0x00FFFFFF
+private val RGB_DOT_CASCADE = COLOR_DOT_CASCADE.toArgb() and 0x00FFFFFF
+private val RGB_DOT_WHITE = COLOR_DOT_WHITE.toArgb() and 0x00FFFFFF
+private val RGB_DOT_SHOCK = COLOR_DOT_SHOCK.toArgb() and 0x00FFFFFF
+
 private const val HALF_PI = (Math.PI / 2.0).toFloat()
+
+// ---------------------------------------------------------------------------
+// 批绘制分组：单帧内把点按 (颜色类别 × alpha 量化桶 × 半径档位) 归并，
+// 每组一次 drawPoints，取代逐点 drawCircle。分组逻辑全部是纯函数，单测直接覆盖。
+// ---------------------------------------------------------------------------
+
+/** 点的颜色类别，与绘制分支一一对应。 */
+internal const val DOT_CAT_BASE = 0        // 基色 / 审批插值色
+internal const val DOT_CAT_GREEN = 1       // 审批放行绿
+internal const val DOT_CAT_CASCADE = 2     // 待确认红瀑
+internal const val DOT_CAT_GLINT = 3       // 完工掠影白
+internal const val DOT_CAT_SHOCK = 4       // 底栏冲击波白
+internal const val DOT_CATEGORY_COUNT = 5
+
+/** alpha 量化档数：桶代表值取 (bucket+0.5)/6，最大量化误差 1/12 < 1/8。 */
+internal const val DOT_ALPHA_BUCKETS = 6
+
+/** 半径档数：0 号为静态半径（无动态放大），其余为水波/掠影/冲击波的放大档。 */
+internal const val DOT_RADIUS_BUCKETS = 5
+
+internal const val DOT_GROUPS_PER_CATEGORY = DOT_ALPHA_BUCKETS * DOT_RADIUS_BUCKETS
+internal const val DOT_GROUP_COUNT = DOT_CATEGORY_COUNT * DOT_GROUPS_PER_CATEGORY
+
+/** 空闲纯呼吸时呼吸相位的量化步数：1/24 步长，约 2800ms/24 ≈ 117ms 一档。 */
+internal const val IDLE_BREATH_STEPS = 24
+
+/** alpha(0~1) → 量化桶号。NaN / 越界一律收敛到合法桶，绝不逸出 [0, DOT_ALPHA_BUCKETS)。 */
+internal fun dotAlphaBucket(alpha: Float): Int =
+    (alpha.coerceIn(0f, 1f) * DOT_ALPHA_BUCKETS).toInt().coerceIn(0, DOT_ALPHA_BUCKETS - 1)
+
+/** 桶号 → 该桶绘制时统一使用的 alpha（取桶中点，正向与负向量化误差均摊）。 */
+internal fun dotBucketAlpha(bucket: Int): Float =
+    (bucket.coerceIn(0, DOT_ALPHA_BUCKETS - 1) + 0.5f) / DOT_ALPHA_BUCKETS
+
+/** 半径增生量(px) → 半径档位；四舍五入到最近档，误差 ≤ quantumPx/2。 */
+internal fun dotRadiusBucket(extraRadiusPx: Float, quantumPx: Float): Int {
+    if (quantumPx <= 0f || extraRadiusPx <= 0f) return 0
+    val bucket = ((extraRadiusPx / quantumPx) + 0.5f).toInt()
+    return bucket.coerceIn(0, DOT_RADIUS_BUCKETS - 1)
+}
+
+/** 点的颜色类别判定：严格等价于历史 when 分支的优先级顺序。 */
+internal fun dotCategory(
+    approvalT: Float,
+    approvedGreen: Boolean,
+    inCascade: Boolean,
+    glintAlpha: Float,
+    shockAlpha: Float,
+): Int = when {
+    approvalT > 0.01f -> DOT_CAT_BASE
+    approvedGreen -> DOT_CAT_GREEN
+    inCascade -> DOT_CAT_CASCADE
+    glintAlpha > 0.05f -> DOT_CAT_GLINT
+    shockAlpha > 0.05f -> DOT_CAT_SHOCK
+    else -> DOT_CAT_BASE
+}
+
+/** 组内代表 alpha：取成员均值让整组像素误差无偏；空组回退到桶中心（空组不会被绘制，仅防除零）。 */
+internal fun dotGroupAlpha(sumAlpha: Float, memberCount: Int, bucket: Int): Float =
+    if (memberCount > 0) sumAlpha / memberCount else dotBucketAlpha(bucket)
+
+/** 组内代表半径：同理取成员均值；空组回退到该档的静态代表半径。 */
+internal fun dotGroupRadius(sumRadius: Float, memberCount: Int, fallbackRadius: Float): Float =
+    if (memberCount > 0) sumRadius / memberCount else fallbackRadius
+
+/** 分桶平面下标：类别 × alpha 桶 × 半径档，取值恒在 [0, DOT_GROUP_COUNT)。 */
+internal fun dotGroupIndex(
+    category: Int,
+    alpha: Float,
+    extraRadiusPx: Float,
+    quantumPx: Float,
+): Int {
+    val cat = category.coerceIn(0, DOT_CATEGORY_COUNT - 1)
+    val alphaBucket = dotAlphaBucket(alpha)
+    val radiusBucket = dotRadiusBucket(extraRadiusPx, quantumPx)
+    return (cat * DOT_ALPHA_BUCKETS + alphaBucket) * DOT_RADIUS_BUCKETS + radiusBucket
+}
 
 /**
  * 单次构建整个屏幕的点阵几何 (仅在画布尺寸或网格间距变化时执行一次)。
@@ -134,8 +243,13 @@ private fun buildMatrixGrid(
  * 1. 方形阵列：严格基于直角坐标系 (x, y) 均匀栅格排布，以圆心为基准对称排布；
  * 2. 覆盖全圆：完全铺满圆形表盘的所有区域（包括四周圆弧月半弧），无任何方形裁剪框；
  * 3. 几何预缓存：所有点位与距离在组合期一次性算入 FloatArray，绘制期不再分配对象、不再求平方根；
- * 4. 动态行波节流：闲置待机时停止思考波动帧驱动，杜绝后台空转耗电；
- * 5. 审批进度着色：approvalProgress 让点阵自身从基色插值到放行绿，不额外叠加任何整屏色层。
+ * 4. 批绘制：逐帧把点按 (颜色类别 × alpha 量化桶 × 半径档位) 归并成若干组，每组一次
+ *    drawPoints(PointMode.Points, StrokeCap.Round, strokeWidth = 2 × 半径) 取代逐点 drawCircle；
+ *    分组用 remember 的 IntArray/FloatArray 原地做计数排序，绘制的 alpha 与半径取组内成员均值，
+ *    绘制期零分配、无 List；
+ * 5. 空闲降频：纯呼吸待机时把呼吸相位量化到 1/24，量化值不变则不产生绘制失效，
+ *    上一帧的绘制指令被整帧复用；思考波相位只在真有行波时才被读取，不污染空闲帧依赖；
+ * 6. 审批进度着色：approvalProgress 让点阵自身从基色插值到放行绿，不额外叠加任何整屏色层。
  */
 @Composable
 fun UnifiedMatrixCanvas(
@@ -170,6 +284,11 @@ fun UnifiedMatrixCanvas(
         ),
         label = "thinkingWavePhase"
     )
+
+    // 空闲降频的相位量化：量化值不变时读端不失效，Compose 直接复用上一帧已录制的绘制指令
+    val idleBreathStep by remember {
+        derivedStateOf { (breathCycle * IDLE_BREATH_STEPS + 0.5f).toInt() }
+    }
 
     // 红瀑下倾进度动画 (0f ~ 1f)
     val cascadeAnim = remember { Animatable(0f) }
@@ -220,6 +339,9 @@ fun UnifiedMatrixCanvas(
             )
         }
 
+        // 分桶缓冲同样只随网格点数分配一次
+        val batches = remember(grid.count) { MatrixBatches(grid.count) }
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val count = grid.count
             if (count == 0) return@Canvas
@@ -243,6 +365,8 @@ fun UnifiedMatrixCanvas(
             val cascadeBand = 60.dp.toPx()
             val glintBandWidth = 48.dp.toPx()
             val dynamicUnit = 0.8.dp.toPx()
+            // 半径量化档宽：一档 0.6dp，再取组内均值后残差 ≈ 0.17dp（基半径 2.3dp 的 7%，不可辨）
+            val radiusQuantum = 0.6.dp.toPx()
 
             // ---- 逐帧不变量的行波参数，一次性算好 ----
             val glintPosition = glintAnim.value * (w + h)
@@ -252,19 +376,22 @@ fun UnifiedMatrixCanvas(
             val shockEnergy = (1f - shockwaveProgress * 0.35f).coerceIn(0f, 1f)
             val hasRipple = thinkingIntensity > 0.01f
             val rippleReach = maxRadius * 1.25f
-            val rippleTravel = (thinkingWavePhase * maxRadius * 1.4f) % rippleReach
             // 行波两端包络：出生时淡入、抵达边界时淡出。
             // 没有它的话，travel≈0 时 |dist-travel| < band 覆盖的是半径 band 的实心圆盘，
             // 而能量项在中心最大，于是每次波从圆心诞生都会"啪"地闪一下；
             // 同时 travel 取模回绕是从 reach 瞬移回 0，也会闪。包络让这两处都变成不可见。
             val rippleRamp = rippleReach * 0.18f
-            val rippleEnvelope =
+            // 思考波相位只在真有行波时才读取：空闲待机不建立这条依赖，避免每帧无谓失效
+            val rippleTravel = if (hasRipple) (thinkingWavePhase * maxRadius * 1.4f) % rippleReach else 0f
+            val rippleEnvelope = if (hasRipple) {
                 ((rippleTravel / rippleRamp).coerceIn(0f, 1f) *
                     ((rippleReach - rippleTravel) / rippleRamp).coerceIn(0f, 1f))
+            } else {
+                0f
+            }
             val hasGlint = glintAnim.value in -0.3f..1.3f
             val hasCascade = cascadeAnim.value > 0.01f
             val approvedGreen = approvalVisualState == ApprovalVisualState.APPROVED_GREEN
-            val breathBase = 0.24f + 0.28f * breathCycle
 
             // 审批进度：每个点自己的颜色从冷白基色连续插值到放行绿，而不是在整屏上盖一层绿膜；
             // 亮度与半径随进度轻微增强，滑块越往左推，整屏点阵越绿越亮。
@@ -276,6 +403,35 @@ fun UnifiedMatrixCanvas(
             val approvalAlphaBoost = 0.9f * approvalT
             val approvalAlphaFloor = 0.22f * approvalT
 
+            // ---- 空闲降频：纯呼吸待机时把呼吸相位量化到 1/24 ----
+            // 量化值不变时这里不会去读 breathCycle 原始值，本帧也就不产生绘制失效，
+            // 上一帧录制的绘制指令被整帧复用（与"在 draw 内提前 return"等效，
+            // 但不会把节点重录成空指令——那会让点阵闪一帧空白）。
+            val idleBreathOnly = !isRecordingVoice && !hasRipple && !hasShock && !hasGlint &&
+                !hasCascade && approvalT < 0.01f && !approvedGreen
+            val breath = if (idleBreathOnly) idleBreathStep / IDLE_BREATH_STEPS.toFloat() else breathCycle
+            val breathBase = 0.24f + 0.28f * breath
+
+            val staticRadius = baseRadius * approvalRadiusScale
+            val groupOfDot = batches.groupOfDot
+            val groupSize = batches.groupSize
+            val groupStart = batches.groupStart
+            val groupCursor = batches.groupCursor
+            val points = batches.points
+            val alphaSum = batches.alphaSum
+            val radiusSum = batches.radiusSum
+            val categoryRgb = batches.categoryRgb
+
+            categoryRgb[DOT_CAT_BASE] = baseDotColor.toArgb() and 0x00FFFFFF
+            categoryRgb[DOT_CAT_GREEN] = RGB_DOT_GREEN
+            categoryRgb[DOT_CAT_CASCADE] = RGB_DOT_CASCADE
+            categoryRgb[DOT_CAT_GLINT] = RGB_DOT_WHITE
+            categoryRgb[DOT_CAT_SHOCK] = RGB_DOT_SHOCK
+
+            // ---- pass 1：逐点分类 + 分桶计数 + 组内累加（本帧唯一需要逐点算三角函数的地方）----
+            groupSize.fill(0)
+            alphaSum.fill(0f)
+            radiusSum.fill(0f)
             var i = 0
             while (i < count) {
                 val edgeFade = edgeFadeArr[i]
@@ -329,34 +485,74 @@ fun UnifiedMatrixCanvas(
                     cascadeRatio = (1f - (distFromFront / cascadeBand).coerceIn(0f, 1f))
                 }
 
-                // 颜色与混合决定
-                val particleColor = when {
-                    // 审批滑块一旦开始推进，点阵进度的绿必须压过"待确认红瀑"，否则红会把绿盖掉、用户看不到反馈
-                    approvalT > 0.01f -> baseDotColor.copy(
-                        alpha = (baseAlpha * (1f + approvalAlphaBoost) + rippleAlpha + approvalAlphaFloor)
-                            .coerceIn(0f, 1f)
-                    )
-                    approvedGreen -> COLOR_DOT_GREEN.copy(alpha = (0.85f * edgeFade).coerceIn(0f, 1f))
-                    isParticleInCascade -> COLOR_DOT_CASCADE.copy(
-                        alpha = ((0.46f + 0.54f * cascadeRatio) * edgeFade).coerceIn(0f, 1f)
-                    )
-                    glintAlpha > 0.05f -> COLOR_DOT_WHITE.copy(alpha = (baseAlpha + glintAlpha).coerceIn(0f, 1f))
-                    shockAlpha > 0.05f -> COLOR_DOT_SHOCK.copy(alpha = (baseAlpha + shockAlpha).coerceIn(0f, 1f))
-                    else -> baseDotColor.copy(
-                        alpha = (baseAlpha * (1f + approvalAlphaBoost) + rippleAlpha + approvalAlphaFloor)
-                            .coerceIn(0f, 1f)
-                    )
+                // 6. 颜色类别 + alpha（与历史 when 分支逐条等价，仅把逐点 Color.copy 换成裸 alpha）
+                val category =
+                    dotCategory(approvalT, approvedGreen, isParticleInCascade, glintAlpha, shockAlpha)
+                val alpha = when (category) {
+                    DOT_CAT_GREEN -> (0.85f * edgeFade).coerceIn(0f, 1f)
+                    DOT_CAT_CASCADE -> ((0.46f + 0.54f * cascadeRatio) * edgeFade).coerceIn(0f, 1f)
+                    DOT_CAT_GLINT -> (baseAlpha + glintAlpha).coerceIn(0f, 1f)
+                    DOT_CAT_SHOCK -> (baseAlpha + shockAlpha).coerceIn(0f, 1f)
+                    else -> (baseAlpha * (1f + approvalAlphaBoost) + rippleAlpha + approvalAlphaFloor)
+                        .coerceIn(0f, 1f)
                 }
 
-                val dynamicRadius = baseRadius * approvalRadiusScale +
-                    (rippleScale * 1.0f + glintScale * 1.2f + shockScale * 1.5f) * dynamicUnit
+                // 7. 半径增生量：动态放大单独占档；无动态的帧里 0 档成员全是静态半径，组代表值即精确半径
+                val extraRadius = (rippleScale + glintScale * 1.2f + shockScale * 1.5f) * dynamicUnit
 
-                drawCircle(
-                    color = particleColor,
-                    radius = dynamicRadius,
-                    center = Offset(xs[i] * scaleX, ys[i] * scaleY)
-                )
+                val group = dotGroupIndex(category, alpha, extraRadius, radiusQuantum)
+                groupOfDot[i] = group
+                groupSize[group]++
+                alphaSum[group] += alpha
+                radiusSum[group] += staticRadius + extraRadius
                 i++
+            }
+
+            // ---- 前缀和：把每个桶的计数换算成 points 里的连续区间 ----
+            var cursor = 0
+            var group = 0
+            while (group < DOT_GROUP_COUNT) {
+                groupStart[group] = cursor
+                groupCursor[group] = cursor
+                cursor += groupSize[group]
+                group++
+            }
+
+            // ---- pass 2：把坐标按组写进连续段（只做两次数组写入，不再重算任何三角函数）----
+            i = 0
+            while (i < count) {
+                val slot = groupCursor[groupOfDot[i]]
+                groupCursor[groupOfDot[i]] = slot + 1
+                points[slot * 2] = xs[i] * scaleX
+                points[slot * 2 + 1] = ys[i] * scaleY
+                i++
+            }
+
+            // ---- 批绘制：每满组一次 drawPoints(PointMode.Points, 圆头, strokeWidth = 2 × 半径) ----
+            drawIntoCanvas { canvas ->
+                val nativeCanvas = canvas.nativeCanvas
+                val nativePaint = batches.paint.asFrameworkPaint()
+                var g = 0
+                while (g < DOT_GROUP_COUNT) {
+                    val dotCount = groupSize[g]
+                    if (dotCount > 0) {
+                        val category = g / DOT_GROUPS_PER_CATEGORY
+                        val withinCategory = g - category * DOT_GROUPS_PER_CATEGORY
+                        val alphaBucket = withinCategory / DOT_RADIUS_BUCKETS
+                        val radiusBucket = withinCategory - alphaBucket * DOT_RADIUS_BUCKETS
+                        val groupAlpha = dotGroupAlpha(alphaSum[g], dotCount, alphaBucket)
+                        val groupRadius = dotGroupRadius(
+                            radiusSum[g],
+                            dotCount,
+                            staticRadius + radiusBucket * radiusQuantum,
+                        )
+                        val alphaByte = (groupAlpha * 255f + 0.5f).toInt().coerceIn(0, 255)
+                        nativePaint.color = categoryRgb[category] or (alphaByte shl 24)
+                        nativePaint.strokeWidth = 2f * groupRadius
+                        nativeCanvas.drawPoints(points, groupStart[g] * 2, dotCount * 2, nativePaint)
+                    }
+                    g++
+                }
             }
         }
     }

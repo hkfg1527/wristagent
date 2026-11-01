@@ -331,11 +331,19 @@ fun SpringStreamingText(
         remember { mutableStateOf(1f) }
     }
 
+    // 增量清洗 + 记忆化：
+    //  1) StreamMarkdownStripper 只处理新增的完整行（否则 2000 字回复每 32ms 全量重算是 O(n²)）；
+    //  2) remember(text, isStreaming) 避免无关重组（光标闪烁、父级状态变化）也触发解析。
+    val stripper = remember { StreamingMarkdownStripper() }
+    val cleanedText = remember(text, isStreaming) {
+        stripper.strip(text, hideUnclosedTail = isStreaming)
+    }
+
     BasicText(
         modifier = modifier,
         text = buildAnnotatedString {
             // 渲染前做最小 Markdown 清洗：成对强调标记与反引号不外露，流式未闭合标记不闪烁
-            append(stripEmphasisMarkers(text, hideUnclosedTail = isStreaming))
+            append(cleanedText)
             if (isStreaming) {
                 withStyle(SpanStyle(color = Wear.Palette.Accent.copy(alpha = cursorAlpha))) {
                     append(" ▌")

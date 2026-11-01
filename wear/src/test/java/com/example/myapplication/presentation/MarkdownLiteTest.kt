@@ -114,4 +114,45 @@ class MarkdownLiteTest {
         val raw = "2026年10月31日 星期六"
         assertEquals(raw, stripEmphasisMarkers(raw, hideUnclosedTail = true))
     }
+
+    // ============ 流式增量清洗器：必须与全量实现逐字一致（性能优化不得改变输出） ============
+
+    @Test
+    fun `增量清洗在逐字增长时与全量实现一致`() {
+        val full = "**粗体** 与 `code` 以及 *斜体*，换行\n第二行 **未闭合"
+        val stripper = com.example.myapplication.presentation.ui.StreamingMarkdownStripper()
+        for (end in 1..full.length) {
+            val partial = full.substring(0, end)
+            assertEquals(
+                "第 " + end + " 字符处结果不一致",
+                stripEmphasisMarkers(partial, hideUnclosedTail = true),
+                stripper.strip(partial, hideUnclosedTail = true)
+            )
+        }
+    }
+
+    @Test
+    fun `增量清洗在多行追加时与全量实现一致`() {
+        val stripper = com.example.myapplication.presentation.ui.StreamingMarkdownStripper()
+        val lines = listOf("# 标题", "- 列表 **项**", "```", "code block", "```", "尾部 `x`")
+        var acc = ""
+        for (line in lines) {
+            acc = if (acc.isEmpty()) line else acc + "\n" + line
+            assertEquals(stripEmphasisMarkers(acc, hideUnclosedTail = false), stripper.strip(acc, hideUnclosedTail = false))
+            assertEquals(stripEmphasisMarkers(acc, hideUnclosedTail = true), stripper.strip(acc, hideUnclosedTail = true))
+        }
+    }
+
+    @Test
+    fun `增量清洗在输入被替换时回退到全量结果`() {
+        val stripper = com.example.myapplication.presentation.ui.StreamingMarkdownStripper()
+        stripper.strip("第一版 **内容**", hideUnclosedTail = true)
+        // 完全不同的新文本（例如切换会话）：前缀不匹配必须自行回退，而不是拼接旧结果
+        val replaced = "完全不同的 *另一段*"
+        assertEquals(stripEmphasisMarkers(replaced, hideUnclosedTail = true), stripper.strip(replaced, hideUnclosedTail = true))
+        assertEquals(
+            stripEmphasisMarkers("", hideUnclosedTail = true),
+            stripper.strip("", hideUnclosedTail = true)
+        )
+    }
 }

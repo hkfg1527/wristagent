@@ -132,3 +132,40 @@ private fun isMarkerRun(prev: Char?, next: Char?, char: Char): Boolean {
 
 private fun Char?.isAsciiAlnum(): Boolean =
     this != null && (this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9')
+/**
+ * 流式增量清洗器：把 [stripEmphasisMarkers] 的全量重算降成「只处理新增部分」。
+ *
+ * 为什么需要：流式每 32ms 更新一次，若每次都把整段文本 split + 逐行 regex + 标记配对，
+ * 2000 字回复的总开销是 O(n²)，真表上表现为周期性 48~117ms 的长帧。
+ *
+ * 实现：以最后一个换行为界，前半部分（已完成的完整行）只在**新增了完整行**时增量追加；
+ * 末行因为 hideUnclosedTail 只影响它，每次都重新算（单行成本可忽略）。
+ * 输入不是上一次的前缀扩展时自动回退到全量重算，保证正确性优先。
+ */
+class StreamingMarkdownStripper {
+    private var cachedHeadRaw: String = ""
+    private var cachedHeadStripped: String = ""
+
+    fun strip(raw: String, hideUnclosedTail: Boolean): String {
+        if (raw.isEmpty()) {
+            cachedHeadRaw = ""
+            cachedHeadStripped = ""
+            return raw
+        }
+        val cut = raw.lastIndexOf('\n')
+        val headRaw = if (cut >= 0) raw.substring(0, cut + 1) else ""
+        val tailRaw = if (cut >= 0) raw.substring(cut + 1) else raw
+
+        val headStripped = when {
+            headRaw == cachedHeadRaw -> cachedHeadStripped
+            headRaw.startsWith(cachedHeadRaw) ->
+                cachedHeadStripped + stripEmphasisMarkers(headRaw.substring(cachedHeadRaw.length))
+            else -> stripEmphasisMarkers(headRaw)
+        }
+        cachedHeadRaw = headRaw
+        cachedHeadStripped = headStripped
+
+        val tailStripped = stripEmphasisMarkers(tailRaw, hideUnclosedTail = hideUnclosedTail)
+        return headStripped + tailStripped
+    }
+}
