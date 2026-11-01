@@ -691,21 +691,21 @@ private fun DrawScope.drawCurvedBottomHandle(progress: Float) {
     if (p <= 0.001f) return
     fun mix(from: Float, to: Float) = from + (to - from) * p
 
-    // 起点：主键圆心（屏幕水平居中，底距 12dp + 半径 26dp）
-    val buttonCenterY = size.height - (12.dp.toPx() + 26.dp.toPx())
-    val buttonCenterX = size.width / 2f
-    // 终点：以屏幕圆心为基准、半径 84dp 的底部弧
+    // ★ 硬约束：这条弧**永远是一小段细线**，绝不参与"从球插值"。
+    // 之前让线宽 52dp→4.5dp、弧长 360°→48° 一起插值，中间态就是一块半屏粗弧（用户看到"两个巨大圆弧闪一下"）。
+    // 现在：线宽恒 5dp、弧长最大 48°、圆心固定在屏幕中心（只让半径长大），几何上不可能再糊住屏幕。
+    val strokePx = 5.dp.toPx()
+    val sweep = mix(18f, 48f)
+    // 半径从主键附近（48dp ⇒ 弧顶 y≈144dp）长到贴底（84dp ⇒ y≈180dp）：
+    // 视觉上是"从按钮位置往下弯过去贴边"，全程停留在屏幕下半部。
+    val startRadius = 48.dp.toPx()
     val endRadius = size.minDimension / 2f - 12.dp.toPx()
-
-    // 圆心从"主键中心"平滑移到"屏幕中心"：弧线因此像是从球里长出来、再弯下去贴底
-    val centerX = mix(buttonCenterX, size.width / 2f)
-    val centerY = mix(buttonCenterY, size.height / 2f)
-    val radius = mix(0f, endRadius)
-    // 线宽从"整颗球的直径"收到 4.5dp：p=0 时半径 0 + 52dp 圆头 = 一颗实心球
-    val strokePx = mix(52.dp.toPx(), 4.5.dp.toPx())
-    val sweep = mix(360f, 48f)
-    // 只在极早期淡入，避免与仍在收缩的主键叠色
-    val alpha = (p / 0.22f).coerceIn(0f, 1f) * 0.62f
+    val radius = mix(startRadius, endRadius)
+    val centerX = size.width / 2f
+    val centerY = size.height / 2f
+    // 主键先把体积收掉，弧条再淡入：两者不同时出现，避免叠色
+    // 弧条必须等主键基本收完再出现（p>0.55），否则会和正在缩小的按钮叠成两个形状
+    val alpha = ((p - 0.55f) / 0.30f).coerceIn(0f, 1f) * 0.62f
 
     drawArc(
         color = Wear.Palette.Orb.copy(alpha = alpha),

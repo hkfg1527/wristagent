@@ -356,7 +356,10 @@ fun BottomInteractiveBlock(
 
             // ================= 核心单体主按键 (手势感应、弹性伸缩、长按录音) =================
             // 收起进度 → 尺寸与圆角：56dp×8dp/4dp 的白色小条 <-> 52dp 圆形主键
-            val collapseFraction = collapseProgress.coerceIn(0f, 1f)
+            // 平方缓动：让主键在收起的**前半段**就迅速退到最小尺寸，
+            // 避免中间态停在一块"宽圆角矩形"上（那会和随后淡入的弧条同时出现，看起来像被拆成两个东西）。
+            val collapseProgressRaw = collapseProgress.coerceIn(0f, 1f)
+            val collapseFraction = collapseProgressRaw * collapseProgressRaw
             val keyWidth = lerpDp(CollapsedStripWidth, capsuleWidth, collapseFraction)
             val keyHeight = lerpDp(CollapsedStripHeight, Wear.Size.Orb, collapseFraction)
             val keyCorner = lerpDp(CollapsedStripCorner, Wear.Size.Orb / 2, collapseFraction)
