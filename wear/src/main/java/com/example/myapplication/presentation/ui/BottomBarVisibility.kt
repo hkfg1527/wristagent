@@ -63,6 +63,13 @@ object BottomBarVisibility {
         return lastUserScrollMs < turnStartMs
     }
 
+    /**
+     * 提词器滚到输出结尾后，按钮是否应该自动回来。
+     * 结论是**无条件恢复**：此刻正文下方刚好空出位置，且"读完了"就是最强的操作意图信号。
+     * 注意它与 [collapseAllowed] 无关 —— 挂起期只约束"收起"，从不约束"恢复"。
+     */
+    fun shouldRestoreAtOutputEnd(): Boolean = true
+
     fun next(current: BottomBarMode, event: BottomBarEvent, forceExpanded: Boolean): BottomBarMode {
         if (forceExpanded) return BottomBarMode.Expanded
         return when (event) {

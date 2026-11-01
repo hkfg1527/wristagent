@@ -201,4 +201,19 @@ class ChatUiStateBottomBarForceTest {
             )
         )
     }
+
+    /** 输出到底后按钮必须无条件恢复（挂起期也不能拦）。 */
+    @Test
+    fun `输出到底后按钮自动恢复_且不受挂起期影响`() {
+        assertTrue(BottomBarVisibility.shouldRestoreAtOutputEnd())
+        // 即使处在挂起期，恢复方向也必须放行
+        assertEquals(
+            BottomBarMode.Expanded,
+            BottomBarVisibility.next(
+                current = BottomBarMode.Collapsed,
+                event = BottomBarEvent.StripTap,
+                forceExpanded = false
+            )
+        )
+    }
 }

@@ -371,6 +371,10 @@ fun ChatScreen(
                 ReadingCameraPhase.AutoPan -> {
                     if (!listState.canScrollForward) {
                         camera.onEvent(ReadingCameraEvent.ReachedEnd)
+                        // 提词器滚到「输出结尾」：正文下方正好空出位置，按钮自动回来。
+                        // 这里绕过唤醒挂起期（挂起只阻止"收起"，不阻止"恢复"），
+                        // 因为这是"读完了"的明确信号，用户此刻最可能想继续操作。
+                        viewModel.setBottomBarMode(BottomBarMode.Expanded)
                         return@LaunchedEffect
                     }
 
@@ -481,19 +485,17 @@ fun ChatScreen(
 
     // 持续把当前居中位置写回 ViewModel：切屏前就有最新值可恢复
     LaunchedEffect(listState) {
-        snapshotFlow { listState.centerItemIndex to listState.centerItemScrollOffset }
-            .collect { (index, offset) -> viewModel.saveListPosition(index, offset) }
+        // 用 Long 把 (index, offset) 编成单值：滚动时每帧都会求值，Pair 分配是实打实的垃圾
+        snapshotFlow { (listState.centerItemIndex.toLong() shl 32) or (listState.centerItemScrollOffset.toLong() and 0xFFFFFFFFL) }
+            .collect { packed ->
+                viewModel.saveListPosition(
+                    centerItemIndex = (packed shr 32).toInt(),
+                    centerItemScrollOffset = packed.toInt()
+                )
+            }
     }
 
-    var currentTime by remember {
-        mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
-    }
-    LaunchedEffect(Unit) {
-        while (true) {
-            currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-            delay(1000)
-        }
-    }
+
 
     Box(
         modifier = Modifier
@@ -552,10 +554,8 @@ fun ChatScreen(
         // 审批态由居中文字浮层接管，文字顶边会扫到弧形时钟字形，
         // 因此审批期间隐藏时钟：沉浸要的是干净，而不是留下一条状态栏残影。
         if (!isApprovalFocus) {
-            TopClockBar(
-                timeText = currentTime,
-                modifier = Modifier.fillMaxSize()
-            )
+            // 时间状态由时钟自己持有：避免每秒让整棵 ChatScreen 重组
+            TopClockBar(modifier = Modifier.fillMaxSize())
         }
 
         // ================= 3.5 审批浮层：没有卡片也没有描边，文字浮在径向暗晕之上 =================
