@@ -150,7 +150,8 @@ class ReadingCameraTest {
         assertTrue("界面倍率必须大于 1", ReadingPace.USER_SPEED_MULTIPLIER > 1f)
         assertEquals(base * ReadingPace.USER_SPEED_MULTIPLIER, boosted, 0.001f)
         assertEquals("人类读速模型本身不随产品提速改变", 0.7f, ReadingPace.PACE_FACTOR, 0.0001f)
-        // 上限校验：即便提速，一屏 94dp 也要 2.5 秒以上才走完，不能变成"刷屏"
-        assertTrue("提速后仍须是慢速阅读", 94f / boosted >= 2.5f)
+        // 用户连续两次要求翻倍（2.0 -> 2.6 -> 5.2），下限随之放宽到 1.2 秒/屏；
+        // 但仍不允许快到"字都看不清"，所以保留这条护栏
+        assertTrue("提速后仍须可读（一屏不少于 1.2 秒）", 94f / boosted >= 1.2f)
     }
 }

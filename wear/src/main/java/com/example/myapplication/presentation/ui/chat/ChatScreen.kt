@@ -16,11 +16,17 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,6 +48,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -51,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.core.content.ContextCompat
 import com.example.myapplication.R
@@ -509,16 +517,20 @@ fun ChatScreen(
 
         // 收起态：半透明弧线贴着圆屏底缘（Wear M3E 的曲面元素都是沿表盘边缘成弧）。
         // 视觉由这里画，点击热区仍由下面 BottomInteractiveBlock 的 44dp 透明区域承担。
-        val collapsedHandleAlpha by animateFloatAsState(
-            targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 1f else 0f,
-            animationSpec = tween(durationMillis = 180),
-            label = "collapsedHandleAlpha"
-        )
-        if (collapsedHandleAlpha > 0.01f) {
-            Canvas(modifier = Modifier.fillMaxSize().alpha(collapsedHandleAlpha)) {
-                drawCurvedBottomHandle()
-            }
+        // ★ 唯一收展进度：1 = 完整主键，0 = 贴底弧条。
+        // 按钮的尺寸/圆角、弧条的圆心/半径/线宽/弧长全部由它插值 —— 一条时间线、一个连续形变，
+        // 不再出现"下面突然冒出、上面自己收、两边各弹一下"的割裂。
+        val collapseProgress = remember { Animatable(1f) }
+        LaunchedEffect(bottomBarMode) {
+            collapseProgress.animateTo(
+                targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 0f else 1f,
+                // 阻尼 0.62：只允许一次轻微过冲（有弹性但不来回弹两下）
+                animationSpec = spring(dampingRatio = 0.62f, stiffness = 320f)
+            )
         }
+        val arcP = 1f - collapseProgress.value
+        // 注意：弧条与它的热区必须画在 BottomInteractiveBlock **之后**（见下方），
+        // 否则会被底栏容器（58dp 高）压在下面，点击事件全被容器吃掉 —— 这就是"点弧条没反应"的真因。
 
         // ================= 4. 单体演变底栏控制器 =================
         // 文字输入弹窗是模态：打开时底栏整体退场，避免卡片与主键互相压叠
@@ -573,8 +585,40 @@ fun ChatScreen(
                 state.pendingApproval?.risk?.aiRiskLevel ?: RiskLevel.MEDIUM
             ),
             collapsed = bottomBarMode == BottomBarMode.Collapsed,
+            collapseProgress = collapseProgress.value,
             onCollapsedStripTap = { reportBottomBarEvent(BottomBarEvent.StripTap) }
         )
+
+        // 弧条绘在底栏之后：保证它在最上层，热区能真正接到点击
+        if (arcP > 0.01f) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCurvedBottomHandle(arcP)
+            }
+            // 热区必须跟着弧走：点弧条本身、或从弧条上滑，都能恢复成主键。
+            // 之前热区留在旧按钮位置，用户点看得见的弧条没反应 —— 这是真 bug。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    // 单一手势处理器：clickable 与 detectVerticalDragGestures 叠在同一节点时，
+                    // 后者会吃掉抬手事件，导致"点弧条没反应"（用户实际遇到的 bug）。
+                    // 这里统一为"抬手即恢复"：轻点、上滑、下滑都算，符合直觉。
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!change.pressed) {
+                                    reportBottomBarEvent(BottomBarEvent.StripTap)
+                                    break
+                                }
+                            }
+                        }
+                    }
+            )
+        }
 
         // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================
         val inlineNotice = state.notice
@@ -642,18 +686,33 @@ fun ChatScreen(
  * 直角矩形小条贴在圆屏底部会啃进圆周、像贴纸；弧线与机身外缘同心，才像是长在表盘上。
  * Canvas 角度约定 0° = 3 点、90° = 6 点，因此 42° ~ 138° 正好覆盖底部约 96° 的一段。
  */
-private fun DrawScope.drawCurvedBottomHandle() {
-    val strokePx = 4.5.dp.toPx()
-    val insetPx = 4.dp.toPx()
-    val radius = size.minDimension / 2f - insetPx
-    if (radius <= 0f) return
+private fun DrawScope.drawCurvedBottomHandle(progress: Float) {
+    val p = progress.coerceIn(0f, 1f)
+    if (p <= 0.001f) return
+    fun mix(from: Float, to: Float) = from + (to - from) * p
+
+    // 起点：主键圆心（屏幕水平居中，底距 12dp + 半径 26dp）
+    val buttonCenterY = size.height - (12.dp.toPx() + 26.dp.toPx())
+    val buttonCenterX = size.width / 2f
+    // 终点：以屏幕圆心为基准、半径 84dp 的底部弧
+    val endRadius = size.minDimension / 2f - 12.dp.toPx()
+
+    // 圆心从"主键中心"平滑移到"屏幕中心"：弧线因此像是从球里长出来、再弯下去贴底
+    val centerX = mix(buttonCenterX, size.width / 2f)
+    val centerY = mix(buttonCenterY, size.height / 2f)
+    val radius = mix(0f, endRadius)
+    // 线宽从"整颗球的直径"收到 4.5dp：p=0 时半径 0 + 52dp 圆头 = 一颗实心球
+    val strokePx = mix(52.dp.toPx(), 4.5.dp.toPx())
+    val sweep = mix(360f, 48f)
+    // 只在极早期淡入，避免与仍在收缩的主键叠色
+    val alpha = (p / 0.22f).coerceIn(0f, 1f) * 0.62f
+
     drawArc(
-        color = Wear.Palette.Orb.copy(alpha = 0.55f),
-        // 弧长与顶部时间文字相当（约 48°），不再横贯整个底缘 —— 两端太远会显得笨重
-        startAngle = 66f,
-        sweepAngle = 48f,
+        color = Wear.Palette.Orb.copy(alpha = alpha),
+        startAngle = 90f - sweep / 2f,
+        sweepAngle = sweep,
         useCenter = false,
-        topLeft = Offset(size.width / 2f - radius, size.height / 2f - radius),
+        topLeft = Offset(centerX - radius, centerY - radius),
         size = Size(radius * 2f, radius * 2f),
         style = Stroke(width = strokePx, cap = StrokeCap.Round)
     )

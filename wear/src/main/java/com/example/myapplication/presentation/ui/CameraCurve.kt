@@ -124,7 +124,7 @@ object ReadingPace {
      * 界面实际使用的倍率：真机上手感 0.7 倍读速太慢（一屏要走 14 秒），用户要求再快一倍。
      * 保留 [PACE_FACTOR] 作为“人类读速模型”的基准，这里只做产品级提速，两者语义分开。
      */
-    const val USER_SPEED_MULTIPLIER = 2.6f
+    const val USER_SPEED_MULTIPLIER = 5.2f
 
     /** 每行字数：12sp 正文、约 190dp 阅读宽的实测值。 */
     const val CHARS_PER_LINE = 14
