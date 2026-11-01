@@ -141,7 +141,11 @@ fun ChatScreen(
         label = "thinkingIntensity"
     )
 
-    val listState = rememberScalingLazyListState()
+    // 用 ViewModel 保存的位置初始化：否则从设置页返回时列表会跳回顶部（用户看到"内容错位/抽搐"）
+    val listState = rememberScalingLazyListState(
+        initialCenterItemIndex = viewModel.savedCenterItemIndex,
+        initialCenterItemScrollOffset = viewModel.savedCenterItemScrollOffset
+    )
     val mainFocusRequester = remember { FocusRequester() }
 
     val isApprovalFocus = state.isApprovalFocus
@@ -297,7 +301,10 @@ fun ChatScreen(
     val cameraFocusIndex = conversationItems.lastIndex
 
     LaunchedEffect(cameraFocusTurnKey) {
-        if (cameraFocusTurnKey == null) return@LaunchedEffect
+        val turnKey = cameraFocusTurnKey ?: return@LaunchedEffect
+        // 每个回合只对齐一次：从设置页返回时 ChatScreen 重新组合，这里必须拦住，
+        // 否则镜头会重新"对齐到回合开头"，看起来像画面抽搐。
+        if (!viewModel.claimCameraTurn(turnKey)) return@LaunchedEffect
         // 注意：这里**不能**用 isExecuting 当门。提词器的核心场景正是"回复已经结束、用户要读全文"，
         // 用 isExecuting 会把 AutoPan 永远挡在门外（回复一结束协程就 return）。
         // 接管条件只看"本轮已经吐出了正文"（由 replyTurnKey 判定），翻历史会话时 replyTurnKey 为 null。
@@ -380,48 +387,44 @@ fun ChatScreen(
     }
 
     // ================= 底栏可见性：滚动即收起成小白条，点条才展开 =================
-    var bottomBarMode by remember { mutableStateOf(BottomBarMode.Expanded) }
+    // 底栏形态存在 ViewModel 里：切到设置再回来时不会重置成展开（否则会弹一下）
+    val bottomBarMode by viewModel.bottomBarMode.collectAsState()
     val bottomBarForceExpanded = state.isBottomBarForceExpanded
     // 进入强制态（执行/审批/录音/弹窗/抽屉）立即展开并锁住，离开强制态不自动收起
     LaunchedEffect(bottomBarForceExpanded) {
-        if (bottomBarForceExpanded) bottomBarMode = BottomBarMode.Expanded
+        if (bottomBarForceExpanded) viewModel.setBottomBarMode(BottomBarMode.Expanded)
     }
     // 唤醒挂起期：点一次弧条把按钮叫回来后，3 秒内不许再因滚动/静默被自动收走
     var wakeLatchUntil by remember { mutableLongStateOf(0L) }
     var lastUserScrollAt by remember { mutableLongStateOf(0L) }
 
+    // 统一的形态迁移入口：挂起期内只允许"展开"方向，禁止自动收起
+    fun applyBarEvent(event: BottomBarEvent, allowCollapse: Boolean) {
+        val next = BottomBarVisibility.next(
+            current = bottomBarMode,
+            event = event,
+            forceExpanded = state.isBottomBarForceExpanded
+        )
+        if (next == BottomBarMode.Collapsed && !allowCollapse) return
+        viewModel.setBottomBarMode(next)
+    }
+
     val reportBottomBarEvent: (BottomBarEvent) -> Unit = { event ->
         val now = SystemClock.uptimeMillis()
         when (event) {
             BottomBarEvent.StripTap -> {
-                bottomBarMode = BottomBarVisibility.next(
-                    current = bottomBarMode,
-                    event = event,
-                    forceExpanded = state.isBottomBarForceExpanded
-                )
-                // 刚被唤醒：挂起 3 秒，避免"手一碰又收走"
+                applyBarEvent(event, allowCollapse = true)
+                // 刚被唤醒：挂起 3 秒，避免手一碰又被收走
                 wakeLatchUntil = now + WAKE_LATCH_MS
             }
 
             BottomBarEvent.UserScroll -> {
                 lastUserScrollAt = now
-                if (BottomBarVisibility.collapseAllowed(now, wakeLatchUntil)) {
-                    bottomBarMode = BottomBarVisibility.next(
-                        current = bottomBarMode,
-                        event = event,
-                        forceExpanded = state.isBottomBarForceExpanded
-                    )
-                }
+                applyBarEvent(event, allowCollapse = BottomBarVisibility.collapseAllowed(now, wakeLatchUntil))
             }
 
             BottomBarEvent.AutoPanQuiet -> {
-                if (BottomBarVisibility.collapseAllowed(now, wakeLatchUntil)) {
-                    bottomBarMode = BottomBarVisibility.next(
-                        current = bottomBarMode,
-                        event = event,
-                        forceExpanded = state.isBottomBarForceExpanded
-                    )
-                }
+                applyBarEvent(event, allowCollapse = BottomBarVisibility.collapseAllowed(now, wakeLatchUntil))
             }
         }
     }
@@ -432,24 +435,27 @@ fun ChatScreen(
             .collect { reportBottomBarEvent(BottomBarEvent.UserScroll) }
     }
 
-    // 新回合到达后 3 秒内无人滚动 → 自动收起（收起后计时结束，不再反复触发）
+    // 新回合到达后 3 秒内无人滚动 → 自动收起（每个回合只计时一次，返回设置页不会重开）
     LaunchedEffect(cameraFocusTurnKey) {
         val key = cameraFocusTurnKey ?: return@LaunchedEffect
+        if (!viewModel.claimAutoCollapseTurn(key)) return@LaunchedEffect
         val turnStart = SystemClock.uptimeMillis()
         delay(AUTO_COLLAPSE_DELAY_MS)
         val now = SystemClock.uptimeMillis()
-        if (BottomBarVisibility.shouldAutoCollapseAfterTurn(
-                nowMs = now,
-                turnStartMs = turnStart,
-                wakeLatchUntilMs = wakeLatchUntil,
-                lastUserScrollMs = lastUserScrollAt,
-                forceExpanded = state.isBottomBarForceExpanded
-            )
-        ) {
-            bottomBarMode = BottomBarVisibility.next(
-                current = bottomBarMode,
-                event = BottomBarEvent.AutoPanQuiet,
-                forceExpanded = state.isBottomBarForceExpanded
+        val shouldCollapse = BottomBarVisibility.shouldAutoCollapseAfterTurn(
+            nowMs = now,
+            turnStartMs = turnStart,
+            wakeLatchUntilMs = wakeLatchUntil,
+            lastUserScrollMs = lastUserScrollAt,
+            forceExpanded = state.isBottomBarForceExpanded
+        )
+        if (shouldCollapse) {
+            viewModel.setBottomBarMode(
+                BottomBarVisibility.next(
+                    current = bottomBarMode,
+                    event = BottomBarEvent.AutoPanQuiet,
+                    forceExpanded = state.isBottomBarForceExpanded
+                )
             )
         }
     }
@@ -471,6 +477,12 @@ fun ChatScreen(
         voiceInputManager.onSpeechError = { rawMessage ->
             viewModel.onVoiceError(rawMessage)
         }
+    }
+
+    // 持续把当前居中位置写回 ViewModel：切屏前就有最新值可恢复
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.centerItemIndex to listState.centerItemScrollOffset }
+            .collect { (index, offset) -> viewModel.saveListPosition(index, offset) }
     }
 
     var currentTime by remember {

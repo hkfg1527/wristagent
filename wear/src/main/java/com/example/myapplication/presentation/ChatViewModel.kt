@@ -13,6 +13,7 @@ import com.example.myapplication.agent.AgentGateway
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
+import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.StreamingThrottleState
@@ -60,6 +61,44 @@ class ChatViewModel(
     private var delayedStretchJob: Job? = null
     private var noticeJob: Job? = null
     private var consumedExternalSeq: Long? = null
+
+    // ==================== 跨屏存活的镜头/底栏状态 ====================
+    // ChatScreen 在切到设置页时会离开组合，remember 全部丢失。若把这些状态留在 Compose 里，
+    // 返回主界面时镜头会重新"对齐回合开头"、底栏会重置展开、3 秒静默计时会重开 —— 用户看到的就是抽搐。
+    // 因此「已接管的回合」与「底栏形态」都提升到这里，随 ViewModel 存活。
+
+    /** 已经接管过镜头的回合 key（每个回合只对齐一次）。 */
+    private val cameraHandledTurns = mutableSetOf<String>()
+
+    /** 已经驱动过"3 秒静默自动收起"的回合 key（每个回合只计时一次）。 */
+    private val autoCollapseHandledTurns = mutableSetOf<String>()
+
+    private val _bottomBarMode = MutableStateFlow(BottomBarMode.Expanded)
+    val bottomBarMode: StateFlow<BottomBarMode> = _bottomBarMode.asStateFlow()
+
+    /** 返回 true 表示这是该回合第一次请求接管，调用方可以开始镜头动画。 */
+    fun claimCameraTurn(turnKey: String): Boolean = cameraHandledTurns.add(turnKey)
+
+    /** 返回 true 表示这是该回合第一次请求计时，调用方可以开始 3 秒静默计时。 */
+    fun claimAutoCollapseTurn(turnKey: String): Boolean = autoCollapseHandledTurns.add(turnKey)
+
+    fun setBottomBarMode(mode: BottomBarMode) {
+        _bottomBarMode.value = mode
+    }
+
+    /**
+     * 列表的滚动位置。同样必须跨屏存活：ChatScreen 切走即销毁，
+     * ScalingLazyListState 跟着一起没，返回时列表会跳回顶部 —— 用户看到的是"镜头抽搐/内容错位"。
+     */
+    var savedCenterItemIndex: Int = 0
+        private set
+    var savedCenterItemScrollOffset: Int = 0
+        private set
+
+    fun saveListPosition(centerItemIndex: Int, centerItemScrollOffset: Int) {
+        savedCenterItemIndex = centerItemIndex
+        savedCenterItemScrollOffset = centerItemScrollOffset
+    }
 
     init {
         gateway.onRequireConfirmation = { toolName, _, risk -> awaitApprovalDecision(toolName, risk) }
