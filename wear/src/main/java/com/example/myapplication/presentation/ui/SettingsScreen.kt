@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui
 
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,7 @@ import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
 import com.example.myapplication.presentation.ui.settings.ModelConfigContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
+import com.example.myapplication.presentation.ui.settings.RowHapticDecider
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
@@ -66,7 +69,6 @@ import com.example.myapplication.presentation.ui.settings.vibrateTick
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.theme.WearMaterialTheme
 import com.example.myapplication.voice.AsrProviderId
-import kotlin.math.abs
 
 /**
  * Wear OS 端侧 AI 设置中心
@@ -137,15 +139,25 @@ fun SettingsScreen(
 
     val listState = rememberScalingLazyListState()
 
+    // 主设置页唯一的滚动震动：中心条目换了一个才震一次；同一索引内的小幅滚动不震，两次之间至少隔 120ms
+    LaunchedEffect(listState) {
+        var previousIndex = listState.centerItemIndex
+        var lastTickMs = RowHapticDecider.NeverTicked
+        snapshotFlow { listState.centerItemIndex }.collect { index ->
+            val nowMs = SystemClock.uptimeMillis()
+            if (RowHapticDecider.shouldTick(previousIndex, index, nowMs, lastTickMs)) {
+                lastTickMs = nowMs
+                context.vibrateTick()
+            }
+            previousIndex = index
+        }
+    }
+
     WearMaterialTheme {
         // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
         PullDownDismissContainer(
             modifier = modifier,
             enabled = activeDialog == null && !showVoiceAsr && !exit.isExiting,
-            atTop = {
-                !listState.canScrollBackward ||
-                    (listState.centerItemIndex == 0 && listState.centerItemScrollOffset == 0)
-            },
             onDismiss = { requestExit(onBack) }
         ) {
             Box(
@@ -169,11 +181,9 @@ fun SettingsScreen(
                         .fillMaxSize()
                         // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                         .onRotaryScrollEvent {
-                            // 表冠：同步吃位移（dispatchRawDelta 不受 scroll 互斥锁排队影响，每格刻度都生效）
-                            listState.dispatchRawDelta(it.verticalScrollPixels)
-                            if (abs(it.verticalScrollPixels) > 10f) {
-                                context.vibrateTick()
-                            }
+                            // 表冠：同步吃位移（dispatchRawDelta 不受 scroll 互斥锁排队影响，每格刻度都生效）；
+                            // 增益只放大位移，震动统一交给"中心条目换人"判定
+                            listState.dispatchRawDelta(rotaryScrollDelta(it.verticalScrollPixels))
                             true
                         }
                         .focusRequester(settingsFocusRequester)

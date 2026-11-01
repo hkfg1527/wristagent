@@ -100,7 +100,6 @@ fun VoiceAsrContent(
                 label = stringResource(R.string.settings_asr_toggle_header),
                 checked = enabled,
                 onCheckedChange = { value ->
-                    context.vibrateTick()
                     enabled = value
                     persist()
                 }
@@ -121,7 +120,6 @@ fun VoiceAsrContent(
                     subtitle = stringResource(descriptionRes),
                     selected = providerId == candidate,
                     onSelect = {
-                        context.vibrateTick()
                         providerId = candidate
                         testStatus = ""
                         persist()
@@ -137,7 +135,6 @@ fun VoiceAsrContent(
                 label = stringResource(R.string.settings_baidu_api_key),
                 value = SettingsValueMath.maskSecret(apiKey),
                 onClick = {
-                    context.vibrateTick()
                     editingField = AsrKeyField.API_KEY
                 }
             )
@@ -148,7 +145,6 @@ fun VoiceAsrContent(
                 label = stringResource(R.string.settings_baidu_secret_key),
                 value = SettingsValueMath.maskSecret(secretKey),
                 onClick = {
-                    context.vibrateTick()
                     editingField = AsrKeyField.SECRET_KEY
                 }
             )
@@ -162,7 +158,6 @@ fun VoiceAsrContent(
                     label = candidate.displayName,
                     selected = language == candidate,
                     onSelect = {
-                        context.vibrateTick()
                         language = candidate
                         persist()
                     }
@@ -182,7 +177,6 @@ fun VoiceAsrContent(
                 enabled = !isTesting,
                 tone = Tone.ACCENT,
                 onClick = {
-                    context.vibrateTick()
                     if (isTesting) return@SettingsActionButton
                     isTesting = true
                     testStatus = context.getString(R.string.settings_asr_recording)

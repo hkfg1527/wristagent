@@ -88,7 +88,6 @@ fun ModelConfigContent(
                         label = ModelLabels.label(modelId),
                         selected = currentModel == modelId,
                         onSelect = {
-                            context.vibrateTick()
                             onSelect(modelId, inputBaseUrl)
                         }
                     )
@@ -104,7 +103,6 @@ fun ModelConfigContent(
                     label = name,
                     selected = inputBaseUrl == url,
                     onSelect = {
-                        context.vibrateTick()
                         inputBaseUrl = url
                         preferences.baseUrl = url
                         onSelect(currentModel, url)
@@ -118,7 +116,6 @@ fun ModelConfigContent(
                 label = stringResource(R.string.settings_text_base_url),
                 value = inputBaseUrl,
                 onClick = {
-                    context.vibrateTick()
                     editingField = ModelTextField.BASE_URL
                 }
             )
@@ -129,7 +126,6 @@ fun ModelConfigContent(
                 label = stringResource(R.string.settings_text_api_key),
                 value = SettingsValueMath.maskSecret(inputApiKey),
                 onClick = {
-                    context.vibrateTick()
                     editingField = ModelTextField.API_KEY
                 }
             )
@@ -145,7 +141,6 @@ fun ModelConfigContent(
                 enabled = !isFetching,
                 tone = Tone.ACCENT,
                 onClick = {
-                    context.vibrateTick()
                     isFetching = true
                     fetchResultText = context.getString(R.string.settings_probe_running)
                     scope.launch {

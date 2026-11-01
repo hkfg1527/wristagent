@@ -76,7 +76,6 @@ fun AdvancedPermissionContent(
                 label = stringResource(R.string.settings_privilege_request_shizuku),
                 enabled = status.shizukuInstalled,
                 onClick = {
-                    context.vibrateTick()
                     val activity = context.findActivity()
                     if (activity != null) manager.requestShizukuPermission(activity, SHIZUKU_REQUEST_CODE)
                 }
@@ -90,7 +89,6 @@ fun AdvancedPermissionContent(
                 ),
                 enabled = !probing,
                 onClick = {
-                    context.vibrateTick()
                     probing = true
                     scope.launch {
                         runCatching { manager.probe() }

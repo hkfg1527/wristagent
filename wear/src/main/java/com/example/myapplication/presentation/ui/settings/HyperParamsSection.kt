@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
@@ -23,7 +22,6 @@ fun HyperParamsContent(
     onBack: () -> Unit,
     onParamsChanged: ((temp: Float, maxTokens: Int, stream: Boolean) -> Unit)? = null
 ) {
-    val context = LocalContext.current
     var temp by remember { mutableFloatStateOf(preferences.temperature) }
     var maxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
     var isStream by remember { mutableStateOf(preferences.streamMode) }
@@ -70,7 +68,6 @@ fun HyperParamsContent(
                 selected = SettingsValueMath.temperatureIndex(temp) ==
                     SettingsValueMath.temperatureIndex(TempFast),
                 onSelect = {
-                    context.vibrateTick()
                     applyTemperature(TempFast)
                 }
             )
@@ -82,7 +79,6 @@ fun HyperParamsContent(
                 selected = SettingsValueMath.temperatureIndex(temp) ==
                     SettingsValueMath.temperatureIndex(TempBalanced),
                 onSelect = {
-                    context.vibrateTick()
                     applyTemperature(TempBalanced)
                 }
             )
@@ -94,7 +90,6 @@ fun HyperParamsContent(
                 selected = SettingsValueMath.temperatureIndex(temp) ==
                     SettingsValueMath.temperatureIndex(TempCreative),
                 onSelect = {
-                    context.vibrateTick()
                     applyTemperature(TempCreative)
                 }
             )
@@ -120,7 +115,6 @@ fun HyperParamsContent(
                 label = stringResource(R.string.settings_sse_on),
                 checked = isStream,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     isStream = enabled
                     preferences.streamMode = enabled
                     notifyChange()

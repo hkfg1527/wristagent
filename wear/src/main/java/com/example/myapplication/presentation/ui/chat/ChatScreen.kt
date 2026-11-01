@@ -69,6 +69,7 @@ import com.example.myapplication.presentation.ApprovalTone
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
+import com.example.myapplication.presentation.ui.RotaryScrollGain
 import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
 import com.example.myapplication.presentation.ui.WAKE_LATCH_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
@@ -564,7 +565,8 @@ fun ChatScreen(
                 // 表冠刻度 = 用户开始滚动：底栏收起成小白条（强制态下不收）
                 if (abs(verticalScrollPixels) > 0f) reportBottomBarEvent(BottomBarEvent.UserScroll)
                 listState.dispatchRawDelta(verticalScrollPixels)
-                if (abs(verticalScrollPixels) > 8f) {
+                // 门限按原始刻度折算：位移已被 RotaryScrollGain 放大过，震动密度保持原样
+                if (abs(verticalScrollPixels) > 8f * RotaryScrollGain) {
                     context.getSystemService(Vibrator::class.java)?.let { vib ->
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))

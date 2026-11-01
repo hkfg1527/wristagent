@@ -243,7 +243,7 @@ private fun OnboardingConfigPhase(
                 // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件。
                 .onRotaryScrollEvent {
                     coroutineScope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
+                        listState.scrollBy(rotaryScrollDelta(it.verticalScrollPixels))
                     }
                     true
                 }

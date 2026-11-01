@@ -45,7 +45,6 @@ fun MemoryManagerContent(
                     label = stringResource(labelRes),
                     selected = turns == count,
                     onSelect = {
-                        context.vibrateTick()
                         turns = count
                         preferences.maxContextTurns = count
                     }
@@ -64,7 +63,7 @@ fun MemoryManagerContent(
                 },
                 tone = if (memoryCleared) Tone.MUTED else Tone.DANGER,
                 onClick = {
-                    context.vibrateTick()
+                    context.vibrateConfirm()
                     preferences.resetAll()
                     memoryCleared = true
                 }
@@ -107,8 +106,6 @@ fun SecurityGuardrailContent(
     onBack: () -> Unit,
     onSelect: (SecurityMode) -> Unit
 ) {
-    val context = LocalContext.current
-
     val modes = listOf(
         Triple(SecurityMode.NOVICE, R.string.settings_security_novice_title, R.string.settings_security_novice_desc),
         Triple(SecurityMode.STANDARD, R.string.settings_security_standard_title, R.string.settings_security_standard_desc),
@@ -128,7 +125,6 @@ fun SecurityGuardrailContent(
                     subtitle = stringResource(descRes),
                     selected = currentMode == mode,
                     onSelect = {
-                        context.vibrateTick()
                         onSelect(mode)
                     }
                 )

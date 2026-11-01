@@ -14,8 +14,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,12 +56,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -92,9 +86,9 @@ import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.rotaryScrollDelta
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /** 所有设置页共用的内容宽度上限：192dp 圆屏两侧各让出 12dp 安全边。 */
 val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
@@ -111,9 +105,6 @@ private val SettingsSectionGap = Wear.Space.Lg
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
 private val DialogFieldMaxHeight = 120.dp
 
-/** 表冠滚动触发震动的位移阈值。 */
-private const val RotaryTickThreshold = 10f
-
 fun Context.vibrateTick() {
     try {
         val vibrator = getSystemService(Vibrator::class.java) ?: return
@@ -122,6 +113,19 @@ fun Context.vibrateTick() {
         } else {
             @Suppress("DEPRECATION")
             vibrator.vibrate(15L)
+        }
+    } catch (_: Exception) {}
+}
+
+/** 破坏性操作与真实提交的唯一确认震动：一次、短促，与滚动刻度震动彻底分开。 */
+fun Context.vibrateConfirm() {
+    try {
+        val vibrator = getSystemService(Vibrator::class.java) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(20L)
         }
     } catch (_: Exception) {}
 }
@@ -182,7 +186,6 @@ fun SettingsSubPage(
     overlay: @Composable () -> Unit = {},
     rows: @Composable SettingsRows.() -> Unit
 ) {
-    val context = LocalContext.current
     val stagger = rememberSettingsRowStaggerState()
     val exit = rememberSettingsExitController()
 
@@ -211,10 +214,8 @@ fun SettingsSubPage(
                 .fillMaxSize()
                 // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                 .onRotaryScrollEvent {
-                    listState.dispatchRawDelta(it.verticalScrollPixels)
-                    if (abs(it.verticalScrollPixels) > RotaryTickThreshold) {
-                        context.vibrateTick()
-                    }
+                    // 表冠：增益后同步吃位移；子页不再有任何滚动震动
+                    listState.dispatchRawDelta(rotaryScrollDelta(it.verticalScrollPixels))
                     true
                 }
                 .focusRequester(listFocusRequester)
@@ -874,17 +875,17 @@ val PullDownDismissThreshold = 50.dp
 
 /**
  * 设置页"下滑退出"容器：与"主键上滑进入"对称的反向退出。
- * - 收手势的节点（外层）自己永不位移，位移只作用在内容节点（内层）。同一个节点既收指针又被
- *   translationY 平移时，会出现"手指动 1px → 节点下移 1px → 指针局部坐标再变 1px"的正反馈，
- *   表现为原点与拖动位置之间高频闪屏。
- * - 位移量由 [positionChangeIgnoreConsumed] 的增量累加得到，既不依赖起始点，也不受任何自身平移影响。
- * - 只有列表已在顶部（[atTop] 为 true）且继续向下拖动超过触摸阈值时才在 Initial 阶段接管并 consume；
- *   未到顶时一个事件都不消费，纵向滚动照常交给列表。
+ * - 拖动一律先交给列表：[NestedScrollConnection.onPostScroll] 只会收到列表吃不下、还剩下的向下位移
+ *   （`available.y > 0`，等价于"已到顶还继续下拽"）。列表还能滚时剩余位移恒为 0，此处一个像素都不吃，
+ *   手指拖动的滚动与松手后的惯性衰减全部留在 ScalingLazyColumn 自己手里。
+ * - 收位移的节点与做位移的节点分离：外层只挂 nestedScroll 与尺寸测量，位移只作用在内层内容，
+ *   避免"节点自身平移又把局部坐标算回去"的正反馈闪屏。
+ * - 松手（[NestedScrollConnection.onPreFling]）时位移超过 [PullDownDismissThreshold] 播退场并回调
+ *   [onDismiss]，否则回弹复位。
  */
 @Composable
 fun PullDownDismissContainer(
     enabled: Boolean,
-    atTop: () -> Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -892,64 +893,59 @@ fun PullDownDismissContainer(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val dragY = remember { Animatable(0f) }
+    val pullPx = remember { mutableFloatStateOf(0f) }
     var isDismissing by remember { mutableStateOf(false) }
     var pageHeightPx by remember { mutableFloatStateOf(1f) }
     val thresholdPx = with(density) { PullDownDismissThreshold.toPx() }
-    val currentAtTop by rememberUpdatedState(atTop)
+    val currentEnabled by rememberUpdatedState(enabled)
     val currentDismiss by rememberUpdatedState(onDismiss)
+
+    // 关闭时（例如打开子页）立刻清零：不留半截位移，也不让残留累积量参与下一次手势
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            pullPx.floatValue = 0f
+            dragY.snapTo(0f)
+        }
+    }
+
+    val connection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // 只有"列表已到顶还继续向下拽"才会走到这里，其余情况列表自己已经把位移吃干净
+                if (!currentEnabled || isDismissing || available.y <= 0f) return Offset.Zero
+                pullPx.floatValue = (pullPx.floatValue + available.y).coerceAtLeast(0f)
+                val target = pullPx.floatValue
+                scope.launch { dragY.snapTo(target) }
+                return Offset(0f, available.y)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (isDismissing) return available
+                val pull = pullPx.floatValue
+                pullPx.floatValue = 0f
+                if (pull > thresholdPx) {
+                    isDismissing = true
+                    dragY.animateTo(pageHeightPx, tween(140))
+                    currentDismiss()
+                    // 速度全部吃掉：退场时列表不该继续惯性滚动
+                    return available
+                }
+                if (pull > 0f) dragY.animateTo(0f, spring(0.75f, 350f))
+                return Velocity.Zero
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .onGloballyPositioned { coords -> pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f) }
-            // 手势节点：不携带任何位移
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    val slopPx = viewConfiguration.touchSlop
-                    var capturing = false
-                    var accumulatedX = 0f
-                    var accumulatedY = 0f
-
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-
-                        if (!change.pressed) {
-                            if (capturing) {
-                                if (dragY.value > thresholdPx) {
-                                    if (!isDismissing) {
-                                        isDismissing = true
-                                        scope.launch {
-                                            dragY.animateTo(pageHeightPx, tween(140))
-                                            currentDismiss()
-                                        }
-                                    }
-                                } else {
-                                    scope.launch { dragY.animateTo(0f, spring(0.75f, 350f)) }
-                                }
-                            }
-                            break
-                        }
-
-                        val delta = change.positionChangeIgnoreConsumed()
-                        accumulatedX += delta.x
-                        accumulatedY += delta.y
-                        // 只有"已在顶部 + 明确向下 + 超过触摸阈值"才接管，其余全部让给列表自己滚动
-                        if (!capturing && !isDismissing && currentAtTop() &&
-                            accumulatedY > slopPx && accumulatedY > abs(accumulatedX)
-                        ) {
-                            capturing = true
-                        }
-                        if (capturing) {
-                            change.consume()
-                            val clamped = accumulatedY.coerceAtLeast(0f)
-                            scope.launch { dragY.snapTo(clamped) }
-                        }
-                    }
-                }
-            }
+            // 手势节点：只有"列表吃不下"的剩余位移会到这里，且不携带任何位移
+            .nestedScroll(connection)
     ) {
         // 内容节点：只做视觉位移与透明度衰减
         Box(

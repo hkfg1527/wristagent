@@ -180,7 +180,7 @@ fun SessionDrawer(
                         // 顺序即作用域：处理器必须在 focusable 之外，否则表冠事件冒不进来
                         .onRotaryScrollEvent {
                             scope.launch {
-                                listState.scrollBy(it.verticalScrollPixels)
+                                listState.scrollBy(rotaryScrollDelta(it.verticalScrollPixels))
                                 if (abs(it.verticalScrollPixels) > 8f) {
                                     context.getSystemService(Vibrator::class.java)?.let { vib ->
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

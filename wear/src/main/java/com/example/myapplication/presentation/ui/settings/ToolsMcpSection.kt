@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
@@ -22,7 +21,6 @@ fun ToolsMcpContent(
     onBack: () -> Unit,
     onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
 ) {
-    val context = LocalContext.current
     var toolDeviceStatus by remember { mutableStateOf(preferences.toolDeviceStatusEnabled) }
     var toolVibrate by remember { mutableStateOf(preferences.toolVibrateEnabled) }
     var toolMatrixDensity by remember { mutableStateOf(preferences.toolMatrixDensityEnabled) }
@@ -42,7 +40,6 @@ fun ToolsMcpContent(
                 secondary = "get_device_status",
                 checked = toolDeviceStatus,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolDeviceStatus = enabled
                     preferences.toolDeviceStatusEnabled = enabled
                 }
@@ -55,7 +52,6 @@ fun ToolsMcpContent(
                 secondary = "vibrate_device",
                 checked = toolVibrate,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolVibrate = enabled
                     preferences.toolVibrateEnabled = enabled
                 }
@@ -68,7 +64,6 @@ fun ToolsMcpContent(
                 secondary = "adjust_matrix_density",
                 checked = toolMatrixDensity,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolMatrixDensity = enabled
                     preferences.toolMatrixDensityEnabled = enabled
                 }
@@ -81,7 +76,6 @@ fun ToolsMcpContent(
                 secondary = "set_system_power_mode",
                 checked = toolPowerMode,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolPowerMode = enabled
                     preferences.toolPowerModeEnabled = enabled
                 }
@@ -94,7 +88,6 @@ fun ToolsMcpContent(
                 secondary = "query_time_weather",
                 checked = toolWeather,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolWeather = enabled
                     preferences.toolWeatherEnabled = enabled
                 }
@@ -107,7 +100,6 @@ fun ToolsMcpContent(
                 secondary = "web_search",
                 checked = toolWebSearch,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     toolWebSearch = enabled
                     preferences.toolWebSearchEnabled = enabled
                 }
@@ -121,7 +113,6 @@ fun ToolsMcpContent(
                 label = stringResource(R.string.settings_mcp_probe),
                 checked = isMcpEnabled,
                 onCheckedChange = { enabled ->
-                    context.vibrateTick()
                     onToggleMcp(enabled, mcpEndpoint)
                 }
             )

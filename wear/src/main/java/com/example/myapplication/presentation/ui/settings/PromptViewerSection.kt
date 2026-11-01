@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 
@@ -27,7 +26,6 @@ fun PromptViewerContent(
     onBack: () -> Unit,
     onSavePrompt: (String) -> Unit
 ) {
-    val context = LocalContext.current
     var editorOpen by remember { mutableStateOf(false) }
     var textValue by remember { mutableStateOf(customPrompt) }
     // 预设名参与选中比较，先取本地化文案再进 remember，避免在非组合上下文里读资源。
@@ -86,7 +84,6 @@ fun PromptViewerContent(
                     label = label,
                     selected = activePreset == label,
                     onSelect = {
-                        context.vibrateTick()
                         applyPreset(label, prompt)
                     }
                 )
@@ -102,7 +99,6 @@ fun PromptViewerContent(
                     stringResource(R.string.settings_prompt_custom)
                 },
                 onClick = {
-                    context.vibrateTick()
                     editorOpen = true
                 }
             )

@@ -35,6 +35,7 @@ import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
+import com.example.myapplication.presentation.ui.rotaryScrollDelta
 import com.example.myapplication.presentation.ui.UserChatBubble
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
@@ -170,7 +171,7 @@ internal fun ConversationList(
             // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
             // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件
             // （wear 自己的 Modifier.rotaryScrollable 也是 rotaryHandler(...).focusRequester(...).focusable 这个顺序）。
-            .onRotaryScrollEvent { event -> onRotaryScroll(event.verticalScrollPixels) }
+            .onRotaryScrollEvent { event -> onRotaryScroll(rotaryScrollDelta(event.verticalScrollPixels)) }
             .focusRequester(focusRequester)
             .focusable(),
         horizontalAlignment = Alignment.Start,
