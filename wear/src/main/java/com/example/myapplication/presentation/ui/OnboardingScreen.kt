@@ -239,14 +239,16 @@ private fun OnboardingConfigPhase(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .focusRequester(focusRequester)
-                .focusable()
+                // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
+                // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件。
                 .onRotaryScrollEvent {
                     coroutineScope.launch {
                         listState.scrollBy(it.verticalScrollPixels)
                     }
                     true
-                },
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
             // 顶部让出叉号行高度，滚动内容不会爬到叉号下面
             contentPadding = PaddingValues(
                 start = Wear.Space.Edge,

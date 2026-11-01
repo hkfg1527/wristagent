@@ -177,8 +177,7 @@ fun SessionDrawer(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .focusRequester(drawerFocusRequester)
-                        .focusable()
+                        // 顺序即作用域：处理器必须在 focusable 之外，否则表冠事件冒不进来
                         .onRotaryScrollEvent {
                             scope.launch {
                                 listState.scrollBy(it.verticalScrollPixels)
@@ -191,7 +190,9 @@ fun SessionDrawer(
                                 }
                             }
                             true
-                        },
+                        }
+                        .focusRequester(drawerFocusRequester)
+                        .focusable(),
                     contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Lg),
                     verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
                     horizontalAlignment = Alignment.CenterHorizontally
