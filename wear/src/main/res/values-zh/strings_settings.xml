@@ -130,4 +130,10 @@
     <string name="settings_baidu_api_key">百度 API Key（AK）</string>
     <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
     <string name="settings_temp_presets">快捷预设</string>
+    <string name="settings_remote_console_title">网页控制台</string>
+    <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
+    <string name="settings_remote_console_stopped">已关闭</string>
+    <string name="settings_remote_console_hint">手机连同一 Wi-Fi，用浏览器打开下面的地址即可调整全部设置。</string>
+    <string name="settings_remote_console_token">访问令牌</string>
+    <string name="settings_remote_console_copy_hint">点击地址可复制</string>
 </resources>

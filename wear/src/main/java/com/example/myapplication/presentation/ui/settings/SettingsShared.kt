@@ -141,6 +141,7 @@ enum class SettingsSubDialog {
     MEMORY_MANAGER,
     WING_SHORTCUT,
     PRIVILEGE,
+    REMOTE_CONSOLE,
     SECURITY_GUARDRAIL
 }
 

@@ -130,4 +130,10 @@
     <string name="settings_baidu_api_key">API Key (AK)</string>
     <string name="settings_baidu_secret_key">Secret Key (SK)</string>
     <string name="settings_temp_presets">Quick presets</string>
+    <string name="settings_remote_console_title">Web Console</string>
+    <string name="settings_remote_console_running">Running on port %1$d</string>
+    <string name="settings_remote_console_stopped">Stopped</string>
+    <string name="settings_remote_console_hint">Open this address in a phone browser on the same Wi-Fi to edit every setting.</string>
+    <string name="settings_remote_console_token">Access token</string>
+    <string name="settings_remote_console_copy_hint">Tap the address to copy it</string>
 </resources>

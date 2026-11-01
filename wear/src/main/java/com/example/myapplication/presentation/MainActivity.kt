@@ -12,6 +12,7 @@ import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.AgentRepository
 import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.theme.MyApplicationTheme
 import com.example.myapplication.presentation.ui.chat.WearAgentApp
 
@@ -25,6 +26,9 @@ class MainActivity : ComponentActivity() {
     private val externalPromptState = mutableStateOf<ExternalPrompt?>(null)
 
     private val preferences by lazy { AgentPreferences(applicationContext) }
+    // 局域网网页控制台：随 Activity 存活（无前台服务），退到后台被回收即断开。
+    // create() 是单例工厂，重复调用安全；start()/stop() 幂等，端口被占会自动回退 8081/8082。
+    private val consoleServer by lazy { ConsoleServer.create(applicationContext) }
     private val toolRegistry by lazy { AgentToolRegistry(applicationContext) }
 
     private val chatViewModel: ChatViewModel by viewModels {
@@ -62,6 +66,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         handleIntent(intent)
+        // 监听失败（端口全占）时 start() 不抛异常、port 保持 -1，App 照常可用
+        consoleServer.start()
+    }
+
+    override fun onDestroy() {
+        consoleServer.stop()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

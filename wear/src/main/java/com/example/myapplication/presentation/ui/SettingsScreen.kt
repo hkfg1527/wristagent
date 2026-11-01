@@ -43,6 +43,8 @@ import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.privilege.PrivilegeManager
+import com.example.myapplication.agent.remote.ConsoleServer
+import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.AdvancedPermissionContent
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
@@ -112,6 +114,10 @@ fun SettingsScreen(
 
     // 特权层：随设置页存活（进入时探测一次、离开时释放监听），
     // 状态用 StateFlow 收集，列表行只显示当前后端名，不参与任何系统调用。
+    val consoleServer = remember { ConsoleServer.create(context.applicationContext) }
+    var consolePort by remember { mutableIntStateOf(consoleServer.port) }
+    var consoleRunning by remember { mutableStateOf(consoleServer.isRunning) }
+
     val privilegeManager = remember { PrivilegeManager(context) }
     val privilegeStatus by privilegeManager.status.collectAsState()
     DisposableEffect(privilegeManager) {
@@ -456,6 +462,9 @@ fun SettingsScreen(
                                 currentRightAction = action
                                 preferences.rightButtonAction = action
                             }
+                        )
+                        SettingsSubDialog.REMOTE_CONSOLE -> RemoteConsoleContent(
+                            onBack = { activeDialog = null }
                         )
                         SettingsSubDialog.PRIVILEGE -> AdvancedPermissionContent(
                             manager = privilegeManager,
