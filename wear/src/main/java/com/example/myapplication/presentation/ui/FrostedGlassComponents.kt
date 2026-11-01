@@ -315,41 +315,33 @@ fun SpringStreamingText(
     modifier: Modifier = Modifier,
     animateCursor: Boolean = true
 ) {
-    // 不需要呼吸时不创建无限动画：静止光标不占帧回调
-    val cursorAlpha by if (isStreaming && animateCursor) {
-        val infiniteTransition = rememberInfiniteTransition(label = "cursorBlink")
-        infiniteTransition.animateFloat(
-            initialValue = 0.2f,
-            targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(450, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "cursorAlpha"
-        )
-    } else {
-        remember { mutableStateOf(1f) }
-    }
-
     // 增量清洗 + 记忆化：
     //  1) StreamMarkdownStripper 只处理新增的完整行（否则 2000 字回复每 32ms 全量重算是 O(n²)）；
-    //  2) remember(text, isStreaming) 避免无关重组（光标闪烁、父级状态变化）也触发解析。
+    //  2) remember(text, isStreaming) 保证只有内容真的变了才重建 AnnotatedString。
     val stripper = remember { StreamingMarkdownStripper() }
     val cleanedText = remember(text, isStreaming) {
         stripper.strip(text, hideUnclosedTail = isStreaming)
     }
 
-    BasicText(
-        modifier = modifier,
-        text = buildAnnotatedString {
+    // 光标不再呼吸：原来 cursorAlpha 是在组合期读的动画值，导致**每一帧**都重建一遍
+    // AnnotatedString（450ms 呼吸 ≈ 60 次/秒），这是流式期间最没意义的开销。
+    // 而且流式时文字本身每 32ms 就换一次，闪烁根本看不出来 —— 改为静止实心光标后，
+    // 重建次数从 60/秒降到「每次文本更新 1 次」。
+    val annotated = remember(cleanedText, isStreaming) {
+        buildAnnotatedString {
             // 渲染前做最小 Markdown 清洗：成对强调标记与反引号不外露，流式未闭合标记不闪烁
             append(cleanedText)
             if (isStreaming) {
-                withStyle(SpanStyle(color = Wear.Palette.Accent.copy(alpha = cursorAlpha))) {
+                withStyle(SpanStyle(color = Wear.Palette.Accent)) {
                     append(" ▌")
                 }
             }
-        },
+        }
+    }
+
+    BasicText(
+        modifier = modifier,
+        text = annotated,
         style = Wear.TextBody
     )
 }

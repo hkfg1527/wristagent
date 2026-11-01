@@ -239,7 +239,7 @@ internal fun ConversationList(
                                                     text = block.content,
                                                     isStreaming = block.isStreaming,
                                                     // 单次刷新吐出十几字以上就是"过快"：不做逐字动画，只直接刷新文本
-                                                    animateCursor = !isStreamingBurst
+                                            
                                                 )
                                             }
                                         }
