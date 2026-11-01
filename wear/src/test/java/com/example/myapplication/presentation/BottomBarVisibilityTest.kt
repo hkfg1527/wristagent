@@ -216,4 +216,18 @@ class ChatUiStateBottomBarForceTest {
             )
         )
     }
+
+    /** 滚到底部：不许收起，并且必须恢复按钮（与挂起期无关）。 */
+    @Test
+    fun `滚到底部不收起且自动恢复`() {
+        // 在底部：即使不在挂起期也不许收起
+        assertFalse(BottomBarVisibility.shouldCollapseOnScroll(nowMs = 10_000L, wakeLatchUntilMs = 0L, atBottom = true))
+        // 不在底部且已过挂起期：允许收起
+        assertTrue(BottomBarVisibility.shouldCollapseOnScroll(nowMs = 10_000L, wakeLatchUntilMs = 0L, atBottom = false))
+        // 不在底部但在挂起期内：不许收起
+        assertFalse(BottomBarVisibility.shouldCollapseOnScroll(nowMs = 10_000L, wakeLatchUntilMs = 10_001L, atBottom = false))
+        // 到底就恢复，没到底不主动恢复
+        assertTrue(BottomBarVisibility.shouldRestoreAtBottom(atBottom = true))
+        assertFalse(BottomBarVisibility.shouldRestoreAtBottom(atBottom = false))
+    }
 }

@@ -424,7 +424,21 @@ fun ChatScreen(
 
             BottomBarEvent.UserScroll -> {
                 lastUserScrollAt = now
-                applyBarEvent(event, allowCollapse = BottomBarVisibility.collapseAllowed(now, wakeLatchUntil))
+                // 已经在底部：不收起（底部是"随时要操作"的位置），并且把按钮恢复回来。
+                // 注意判据：底部预留 76dp 会让"最后一行可见"与 canScrollForward==false 不等价
+                // （内容到底后列表仍能再滚 152px），所以用"最后一条已进入可视区"来判定。
+                val atBottom = isContentEndVisible(listState, conversationItems.size)
+                if (BottomBarVisibility.shouldRestoreAtBottom(atBottom)) {
+                    viewModel.setBottomBarMode(BottomBarMode.Expanded)
+                }
+                applyBarEvent(
+                    event,
+                    allowCollapse = BottomBarVisibility.shouldCollapseOnScroll(
+                        nowMs = now,
+                        wakeLatchUntilMs = wakeLatchUntil,
+                        atBottom = atBottom
+                    )
+                )
             }
 
             BottomBarEvent.AutoPanQuiet -> {
@@ -437,6 +451,18 @@ fun ChatScreen(
         snapshotFlow { listState.isScrollInProgress }
             .filter { it }
             .collect { reportBottomBarEvent(BottomBarEvent.UserScroll) }
+    }
+
+    // 兜底：惯性甩动到底部时，isScrollInProgress 可能已经变 false 才耗尽动量，
+    // 上面那次 UserScroll 判断会漏掉 → 这里直接盯"能否继续向前滚"的翻转。
+    LaunchedEffect(listState, conversationItems.size) {
+        snapshotFlow { isContentEndVisible(listState, conversationItems.size) }
+            .filter { visible -> visible }
+            .collect {
+                if (viewModel.bottomBarMode.value == BottomBarMode.Collapsed) {
+                    viewModel.setBottomBarMode(BottomBarMode.Expanded)
+                }
+            }
     }
 
     // 新回合到达后 3 秒内无人滚动 → 自动收起（每个回合只计时一次，返回设置页不会重开）
@@ -728,6 +754,31 @@ fun ChatScreen(
             )
         }
     }
+}
+
+/**
+ * 是否已经"看到内容结尾"：最后一条已经出现在可视区，或已经无法继续向前滚。
+ *
+ * 为什么不能只看 canScrollForward：列表底部有 76dp 预留，内容到底之后仍可再滚 152px，
+ * 于是"最后一行已经显示出来"时 canScrollForward 依然是 true —— 用户视角早就到底了，
+ * 而按 canScrollForward 判断会永远不成立。
+ */
+private fun isContentEndVisible(
+    listState: androidx.wear.compose.foundation.lazy.ScalingLazyListState,
+    itemCount: Int
+): Boolean {
+    if (itemCount <= 0) return true
+    if (!listState.canScrollForward) return true
+    val info = listState.layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return false
+    if (last.index < itemCount - 1) return false
+    // 注意：Wear 的 ScalingLazyListItemInfo.offset 是**相对视口中线**的中心偏移（不是顶边），
+    // 所以条的底边在视口里的坐标 = 视口中心 + offset + size/2。
+    // 另外整段回复是"同一个 item"，光看"最后一条可见"永远为真（大卡片几乎总在屏上），
+    // 必须判断它的**底边是否已经进入屏幕**。
+    val viewportHeightPx = info.viewportSize.height.toFloat()
+    val lastItemBottom = viewportHeightPx / 2f + last.offset + last.size / 2f
+    return lastItemBottom <= viewportHeightPx
 }
 
 /**

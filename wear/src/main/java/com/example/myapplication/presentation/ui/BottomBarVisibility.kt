@@ -64,6 +64,25 @@ object BottomBarVisibility {
     }
 
     /**
+     * 用户滚动时是否允许收起底栏。
+     *
+     * 关键一条：**已经滚到底部就不许收**。底部的语义是"读到最新了、随时要操作"，
+     * 此处收走按钮会让用户既看不到内容下方留白、又找不到入口；
+     * 而且"滚到底"本身就是要恢复按钮的信号（见 [shouldRestoreAtBottom]）。
+     */
+    fun shouldCollapseOnScroll(nowMs: Long, wakeLatchUntilMs: Long, atBottom: Boolean): Boolean {
+        if (atBottom) return false
+        return collapseAllowed(nowMs, wakeLatchUntilMs)
+    }
+
+    /**
+     * 是否应该因为"到达底部"而恢复按钮：到底了就恢复，无条件。
+     * 与 [shouldRestoreAtOutputEnd] 同义（一个由用户滚动触发，一个由提词器触发），
+     * 都只约束"恢复"方向，不受唤醒挂起期影响。
+     */
+    fun shouldRestoreAtBottom(atBottom: Boolean): Boolean = atBottom
+
+    /**
      * 提词器滚到输出结尾后，按钮是否应该自动回来。
      * 结论是**无条件恢复**：此刻正文下方刚好空出位置，且"读完了"就是最强的操作意图信号。
      * 注意它与 [collapseAllowed] 无关 —— 挂起期只约束"收起"，从不约束"恢复"。
