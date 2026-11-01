@@ -27,6 +27,7 @@ import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.SettingsScreen
+import com.example.myapplication.presentation.ui.settings.SettingsScreenVeilMs
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AudioRecordWavCapture
 import com.example.myapplication.voice.VoiceAsrGateway
@@ -86,12 +87,19 @@ fun WearAgentApp(
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                if (targetState == AppScreen.SETTINGS) {
-                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
-                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeOut(tween(180)))
-                } else {
-                    (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
-                        .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180)))
+                when {
+                    // 进入设置：容器只做一层极轻淡入盖住切换，逐行浮动由 SettingsScreen 内部按行播放
+                    targetState == AppScreen.SETTINGS ->
+                        fadeIn(tween(SettingsScreenVeilMs))
+                            .togetherWith(fadeOut(tween(SettingsScreenVeilMs)))
+                    // 离开设置：设置页已先把各行逐行沉出，这里只需要一层很短的淡出盖住切换瞬间，
+                    // 目标屏保持它原有的入场（主界面入场未改）
+                    initialState == AppScreen.SETTINGS ->
+                        (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
+                            .togetherWith(fadeOut(tween(SettingsScreenVeilMs)))
+                    else ->
+                        (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
+                            .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180)))
                 }
             },
             label = "screenTransition"

@@ -61,6 +61,7 @@ import com.example.myapplication.presentation.ui.settings.ModelConfigContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
+import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.settings.SubPageBottomReserve
 import com.example.myapplication.presentation.ui.settings.SubSettingsModal
@@ -68,6 +69,8 @@ import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
 import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.WingShortcutContent
 import com.example.myapplication.presentation.ui.settings.PullDownDismissContainer
+import com.example.myapplication.presentation.ui.settings.rememberSettingsExitController
+import com.example.myapplication.presentation.ui.settings.rememberSettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.vibrateTick
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
@@ -81,6 +84,7 @@ private val SettingsContentMaxWidth = 168.dp
  * - 扁平单行列表：每个分区一行（标题 + 当前值 + chevron），分区之间以分隔线切分
  * - 所有取值来自 Wear 设计令牌，字号最小 12sp，可点区域不小于 44dp
  * - ScalingLazyColumn 圆屏曲率自适应与物理表冠联动
+ * - 进出场为逐行浮动：每行按自己的内容序号延迟浮起/沉下，容器只做极轻淡入淡出
  */
 @Composable
 fun SettingsScreen(
@@ -110,6 +114,13 @@ fun SettingsScreen(
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
     var showVoiceAsr by remember { mutableStateOf(false) }
 
+    // 逐行浮动：入场记账本（滚动复用不重播）+ 退场调度器（沉完才切屏）
+    val rowStagger = rememberSettingsRowStaggerState()
+    val exit = rememberSettingsExitController()
+
+    // 四条退出路径（下滑、系统 BACK、末尾完成返回、重看引导）统一走这里：先播沉出再执行返回动作
+    val requestExit: (() -> Unit) -> Unit = { action -> exit.begin(action) }
+
     // 系统 BACK 三层化：子页打开时只关子页并留在设置列表，不退出整个设置页。
     // 顺序保证：本回调在 SettingsScreen 组合体内注册，MainActivity 的 SETTINGS 分支 BackHandler
     // 早于 SettingsScreen 调用（即更早注册），OnBackPressedDispatcher 后注册者优先，故 BACK 先命中这里。
@@ -121,12 +132,18 @@ fun SettingsScreen(
         }
     }
 
+    // 根页 BACK 也走逐行沉出。退场中本处理器仍然拦截（begin 忽略重复请求），
+    // 否则连按会落到外层把动画打断成硬切。
+    BackHandler(enabled = activeDialog == null && !showVoiceAsr) {
+        requestExit(onBack)
+    }
+
     val listState = rememberScalingLazyListState()
 
     // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
     PullDownDismissContainer(
         modifier = modifier,
-        enabled = activeDialog == null && !showVoiceAsr,
+        enabled = activeDialog == null && !showVoiceAsr && !exit.isExiting,
         // 到顶判定：列表已无法向后滚动（等价于 firstVisibleItemIndex==0 && ScrollOffset==0，
         // ScalingLazyListState 只把这些量暴露为 canScrollBackward），再加首项正落在垂直中心兜底，
         // 避免自动居中初始化时残留像素级偏移导致手势失效。
@@ -134,7 +151,7 @@ fun SettingsScreen(
             !listState.canScrollBackward ||
                 (listState.centerItemIndex == 0 && listState.centerItemScrollOffset == 0)
         },
-        onDismiss = onBack
+        onDismiss = { requestExit(onBack) }
     ) {
         Box(
             modifier = Modifier
@@ -177,174 +194,229 @@ fun SettingsScreen(
             ) {
                 // 顶部标题：水平居中，不再在圆屏最外圈放叉号（退出走下划 / 系统 BACK / 末尾完成返回）
                 item {
-                    Box(
-                        modifier = Modifier
-                            .widthIn(max = SettingsContentMaxWidth)
-                            .fillMaxWidth()
-                            .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm)
-                            .height(Wear.Size.Touch),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BasicText(
-                            text = stringResource(R.string.settings_title),
-                            style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    SettingsStaggeredRow(index = 0, stagger = rowStagger, exit = exit) {
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = SettingsContentMaxWidth)
+                                .fillMaxWidth()
+                                .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm)
+                                .height(Wear.Size.Touch),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            BasicText(
+                                text = stringResource(R.string.settings_title),
+                                style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
                 // 1. 模型与服务：标题独占首行，值 + 徽章置于次行，徽章按真实 API Key 配置状态渲染
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_model_and_service),
-                        value = currentModel,
-                        badge = SettingsStatusTextRes.modelServiceBadge(apiKeyConfigured).let { (res, tone) -> stringResource(res) to tone },
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.MODEL_CONFIG
-                        }
-                    )
+                    SettingsStaggeredRow(index = 1, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_model_and_service),
+                            value = currentModel,
+                            badge = SettingsStatusTextRes.modelServiceBadge(apiKeyConfigured).let { (res, tone) -> stringResource(res) to tone },
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.MODEL_CONFIG
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                // 分隔线跟随上一行的序号，与该行同步浮起，不会单独先亮出来
+                item {
+                    SettingsStaggeredRow(index = 1, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 2. 模型参数
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_model_params),
-                        value = "Temp %.1f".format(currentTemp),
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.HYPER_PARAMS
-                        }
-                    )
+                    SettingsStaggeredRow(index = 2, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_model_params),
+                            value = "Temp %.1f".format(currentTemp),
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.HYPER_PARAMS
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 2, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 3. 内置工具与 MCP
                 item {
-                    val activeCount = listOf(
-                        preferences.toolDeviceStatusEnabled,
-                        preferences.toolVibrateEnabled,
-                        preferences.toolMatrixDensityEnabled,
-                        preferences.toolPowerModeEnabled,
-                        preferences.toolWeatherEnabled,
-                        preferences.toolWebSearchEnabled
-                    ).count { it }
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_tools_and_mcp),
-                        value = stringResource(R.string.settings_tools_enabled_count, activeCount),
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.TOOLS_MCP
-                        }
-                    )
+                    SettingsStaggeredRow(index = 3, stagger = rowStagger, exit = exit) {
+                        val activeCount = listOf(
+                            preferences.toolDeviceStatusEnabled,
+                            preferences.toolVibrateEnabled,
+                            preferences.toolMatrixDensityEnabled,
+                            preferences.toolPowerModeEnabled,
+                            preferences.toolWeatherEnabled,
+                            preferences.toolWebSearchEnabled
+                        ).count { it }
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_tools_and_mcp),
+                            value = stringResource(R.string.settings_tools_enabled_count, activeCount),
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.TOOLS_MCP
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 3, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 4. 系统提示词
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_system_prompt),
-                        value = if (customPrompt.isBlank()) stringResource(R.string.settings_prompt_default) else stringResource(R.string.settings_prompt_custom),
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.PROMPT_VIEWER
-                        }
-                    )
+                    SettingsStaggeredRow(index = 4, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_system_prompt),
+                            value = if (customPrompt.isBlank()) stringResource(R.string.settings_prompt_default) else stringResource(R.string.settings_prompt_custom),
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.PROMPT_VIEWER
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 4, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 5. 会话与上下文
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_memory_management),
-                        value = stringResource(R.string.settings_memory_turns, preferences.maxContextTurns),
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.MEMORY_MANAGER
-                        }
-                    )
+                    SettingsStaggeredRow(index = 5, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_memory_management),
+                            value = stringResource(R.string.settings_memory_turns, preferences.maxContextTurns),
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.MEMORY_MANAGER
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 5, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 6. 快捷操作
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_side_key),
-                        // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
-                        value = stringResource(R.string.settings_side_key_value),
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.WING_SHORTCUT
-                        }
-                    )
+                    SettingsStaggeredRow(index = 6, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_side_key),
+                            // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
+                            value = stringResource(R.string.settings_side_key_value),
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.WING_SHORTCUT
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 6, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 7. 操作安全防线
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_security_policy),
-                        value = when (currentSecurityMode) {
-                            SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
-                            SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
-                            SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
-                        },
-                        onClick = {
-                            context.vibrateTick()
-                            activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
-                        }
-                    )
+                    SettingsStaggeredRow(index = 7, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_security_policy),
+                            value = when (currentSecurityMode) {
+                                SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
+                                SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
+                                SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
+                            },
+                            onClick = {
+                                context.vibrateTick()
+                                activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 7, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 8. 语音转写
                 item {
-                    val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_asr),
-                        value = when {
-                            !asrEnabled -> stringResource(R.string.settings_asr_off)
-                            asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> stringResource(R.string.settings_asr_key_missing)
-                            asrProvider == AsrProviderId.BAIDU -> stringResource(R.string.settings_asr_baidu)
-                            else -> stringResource(R.string.settings_asr_system)
-                        },
-                        onClick = {
-                            context.vibrateTick()
-                            showVoiceAsr = true
-                        }
-                    )
+                    SettingsStaggeredRow(index = 8, stagger = rowStagger, exit = exit) {
+                        val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_asr),
+                            value = when {
+                                !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                asrProvider == AsrProviderId.BAIDU && !asrKeyReady -> stringResource(R.string.settings_asr_key_missing)
+                                asrProvider == AsrProviderId.BAIDU -> stringResource(R.string.settings_asr_baidu)
+                                else -> stringResource(R.string.settings_asr_system)
+                            },
+                            onClick = {
+                                context.vibrateTick()
+                                showVoiceAsr = true
+                            }
+                        )
+                    }
                 }
 
-                item { WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth)) }
+                item {
+                    SettingsStaggeredRow(index = 8, stagger = rowStagger, exit = exit) {
+                        WearDivider(modifier = Modifier.widthIn(max = SettingsContentMaxWidth))
+                    }
+                }
 
                 // 9. 重新观看新手引导
                 item {
-                    SettingsEntry(
-                        title = stringResource(R.string.settings_replay_onboarding),
-                        onClick = {
-                            context.vibrateTick()
-                            onRestartOnboarding()
-                        }
-                    )
+                    SettingsStaggeredRow(index = 9, stagger = rowStagger, exit = exit) {
+                        SettingsEntry(
+                            title = stringResource(R.string.settings_replay_onboarding),
+                            onClick = {
+                                context.vibrateTick()
+                                requestExit(onRestartOnboarding)
+                            }
+                        )
+                    }
                 }
 
                 // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
                 item {
-                    SettingsActionButton(
-                        label = stringResource(R.string.settings_done_back),
-                        tone = Tone.ACCENT,
-                        modifier = Modifier.widthIn(max = SettingsContentMaxWidth),
-                        onClick = onBack
-                    )
+                    SettingsStaggeredRow(index = 10, stagger = rowStagger, exit = exit) {
+                        SettingsActionButton(
+                            label = stringResource(R.string.settings_done_back),
+                            tone = Tone.ACCENT,
+                            modifier = Modifier.widthIn(max = SettingsContentMaxWidth),
+                            onClick = { requestExit(onBack) }
+                        )
+                    }
                 }
 
                 item {
