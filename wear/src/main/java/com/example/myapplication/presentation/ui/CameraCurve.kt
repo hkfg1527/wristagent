@@ -120,6 +120,12 @@ object ReadingPace {
     /** 相对基准的降速系数：用户要求按 0.7 走，宁可慢一点也不要催。 */
     const val PACE_FACTOR = 0.7f
 
+    /**
+     * 界面实际使用的倍率：真机上手感 0.7 倍读速太慢（一屏要走 14 秒），用户要求再快一倍。
+     * 保留 [PACE_FACTOR] 作为“人类读速模型”的基准，这里只做产品级提速，两者语义分开。
+     */
+    const val USER_SPEED_MULTIPLIER = 2.6f
+
     /** 每行字数：12sp 正文、约 190dp 阅读宽的实测值。 */
     const val CHARS_PER_LINE = 14
 
@@ -134,11 +140,17 @@ object ReadingPace {
     fun secondsPerLine(paceFactor: Float = PACE_FACTOR): Float = CHARS_PER_LINE / charsPerSec(paceFactor)
 
     /** 恒定下滚速度（dp/s）：一行的高度除以读一行的时间。 */
-    fun panSpeedDpPerSec(paceFactor: Float = PACE_FACTOR): Float = LINE_HEIGHT_DP / secondsPerLine(paceFactor)
+    fun panSpeedDpPerSec(
+        paceFactor: Float = PACE_FACTOR,
+        speedMultiplier: Float = 1f
+    ): Float = LINE_HEIGHT_DP / secondsPerLine(paceFactor) * speedMultiplier
 
     /** 恒定下滚速度（px/s）。 */
-    fun panSpeedPxPerSec(density: Float, paceFactor: Float = PACE_FACTOR): Float =
-        panSpeedDpPerSec(paceFactor) * density
+    fun panSpeedPxPerSec(
+        density: Float,
+        paceFactor: Float = PACE_FACTOR,
+        speedMultiplier: Float = 1f
+    ): Float = panSpeedDpPerSec(paceFactor, speedMultiplier) * density
 }
 
 /** 提词器镜头阶段：空闲 / 对齐到本回合开头 / 恒定慢速下滚。 */

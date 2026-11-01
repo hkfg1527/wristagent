@@ -126,4 +126,26 @@ class ChatUiStateBottomBarForceTest {
             idle().copy(draft = TextInputState(isOpen = false)).isBottomBarForceExpanded
         )
     }
+
+    /** 自动下滚静默 3 秒 → 自动收起；强制态下同样不许收。 */
+    @Test
+    fun `自动下滚静默后自动收起_但强制态不收`() {
+        assertEquals(
+            BottomBarMode.Collapsed,
+            BottomBarVisibility.next(
+                current = BottomBarMode.Expanded,
+                event = BottomBarEvent.AutoPanQuiet,
+                forceExpanded = false
+            )
+        )
+        assertEquals(
+            BottomBarMode.Expanded,
+            BottomBarVisibility.next(
+                current = BottomBarMode.Expanded,
+                event = BottomBarEvent.AutoPanQuiet,
+                forceExpanded = true
+            )
+        )
+        assertEquals(3000L, com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS)
+    }
 }

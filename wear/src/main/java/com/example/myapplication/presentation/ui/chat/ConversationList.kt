@@ -46,6 +46,12 @@ import com.example.myapplication.presentation.ui.theme.Wear
  */
 private val ConversationCardMaxWidth = 200.dp
 
+/**
+ * 顶部时钟带遮罩色：不是纯黑，留约 14% 透明让内容隐约透出（用户要求"别那么黑"）。
+ * DstIn 混合下 alpha 决定"抹掉多少"，0.86 即保留 14%。
+ */
+private val MatMaskColor = Wear.Palette.Bg.copy(alpha = 0.86f)
+
 /** 列表条目 key：用户气泡用 block id，助手回合用回合 key，保证滚动位置稳定。 */
 internal fun itemKeyOf(item: RenderableConversationItem): String = when (item) {
     is RenderableConversationItem.UserPrompt -> item.block.id
@@ -145,8 +151,9 @@ internal fun ConversationList(
                         brush = Brush.verticalGradient(
                             0f to Color.Transparent,
                             (solidUntilPx / heightPx).coerceIn(0f, 1f) to Color.Transparent,
-                            (clockBandPx / heightPx).coerceIn(0f, 1f) to Wear.Palette.Bg,
-                            ((heightPx - bottomEdgePx) / heightPx).coerceIn(0f, 1f) to Wear.Palette.Bg,
+                            // 不再 100% 抹黑：留约 14% 透出，让时钟带里能隐约看到内容而不是一块死黑
+                            (clockBandPx / heightPx).coerceIn(0f, 1f) to MatMaskColor,
+                            ((heightPx - bottomEdgePx) / heightPx).coerceIn(0f, 1f) to MatMaskColor,
                             1f to Color.Transparent
                         ),
                         blendMode = BlendMode.DstIn

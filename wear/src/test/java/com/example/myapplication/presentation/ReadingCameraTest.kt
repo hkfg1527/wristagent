@@ -140,4 +140,17 @@ class ReadingCameraTest {
         assertEquals(ReadingCameraPhase.Idle, camera.onEvent(ReadingCameraEvent.Aligned))
         assertEquals(ReadingCameraPhase.Idle, camera.onEvent(ReadingCameraEvent.ReachedEnd))
     }
+
+    /** 用户要求提词器再快一倍：倍率只作用于界面速度，不改变人类读速模型（PACE_FACTOR 保持 0.7）。 */
+    @Test
+    fun `用户倍率提快下滚且仍属极慢`() {
+        val base = ReadingPace.panSpeedDpPerSec()
+        val boosted = ReadingPace.panSpeedDpPerSec(speedMultiplier = ReadingPace.USER_SPEED_MULTIPLIER)
+        // 倍率必须 >1（真机实测 0.7 读速太慢），但不写死具体倍数，方便继续调参
+        assertTrue("界面倍率必须大于 1", ReadingPace.USER_SPEED_MULTIPLIER > 1f)
+        assertEquals(base * ReadingPace.USER_SPEED_MULTIPLIER, boosted, 0.001f)
+        assertEquals("人类读速模型本身不随产品提速改变", 0.7f, ReadingPace.PACE_FACTOR, 0.0001f)
+        // 上限校验：即便提速，一屏 94dp 也要 2.5 秒以上才走完，不能变成"刷屏"
+        assertTrue("提速后仍须是慢速阅读", 94f / boosted >= 2.5f)
+    }
 }

@@ -9,8 +9,17 @@ enum class BottomBarEvent {
     UserScroll,
 
     /** 点击收起态的小白条。 */
-    StripTap
+    StripTap,
+
+    /**
+     * 提词器自动下滚持续超过 [AUTO_COLLAPSE_DELAY_MS] 且用户没有任何操作。
+     * 此时说明用户在专心读，按钮就应该让位收起；3 秒之内仍保持按钮可见（给"想自己动手"的人留窗口）。
+     */
+    AutoPanQuiet
 }
+
+/** 自动下滚持续多久后自动收起底栏（用户全程无操作）。 */
+const val AUTO_COLLAPSE_DELAY_MS = 3000L
 
 /**
  * 底栏可见性状态机（纯逻辑，可单测）。
@@ -31,6 +40,7 @@ object BottomBarVisibility {
         if (forceExpanded) return BottomBarMode.Expanded
         return when (event) {
             BottomBarEvent.UserScroll -> BottomBarMode.Collapsed
+            BottomBarEvent.AutoPanQuiet -> BottomBarMode.Collapsed
             BottomBarEvent.StripTap -> BottomBarMode.Expanded
         }
     }

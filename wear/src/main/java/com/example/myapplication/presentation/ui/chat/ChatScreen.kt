@@ -17,6 +17,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,9 +37,15 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -53,6 +61,8 @@ import com.example.myapplication.presentation.ApprovalTone
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
+import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
+import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
 import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBarVisibility
@@ -277,6 +287,8 @@ fun ChatScreen(
     // 只有"紧跟用户提问、且已经吐出正文的助手回合"才接管镜头；null 表示本轮没有接管。
     val cameraFocusTurnKey = remember(conversationItems) { CameraCurve.replyTurnKey(conversationItems) }
     val cameraFocusIndex = conversationItems.lastIndex
+    // 相机循环里只能改状态、不能直接调后面的 lambda：用计数信号把"自动收起"事件传出去
+    var autoPanQuietTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(cameraFocusTurnKey) {
         if (cameraFocusTurnKey == null) return@LaunchedEffect
@@ -286,7 +298,10 @@ fun ChatScreen(
         val densityScale = density.density
         val targetTopPx = with(density) { (Wear.Size.TopContentInset + CameraCurve.FOCUS_TOP_MARGIN_DP.dp).toPx() }
         val deadZonePx = CameraCurve.deadZonePx(densityScale)
-        val panSpeedPxPerSec = ReadingPace.panSpeedPxPerSec(densityScale)
+        val panSpeedPxPerSec = ReadingPace.panSpeedPxPerSec(
+            density = densityScale,
+            speedMultiplier = ReadingPace.USER_SPEED_MULTIPLIER
+        )
         val camera = ReadingCamera()
         camera.onEvent(ReadingCameraEvent.TurnBodyAppeared)
         var speedPxPerSec = 0f
@@ -294,6 +309,9 @@ fun ChatScreen(
         // AutoPan 的亚像素残余：6.6dp/s ≈ 0.22px/帧，直接发 dispatchRawDelta 会被取整丢弃，
         // 必须把不足 1px 的部分攒起来，攒够 1px 再滚动一次（平均速度才等于 13.3px/s）。
         var panResidualPx = 0f
+        // 自动下滚开始时刻：持续 3 秒且用户全程无操作，就把底栏自己收起来（用户盯着读，按钮该让位）
+        var autoPanStartedAt = 0L
+        var autoCollapseReported = false
         while (isActive) {
             // 注意：withFrameMillis 给的是**毫秒**（不是纳秒），除 1e9 会把 dt 恒夹成下限 0.004，
             // 导致 AutoPan 实际速度只有设计的 1/4。
@@ -343,10 +361,19 @@ fun ChatScreen(
                         camera.onEvent(ReadingCameraEvent.ReachedEnd)
                         return@LaunchedEffect
                     }
+                    if (autoPanStartedAt == 0L) autoPanStartedAt = SystemClock.uptimeMillis()
+                    // 3 秒内仍留着按钮（给想自己动手的人一个窗口），超过且用户没动过就自动收起
+                    if (!autoCollapseReported &&
+                        SystemClock.uptimeMillis() - autoPanStartedAt >= AUTO_COLLAPSE_DELAY_MS
+                    ) {
+                        autoCollapseReported = true
+                        autoPanQuietTick++
+                    }
                     // 提词器：恒定慢速，绝不再按剩余距离提速；亚像素增量要累积，否则每帧都被取整丢弃
                     val wantPx = panSpeedPxPerSec * dt + panResidualPx
                     val appliedPx = listState.dispatchRawDelta(wantPx)
                     panResidualPx = wantPx - appliedPx
+
                 }
 
                 ReadingCameraPhase.Idle -> return@LaunchedEffect
@@ -368,6 +395,11 @@ fun ChatScreen(
             forceExpanded = state.isBottomBarForceExpanded
         )
     }
+    // 自动下滚持续 3 秒且用户无操作 → 把底栏收成小弧条（3 秒内仍保留按钮）
+    LaunchedEffect(autoPanQuietTick) {
+        if (autoPanQuietTick > 0) reportBottomBarEvent(BottomBarEvent.AutoPanQuiet)
+    }
+
     // 手指拖拽的"开始滚动"上报：只认用户手势（镜头自己走 dispatchRawDelta 不会置真）
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
@@ -474,6 +506,19 @@ fun ChatScreen(
             risk = state.pendingApproval?.risk,
             collapse = approvalCollapse.value
         )
+
+        // 收起态：半透明弧线贴着圆屏底缘（Wear M3E 的曲面元素都是沿表盘边缘成弧）。
+        // 视觉由这里画，点击热区仍由下面 BottomInteractiveBlock 的 44dp 透明区域承担。
+        val collapsedHandleAlpha by animateFloatAsState(
+            targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "collapsedHandleAlpha"
+        )
+        if (collapsedHandleAlpha > 0.01f) {
+            Canvas(modifier = Modifier.fillMaxSize().alpha(collapsedHandleAlpha)) {
+                drawCurvedBottomHandle()
+            }
+        }
 
         // ================= 4. 单体演变底栏控制器 =================
         // 文字输入弹窗是模态：打开时底栏整体退场，避免卡片与主键互相压叠
@@ -588,4 +633,28 @@ fun ChatScreen(
             )
         }
     }
+}
+
+/**
+ * 收起态贴底把手：沿圆屏底缘画一段半透明圆弧。
+ *
+ * 为什么是弧：Wear 的界面元素都以表盘圆心为基准成弧（曲面文字/曲面列表同理），
+ * 直角矩形小条贴在圆屏底部会啃进圆周、像贴纸；弧线与机身外缘同心，才像是长在表盘上。
+ * Canvas 角度约定 0° = 3 点、90° = 6 点，因此 42° ~ 138° 正好覆盖底部约 96° 的一段。
+ */
+private fun DrawScope.drawCurvedBottomHandle() {
+    val strokePx = 4.5.dp.toPx()
+    val insetPx = 4.dp.toPx()
+    val radius = size.minDimension / 2f - insetPx
+    if (radius <= 0f) return
+    drawArc(
+        color = Wear.Palette.Orb.copy(alpha = 0.55f),
+        // 弧长与顶部时间文字相当（约 48°），不再横贯整个底缘 —— 两端太远会显得笨重
+        startAngle = 66f,
+        sweepAngle = 48f,
+        useCenter = false,
+        topLeft = Offset(size.width / 2f - radius, size.height / 2f - radius),
+        size = Size(radius * 2f, radius * 2f),
+        style = Stroke(width = strokePx, cap = StrokeCap.Round)
+    )
 }

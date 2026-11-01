@@ -369,10 +369,11 @@ fun BottomInteractiveBlock(
                 modifier = Modifier
                     .scale(orbScaleAnim)
                     .size(keyWidth, keyHeight)
-                    .shadow(elevation = 8.dp, shape = RoundedCornerShape(keyCorner))
+                    // 收起态（collapseFraction→0）由 ChatScreen 画贴底弧线，这里的实心块淡出，只保留热区
+                    .shadow(elevation = 8.dp * collapseFraction, shape = RoundedCornerShape(keyCorner))
                     .clip(RoundedCornerShape(keyCorner))
                     // 冷银白主键底色（品牌识别），与审批胶囊共用同一令牌
-                    .background(Wear.Palette.Orb)
+                    .background(Wear.Palette.Orb.copy(alpha = collapseFraction))
                     .pointerInput(isSplitExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
