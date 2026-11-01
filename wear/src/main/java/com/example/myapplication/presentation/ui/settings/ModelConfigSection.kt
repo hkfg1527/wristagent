@@ -1,23 +1,12 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentDispatcher
@@ -25,159 +14,158 @@ import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ModelCycle
 import com.example.myapplication.presentation.ui.ModelLabels
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.components.WearChip
-import com.example.myapplication.presentation.ui.components.WearSectionHeader
-import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
+/** 该页可编辑的两个文本项。 */
+private enum class ModelTextField { BASE_URL, API_KEY }
+
+/** 内置端点：取值与旧版 chip 完全一致。 */
+private val BuiltInEndpoints = listOf(
+    "https://api.deepseek.com" to "DeepSeek",
+    "https://generativelanguage.googleapis.com" to "Google"
+)
+
 /**
- * 模型与端点配置内容：模型直选、端点切换、自定义 BaseUrl/Key 与握手自检。
+ * 模型与端点配置：模型单选、端点单选、BaseUrl/API Key 走输入对话框、握手自检。
+ * 读写键与副作用保持不变；文本项从"列表内 TextField"改为"一行入口 + 对话框"，
+ * 避免眼控/表冠滚动与软键盘抢焦点。
  */
 @Composable
 fun ModelConfigContent(
     preferences: AgentPreferences,
     currentModel: String,
     currentBaseUrl: String,
+    onBack: () -> Unit,
     onSelect: (model: String, baseUrl: String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var inputBaseUrl by remember { mutableStateOf(currentBaseUrl) }
     var inputApiKey by remember { mutableStateOf(preferences.apiKey) }
-    var showCustomInput by remember { mutableStateOf(false) }
-
+    var editingField by remember { mutableStateOf<ModelTextField?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var fetchResultText by remember { mutableStateOf<String?>(null) }
 
-    val scrollState = rememberScrollState()
+    val models = ModelCycle.parse(preferences.cachedRemoteModels)
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+    SettingsSubPage(
+        title = stringResource(R.string.settings_sub_model_config),
+        onBack = onBack,
+        overlay = {
+            when (editingField) {
+                ModelTextField.BASE_URL -> SettingsTextDialog(
+                    title = stringResource(R.string.settings_text_base_url),
+                    initial = inputBaseUrl,
+                    placeholder = stringResource(R.string.settings_base_url_hint),
+                    onValueChange = { value ->
+                        inputBaseUrl = value
+                        preferences.baseUrl = value
+                    },
+                    onDismiss = { editingField = null }
+                )
+                ModelTextField.API_KEY -> SettingsTextDialog(
+                    title = stringResource(R.string.settings_text_api_key),
+                    initial = inputApiKey,
+                    placeholder = stringResource(R.string.settings_api_key_hint),
+                    onValueChange = { value ->
+                        inputApiKey = value
+                        preferences.apiKey = value
+                    },
+                    onDismiss = { editingField = null }
+                )
+                null -> Unit
+            }
+        }
     ) {
-        WearSectionHeader(text = stringResource(R.string.settings_model_pick))
+        section(stringResource(R.string.settings_model_pick))
 
-        val models = ModelCycle.parse(preferences.cachedRemoteModels)
         if (ModelLabels.isEmpty(models)) {
-            BasicText(
-                text = stringResource(R.string.settings_no_models),
-                style = Wear.TextCaption,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            row { SettingsCaptionRow(text = stringResource(R.string.settings_no_models)) }
         } else {
-            ModelLabels.rows(models, perRow = 2).forEach { rowModels ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                ) {
-                    rowModels.forEach { modelId ->
-                        WearChip(
-                            label = ModelLabels.label(modelId),
-                            selected = currentModel == modelId,
-                            onClick = {
-                                context.vibrateTick()
-                                onSelect(modelId, inputBaseUrl)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (rowModels.size < 2) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+            models.forEach { modelId ->
+                row {
+                    SettingsRadioRow(
+                        label = ModelLabels.label(modelId),
+                        selected = currentModel == modelId,
+                        onSelect = {
+                            context.vibrateTick()
+                            onSelect(modelId, inputBaseUrl)
+                        }
+                    )
                 }
             }
         }
 
-        WearSectionHeader(text = stringResource(R.string.settings_api_endpoint))
+        section(stringResource(R.string.settings_api_endpoint))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(
-                "https://api.deepseek.com" to "DeepSeek",
-                "https://generativelanguage.googleapis.com" to "Google"
-            ).forEach { (url, name) ->
-                WearChip(
+        BuiltInEndpoints.forEach { (url, name) ->
+            row {
+                SettingsRadioRow(
                     label = name,
                     selected = inputBaseUrl == url,
-                    onClick = {
+                    onSelect = {
                         context.vibrateTick()
                         inputBaseUrl = url
                         preferences.baseUrl = url
                         onSelect(currentModel, url)
-                    },
-                    modifier = Modifier.weight(1f)
+                    }
                 )
             }
         }
 
-        SettingsActionButton(
-            label = if (showCustomInput) stringResource(R.string.settings_custom_input_hide) else stringResource(R.string.settings_custom_input_show),
-            onClick = {
-                context.vibrateTick()
-                showCustomInput = !showCustomInput
-            }
-        )
-
-        if (showCustomInput) {
-            WearSectionHeader(text = "BaseUrl")
-            SettingsInput(
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_text_base_url),
                 value = inputBaseUrl,
-                onValueChange = {
-                    inputBaseUrl = it
-                    preferences.baseUrl = it
-                },
-                placeholder = "https://api.example.com"
-            )
-            WearSectionHeader(text = "API Key")
-            SettingsInput(
-                value = inputApiKey,
-                onValueChange = {
-                    inputApiKey = it
-                    preferences.apiKey = it
-                },
-                placeholder = "sk-..."
+                onClick = {
+                    context.vibrateTick()
+                    editingField = ModelTextField.BASE_URL
+                }
             )
         }
 
-        SettingsActionButton(
-            label = if (isFetching) stringResource(R.string.settings_ping_running) else stringResource(R.string.settings_ping_idle),
-            enabled = !isFetching,
-            tone = Tone.ACCENT,
-            onClick = {
-                context.vibrateTick()
-                isFetching = true
-                fetchResultText = context.getString(R.string.settings_probe_running)
-                scope.launch {
-                    val (timeMs, models) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
-                    isFetching = false
-                    if (timeMs >= 0) {
-                        fetchResultText = context.getString(R.string.settings_probe_ready, timeMs, models.size)
-                        if (models.isNotEmpty()) {
-                            preferences.cachedRemoteModels = models.joinToString(",")
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_text_api_key),
+                value = SettingsValueMath.maskSecret(inputApiKey),
+                onClick = {
+                    context.vibrateTick()
+                    editingField = ModelTextField.API_KEY
+                }
+            )
+        }
+
+        row {
+            SettingsActionButton(
+                label = if (isFetching) {
+                    stringResource(R.string.settings_ping_running)
+                } else {
+                    stringResource(R.string.settings_ping_idle)
+                },
+                enabled = !isFetching,
+                tone = Tone.ACCENT,
+                onClick = {
+                    context.vibrateTick()
+                    isFetching = true
+                    fetchResultText = context.getString(R.string.settings_probe_running)
+                    scope.launch {
+                        val (timeMs, remoteModels) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
+                        isFetching = false
+                        if (timeMs >= 0) {
+                            fetchResultText = context.getString(R.string.settings_probe_ready, timeMs, remoteModels.size)
+                            if (remoteModels.isNotEmpty()) {
+                                preferences.cachedRemoteModels = remoteModels.joinToString(",")
+                            }
+                        } else {
+                            fetchResultText = context.getString(R.string.settings_probe_failed)
                         }
-                    } else {
-                        fetchResultText = context.getString(R.string.settings_probe_failed)
                     }
                 }
-            }
-        )
-
-        fetchResultText?.let {
-            BasicText(
-                text = it,
-                style = Wear.TextCaption,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
             )
         }
 
-        SubPageDoneRow()
-
-        Spacer(modifier = Modifier.height(SubPageBottomReserve))
+        fetchResultText?.let { text ->
+            row { SettingsCaptionRow(text = text) }
+        }
     }
 }

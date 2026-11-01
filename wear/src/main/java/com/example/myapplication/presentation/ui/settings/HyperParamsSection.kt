@@ -1,14 +1,5 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -16,24 +7,20 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
-import com.example.myapplication.presentation.ui.components.WearChip
-import com.example.myapplication.presentation.ui.components.WearSectionHeader
-import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.roundToInt
 
 /**
- * 推理超参数调优：温度步进与预设、最大输出 Token、传输协议开关。
+ * 推理超参数调优：温度滑轨与三档预设、最大输出 Token 滑轨、传输协议单选。
+ * 读写键与副作用与旧版逐条一致：改温度立即落盘并回调，改 Token 同理。
  */
 @Composable
 fun HyperParamsContent(
     preferences: AgentPreferences,
+    onBack: () -> Unit,
     onParamsChanged: ((temp: Float, maxTokens: Int, stream: Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -45,151 +32,118 @@ fun HyperParamsContent(
         onParamsChanged?.invoke(temp, maxTokens, isStream)
     }
 
-    val scrollState = rememberScrollState()
+    fun applyTemperature(next: Float) {
+        val quantized = SettingsValueMath.quantizeTemperature(next)
+        if (quantized == temp) return
+        temp = quantized
+        preferences.temperature = quantized
+        notifyChange()
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+    fun applyMaxTokens(next: Int) {
+        if (next == maxTokens) return
+        maxTokens = next
+        preferences.maxOutputTokens = next
+        notifyChange()
+    }
+
+    SettingsSubPage(
+        title = stringResource(R.string.settings_sub_hyper_params),
+        onBack = onBack
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            WearSectionHeader(text = stringResource(R.string.settings_temperature), modifier = Modifier.weight(1f))
-            BasicText(
-                text = "%.1f".format(temp),
-                style = Wear.TextTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_temperature),
+                value = temp,
+                valueRange = SettingsValueMath.TemperatureMin..SettingsValueMath.TemperatureMax,
+                steps = SettingsValueMath.TemperatureSteps,
+                valueText = "%.1f".format(temp),
+                onValueChange = { raw -> applyTemperature(raw) }
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            SettingsActionButton(
-                label = "− 0.1",
-                modifier = Modifier.weight(1f),
-                onClick = {
+        section(stringResource(R.string.settings_temp_presets))
+
+        row {
+            SettingsRadioRow(
+                label = stringResource(R.string.settings_temp_fast),
+                selected = SettingsValueMath.temperatureIndex(temp) ==
+                    SettingsValueMath.temperatureIndex(TempFast),
+                onSelect = {
                     context.vibrateTick()
-                    val next = (temp - 0.1f).coerceIn(0.0f, 1.5f)
-                    temp = (next * 10).roundToInt() / 10f
-                    preferences.temperature = temp
-                    notifyChange()
-                }
-            )
-            SettingsActionButton(
-                label = "+ 0.1",
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    context.vibrateTick()
-                    val next = (temp + 0.1f).coerceIn(0.0f, 1.5f)
-                    temp = (next * 10).roundToInt() / 10f
-                    preferences.temperature = temp
-                    notifyChange()
+                    applyTemperature(TempFast)
                 }
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(
-                0.2f to stringResource(R.string.settings_temp_fast),
-                0.7f to stringResource(R.string.settings_temp_balanced),
-                1.2f to stringResource(R.string.settings_temp_creative)
-            ).forEach { (presetTemp, label) ->
-                WearChip(
-                    label = label,
-                    selected = (temp * 10).roundToInt() == (presetTemp * 10).roundToInt(),
-                    onClick = {
-                        context.vibrateTick()
-                        temp = presetTemp
-                        preferences.temperature = presetTemp
-                        notifyChange()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        row {
+            SettingsRadioRow(
+                label = stringResource(R.string.settings_temp_balanced),
+                selected = SettingsValueMath.temperatureIndex(temp) ==
+                    SettingsValueMath.temperatureIndex(TempBalanced),
+                onSelect = {
+                    context.vibrateTick()
+                    applyTemperature(TempBalanced)
+                }
+            )
         }
 
-        WearSectionHeader(text = stringResource(R.string.settings_max_tokens))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(150 to stringResource(R.string.settings_tokens_150), 300 to stringResource(R.string.settings_tokens_300)).forEach { (tokens, label) ->
-                WearChip(
-                    label = label,
-                    selected = maxTokens == tokens,
-                    onClick = {
-                        context.vibrateTick()
-                        maxTokens = tokens
-                        preferences.maxOutputTokens = tokens
-                        notifyChange()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        row {
+            SettingsRadioRow(
+                label = stringResource(R.string.settings_temp_creative),
+                selected = SettingsValueMath.temperatureIndex(temp) ==
+                    SettingsValueMath.temperatureIndex(TempCreative),
+                onSelect = {
+                    context.vibrateTick()
+                    applyTemperature(TempCreative)
+                }
+            )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(600 to stringResource(R.string.settings_tokens_600), 1200 to stringResource(R.string.settings_tokens_1200), 2048 to stringResource(R.string.settings_tokens_2048)).forEach { (tokens, label) ->
-                WearChip(
-                    label = label,
-                    selected = maxTokens == tokens,
-                    onClick = {
-                        context.vibrateTick()
-                        maxTokens = tokens
-                        preferences.maxOutputTokens = tokens
-                        notifyChange()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_max_tokens),
+                value = SettingsValueMath.tokenIndex(maxTokens).toFloat(),
+                valueRange = 0f..SettingsValueMath.TokenLadder.lastIndex.toFloat(),
+                steps = SettingsValueMath.TokenSteps,
+                valueText = maxTokens.toString(),
+                onValueChange = { raw ->
+                    applyMaxTokens(SettingsValueMath.tokenAt(raw.roundToInt()))
+                }
+            )
         }
 
-        WearSectionHeader(text = stringResource(R.string.settings_transport))
+        section(stringResource(R.string.settings_transport))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            WearChip(
+        row {
+            SettingsRadioRow(
                 label = stringResource(R.string.settings_sse_on),
                 selected = isStream,
-                onClick = {
+                onSelect = {
                     context.vibrateTick()
                     isStream = true
                     preferences.streamMode = true
                     notifyChange()
-                },
-                modifier = Modifier.weight(1f)
+                }
             )
-            WearChip(
+        }
+
+        row {
+            SettingsRadioRow(
                 label = stringResource(R.string.settings_sse_off),
                 selected = !isStream,
-                onClick = {
+                onSelect = {
                     context.vibrateTick()
                     isStream = false
                     preferences.streamMode = false
                     notifyChange()
-                },
-                modifier = Modifier.weight(1f)
+                }
             )
         }
-
-        SubPageDoneRow()
-
-        Spacer(modifier = Modifier.height(SubPageBottomReserve))
     }
 }
+
+/** 三档温度预设：与旧版 chip 完全相同的取值。 */
+private const val TempFast = 0.2f
+private const val TempBalanced = 0.7f
+private const val TempCreative = 1.2f

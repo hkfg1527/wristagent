@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.presentation.ui.theme.Wear
 
@@ -201,9 +202,14 @@ fun WearChip(
     }
 }
 
-/** 小徽标：固定高度的小圆角标签，色调由 [Tone] 决定。 */
+/** 小徽标：固定高度的小圆角标签，色调由 [Tone] 决定；[horizontalPadding] 供窄徽章收紧内边距。 */
 @Composable
-fun WearBadge(text: String, tone: Tone, modifier: Modifier = Modifier) {
+fun WearBadge(
+    text: String,
+    tone: Tone,
+    modifier: Modifier = Modifier,
+    horizontalPadding: Dp = Wear.Space.Sm,
+) {
     val shape = RoundedCornerShape(Wear.Space.Xs)
     val container = when (tone) {
         Tone.ACCENT -> Wear.Palette.AccentDim
@@ -221,7 +227,7 @@ fun WearBadge(text: String, tone: Tone, modifier: Modifier = Modifier) {
             .height(Wear.Size.BadgeHeight)
             .clip(shape)
             .background(container)
-            .padding(horizontal = Wear.Space.Sm),
+            .padding(horizontal = horizontalPadding),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(

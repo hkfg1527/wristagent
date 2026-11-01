@@ -2,8 +2,9 @@
     <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
     <string name="settings_title">系统设置</string>
     <string name="settings_model_and_service">模型与服务</string>
-    <string name="settings_badge_configured">已配置</string>
-    <string name="settings_badge_unconfigured">未配置</string>
+    <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
+    <string name="settings_badge_configured">已设</string>
+    <string name="settings_badge_unconfigured">未设</string>
     <string name="settings_model_params">模型参数</string>
     <string name="settings_tools_and_mcp">端侧工具与 MCP</string>
     <string name="settings_tools_enabled_count">%1$d/6 已启用</string>
@@ -35,11 +36,6 @@
     <string name="settings_temp_balanced">平衡 0.7</string>
     <string name="settings_temp_creative">发散 1.2</string>
     <string name="settings_max_tokens">最大输出 Token</string>
-    <string name="settings_tokens_150">150 节能</string>
-    <string name="settings_tokens_300">300 适中</string>
-    <string name="settings_tokens_600">600 完整</string>
-    <string name="settings_tokens_1200">1200 深度</string>
-    <string name="settings_tokens_2048">2048 满额</string>
     <string name="settings_transport">传输协议</string>
     <string name="settings_sse_on">开启 SSE 流式</string>
     <string name="settings_sse_off">关闭流式</string>
@@ -53,7 +49,6 @@
     <string name="settings_memory_cleared">已清空当前记忆与偏好</string>
     <string name="settings_memory_clear_all">一键清空全部记忆与偏好</string>
     <string name="settings_side_key_header">右侧副键绑定</string>
-    <string name="settings_activated">已激活</string>
     <string name="settings_security_novice_title">严格安全模式</string>
     <string name="settings_security_novice_desc">所有敏感与系统操作均需审批（3 秒倒计时防误触）</string>
     <string name="settings_security_standard_title">标准提示模式</string>
@@ -65,8 +60,6 @@
     <string name="settings_model_pick">模型直选</string>
     <string name="settings_no_models">未发现可用模型，请先点击下方按钮拉取模型列表</string>
     <string name="settings_api_endpoint">API 端点</string>
-    <string name="settings_custom_input_hide">收起自定义输入</string>
-    <string name="settings_custom_input_show">手动修改 BaseUrl / Key</string>
     <string name="settings_ping_running">正在 Ping 测试...</string>
     <string name="settings_ping_idle">端点测速与实时握手 Ping</string>
     <string name="settings_probe_running">正在握手探测...</string>
@@ -79,8 +72,6 @@
     <string name="settings_preset_architect">架构师</string>
     <string name="settings_preset_secretary">生活秘书</string>
     <string name="settings_preset_clear_test">清空测试</string>
-    <string name="settings_prompt_edit_hide">收起自定义编辑</string>
-    <string name="settings_prompt_edit_show">手动修改提示词文本</string>
     <string name="settings_prompt_placeholder">输入系统提示词</string>
 
     <!-- 端侧工具与 MCP 分区。 -->
@@ -91,17 +82,11 @@
     <string name="settings_tool_time_weather">时间与天气感知</string>
     <string name="settings_tool_web_search">真实网络搜索</string>
     <string name="settings_tools_release_header">端侧工具放行</string>
-    <string name="settings_tool_allowed">放行</string>
-    <string name="settings_tool_blocked">拦截</string>
     <string name="settings_mcp_protocol">MCP 协议</string>
     <string name="settings_mcp_probe">MCP 协议探针</string>
-    <string name="settings_mcp_connected">已连接</string>
-    <string name="settings_mcp_disabled">未启用</string>
 
     <!-- 语音转写分区。 -->
     <string name="settings_asr_toggle_header">语音转写开关</string>
-    <string name="settings_switch_on">开启</string>
-    <string name="settings_switch_off">关闭</string>
     <string name="settings_asr_service_header">识别服务</string>
     <string name="settings_asr_baidu_desc">百度短语音：密钥缺失时自动回退系统识别</string>
     <string name="settings_asr_system_desc">系统识别：依赖手表现有语音服务</string>
@@ -115,4 +100,34 @@
     <string name="settings_asr_recording">录音中，请说话…</string>
     <string name="settings_asr_success">转写成功：%1$s</string>
     <string name="settings_asr_failure">转写失败：%1$s</string>
+
+    <!-- 特权执行（Root / Shizuku）分区。 -->
+    <string name="settings_privilege_title">特权执行</string>
+    <string name="settings_privilege_backend">当前后端：%1$s</string>
+    <string name="settings_privilege_root_label">Root</string>
+    <string name="settings_privilege_root_available">可用</string>
+    <string name="settings_privilege_root_unavailable">不可用</string>
+    <string name="settings_privilege_shizuku_label">Shizuku</string>
+    <string name="settings_privilege_shizuku_installed">已安装</string>
+    <string name="settings_privilege_shizuku_not_installed">未安装</string>
+    <string name="settings_privilege_shizuku_permission_label">Shizuku 授权</string>
+    <string name="settings_privilege_shizuku_granted">已授权</string>
+    <string name="settings_privilege_shizuku_not_granted">未授权</string>
+    <string name="settings_privilege_request_shizuku">请求 Shizuku 权限</string>
+    <string name="settings_privilege_probe">运行探针</string>
+    <string name="settings_privilege_probe_running">探测中...</string>
+    <string name="settings_privilege_probe_empty">暂无输出</string>
+
+    <!-- 设置页骨架：返回键、输入对话框与文本入口取值。 -->
+    <string name="settings_back">返回</string>
+    <string name="settings_dialog_cancel">取消</string>
+    <string name="settings_dialog_confirm">完成</string>
+    <string name="settings_value_empty">未设置</string>
+    <string name="settings_text_base_url">接口地址</string>
+    <string name="settings_text_api_key">API Key</string>
+    <string name="settings_base_url_hint">https://api.example.com</string>
+    <string name="settings_api_key_hint">sk-...</string>
+    <string name="settings_baidu_api_key">百度 API Key（AK）</string>
+    <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
+    <string name="settings_temp_presets">快捷预设</string>
 </resources>

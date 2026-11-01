@@ -1,35 +1,25 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
-import com.example.myapplication.presentation.ui.components.WearSectionHeader
-import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
- * 工具集细粒度放行控制与 MCP 协议探针。
+ * 工具集细粒度放行与 MCP 协议探针：六个内置工具改用官方 SwitchButton，
+ * 点击语义、写入的偏好键与旧版逐条一致。
  */
 @Composable
 fun ToolsMcpContent(
     preferences: AgentPreferences,
     isMcpEnabled: Boolean,
     mcpEndpoint: String,
+    onBack: () -> Unit,
     onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
 ) {
     val context = LocalContext.current
@@ -40,78 +30,103 @@ fun ToolsMcpContent(
     var toolWeather by remember { mutableStateOf(preferences.toolWeatherEnabled) }
     var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
 
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+    SettingsSubPage(
+        title = stringResource(R.string.settings_tools_and_mcp),
+        onBack = onBack
     ) {
-        val toolItems = listOf(
-            Triple("get_device_status", stringResource(R.string.settings_tool_device_status), toolDeviceStatus) to {
-                toolDeviceStatus = !toolDeviceStatus
-                preferences.toolDeviceStatusEnabled = toolDeviceStatus
-            },
-            Triple("vibrate_device", stringResource(R.string.settings_tool_vibrate), toolVibrate) to {
-                toolVibrate = !toolVibrate
-                preferences.toolVibrateEnabled = toolVibrate
-            },
-            Triple("adjust_matrix_density", stringResource(R.string.settings_tool_matrix_density), toolMatrixDensity) to {
-                toolMatrixDensity = !toolMatrixDensity
-                preferences.toolMatrixDensityEnabled = toolMatrixDensity
-            },
-            Triple("set_system_power_mode", stringResource(R.string.settings_tool_power_mode), toolPowerMode) to {
-                toolPowerMode = !toolPowerMode
-                preferences.toolPowerModeEnabled = toolPowerMode
-            },
-            Triple("query_time_weather", stringResource(R.string.settings_tool_time_weather), toolWeather) to {
-                toolWeather = !toolWeather
-                preferences.toolWeatherEnabled = toolWeather
-            },
-            Triple("web_search", stringResource(R.string.settings_tool_web_search), toolWebSearch) to {
-                toolWebSearch = !toolWebSearch
-                preferences.toolWebSearchEnabled = toolWebSearch
-            }
-        )
+        section(stringResource(R.string.settings_tools_release_header))
 
-        WearSectionHeader(text = stringResource(R.string.settings_tools_release_header))
-
-        toolItems.forEach { (meta, toggle) ->
-            val (name, label, enabled) = meta
-            SettingsChoiceRow(
-                title = label,
-                subtitle = name,
-                value = if (enabled) stringResource(R.string.settings_tool_allowed) else stringResource(R.string.settings_tool_blocked),
-                selected = enabled,
-                onClick = {
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_device_status),
+                secondary = "get_device_status",
+                checked = toolDeviceStatus,
+                onCheckedChange = { enabled ->
                     context.vibrateTick()
-                    toggle()
+                    toolDeviceStatus = enabled
+                    preferences.toolDeviceStatusEnabled = enabled
                 }
             )
         }
 
-        WearSectionHeader(text = stringResource(R.string.settings_mcp_protocol))
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_vibrate),
+                secondary = "vibrate_device",
+                checked = toolVibrate,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    toolVibrate = enabled
+                    preferences.toolVibrateEnabled = enabled
+                }
+            )
+        }
 
-        SettingsChoiceRow(
-            title = stringResource(R.string.settings_mcp_probe),
-            value = if (isMcpEnabled) stringResource(R.string.settings_mcp_connected) else stringResource(R.string.settings_mcp_disabled),
-            selected = isMcpEnabled,
-            onClick = {
-                context.vibrateTick()
-                onToggleMcp(!isMcpEnabled, mcpEndpoint)
-            }
-        )
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_matrix_density),
+                secondary = "adjust_matrix_density",
+                checked = toolMatrixDensity,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    toolMatrixDensity = enabled
+                    preferences.toolMatrixDensityEnabled = enabled
+                }
+            )
+        }
 
-        BasicText(
-            text = mcpEndpoint,
-            style = Wear.TextMono,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_power_mode),
+                secondary = "set_system_power_mode",
+                checked = toolPowerMode,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    toolPowerMode = enabled
+                    preferences.toolPowerModeEnabled = enabled
+                }
+            )
+        }
 
-        SubPageDoneRow()
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_time_weather),
+                secondary = "query_time_weather",
+                checked = toolWeather,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    toolWeather = enabled
+                    preferences.toolWeatherEnabled = enabled
+                }
+            )
+        }
 
-        Spacer(modifier = Modifier.height(SubPageBottomReserve))
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tool_web_search),
+                secondary = "web_search",
+                checked = toolWebSearch,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    toolWebSearch = enabled
+                    preferences.toolWebSearchEnabled = enabled
+                }
+            )
+        }
+
+        section(stringResource(R.string.settings_mcp_protocol))
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_mcp_probe),
+                checked = isMcpEnabled,
+                onCheckedChange = { enabled ->
+                    context.vibrateTick()
+                    onToggleMcp(enabled, mcpEndpoint)
+                }
+            )
+        }
+
+        row { SettingsCaptionRow(text = mcpEndpoint, mono = true) }
     }
 }

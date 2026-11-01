@@ -1,30 +1,16 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.components.WearChip
-import com.example.myapplication.presentation.ui.components.WearSectionHeader
-import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrLanguage
 import com.example.myapplication.voice.AsrProviderId
 import com.example.myapplication.voice.AsrResult
@@ -33,12 +19,17 @@ import com.example.myapplication.voice.AudioRecordWavCapture
 import com.example.myapplication.voice.VoiceAsrGateway
 import kotlinx.coroutines.launch
 
+/** 该页可编辑的两个密钥项。 */
+private enum class AsrKeyField { API_KEY, SECRET_KEY }
+
 /**
- * 语音转写配置分区：厂商切换、百度 AK/SK、识别语言、总开关与真实测试转写。
+ * 语音转写配置分区：总开关、厂商单选、百度 AK/SK 对话框、识别语言单选与真实自检。
+ * 每次改动都走同一 [AsrSettings] 快照落盘，写键与副作用与旧版完全一致。
  */
 @Composable
 fun VoiceAsrContent(
     preferences: AgentPreferences,
+    onBack: () -> Unit,
     onSettingsChanged: ((AsrSettings) -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -50,6 +41,7 @@ fun VoiceAsrContent(
     var language by remember { mutableStateOf(initial.language) }
     var apiKey by remember { mutableStateOf(initial.baiduApiKey) }
     var secretKey by remember { mutableStateOf(initial.baiduSecretKey) }
+    var editingField by remember { mutableStateOf<AsrKeyField?>(null) }
 
     var isTesting by remember { mutableStateOf(false) }
     var testStatus by remember { mutableStateOf("") }
@@ -72,147 +64,147 @@ fun VoiceAsrContent(
         onSettingsChanged?.invoke(settings)
     }
 
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
-    ) {
-        WearSectionHeader(text = stringResource(R.string.settings_asr_toggle_header))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(true to stringResource(R.string.settings_switch_on), false to stringResource(R.string.settings_switch_off)).forEach { (value, label) ->
-                WearChip(
-                    label = label,
-                    selected = enabled == value,
-                    onClick = {
-                        context.vibrateTick()
-                        enabled = value
+    SettingsSubPage(
+        title = stringResource(R.string.settings_asr),
+        onBack = onBack,
+        overlay = {
+            when (editingField) {
+                AsrKeyField.API_KEY -> SettingsTextDialog(
+                    title = stringResource(R.string.settings_baidu_api_key),
+                    initial = apiKey,
+                    placeholder = stringResource(R.string.settings_baidu_api_key_hint),
+                    onValueChange = { value ->
+                        apiKey = value
                         persist()
                     },
-                    modifier = Modifier.weight(1f)
+                    onDismiss = { editingField = null }
                 )
+                AsrKeyField.SECRET_KEY -> SettingsTextDialog(
+                    title = stringResource(R.string.settings_baidu_secret_key),
+                    initial = secretKey,
+                    placeholder = stringResource(R.string.settings_baidu_secret_key_hint),
+                    onValueChange = { value ->
+                        secretKey = value
+                        persist()
+                    },
+                    onDismiss = { editingField = null }
+                )
+                null -> Unit
             }
         }
+    ) {
+        section(stringResource(R.string.settings_asr_toggle_header))
 
-        WearSectionHeader(text = stringResource(R.string.settings_asr_service_header))
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_asr_toggle_header),
+                checked = enabled,
+                onCheckedChange = { value ->
+                    context.vibrateTick()
+                    enabled = value
+                    persist()
+                }
+            )
+        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            listOf(AsrProviderId.SYSTEM, AsrProviderId.BAIDU).forEach { candidate ->
-                WearChip(
+        section(stringResource(R.string.settings_asr_service_header))
+
+        listOf(AsrProviderId.SYSTEM, AsrProviderId.BAIDU).forEach { candidate ->
+            val descriptionRes = if (candidate == AsrProviderId.BAIDU) {
+                R.string.settings_asr_baidu_desc
+            } else {
+                R.string.settings_asr_system_desc
+            }
+            row {
+                SettingsRadioRow(
                     label = candidate.displayName,
+                    subtitle = stringResource(descriptionRes),
                     selected = providerId == candidate,
-                    onClick = {
+                    onSelect = {
                         context.vibrateTick()
                         providerId = candidate
                         testStatus = ""
                         persist()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        BasicText(
-            text = if (providerId == AsrProviderId.BAIDU) {
-                stringResource(R.string.settings_asr_baidu_desc)
-            } else {
-                stringResource(R.string.settings_asr_system_desc)
-            },
-            style = Wear.TextCaption,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        WearSectionHeader(text = stringResource(R.string.settings_baidu_keys_header))
-        WearSectionHeader(text = "API Key (AK)")
-
-        SettingsInput(
-            value = apiKey,
-            onValueChange = {
-                apiKey = it
-                persist()
-            },
-            placeholder = stringResource(R.string.settings_baidu_api_key_hint)
-        )
-
-        WearSectionHeader(text = "Secret Key (SK)")
-
-        SettingsInput(
-            value = secretKey,
-            onValueChange = {
-                secretKey = it
-                persist()
-            },
-            placeholder = stringResource(R.string.settings_baidu_secret_key_hint)
-        )
-
-        WearSectionHeader(text = stringResource(R.string.settings_asr_language_header))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            AsrLanguage.values().forEach { candidate ->
-                WearChip(
-                    label = candidate.displayName,
-                    selected = language == candidate,
-                    onClick = {
-                        context.vibrateTick()
-                        language = candidate
-                        persist()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        WearSectionHeader(text = stringResource(R.string.settings_asr_selftest_header))
-
-        SettingsActionButton(
-            label = if (isTesting) stringResource(R.string.settings_asr_testing) else stringResource(R.string.settings_asr_test),
-            enabled = !isTesting,
-            tone = Tone.ACCENT,
-            onClick = {
-                context.vibrateTick()
-                if (isTesting) return@SettingsActionButton
-                isTesting = true
-                testStatus = context.getString(R.string.settings_asr_recording)
-                persist()
-                val gateway = VoiceAsrGateway(capture = AudioRecordWavCapture(context))
-                scope.launch {
-                    val result = gateway.transcribe(
-                        currentSettings(),
-                        android.speech.SpeechRecognizer.isRecognitionAvailable(context)
-                    )
-                    isTesting = false
-                    testStatus = when (result) {
-                        is AsrResult.Success -> context.getString(R.string.settings_asr_success, result.text)
-                        is AsrResult.Failure -> context.getString(R.string.settings_asr_failure, result.reason)
                     }
-                }
+                )
             }
-        )
+        }
 
-        if (testStatus.isNotBlank()) {
-            BasicText(
-                text = testStatus,
-                style = Wear.TextCaption,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+        section(stringResource(R.string.settings_baidu_keys_header))
+
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_baidu_api_key),
+                value = SettingsValueMath.maskSecret(apiKey),
+                onClick = {
+                    context.vibrateTick()
+                    editingField = AsrKeyField.API_KEY
+                }
             )
         }
 
-        SubPageDoneRow()
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_baidu_secret_key),
+                value = SettingsValueMath.maskSecret(secretKey),
+                onClick = {
+                    context.vibrateTick()
+                    editingField = AsrKeyField.SECRET_KEY
+                }
+            )
+        }
 
-        Spacer(modifier = Modifier.height(SubPageBottomReserve))
+        section(stringResource(R.string.settings_asr_language_header))
+
+        AsrLanguage.values().forEach { candidate ->
+            row {
+                SettingsRadioRow(
+                    label = candidate.displayName,
+                    selected = language == candidate,
+                    onSelect = {
+                        context.vibrateTick()
+                        language = candidate
+                        persist()
+                    }
+                )
+            }
+        }
+
+        section(stringResource(R.string.settings_asr_selftest_header))
+
+        row {
+            SettingsActionButton(
+                label = if (isTesting) {
+                    stringResource(R.string.settings_asr_testing)
+                } else {
+                    stringResource(R.string.settings_asr_test)
+                },
+                enabled = !isTesting,
+                tone = Tone.ACCENT,
+                onClick = {
+                    context.vibrateTick()
+                    if (isTesting) return@SettingsActionButton
+                    isTesting = true
+                    testStatus = context.getString(R.string.settings_asr_recording)
+                    persist()
+                    val gateway = VoiceAsrGateway(capture = AudioRecordWavCapture(context))
+                    scope.launch {
+                        val result = gateway.transcribe(
+                            currentSettings(),
+                            android.speech.SpeechRecognizer.isRecognitionAvailable(context)
+                        )
+                        isTesting = false
+                        testStatus = when (result) {
+                            is AsrResult.Success -> context.getString(R.string.settings_asr_success, result.text)
+                            is AsrResult.Failure -> context.getString(R.string.settings_asr_failure, result.reason)
+                        }
+                    }
+                }
+            )
+        }
+
+        if (testStatus.isNotBlank()) {
+            row { SettingsCaptionRow(text = testStatus) }
+        }
     }
 }

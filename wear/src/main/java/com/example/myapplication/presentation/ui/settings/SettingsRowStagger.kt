@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 
-/** 设置列表参与逐行动画的内容行数：标题 + 9 个分区入口 + 末尾"完成返回"。 */
+/** 根设置列表参与逐行动画的内容行数：标题 + 9 个分区入口 + 末尾"完成返回"。 */
 const val SettingsStaggeredRowCount = 11
 
 /** 进场位移 24dp：从下方浮上来。 */
@@ -111,6 +111,7 @@ fun SettingsStaggeredRow(
     index: Int,
     stagger: SettingsRowStaggerState,
     exit: SettingsExitController,
+    rowCount: Int = SettingsStaggeredRowCount,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -125,9 +126,9 @@ fun SettingsStaggeredRow(
         }
     }
 
-    // 退场反向起跑：末行先走，标题最后走。
-    val exitStartMs = remember(index) {
-        staggerDelayMs(SettingsStaggeredRowCount - 1 - index, SettingsRowExitStepMs, SettingsRowExitCapMs)
+    // 退场反向起跑：末行先走，标题最后走。行数由调用方传入，子页行数与根页不同也能正确反向。
+    val exitStartMs = remember(index, rowCount) {
+        staggerDelayMs(rowCount - 1 - index, SettingsRowExitStepMs, SettingsRowExitCapMs)
     }
 
     val density = LocalDensity.current

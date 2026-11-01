@@ -2,8 +2,9 @@
     <!-- Settings entry titles, sub-page titles and status text (SettingsScreen + settings/ sections). -->
     <string name="settings_title">Settings</string>
     <string name="settings_model_and_service">Models &amp; Services</string>
-    <string name="settings_badge_configured">Configured</string>
-    <string name="settings_badge_unconfigured">Not configured</string>
+    <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
+    <string name="settings_badge_configured">Set</string>
+    <string name="settings_badge_unconfigured">None</string>
     <string name="settings_model_params">Model Parameters</string>
     <string name="settings_tools_and_mcp">On-device Tools &amp; MCP</string>
     <string name="settings_tools_enabled_count">%1$d/6 enabled</string>
@@ -35,11 +36,6 @@
     <string name="settings_temp_balanced">Balanced 0.7</string>
     <string name="settings_temp_creative">Creative 1.2</string>
     <string name="settings_max_tokens">Max output tokens</string>
-    <string name="settings_tokens_150">150 saver</string>
-    <string name="settings_tokens_300">300 balanced</string>
-    <string name="settings_tokens_600">600 complete</string>
-    <string name="settings_tokens_1200">1200 deep</string>
-    <string name="settings_tokens_2048">2048 maximum</string>
     <string name="settings_transport">Transport protocol</string>
     <string name="settings_sse_on">Enable SSE streaming</string>
     <string name="settings_sse_off">Turn streaming off</string>
@@ -53,7 +49,6 @@
     <string name="settings_memory_cleared">Current memory and preferences cleared</string>
     <string name="settings_memory_clear_all">Clear all memory and preferences</string>
     <string name="settings_side_key_header">Right Side Key Binding</string>
-    <string name="settings_activated">Active</string>
     <string name="settings_security_novice_title">Strict safety mode</string>
     <string name="settings_security_novice_desc">Every sensitive and system action needs approval, with a 3 second countdown against mis-taps</string>
     <string name="settings_security_standard_title">Standard prompt mode</string>
@@ -65,8 +60,6 @@
     <string name="settings_model_pick">Direct model pick</string>
     <string name="settings_no_models">No models available yet, tap the button below to fetch the list</string>
     <string name="settings_api_endpoint">API endpoint</string>
-    <string name="settings_custom_input_hide">Hide the custom input</string>
-    <string name="settings_custom_input_show">Edit BaseUrl / Key manually</string>
     <string name="settings_ping_running">Pinging...</string>
     <string name="settings_ping_idle">Endpoint speed test with a live handshake ping</string>
     <string name="settings_probe_running">Handshaking...</string>
@@ -79,8 +72,6 @@
     <string name="settings_preset_architect">Architect</string>
     <string name="settings_preset_secretary">Daily assistant</string>
     <string name="settings_preset_clear_test">Clear test</string>
-    <string name="settings_prompt_edit_hide">Hide the custom editor</string>
-    <string name="settings_prompt_edit_show">Edit the prompt text manually</string>
     <string name="settings_prompt_placeholder">Enter the system prompt</string>
 
     <!-- Tools and MCP section. -->
@@ -91,17 +82,11 @@
     <string name="settings_tool_time_weather">Time and weather</string>
     <string name="settings_tool_web_search">Live web search</string>
     <string name="settings_tools_release_header">On-device tool allowlist</string>
-    <string name="settings_tool_allowed">Allowed</string>
-    <string name="settings_tool_blocked">Blocked</string>
     <string name="settings_mcp_protocol">MCP protocol</string>
     <string name="settings_mcp_probe">MCP protocol probe</string>
-    <string name="settings_mcp_connected">Connected</string>
-    <string name="settings_mcp_disabled">Not enabled</string>
 
     <!-- Voice and ASR section. -->
     <string name="settings_asr_toggle_header">Speech-to-text switch</string>
-    <string name="settings_switch_on">On</string>
-    <string name="settings_switch_off">Off</string>
     <string name="settings_asr_service_header">Recognition service</string>
     <string name="settings_asr_baidu_desc">Baidu short speech: falls back to the system recognizer when the key is missing</string>
     <string name="settings_asr_system_desc">System recognizer: uses the speech service built into the watch</string>
@@ -115,4 +100,34 @@
     <string name="settings_asr_recording">Recording, please speak...</string>
     <string name="settings_asr_success">Transcribed: %1$s</string>
     <string name="settings_asr_failure">Transcription failed: %1$s</string>
+
+    <!-- Privileged execution (Root / Shizuku) section. -->
+    <string name="settings_privilege_title">Privileged Execution</string>
+    <string name="settings_privilege_backend">Backend: %1$s</string>
+    <string name="settings_privilege_root_label">Root</string>
+    <string name="settings_privilege_root_available">Available</string>
+    <string name="settings_privilege_root_unavailable">Unavailable</string>
+    <string name="settings_privilege_shizuku_label">Shizuku</string>
+    <string name="settings_privilege_shizuku_installed">Installed</string>
+    <string name="settings_privilege_shizuku_not_installed">Not installed</string>
+    <string name="settings_privilege_shizuku_permission_label">Shizuku access</string>
+    <string name="settings_privilege_shizuku_granted">Granted</string>
+    <string name="settings_privilege_shizuku_not_granted">Not granted</string>
+    <string name="settings_privilege_request_shizuku">Request Shizuku permission</string>
+    <string name="settings_privilege_probe">Run probe</string>
+    <string name="settings_privilege_probe_running">Probing...</string>
+    <string name="settings_privilege_probe_empty">No output yet</string>
+
+    <!-- 设置页骨架：返回键、输入对话框与文本入口取值。 -->
+    <string name="settings_back">Back</string>
+    <string name="settings_dialog_cancel">Cancel</string>
+    <string name="settings_dialog_confirm">Done</string>
+    <string name="settings_value_empty">Not set</string>
+    <string name="settings_text_base_url">Base URL</string>
+    <string name="settings_text_api_key">API Key</string>
+    <string name="settings_base_url_hint">https://api.example.com</string>
+    <string name="settings_api_key_hint">sk-...</string>
+    <string name="settings_baidu_api_key">API Key (AK)</string>
+    <string name="settings_baidu_secret_key">Secret Key (SK)</string>
+    <string name="settings_temp_presets">Quick presets</string>
 </resources>
