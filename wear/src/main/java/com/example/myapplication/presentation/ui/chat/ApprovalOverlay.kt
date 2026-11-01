@@ -90,9 +90,14 @@ private fun riskBarsLit(level: RiskLevel): Int = when (level) {
  * 竖排标签每块要多占一行（四块合计 64dp），而滑轨上方只有 164dp，
  * 行内引子把这行高度让给正文，四块信息一条不少。
  */
-private fun approvalParagraph(label: String, body: String, bodyStyle: TextStyle): AnnotatedString =
+private fun approvalParagraph(
+    label: String,
+    body: String,
+    bodyStyle: TextStyle,
+    labelStyle: TextStyle
+): AnnotatedString =
     buildAnnotatedString {
-        withStyle(SpanStyle(fontSize = Wear.TextCaption.fontSize, color = Wear.Palette.TextMuted)) {
+        withStyle(SpanStyle(fontSize = labelStyle.fontSize, color = Wear.Palette.TextMuted)) {
             append(label)
             append("  ")
         }
@@ -227,7 +232,8 @@ internal fun ApprovalFloatingLayer(
                             text = approvalParagraph(
                                 stringResource(R.string.wearchat_approval_label_call),
                                 toolDisplayName,
-                                centeredBody
+                                centeredBody,
+                                Wear.TextCaption
                             ),
                             style = centeredBody,
                             maxLines = 2,
@@ -242,7 +248,8 @@ internal fun ApprovalFloatingLayer(
                                 text = approvalParagraph(
                                     stringResource(R.string.wearchat_approval_label_change),
                                     whatItDoes,
-                                    centeredBody
+                                    centeredBody,
+                                    Wear.TextCaption
                                 ),
                                 style = centeredBody,
                                 maxLines = 3,
@@ -258,7 +265,8 @@ internal fun ApprovalFloatingLayer(
                                 text = approvalParagraph(
                                     stringResource(R.string.wearchat_approval_label_worst_case),
                                     worstCase,
-                                    centeredWorstCase
+                                    centeredWorstCase,
+                                    Wear.TextCaption
                                 ),
                                 style = centeredWorstCase,
                                 maxLines = 2,

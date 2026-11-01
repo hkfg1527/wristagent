@@ -80,8 +80,8 @@ internal fun TextInputDialog(
             // 外层承接口感遮罩，内容整体抬到输入法上沿之上
             .imePadding()
             .padding(
-                start = Wear.Space.Edge,
-                end = Wear.Space.Edge,
+                start = Wear.Space.Lg,
+                end = Wear.Space.Lg,
                 top = Wear.Space.Sm,
                 bottom = Wear.Space.Sm
             ),
@@ -117,7 +117,7 @@ internal fun TextInputDialog(
                     .fillMaxWidth()
                     .heightIn(min = Wear.Size.Touch, max = 120.dp)
                     .focusRequester(dialogFocusRequester)
-                    .clip(RoundedCornerShape(Wear.Radius.Chip))
+                    .clip(RoundedCornerShape(Wear.Radius.Control))
                     .background(Wear.Palette.SurfaceAlt)
                     .padding(Wear.Space.Md)
             )
@@ -156,7 +156,7 @@ private fun DialogActionButton(
     Box(
         modifier = modifier
             .height(Wear.Size.Touch)
-            .clip(RoundedCornerShape(Wear.Radius.Chip))
+            .clip(RoundedCornerShape(Wear.Radius.Control))
             // 主操作与主键同色（Orb 冷银白 + 深字），次操作留空只用文字，视觉上只留一个实心按钮
             .background(if (isPrimary) Wear.Palette.Orb else Color.Transparent)
             .clickable { onClick() }

@@ -708,8 +708,8 @@ fun ChatScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(
-                            start = Wear.Space.Edge,
-                            end = Wear.Space.Edge,
+                            start = Wear.Space.Lg,
+                            end = Wear.Space.Lg,
                             bottom = Wear.Size.BottomBarReserve
                         )
                 )

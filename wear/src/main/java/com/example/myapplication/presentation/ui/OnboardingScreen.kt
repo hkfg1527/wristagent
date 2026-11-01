@@ -251,8 +251,8 @@ private fun OnboardingConfigPhase(
                 .focusable(),
             // 顶部让出叉号行高度，滚动内容不会爬到叉号下面
             contentPadding = PaddingValues(
-                start = Wear.Space.Edge,
-                end = Wear.Space.Edge,
+                start = Wear.Space.Lg,
+                end = Wear.Space.Lg,
                 top = Wear.Size.TopContentInset + Wear.Size.Touch,
                 bottom = Wear.Space.Lg
             ),

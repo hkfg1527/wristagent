@@ -1,14 +1,19 @@
 package com.example.myapplication.presentation.ui.theme
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.wear.compose.material3.MaterialTheme
 
 /**
- * Wear 设计令牌：颜色、圆角、间距、尺寸与字号阶梯的唯一来源，UI 层只从这里取值。
+ * Wear 设计令牌：颜色、圆角、间距、尺寸的唯一来源。
+ *
+ * 排版不在这里定义 —— 字号阶梯的唯一权威是 [MaterialTheme.typography]（由 [WearMaterialTheme]
+ * 注入官方 M3E [androidx.wear.compose.material3.Typography]）。下面的 Text* 只是"官方槽位 + 令牌色"
+ * 的映射，不再持有任何 sp 数值。
  */
 object Wear {
     /** 颜色令牌。 */
@@ -34,21 +39,26 @@ object Wear {
         val Orb = Color(0xFFE8EDF5)
     }
 
-    /** 圆角令牌。 */
+    /**
+     * 圆角令牌：只保留两档。
+     * - [Control] 控件（行、按钮、滑轨、开关）
+     * - [Card] 卡片（对话框、浮层）
+     *
+     * 实际下发给组件的是 [WearShapes]，它把官方五档全部收敛到这两档上，
+     * 于是任何官方组件拿到的圆角都只会是其中之一。
+     */
     object Radius {
-        val Chip = 10.dp
-        val Card = 16.dp
-        val Sheet = 24.dp
+        val Control = 12.dp
+        val Card = 24.dp
     }
 
-    /** 间距令牌。 */
+    /** 间距令牌：只允许 4 的倍数，取值集合固定为 4 / 8 / 12 / 16 / 24。 */
     object Space {
         val Xs = 4.dp
         val Sm = 8.dp
         val Md = 12.dp
         val Lg = 16.dp
         val Xl = 24.dp
-        val Edge = 20.dp
     }
 
     /** 尺寸令牌。 */
@@ -60,6 +70,8 @@ object Wear {
         val TopContentInset = 34.dp
         /** 底栏保留区：主键 52dp + 底距 12dp + 12dp 余量，尽量把高度让给正文 */
         val BottomBarReserve = 76.dp
+        /** 行尾状态色块：只用一块颜色表示状态，不和大段文字抢注意力 */
+        val StatusBlock = 8.dp
         /**
          * 列表末端可达高度（bottom padding），**恒等于** [BottomBarReserve]。
          *
@@ -71,21 +83,44 @@ object Wear {
         val ListCenterReach = BottomBarReserve
     }
 
-    // 字号阶梯：最小 12sp，禁止再出现更小字号
-    /** 顶部曲面时钟专用字号：18sp 让弧形表盘时间不顶到圆周，正文可用区更宽 */
-    val TextDisplay = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextPrimary)
-    val TextTitle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextPrimary)
-    val TextBody = TextStyle(
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Normal,
-        color = Palette.TextPrimary,
-        lineHeight = 19.sp,
-    )
-    val TextCaption = TextStyle(
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Normal,
-        color = Palette.TextSecondary,
-        lineHeight = 16.sp,
-    )
-    val TextMono = TextStyle(fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Palette.TextSecondary)
+    /**
+     * 大标题/数字档：官方 displayMedium。
+     *
+     * 这里的 TextStyle 只负责"官方字号 + 令牌色"的组合，字号本身来自 [MaterialTheme.typography]。
+     */
+    val TextDisplay: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.displayMedium.withTokenColor(Palette.TextPrimary)
+
+    /** 页面标题档：官方 titleLarge。 */
+    val TextDisplayTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.titleLarge.withTokenColor(Palette.TextPrimary)
+
+    /** 标题档：官方 titleMedium。 */
+    val TextTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.titleMedium.withTokenColor(Palette.TextPrimary)
+
+    /** 正文档：官方 bodyMedium。 */
+    val TextBody: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextPrimary)
+
+    /** 说明档：官方 bodySmall。 */
+    val TextCaption: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
+
+    /** 等宽档：官方 bodySmall 换等宽字族，用于端点、密钥掩码与探针输出。 */
+    val TextMono: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.bodySmall.copy(
+            fontFamily = FontFamily.Monospace,
+            color = Palette.TextSecondary
+        )
 }
+
+/** 把令牌色贴到官方字号上：字号只从 typography 来，颜色只从 Palette 来。 */
+private fun TextStyle.withTokenColor(color: Color): TextStyle =
+    if (this.color == color) this else copy(color = color)

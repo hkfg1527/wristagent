@@ -496,7 +496,7 @@ fun BottomInteractiveBlock(
         } else {
             // ================= 思考中：白色停止按钮 =================
             // 与主键同色（Orb 冷银白），文字用 Bg 深色保证对比；不再加边框，白底在深色点阵上已经足够分离。
-            val stopShape = RoundedCornerShape(Wear.Radius.Chip)
+            val stopShape = RoundedCornerShape(Wear.Radius.Control)
             Box(
                 modifier = Modifier
                     .size(capsuleWidth, Wear.Size.Touch)

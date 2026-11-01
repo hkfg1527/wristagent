@@ -12,6 +12,7 @@ import androidx.wear.compose.foundation.CurvedAlignment
 import androidx.wear.compose.foundation.CurvedLayout
 import androidx.wear.compose.foundation.CurvedModifier
 import androidx.wear.compose.foundation.padding
+import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.curvedText
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
@@ -25,8 +26,7 @@ private const val CLOCK_ANCHOR_DEGREES = 270f
 /** 时钟可用弧长上限：正上方 ±60°（合计 120°），保证文字绝不铺到圆屏两侧被裁。 */
 private const val CLOCK_MAX_SWEEP_DEGREES = 120f
 
-/** 时钟字号相对 TextDisplay(18sp) 的缩放：0.84 → 约 15sp。 */
-private const val ClockFontScale = 0.84f
+/** 时钟走官方弧形字阶 arcMedium，不再对某个字号做乘法缩放。 */
 
 /**
  * 顶部时间：官方 Wear 曲面文字 (CurvedLayout + M3 curvedText)，沿屏幕圆形外缘贴在正上方。
@@ -58,6 +58,8 @@ fun TopClockBar(
     timeText: String,
     modifier: Modifier = Modifier
 ) {
+    // CurvedLayout 的 content 是 SubcomposeLayout 的非组合作用域，主题必须在外面读
+    val arcStyle = MaterialTheme.typography.arcMedium
     CurvedLayout(
         modifier = modifier,
         anchor = CLOCK_ANCHOR_DEGREES,
@@ -74,9 +76,9 @@ fun TopClockBar(
             maxSweepAngle = CLOCK_MAX_SWEEP_DEGREES,
             // 默认角向（Normal）即为贴合顶缘的 ∩ 弧：两端下垂、中间最高，且字形正立
             color = Wear.Palette.TextPrimary,
-            // 用户要求时间小一点：18sp 在 192dp 真表上偏抢眼，缩到约 15sp（仍 ≥12sp 下限）
-            fontSize = Wear.TextDisplay.fontSize * ClockFontScale,
-            fontWeight = Wear.TextDisplay.fontWeight
+            // 字号/字重取自主题注入的官方弧形字阶（Typography.arcMedium），不再本地缩放
+            fontSize = arcStyle.fontSize,
+            fontWeight = arcStyle.fontWeight
         )
     }
 }

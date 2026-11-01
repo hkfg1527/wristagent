@@ -193,7 +193,7 @@ fun SessionDrawer(
                         }
                         .focusRequester(drawerFocusRequester)
                         .focusable(),
-                    contentPadding = PaddingValues(horizontal = Wear.Space.Edge, vertical = Wear.Space.Lg),
+                    contentPadding = PaddingValues(horizontal = Wear.Space.Lg, vertical = Wear.Space.Lg),
                     verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -314,7 +314,7 @@ private fun SessionRow(
     val timeStr = remember(session.createdAt) {
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(session.createdAt))
     }
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
 
     var confirmingDelete by remember(session.id) { mutableStateOf(false) }
     LaunchedEffect(session.id, confirmingDelete) {
@@ -417,7 +417,7 @@ private fun DeleteButton(onClick: () -> Unit) {
 /** 44dp 确认态按钮：删除用 Danger，取消用次要文字色。 */
 @Composable
 private fun ConfirmDeleteButton(label: String, color: Color, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
     Box(
         modifier = Modifier
             .size(Wear.Size.Touch)

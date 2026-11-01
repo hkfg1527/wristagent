@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,7 +49,10 @@ import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
+import com.example.myapplication.presentation.ui.settings.SettingsExitController
 import com.example.myapplication.presentation.ui.settings.SettingsNavRow
+import com.example.myapplication.presentation.ui.settings.SettingsRowDivider
+import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsStatusTextRes
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
@@ -66,8 +70,9 @@ import kotlin.math.abs
 
 /**
  * Wear OS 端侧 AI 设置中心
- * - 扁平单行列表：每个分区一行（标题 + 当前值 + chevron），副标题与徽章同行且徽章宽度封顶
- * - 所有取值来自 Wear 设计令牌，字号最小 12sp，可点区域不小于 44dp，行间距 8dp
+ * - 扁平单行列表：每行只有标题 / 当前值 / 行尾标记三个元素，行间只有 1dp 分隔线，没有逐行卡片
+ * - 全屏只有一个视觉重点：顶部的页面标题；其余行标题统一 secondary，值与箭头统一 muted
+ * - 所有取值来自 Wear 设计令牌，字号全部落在官方 M3E 阶梯上，可点区域不小于 44dp，行间距 8dp
  * - ScalingLazyColumn 圆屏曲率自适应与物理表冠联动
  * - 进出场为逐行浮动：每行按自己的内容序号延迟浮起/沉下，容器只做极轻淡入淡出
  */
@@ -187,7 +192,7 @@ fun SettingsScreen(
                     // 圆屏官方做法：首项默认对齐视口垂直中心，上下边缘随曲率缩小淡出
                     autoCentering = AutoCenteringParams(itemIndex = 0)
                 ) {
-                    // 顶部标题：水平居中，整块压在曲面时钟带以下
+                    // 顶部标题：本屏唯一的视觉重点（主色 + titleLarge 级），水平居中，压在曲面时钟带以下
                     item {
                         SettingsStaggeredRow(index = 0, stagger = rowStagger, exit = exit) {
                             Box(
@@ -200,7 +205,7 @@ fun SettingsScreen(
                             ) {
                                 BasicText(
                                     text = stringResource(R.string.settings_title),
-                                    style = Wear.TextTitle.copy(textAlign = TextAlign.Center),
+                                    style = Wear.TextDisplayTitle.copy(textAlign = TextAlign.Center),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -208,9 +213,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 1. 模型与服务：标题独占首行，副标题与徽章同行，徽章宽度封顶后副标题恒 >= 96dp
+                    // 1. 模型与服务：行尾状态色块表示是否已配置
                     item {
-                        SettingsStaggeredRow(index = 1, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 1, stagger = rowStagger, exit = exit, dividerAbove = false) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_and_service),
                                 value = currentModel,
@@ -227,7 +232,7 @@ fun SettingsScreen(
 
                     // 2. 模型参数
                     item {
-                        SettingsStaggeredRow(index = 2, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 2, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_params),
                                 value = "Temp %.1f".format(currentTemp),
@@ -241,7 +246,7 @@ fun SettingsScreen(
 
                     // 3. 内置工具与 MCP
                     item {
-                        SettingsStaggeredRow(index = 3, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 3, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             val activeCount = listOf(
                                 preferences.toolDeviceStatusEnabled,
                                 preferences.toolVibrateEnabled,
@@ -263,7 +268,7 @@ fun SettingsScreen(
 
                     // 4. 系统提示词
                     item {
-                        SettingsStaggeredRow(index = 4, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 4, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_system_prompt),
                                 value = if (customPrompt.isBlank()) {
@@ -281,7 +286,7 @@ fun SettingsScreen(
 
                     // 5. 会话与上下文
                     item {
-                        SettingsStaggeredRow(index = 5, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 5, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_memory_management),
                                 value = stringResource(R.string.settings_memory_turns, preferences.maxContextTurns),
@@ -295,7 +300,7 @@ fun SettingsScreen(
 
                     // 6. 快捷操作
                     item {
-                        SettingsStaggeredRow(index = 6, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 6, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_side_key),
                                 // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
@@ -310,7 +315,7 @@ fun SettingsScreen(
 
                     // 7. 操作安全防线
                     item {
-                        SettingsStaggeredRow(index = 7, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 7, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_security_policy),
                                 value = when (currentSecurityMode) {
@@ -328,7 +333,7 @@ fun SettingsScreen(
 
                     // 8. 语音转写
                     item {
-                        SettingsStaggeredRow(index = 8, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 8, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_asr),
@@ -348,7 +353,7 @@ fun SettingsScreen(
 
                     // 9. 重新观看新手引导
                     item {
-                        SettingsStaggeredRow(index = 9, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 9, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_replay_onboarding),
                                 onClick = {
@@ -361,7 +366,7 @@ fun SettingsScreen(
 
                     // 高级权限：Root / Shizuku 双后端的状态与授权入口
                     item {
-                        SettingsStaggeredRow(index = 10, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 10, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_privilege_title),
                                 value = privilegeStatus.activeBackend.name,
@@ -375,10 +380,10 @@ fun SettingsScreen(
 
                     // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
                     item {
-                        SettingsStaggeredRow(index = 11, stagger = rowStagger, exit = exit) {
+                        RootSettingRow(index = 11, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsActionButton(
                                 label = stringResource(R.string.settings_done_back),
-                                tone = Tone.ACCENT,
+                                tone = Tone.MUTED,
                                 modifier = Modifier.widthIn(max = SettingsContentWidth),
                                 onClick = { requestExit(onBack) }
                             )
@@ -469,6 +474,28 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * 根页的一行：与子页骨架同构 —— 可选的 1dp 分隔线 + 行内容，整体参与逐行浮动。
+ *
+ * 分隔线画在同一列里而不是单独的列表项：单独的列表项会打断 [SettingsStaggeredRow] 的序号，
+ * 也会在圆屏上被自动居中单独缩放。
+ */
+@Composable
+private fun RootSettingRow(
+    index: Int,
+    stagger: SettingsRowStaggerState,
+    exit: SettingsExitController,
+    dividerAbove: Boolean,
+    content: @Composable () -> Unit
+) {
+    SettingsStaggeredRow(index = index, stagger = stagger, exit = exit) {
+        Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
+            if (dividerAbove) SettingsRowDivider()
+            content()
         }
     }
 }

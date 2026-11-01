@@ -86,7 +86,7 @@ fun ThoughtPill(
         ),
         label = "thoughtArrowSpring"
     )
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
 
     Column(
         modifier = modifier
@@ -185,7 +185,7 @@ fun SpringColoredToolPill(
     val tagColor = Color(meta.tagColorHex)
     val pillBackground = tagColor.copy(alpha = 0.14f)
     val pillBorder = tagColor.copy(alpha = 0.6f)
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
 
     // 弹性展开箭头旋转
     val arrowRotation by animateFloatAsState(

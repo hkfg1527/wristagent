@@ -107,7 +107,7 @@ fun WearRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = Wear.Size.Touch)
-            .clip(RoundedCornerShape(Wear.Radius.Chip))
+            .clip(RoundedCornerShape(Wear.Radius.Control))
             .background(if (highlighted) Wear.Palette.SurfaceAlt else Color.Transparent)
             .then(
                 if (onClick != null) {
@@ -172,7 +172,7 @@ fun WearChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
     val container = if (selected) Wear.Palette.Accent else Wear.Palette.SurfaceAlt
     val labelColor = if (selected) Wear.Palette.Bg else Wear.Palette.TextPrimary
 
@@ -242,7 +242,7 @@ fun WearBadge(
 /** 单条提示条：底 + 描边 + 按 [Tone] 上色的说明文字，最多两行。 */
 @Composable
 fun WearBanner(text: String, tone: Tone, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(Wear.Radius.Chip)
+    val shape = RoundedCornerShape(Wear.Radius.Control)
     val container = if (tone == Tone.DANGER) Wear.Palette.DangerSurface else Wear.Palette.Surface
     val content = when (tone) {
         Tone.ACCENT -> Wear.Palette.Accent

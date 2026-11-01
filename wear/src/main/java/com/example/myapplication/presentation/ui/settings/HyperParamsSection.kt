@@ -116,26 +116,13 @@ fun HyperParamsContent(
         section(stringResource(R.string.settings_transport))
 
         row {
-            SettingsRadioRow(
+            SettingsSplitToggleRow(
                 label = stringResource(R.string.settings_sse_on),
-                selected = isStream,
-                onSelect = {
+                checked = isStream,
+                onCheckedChange = { enabled ->
                     context.vibrateTick()
-                    isStream = true
-                    preferences.streamMode = true
-                    notifyChange()
-                }
-            )
-        }
-
-        row {
-            SettingsRadioRow(
-                label = stringResource(R.string.settings_sse_off),
-                selected = !isStream,
-                onSelect = {
-                    context.vibrateTick()
-                    isStream = false
-                    preferences.streamMode = false
+                    isStream = enabled
+                    preferences.streamMode = enabled
                     notifyChange()
                 }
             )

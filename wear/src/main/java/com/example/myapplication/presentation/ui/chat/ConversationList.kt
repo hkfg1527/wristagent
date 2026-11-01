@@ -41,7 +41,7 @@ import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
- * 对话卡片宽度上限：240dp 圆屏减去两侧 [Wear.Space.Edge] 后四周仍留 20dp，
+ * 对话卡片宽度上限：240dp 圆屏减去两侧 [Wear.Space.Lg] 后四周仍留 20dp，
  * 长回复不再贴着圆屏边缘被裁；用户气泡同样收在此宽度内保持右对齐。
  */
 private val ConversationCardMaxWidth = 200.dp
@@ -84,7 +84,7 @@ internal fun ScalingLazyListState.focusRemainingPx(targetIndex: Int, targetTopPx
 
 /**
  * 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除)。
- * 全屏纵向滑动，正文左右内缩 Wear.Space.Edge；靠近上下边缘时按位置自动缩小淡出，正文可与时钟/主键重叠。
+ * 全屏纵向滑动，正文左右内缩 Wear.Space.Lg；靠近上下边缘时按位置自动缩小淡出，正文可与时钟/主键重叠。
  * 表冠事件由外部注入，列表只负责渲染与手势透传。
  */
 @Composable
@@ -166,7 +166,7 @@ internal fun ConversationList(
                     }
                 }
             }
-            .padding(horizontal = Wear.Space.Edge)
+            .padding(horizontal = Wear.Space.Lg)
             // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
             // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件
             // （wear 自己的 Modifier.rotaryScrollable 也是 rotaryHandler(...).focusRequester(...).focusable 这个顺序）。

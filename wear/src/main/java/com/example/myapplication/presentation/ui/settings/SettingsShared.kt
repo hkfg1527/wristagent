@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -20,15 +21,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -47,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -64,8 +66,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -78,15 +82,16 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
+import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.RadioButton
 import androidx.wear.compose.material3.RadioButtonDefaults
 import androidx.wear.compose.material3.Slider
 import androidx.wear.compose.material3.SliderDefaults
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.SwitchButtonDefaults
+import androidx.wear.compose.material3.TextToggleButton
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.components.WearBadge
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -96,6 +101,12 @@ val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
 
 /** 单行 44dp 触控热区之间的最小留白。 */
 val SettingsTouchGap: Dp = Wear.Space.Sm
+
+/** 行与行之间的唯一分隔物：1dp 细线，取代原来的"每行一张卡片"。 */
+private val SettingsDividerThickness = 1.dp
+
+/** 分区之间的间距：上一区末行与本区标题之间留 16dp。 */
+private val SettingsSectionGap = Wear.Space.Lg
 
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
 private val DialogFieldMaxHeight = 120.dp
@@ -129,31 +140,39 @@ enum class SettingsSubDialog {
     SECURITY_GUARDRAIL
 }
 
+/** 一条已登记的行：分区标题与内容行必须区分，因为只有内容行之间才画分隔线。 */
+internal class SettingsRowEntry(
+    val isSection: Boolean,
+    val content: @Composable () -> Unit
+)
+
 /**
  * 统一子页骨架的行登记表：每调用一次就登记一行，登记顺序即逐行动画的序号。
  *
  * 之所以先登记再渲染，是因为退场要"从末行往前起跑"——只有先知道总行数才能算出反向延迟。
  */
 class SettingsRows internal constructor() {
-    internal val items = mutableListOf<@Composable () -> Unit>()
+    internal val items = mutableListOf<SettingsRowEntry>()
 
     /** 登记一行内容。 */
     fun row(content: @Composable () -> Unit) {
-        items.add(content)
+        items.add(SettingsRowEntry(isSection = false, content = content))
     }
 
     /** 登记一行分组标题。 */
     fun section(text: String) {
-        items.add { SettingsSectionHeader(text = text) }
+        items.add(SettingsRowEntry(isSection = true, content = { SettingsSectionHeader(text = text) }))
     }
 }
 
 /**
  * 所有子页共用的页面骨架。
  *
+ * 版面契约（与 [SettingsLayoutMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
- * - 中部：ScalingLazyColumn，内容宽度上限 168dp，行间距 8dp；
- * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]，末行不会被主键压住；
+ * - 中部：ScalingLazyColumn，内容宽度上限 168dp，行间距 8dp，行与行之间只有一条 1dp 分隔线；
+ * - 分区间距 16dp，只由 [SettingsSectionHeader] 的顶部留白提供；
+ * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
  */
 @Composable
@@ -216,10 +235,7 @@ fun SettingsSubPage(
 
             item(key = "page-header") {
                 SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    SettingsPageHeader(
-                        title = title,
-                        onBack = { exit.begin(onBack) }
-                    )
+                    SettingsPageHeader(title = title, onBack = { exit.begin(onBack) })
                 }
             }
 
@@ -227,9 +243,14 @@ fun SettingsSubPage(
                 count = content.size,
                 key = { index -> "page-row-" + index }
             ) { index ->
+                val entry = content[index]
+                val previous = content.getOrNull(index - 1)
+                // 只有"上一条也是内容行"时才加分隔线：分区标题与紧随其后的首行之间不画。
+                val needsDivider = !entry.isSection && previous != null && !previous.isSection
                 SettingsStaggeredRow(index = index + 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    Box(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
-                        content[index]()
+                    Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
+                        if (needsDivider) SettingsRowDivider()
+                        entry.content()
                     }
                 }
             }
@@ -238,7 +259,7 @@ fun SettingsSubPage(
                 SettingsStaggeredRow(index = rowCount - 1, rowCount = rowCount, stagger = stagger, exit = exit) {
                     SettingsActionButton(
                         label = stringResource(R.string.settings_done_back),
-                        tone = Tone.ACCENT,
+                        tone = Tone.MUTED,
                         modifier = Modifier.widthIn(max = SettingsContentWidth),
                         onClick = { exit.begin(onBack) }
                     )
@@ -250,7 +271,22 @@ fun SettingsSubPage(
     }
 }
 
-/** 子页头部：44dp 返回键 + 标题，整块压在曲面时钟带以下。 */
+/** 行间 1dp 分隔线：页面里唯一的"容器"，取代逐行卡片。 */
+@Composable
+fun SettingsRowDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SettingsDividerThickness)
+            .background(Wear.Palette.Border)
+    )
+}
+
+/**
+ * 子页头部：44dp 返回键 + 页面标题，整块压在曲面时钟带以下。
+ *
+ * 标题用 titleLarge 级 + 主色，是本屏**唯一**的视觉重点；下面所有行一律降为 secondary。
+ */
 @Composable
 private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
     Row(
@@ -267,7 +303,7 @@ private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
             modifier = Modifier
                 .widthIn(min = SettingsLayoutMath.SubtitleMinWidthDp.dp)
                 .weight(1f),
-            style = Wear.TextTitle,
+            style = Wear.TextDisplayTitle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -287,7 +323,7 @@ fun SettingsBackButton(onClick: () -> Unit) {
             containerColor = Wear.Palette.Surface,
             contentColor = Wear.Palette.TextPrimary
         ),
-        border = BorderStroke(1.dp, Wear.Palette.Border)
+        border = BorderStroke(SettingsDividerThickness, Wear.Palette.Border)
     ) {
         Canvas(modifier = Modifier.size(Wear.Space.Lg)) {
             val path = Path().apply {
@@ -308,7 +344,11 @@ fun SettingsBackButton(onClick: () -> Unit) {
     }
 }
 
-/** 分组标题：Caption 级小标题，上下留 Xs。 */
+/**
+ * 分组标题：Caption 级小标题。
+ *
+ * 顶部 16dp 就是**分区间距**的唯一来源；下方 4dp 只把标题和本区首行拉开一点。
+ */
 @Composable
 fun SettingsSectionHeader(text: String) {
     BasicText(
@@ -316,7 +356,7 @@ fun SettingsSectionHeader(text: String) {
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(top = Wear.Space.Sm, bottom = Wear.Space.Xs),
+            .padding(top = SettingsSectionGap, bottom = Wear.Space.Xs),
         style = Wear.TextCaption,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
@@ -324,9 +364,10 @@ fun SettingsSectionHeader(text: String) {
 }
 
 /**
- * 根页可进入行：官方 FilledTonal 风格 Button 承载整行，标题独占首行（右侧只有 chevron），
- * 副标题与徽章同行 —— 徽章宽度封顶 [SettingsLayoutMath.BadgeMaxWidthDp]，
- * 副标题因此恒有 >= 96dp 可用宽度，不会被省略号截断。
+ * 可进入行：**没有容器**——只有标题 / 值 / 行尾标记三个元素，行与行之间由 1dp 分隔线切分。
+ *
+ * 行尾标记二选一：有状态时是一块 [Wear.Size.StatusBlock] 的色块（状态文案转成无障碍描述，
+ * 不再和大段文字抢注意力），没有状态时是右向箭头。
  */
 @Composable
 fun SettingsNavRow(
@@ -336,64 +377,68 @@ fun SettingsNavRow(
     badge: Pair<String, Tone>? = null,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Wear.Radius.Chip),
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = Wear.Palette.Surface,
-            contentColor = Wear.Palette.TextPrimary
-        ),
-        contentPadding = PaddingValues(
-            horizontal = Wear.Space.Md,
-            vertical = Wear.Space.Sm
-        )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = Wear.Size.Touch)
+            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-            ) {
-                BasicText(
-                    text = title,
-                    modifier = Modifier.weight(1f),
-                    style = Wear.TextBody,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                ChevronMark()
-            }
-            if (value != null || badge != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-                ) {
-                    if (value != null) {
-                        BasicText(
-                            text = value,
-                            modifier = Modifier.weight(1f),
-                            style = Wear.TextCaption,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (badge != null) {
-                        WearBadge(
-                            text = badge.first,
-                            tone = badge.second,
-                            modifier = Modifier.widthIn(max = SettingsLayoutMath.BadgeMaxWidthDp.dp),
-                            horizontalPadding = Wear.Space.Xs
-                        )
-                    }
-                }
-            }
+        BasicText(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = SettingsRowTitleStyle,
+            // 标题允许换行而不是省略：168dp 内容宽下，"端侧工具与 MCP + 6/6 已启用 + 箭头"
+            // 三段挤一行会把标题裁成"端侧工…"，宁可多占一行也要让用户读全。
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (value != null) {
+            BasicText(
+                text = value,
+                // 值收窄到 72dp，把宽度让给标题（原来 96dp 会把标题压到 50dp）
+                modifier = Modifier.widthIn(max = 72.dp),
+                style = SettingsRowValueStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (badge != null) {
+            SettingsStatusBlock(description = badge.first, tone = badge.second)
+        } else {
+            ChevronMark()
         }
     }
+}
+
+/** 行标题统一样式：secondary 色，把视线全部让给页面标题。 */
+private val SettingsRowTitleStyle: TextStyle
+    @Composable get() = Wear.TextBody.copy(color = Wear.Palette.TextSecondary)
+
+/** 行值统一样式：muted 色，只做参照，不抢注意力。 */
+private val SettingsRowValueStyle: TextStyle
+    @Composable get() = Wear.TextCaption.copy(color = Wear.Palette.TextMuted)
+
+/** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
+@Composable
+private fun SettingsStatusBlock(description: String, tone: Tone) {
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.StatusBlock)
+            .clip(CircleShape)
+            .background(tone.statusBlockColor())
+            .semantics { contentDescription = description }
+    )
+}
+
+/** [Tone] 到令牌色的唯一映射，避免状态色散落在各处。 */
+private fun Tone.statusBlockColor(): Color = when (this) {
+    Tone.ACCENT -> Wear.Palette.Accent
+    Tone.DANGER -> Wear.Palette.Danger
+    Tone.MUTED -> Wear.Palette.TextMuted
 }
 
 /** 开关行：官方 SwitchButton（label + onCheckedChange），不再手绘开关。 */
@@ -409,7 +454,7 @@ fun SettingsSwitchRow(
         checked = checked,
         onCheckedChange = onCheckedChange,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Wear.Radius.Chip),
+        shape = MaterialTheme.shapes.small,
         colors = SwitchButtonDefaults.switchButtonColors(
             checkedContainerColor = Wear.Palette.AccentDim,
             checkedContentColor = Wear.Palette.Accent,
@@ -438,8 +483,29 @@ fun SettingsSwitchRow(
 }
 
 /**
+ * 二值枚举行：官方 M3E [TextToggleButton]。
+ *
+ * Wear M3 1.7.1 里没有 Chip / SplitToggleChip（那是 material2 的组件族），
+ * 分段开关在 M3E 由 TextToggleButton 承担，因此枚举切换走这里。
+ */
+@Composable
+fun SettingsSplitToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextToggleButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier.fillMaxWidth(),
+        content = { SettingsPrimaryLabel(text = label) }
+    )
+}
+
+/**
  * 数值行：官方 Slider（带两端图标的多台阶滑轨），细粒度取值由 [SettingsValueMath] 量化，
- * 不再用 ± 按钮拼装。
+ * 不再用 ± 按钮拼装。标签 / 数值 / 滑轨三件，不再额外套一层卡片。
  */
 @Composable
 fun SettingsSliderRow(
@@ -463,7 +529,7 @@ fun SettingsSliderRow(
             BasicText(
                 text = label,
                 modifier = Modifier.weight(1f),
-                style = Wear.TextBody,
+                style = SettingsRowTitleStyle,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -480,7 +546,7 @@ fun SettingsSliderRow(
             steps = steps,
             modifier = Modifier.fillMaxWidth(),
             valueRange = valueRange,
-            shape = RoundedCornerShape(Wear.Radius.Card),
+            shape = MaterialTheme.shapes.medium,
             colors = SliderDefaults.sliderColors(
                 containerColor = Wear.Palette.Surface,
                 buttonIconColor = Wear.Palette.TextPrimary,
@@ -506,16 +572,16 @@ fun SettingsRadioRow(
         selected = selected,
         onSelect = onSelect,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Wear.Radius.Chip),
+        shape = MaterialTheme.shapes.small,
         colors = RadioButtonDefaults.radioButtonColors(
             selectedContainerColor = Wear.Palette.AccentDim,
             selectedContentColor = Wear.Palette.Accent,
             selectedSecondaryContentColor = Wear.Palette.Accent,
             selectedControlColor = Wear.Palette.Accent,
             unselectedContainerColor = Wear.Palette.Surface,
-            unselectedContentColor = Wear.Palette.TextPrimary,
-            unselectedSecondaryContentColor = Wear.Palette.TextSecondary,
-            unselectedControlColor = Wear.Palette.TextSecondary
+            unselectedContentColor = Wear.Palette.TextSecondary,
+            unselectedSecondaryContentColor = Wear.Palette.TextMuted,
+            unselectedControlColor = Wear.Palette.TextMuted
         ),
         contentPadding = PaddingValues(
             horizontal = Wear.Space.Md,
@@ -530,28 +596,29 @@ fun SettingsRadioRow(
     )
 }
 
-/** 只读说明行：没有点击语义，只用令牌配色区分层级。 */
+/** 只读说明行：同样没有容器，只有标题与值两个元素。 */
 @Composable
 fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier) {
-    Column(
+    Row(
         modifier = modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Wear.Radius.Chip))
-            .background(Wear.Palette.Surface)
-            .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Chip))
-            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Sm),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
+            .heightIn(min = Wear.Size.Touch)
+            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {
         BasicText(
             text = title,
-            style = Wear.TextBody,
+            modifier = Modifier.weight(1f),
+            style = SettingsRowTitleStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         BasicText(
             text = value,
-            style = Wear.TextCaption,
+            modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
+            style = SettingsRowValueStyle,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -601,14 +668,14 @@ fun SettingsActionButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        shape = RoundedCornerShape(Wear.Radius.Chip),
+        shape = MaterialTheme.shapes.small,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
             disabledContainerColor = Wear.Palette.SurfaceAlt,
             disabledContentColor = Wear.Palette.TextSecondary
         ),
-        border = BorderStroke(1.dp, if (enabled) stroke else Wear.Palette.Border),
+        border = BorderStroke(SettingsDividerThickness, if (enabled) stroke else Wear.Palette.Border),
         contentPadding = PaddingValues(
             horizontal = Wear.Space.Md,
             vertical = Wear.Space.Sm
@@ -628,7 +695,7 @@ fun SettingsActionButton(
 }
 
 /**
- * 文本输入入口：列表里只留一行 Button，点开才是真正的输入对话框。
+ * 文本输入入口：列表里只留一行可点区域，点开才是真正的输入对话框。
  * 列表里塞 TextField 会被表冠滚动与软键盘互相抢焦点，这一行不承载输入本身。
  */
 @Composable
@@ -638,45 +705,36 @@ fun SettingsTextEntryRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Wear.Radius.Chip),
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = Wear.Palette.Surface,
-            contentColor = Wear.Palette.TextPrimary
-        ),
-        contentPadding = PaddingValues(
-            horizontal = Wear.Space.Md,
-            vertical = Wear.Space.Sm
-        )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = Wear.Size.Touch)
+            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-        ) {
-            BasicText(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = Wear.TextBody,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            BasicText(
-                text = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
-                modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
-                style = Wear.TextCaption,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            ChevronMark()
-        }
+        BasicText(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = SettingsRowTitleStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        BasicText(
+            text = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
+            modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
+            style = SettingsRowValueStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        ChevronMark()
     }
 }
 
 /**
- * 设置页文本输入对话框：遮罩 + 令牌化卡片 + 官方 Button。
+ * 设置页文本输入对话框：遮罩 + 卡片档圆角 + 官方 Button。
  * 逐字符写回由调用方通过 [onValueChange] 完成，取消时回滚到 [initial]。
  */
 @Composable
@@ -689,7 +747,7 @@ fun SettingsTextDialog(
 ) {
     BackHandler { onDismiss() }
 
-    val shape = RoundedCornerShape(Wear.Radius.Card)
+    val shape = MaterialTheme.shapes.large
     var draft by remember { mutableStateOf(initial) }
 
     Box(
@@ -706,13 +764,13 @@ fun SettingsTextDialog(
                 .fillMaxWidth()
                 .clip(shape)
                 .background(Wear.Palette.Surface)
-                .border(1.dp, Wear.Palette.Border, shape)
+                .border(SettingsDividerThickness, Wear.Palette.Border, shape)
                 .padding(Wear.Space.Md),
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
             BasicText(
                 text = title,
-                style = Wear.TextTitle,
+                style = Wear.TextDisplayTitle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -727,7 +785,7 @@ fun SettingsTextDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Wear.Size.Touch, max = DialogFieldMaxHeight)
-                    .clip(RoundedCornerShape(Wear.Radius.Chip))
+                    .clip(MaterialTheme.shapes.small)
                     .background(Wear.Palette.SurfaceAlt)
                     .padding(Wear.Space.Md),
                 decorationBox = { innerTextField ->
@@ -960,7 +1018,7 @@ fun Modifier.pullDownToDismissOnScroll(
 
 /** 设置页状态徽章的资源映射：状态 -> 文案资源，纯函数便于单测。 */
 internal object SettingsStatusTextRes {
-    /** 模型与服务卡片的配置徽章：已配置走强调色，未配置走警示色。 */
+    /** 模型与服务卡片的配置状态：已配置走强调色，未配置走警示色。 */
     fun modelServiceBadge(configured: Boolean): Pair<Int, Tone> =
         if (configured) {
             R.string.settings_badge_configured to Tone.ACCENT
