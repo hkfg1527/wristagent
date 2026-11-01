@@ -53,18 +53,27 @@ internal fun itemKeyOf(item: RenderableConversationItem): String = when (item) {
 }
 
 /**
- * 剩余距离（px）：最后一条可见项的底部到"目标位置"（视口底部再减掉底部留白）有多远。
- * Wear 的 ScalingLazyList 不给内容总高，只能从 visibleItemsInfo 反推。
+ * 对齐剩余距离（px，带符号）：[targetIndex] 这一项的**顶边**到"可读区顶部"的差。
+ * 正值 = 还要向前滚（把内容往上推），负值 = 目标已经跑到上方，需要反向滚回来。
+ *
+ * 目标项不在可视区时不给"猜的距离"，而是按它相对可见窗口的方向返回搜寻距离，
+ * 让限速模型先找过去（不瞬移），进可视区后再按实际偏移收敛。
  */
-internal fun ScalingLazyListState.remainingToEndPx(bottomPaddingPx: Float): Float {
+internal fun ScalingLazyListState.focusRemainingPx(targetIndex: Int, targetTopPx: Float): Float {
     val info = layoutInfo
-    val last = info.visibleItemsInfo.lastOrNull() ?: return 0f
-    return CameraCurve.remainingPx(
-        lastItemOffsetPx = last.offset.toFloat(),
-        lastItemSizePx = last.size.toFloat(),
-        viewportHeightPx = info.viewportSize.height.toFloat(),
-        bottomPaddingPx = bottomPaddingPx
-    )
+    val viewportHeightPx = info.viewportSize.height.toFloat()
+    val target = info.visibleItemsInfo.firstOrNull { it.index == targetIndex }
+    if (target != null) {
+        return CameraCurve.focusRemainingPx(
+            itemCenterOffsetPx = target.offset.toFloat(),
+            itemSizePx = target.size.toFloat(),
+            viewportHeightPx = viewportHeightPx,
+            targetTopPx = targetTopPx
+        )
+    }
+    val lastVisible = info.visibleItemsInfo.lastOrNull()
+        ?: return CameraCurve.seekRemainingPx(viewportHeightPx, targetBelow = true)
+    return CameraCurve.seekRemainingPx(viewportHeightPx, targetBelow = targetIndex > lastVisible.index)
 }
 
 /**

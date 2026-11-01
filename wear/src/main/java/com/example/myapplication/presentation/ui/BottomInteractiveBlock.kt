@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp as lerpDp
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
 import com.example.myapplication.agent.contract.RiskLevel
@@ -110,6 +111,11 @@ internal val ApprovalTrackTouchHeight = Wear.Size.Touch
 /** 扁胶囊内拇指与胶囊边缘的留白：32dp 胶囊留 3dp 边距，拇指直径 26dp。 */
 private val ApprovalThumbInset = 3.dp
 
+/** 收起态小白条的视觉尺寸：56dp × 8dp、圆角 4dp，贴底同锚点。 */
+internal val CollapsedStripWidth = 56.dp
+internal val CollapsedStripHeight = 8.dp
+internal val CollapsedStripCorner = 4.dp
+
 /**
  * 审批态底栏高度：轨道贴顶、[Wear.Size.BottomBarReserve] 再收 [Wear.Space.Md]。
  * 480px/2.0 密度下屏高 240dp、圆心 120dp，底栏顶边落在 240−12−64=164dp，
@@ -138,7 +144,9 @@ fun BottomInteractiveBlock(
     onReject: () -> Unit,
     onSwipeUpSettings: () -> Unit,           // 阻尼跟手上滑进设置
     onApprovalProgress: (Float) -> Unit = {}, // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
-    approvalTone: Color = Wear.Palette.Danger // 审批强调色：随 AI 风险等级变化（调用方传入等级色）
+    approvalTone: Color = Wear.Palette.Danger, // 审批强调色：随 AI 风险等级变化（调用方传入等级色）
+    collapsed: Boolean = false,              // 用户已经滚动过：主键收起成小白条，点它才恢复
+    onCollapsedStripTap: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val isApproval = mode == BottomBlockMode.ACTION_ALLOW
@@ -147,6 +155,23 @@ fun BottomInteractiveBlock(
     // 分裂展开状态与两翼弹性动量
     var isSplitExpanded by remember { mutableStateOf(false) }
     val splitProgress = remember { Animatable(0f) }
+
+    // 收起成小白条的进度：1 = 完整主键，0 = 56dp×8dp 小条。
+    // 宽、高、圆角、图标透明度与缩放全部由这一个 Animatable 插值，不再另起一套尺寸动画。
+    val collapseProgress = remember { Animatable(1f) }
+    LaunchedEffect(collapsed) {
+        if (collapsed) {
+            // 先把两翼收干净，再收主键：否则小白条会从两翼之间掉下来
+            if (isSplitExpanded || splitProgress.value > 0f) {
+                isSplitExpanded = false
+                splitProgress.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = 280f))
+            }
+            collapseProgress.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 300f))
+        } else {
+            // 展开允许轻微过冲：像一颗被按回来的实体键
+            collapseProgress.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 380f))
+        }
+    }
 
     // 录音按压缩放
     val orbScaleAnim by animateFloatAsState(
@@ -335,12 +360,17 @@ fun BottomInteractiveBlock(
             }
 
             // ================= 核心单体主按键 (手势感应、弹性伸缩、长按录音) =================
+            // 收起进度 → 尺寸与圆角：56dp×8dp/4dp 的白色小条 <-> 52dp 圆形主键
+            val collapseFraction = collapseProgress.value.coerceIn(0f, 1f)
+            val keyWidth = lerpDp(CollapsedStripWidth, capsuleWidth, collapseFraction)
+            val keyHeight = lerpDp(CollapsedStripHeight, Wear.Size.Orb, collapseFraction)
+            val keyCorner = lerpDp(CollapsedStripCorner, Wear.Size.Orb / 2, collapseFraction)
             Box(
                 modifier = Modifier
                     .scale(orbScaleAnim)
-                    .size(capsuleWidth, Wear.Size.Orb)
-                    .shadow(elevation = 8.dp, shape = CircleShape)
-                    .clip(CircleShape)
+                    .size(keyWidth, keyHeight)
+                    .shadow(elevation = 8.dp, shape = RoundedCornerShape(keyCorner))
+                    .clip(RoundedCornerShape(keyCorner))
                     // 冷银白主键底色（品牌识别），与审批胶囊共用同一令牌
                     .background(Wear.Palette.Orb)
                     .pointerInput(isSplitExpanded) {
@@ -428,18 +458,38 @@ fun BottomInteractiveBlock(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
-                    MinimalistKeyboardIcon(
-                        tint = Wear.Palette.Bg,
-                        modifier = Modifier.size(16.dp, 12.dp)
-                    )
-                } else {
-                    MinimalistSoundwaveIcon(
-                        tint = if (mode == BottomBlockMode.RECORDING) Wear.Palette.Danger else Wear.Palette.Bg,
-                        isRecording = mode == BottomBlockMode.RECORDING,
-                        modifier = Modifier.size(16.dp, 16.dp)
-                    )
+                // 图标随收起进度淡出并缩到 0.6：小条上不残留任何图形
+                Box(
+                    modifier = Modifier
+                        .alpha(collapseFraction)
+                        .scale(0.6f + 0.4f * collapseFraction)
+                ) {
+                    if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
+                        MinimalistKeyboardIcon(
+                            tint = Wear.Palette.Bg,
+                            modifier = Modifier.size(16.dp, 12.dp)
+                        )
+                    } else {
+                        MinimalistSoundwaveIcon(
+                            tint = if (mode == BottomBlockMode.RECORDING) Wear.Palette.Danger else Wear.Palette.Bg,
+                            isRecording = mode == BottomBlockMode.RECORDING,
+                            modifier = Modifier.size(16.dp, 16.dp)
+                        )
+                    }
                 }
+            }
+
+            // 收起态热区：视觉只有 56dp×8dp，可点区域仍是 ≥44dp（透明外扩），点它 → 恢复按钮
+            if (collapseFraction < 0.999f) {
+                Box(
+                    modifier = Modifier
+                        .size(width = maxOf(keyWidth, Wear.Size.Touch), height = Wear.Size.Touch)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onCollapsedStripTap
+                        )
+                )
             }
         } else if (isApproval) {
             // ================= 审批拦截：整行只剩一条滑块，单击=拒绝 / 左滑=放行 =================

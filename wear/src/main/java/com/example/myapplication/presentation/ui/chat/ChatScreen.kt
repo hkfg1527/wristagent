@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -52,11 +53,17 @@ import com.example.myapplication.presentation.ApprovalTone
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
+import com.example.myapplication.presentation.ui.BottomBarEvent
+import com.example.myapplication.presentation.ui.BottomBarMode
+import com.example.myapplication.presentation.ui.BottomBarVisibility
 import com.example.myapplication.presentation.ui.CameraCurve
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
+import com.example.myapplication.presentation.ui.ReadingCamera
+import com.example.myapplication.presentation.ui.ReadingCameraEvent
+import com.example.myapplication.presentation.ui.ReadingCameraPhase
+import com.example.myapplication.presentation.ui.ReadingPace
 import com.example.myapplication.presentation.ui.ConversationGrouping
-import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.TopClockBar
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
@@ -67,6 +74,7 @@ import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import com.example.myapplication.voice.VoiceInputManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -255,51 +263,116 @@ fun ChatScreen(
         ConversationGrouping.groupBlocks(state.blocks)
     }
 
-    // ================= 唯一滚动所有者 =================
-    // 之前这里有三条 LaunchedEffect 各自驱动同一个 ScalingLazyListState：
-    //   ① 流式阶段瞬时 scrollBy 跟随  ② 条目变化时 animateScrollToItem（动画）
-    //   ③ 一轮结束 springScrollToEnd（还是逐帧 scroll 的动画）
-    // 三者互相取消、又与"内容边涨边滚"叠加，于是发完消息列表会持续弹来弹去。
-    // 现在收敛成一条链路：同一时刻只有一个滚动协程，且两种状态互斥。
-    val hasUserTurn = conversationItems.any { it is RenderableConversationItem.UserPrompt }
+    // ================= 提词器镜头：唯一的滚动所有者 =================
+    // 只做两件事，且全应用只有这一条链路在动列表：
+    //   ① 回复开始出现正文的那一刻，把这一回合卡片的顶边**限速**挪到可读区顶部
+    //      （TopContentInset 34dp 之下再留 8dp，即 42dp）；
+    //   ② 对齐到位后立刻转为按人类阅读速度推导的**恒定慢速下滚**，用户不用动手就能读完。
+    // 到末尾 / 用户自己滚动 / 审批·录音·弹窗·抽屉 一律停住，停在原地不回弹；
+    // 一轮结束不做任何跳转 —— 这里是"提词器"，不是"结算追到结尾"。
     val density = LocalDensity.current
     // 表冠/拖拽之后的一小段"镜头让路"窗口
     var cameraPauseUntil by remember { mutableLongStateOf(0L) }
 
-    // 唯一镜头引擎：一条加速曲线，没有第二套瞬移机制。
-    LaunchedEffect(state.isExecuting, hasUserTurn, conversationItems.size) {
-        if (!hasUserTurn) return@LaunchedEffect
-        val bottomPaddingPx = with(density) { Wear.Size.ListCenterReach.toPx() }
+    // 只有"紧跟用户提问、且已经吐出正文的助手回合"才接管镜头；null 表示本轮没有接管。
+    val cameraFocusTurnKey = remember(conversationItems) { CameraCurve.replyTurnKey(conversationItems) }
+    val cameraFocusIndex = conversationItems.lastIndex
+
+    LaunchedEffect(cameraFocusTurnKey) {
+        if (cameraFocusTurnKey == null) return@LaunchedEffect
+        // 注意：这里**不能**用 isExecuting 当门。提词器的核心场景正是"回复已经结束、用户要读全文"，
+        // 用 isExecuting 会把 AutoPan 永远挡在门外（回复一结束协程就 return）。
+        // 接管条件只看"本轮已经吐出了正文"（由 replyTurnKey 判定），翻历史会话时 replyTurnKey 为 null。
+        val densityScale = density.density
+        val targetTopPx = with(density) { (Wear.Size.TopContentInset + CameraCurve.FOCUS_TOP_MARGIN_DP.dp).toPx() }
+        val deadZonePx = CameraCurve.deadZonePx(densityScale)
+        val panSpeedPxPerSec = ReadingPace.panSpeedPxPerSec(densityScale)
+        val camera = ReadingCamera()
+        camera.onEvent(ReadingCameraEvent.TurnBodyAppeared)
         var speedPxPerSec = 0f
-        var lastFrameNanos = 0L
+        var lastFrameMillis = 0L
+        // AutoPan 的亚像素残余：6.6dp/s ≈ 0.22px/帧，直接发 dispatchRawDelta 会被取整丢弃，
+        // 必须把不足 1px 的部分攒起来，攒够 1px 再滚动一次（平均速度才等于 13.3px/s）。
+        var panResidualPx = 0f
         while (isActive) {
-            val frameNanos = withFrameMillis { it }
-            val dt = if (lastFrameNanos == 0L) {
+            // 注意：withFrameMillis 给的是**毫秒**（不是纳秒），除 1e9 会把 dt 恒夹成下限 0.004，
+            // 导致 AutoPan 实际速度只有设计的 1/4。
+            val frameMillis = withFrameMillis { it }
+            val dt = if (lastFrameMillis == 0L) {
                 0.016f
             } else {
-                ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.004f, 0.05f)
+                ((frameMillis - lastFrameMillis) / 1_000f).coerceIn(0.004f, 0.05f)
             }
-            lastFrameNanos = frameNanos
-            // 用户在拖/刚转过表冠：这一帧不推进，避免和手指抢位置
-            val userBusy = listState.isScrollInProgress || SystemClock.uptimeMillis() < cameraPauseUntil
-            if (userBusy) {
-                speedPxPerSec = 0f
-                continue
+            lastFrameMillis = frameMillis
+            // 用户接管（手指在拖 / 刚转过表冠）：本轮自动镜头立即作废，绝不把用户推回去
+            if (listState.isScrollInProgress || SystemClock.uptimeMillis() < cameraPauseUntil) {
+                camera.onEvent(ReadingCameraEvent.UserScrolled)
+                return@LaunchedEffect
             }
-            val remainingPx = listState.remainingToEndPx(bottomPaddingPx)
-            if (remainingPx <= 0.5f) {
-                speedPxPerSec = 0f
-                // 已经贴到末端：流式阶段等新内容；一轮结束就收工（全程没有瞬移）
-                if (!state.isExecuting) break
-                continue
+            // 审批 / 录音 / 输入弹窗 / 抽屉：立即停，本轮不再自启
+            val interrupted = state.isApprovalFocus || state.pendingApproval != null ||
+                state.isRecordingVoice || state.draft.isOpen || state.isSessionDrawerOpen
+            if (interrupted) {
+                camera.onEvent(ReadingCameraEvent.Interrupted)
+                return@LaunchedEffect
             }
-            // 速度由剩余距离决定（远快近慢），再由加速度上限决定"多久能加到那么快"（ease-in）；
-            // 越接近末端目标速度越小，于是减速是自然发生的（ease-out）。
-            val targetSpeed = CameraCurve.targetSpeed(remainingPx)
-            speedPxPerSec = CameraCurve.nextSpeed(speedPxPerSec, targetSpeed, dt)
-            val stepPx = CameraCurve.stepPx(speedPxPerSec, dt, remainingPx)
-            if (stepPx > 0f) listState.dispatchRawDelta(stepPx)
+            when (camera.phase) {
+                ReadingCameraPhase.AlignToTurnStart -> {
+                    val remainingPx = listState.focusRemainingPx(cameraFocusIndex, targetTopPx)
+                    if (abs(remainingPx) <= deadZonePx) {
+                        speedPxPerSec = 0f
+                        camera.onEvent(ReadingCameraEvent.Aligned)
+                    } else {
+                        speedPxPerSec = CameraCurve.nextSpeed(
+                            speedPxPerSec,
+                            CameraCurve.targetSpeed(remainingPx, deadZonePx),
+                            dt
+                        )
+                        val stepPx = CameraCurve.stepPx(speedPxPerSec, dt, remainingPx)
+                        val consumedPx = if (stepPx == 0f) 0f else listState.dispatchRawDelta(stepPx)
+                        if (stepPx != 0f && abs(consumedPx) < 0.5f) {
+                            // 已经顶到列表边界，物理上无法更靠近目标：本轮作废，不卡死也不来回蹭
+                            camera.onEvent(ReadingCameraEvent.Interrupted)
+                            return@LaunchedEffect
+                        }
+                    }
+                }
+
+                ReadingCameraPhase.AutoPan -> {
+                    if (!listState.canScrollForward) {
+                        camera.onEvent(ReadingCameraEvent.ReachedEnd)
+                        return@LaunchedEffect
+                    }
+                    // 提词器：恒定慢速，绝不再按剩余距离提速；亚像素增量要累积，否则每帧都被取整丢弃
+                    val wantPx = panSpeedPxPerSec * dt + panResidualPx
+                    val appliedPx = listState.dispatchRawDelta(wantPx)
+                    panResidualPx = wantPx - appliedPx
+                }
+
+                ReadingCameraPhase.Idle -> return@LaunchedEffect
+            }
         }
+    }
+
+    // ================= 底栏可见性：滚动即收起成小白条，点条才展开 =================
+    var bottomBarMode by remember { mutableStateOf(BottomBarMode.Expanded) }
+    val bottomBarForceExpanded = state.isBottomBarForceExpanded
+    // 进入强制态（执行/审批/录音/弹窗/抽屉）立即展开并锁住，离开强制态不自动收起
+    LaunchedEffect(bottomBarForceExpanded) {
+        if (bottomBarForceExpanded) bottomBarMode = BottomBarMode.Expanded
+    }
+    val reportBottomBarEvent: (BottomBarEvent) -> Unit = { event ->
+        bottomBarMode = BottomBarVisibility.next(
+            current = bottomBarMode,
+            event = event,
+            forceExpanded = state.isBottomBarForceExpanded
+        )
+    }
+    // 手指拖拽的"开始滚动"上报：只认用户手势（镜头自己走 dispatchRawDelta 不会置真）
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .filter { it }
+            .collect { reportBottomBarEvent(BottomBarEvent.UserScroll) }
     }
 
     // 外部 intent prompt：进入主界面且空闲时触发一次，随后回清并记录序号防止重组重放
@@ -369,6 +442,8 @@ fun ChatScreen(
                 // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与镜头抢同一把 scroll 互斥锁，
                 // 每格刻度都立刻生效（scope.launch + scroll{} 在高频刻度下会被逐帧滚动挤掉，真表上就像没接上）
                 cameraPauseUntil = SystemClock.uptimeMillis() + CameraPauseAfterUserScrollMs
+                // 表冠刻度 = 用户开始滚动：底栏收起成小白条（强制态下不收）
+                if (abs(verticalScrollPixels) > 0f) reportBottomBarEvent(BottomBarEvent.UserScroll)
                 listState.dispatchRawDelta(verticalScrollPixels)
                 if (abs(verticalScrollPixels) > 8f) {
                     context.getSystemService(Vibrator::class.java)?.let { vib ->
@@ -451,7 +526,9 @@ fun ChatScreen(
             // 滑块着色跟着审批等级走：低风险绿、中度黄、重度黄红、致命红，滑到底仍是绿
             approvalTone = ApprovalTone.accentOf(
                 state.pendingApproval?.risk?.aiRiskLevel ?: RiskLevel.MEDIUM
-            )
+            ),
+            collapsed = bottomBarMode == BottomBarMode.Collapsed,
+            onCollapsedStripTap = { reportBottomBarEvent(BottomBarEvent.StripTap) }
         )
 
         // ================= 5. 瞬时提示条 (语音错误 / 模型切换反馈) =================

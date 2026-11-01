@@ -64,6 +64,18 @@ data class ChatUiState(
     /** 审批沉浸态：居中文字浮层接管，列表退到 35%。 */
     val isApprovalFocus: Boolean get() = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
 
+    /**
+     * 底栏强制展开态：执行中、审批（含放行塌缩）、录音、输入弹窗、抽屉。
+     * 这些状态下按钮必须完整展开且不可收起，否则收起的小白条会盖住当前唯一的可交互入口。
+     */
+    val isBottomBarForceExpanded: Boolean
+        get() = bottomBlockMode != BottomBlockMode.IDLE ||
+            isExecuting ||
+            pendingApproval != null ||
+            isRecordingVoice ||
+            draft.isOpen ||
+            isSessionDrawerOpen
+
     val activeSession: ChatSession get() = sessions.firstOrNull { it.id == activeSessionId } ?: sessions.first()
 
     companion object {
