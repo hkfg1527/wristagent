@@ -18,8 +18,11 @@ enum class BottomBarEvent {
     AutoPanQuiet
 }
 
-/** 自动下滚持续多久后自动收起底栏（用户全程无操作）。 */
+/** 新回合进来后，多久没人动就自动收起底栏。 */
 const val AUTO_COLLAPSE_DELAY_MS = 3000L
+
+/** 用户点弧条唤醒按钮后的"挂起期"：这段时间内滚动/静默都不能再把它收起来。 */
+const val WAKE_LATCH_MS = 3000L
 
 /**
  * 底栏可见性状态机（纯逻辑，可单测）。
@@ -36,6 +39,30 @@ object BottomBarVisibility {
      * 一次状态迁移。[current] 是迁移起点，[event] 是本次输入，[forceExpanded] 表示当前是否处于强制态。
      * 映射是全定义的：强制态吞掉一切事件，否则滚动只收、点条只开（幂等，不会来回抖）。
      */
+    /**
+     * 挂起期内（用户刚点弧条唤醒）任何"自动收起"都要被否决。
+     * 否则用户刚把按钮叫回来、手一碰就被收走，等于白点。
+     */
+    fun collapseAllowed(nowMs: Long, wakeLatchUntilMs: Long): Boolean = nowMs >= wakeLatchUntilMs
+
+    /**
+     * 新回合到达后是否该因为"3 秒没人动"而自动收起：
+     *  - 必须过了挂起期；
+     *  - 且这 3 秒内用户没有滚动过（滚过就说明他正在读，别抢）。
+     */
+    fun shouldAutoCollapseAfterTurn(
+        nowMs: Long,
+        turnStartMs: Long,
+        wakeLatchUntilMs: Long,
+        lastUserScrollMs: Long,
+        forceExpanded: Boolean
+    ): Boolean {
+        if (forceExpanded) return false
+        if (!collapseAllowed(nowMs, wakeLatchUntilMs)) return false
+        if (nowMs - turnStartMs < AUTO_COLLAPSE_DELAY_MS) return false
+        return lastUserScrollMs < turnStartMs
+    }
+
     fun next(current: BottomBarMode, event: BottomBarEvent, forceExpanded: Boolean): BottomBarMode {
         if (forceExpanded) return BottomBarMode.Expanded
         return when (event) {

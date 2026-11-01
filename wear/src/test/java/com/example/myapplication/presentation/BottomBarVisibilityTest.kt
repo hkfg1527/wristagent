@@ -148,4 +148,57 @@ class ChatUiStateBottomBarForceTest {
         )
         assertEquals(3000L, com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS)
     }
+
+    /** 唤醒挂起期：点弧条唤醒后的 3 秒内，滚动不允许收起。 */
+    @Test
+    fun `挂起期内折叠被否决_过期后恢复`() {
+        val wakeAt = 10_000L
+        val latchUntil = wakeAt + com.example.myapplication.presentation.ui.WAKE_LATCH_MS
+        assertFalse(BottomBarVisibility.collapseAllowed(wakeAt + 1L, latchUntil))
+        assertFalse(BottomBarVisibility.collapseAllowed(wakeAt + 2_999L, latchUntil))
+        assertTrue(BottomBarVisibility.collapseAllowed(wakeAt + 3_000L, latchUntil))
+        assertTrue(BottomBarVisibility.collapseAllowed(wakeAt + 9_000L, latchUntil))
+    }
+
+    /** 新回合到达后 3 秒沉默才自动收起；期间滚过、处于挂起期或强制态都不收。 */
+    @Test
+    fun `回合到达后的自动收起有四道否决条件`() {
+        val turnStart = 20_000L
+        val after3s = turnStart + 3_000L
+        // 正常：3 秒后、无滚动、无挂起、非强制 -> 收
+        assertTrue(
+            BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = after3s, turnStartMs = turnStart, wakeLatchUntilMs = 0L,
+                lastUserScrollMs = 0L, forceExpanded = false
+            )
+        )
+        // 还没到 3 秒 -> 不收
+        assertFalse(
+            BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = turnStart + 2_999L, turnStartMs = turnStart, wakeLatchUntilMs = 0L,
+                lastUserScrollMs = 0L, forceExpanded = false
+            )
+        )
+        // 这 3 秒内用户滚过 -> 不收（他在读）
+        assertFalse(
+            BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = after3s, turnStartMs = turnStart, wakeLatchUntilMs = 0L,
+                lastUserScrollMs = turnStart + 500L, forceExpanded = false
+            )
+        )
+        // 挂起期未过 -> 不收
+        assertFalse(
+            BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = after3s, turnStartMs = turnStart, wakeLatchUntilMs = after3s + 1L,
+                lastUserScrollMs = 0L, forceExpanded = false
+            )
+        )
+        // 强制态（执行/审批/录音/弹窗/抽屉） -> 不收
+        assertFalse(
+            BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = after3s, turnStartMs = turnStart, wakeLatchUntilMs = 0L,
+                lastUserScrollMs = 0L, forceExpanded = true
+            )
+        )
+    }
 }

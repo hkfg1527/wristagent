@@ -70,7 +70,7 @@ import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
 import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
-import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
+import com.example.myapplication.presentation.ui.WAKE_LATCH_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
 import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBarVisibility
@@ -295,8 +295,6 @@ fun ChatScreen(
     // 只有"紧跟用户提问、且已经吐出正文的助手回合"才接管镜头；null 表示本轮没有接管。
     val cameraFocusTurnKey = remember(conversationItems) { CameraCurve.replyTurnKey(conversationItems) }
     val cameraFocusIndex = conversationItems.lastIndex
-    // 相机循环里只能改状态、不能直接调后面的 lambda：用计数信号把"自动收起"事件传出去
-    var autoPanQuietTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(cameraFocusTurnKey) {
         if (cameraFocusTurnKey == null) return@LaunchedEffect
@@ -318,8 +316,7 @@ fun ChatScreen(
         // 必须把不足 1px 的部分攒起来，攒够 1px 再滚动一次（平均速度才等于 13.3px/s）。
         var panResidualPx = 0f
         // 自动下滚开始时刻：持续 3 秒且用户全程无操作，就把底栏自己收起来（用户盯着读，按钮该让位）
-        var autoPanStartedAt = 0L
-        var autoCollapseReported = false
+
         while (isActive) {
             // 注意：withFrameMillis 给的是**毫秒**（不是纳秒），除 1e9 会把 dt 恒夹成下限 0.004，
             // 导致 AutoPan 实际速度只有设计的 1/4。
@@ -369,14 +366,7 @@ fun ChatScreen(
                         camera.onEvent(ReadingCameraEvent.ReachedEnd)
                         return@LaunchedEffect
                     }
-                    if (autoPanStartedAt == 0L) autoPanStartedAt = SystemClock.uptimeMillis()
-                    // 3 秒内仍留着按钮（给想自己动手的人一个窗口），超过且用户没动过就自动收起
-                    if (!autoCollapseReported &&
-                        SystemClock.uptimeMillis() - autoPanStartedAt >= AUTO_COLLAPSE_DELAY_MS
-                    ) {
-                        autoCollapseReported = true
-                        autoPanQuietTick++
-                    }
+
                     // 提词器：恒定慢速，绝不再按剩余距离提速；亚像素增量要累积，否则每帧都被取整丢弃
                     val wantPx = panSpeedPxPerSec * dt + panResidualPx
                     val appliedPx = listState.dispatchRawDelta(wantPx)
@@ -396,23 +386,72 @@ fun ChatScreen(
     LaunchedEffect(bottomBarForceExpanded) {
         if (bottomBarForceExpanded) bottomBarMode = BottomBarMode.Expanded
     }
-    val reportBottomBarEvent: (BottomBarEvent) -> Unit = { event ->
-        bottomBarMode = BottomBarVisibility.next(
-            current = bottomBarMode,
-            event = event,
-            forceExpanded = state.isBottomBarForceExpanded
-        )
-    }
-    // 自动下滚持续 3 秒且用户无操作 → 把底栏收成小弧条（3 秒内仍保留按钮）
-    LaunchedEffect(autoPanQuietTick) {
-        if (autoPanQuietTick > 0) reportBottomBarEvent(BottomBarEvent.AutoPanQuiet)
-    }
+    // 唤醒挂起期：点一次弧条把按钮叫回来后，3 秒内不许再因滚动/静默被自动收走
+    var wakeLatchUntil by remember { mutableLongStateOf(0L) }
+    var lastUserScrollAt by remember { mutableLongStateOf(0L) }
 
+    val reportBottomBarEvent: (BottomBarEvent) -> Unit = { event ->
+        val now = SystemClock.uptimeMillis()
+        when (event) {
+            BottomBarEvent.StripTap -> {
+                bottomBarMode = BottomBarVisibility.next(
+                    current = bottomBarMode,
+                    event = event,
+                    forceExpanded = state.isBottomBarForceExpanded
+                )
+                // 刚被唤醒：挂起 3 秒，避免"手一碰又收走"
+                wakeLatchUntil = now + WAKE_LATCH_MS
+            }
+
+            BottomBarEvent.UserScroll -> {
+                lastUserScrollAt = now
+                if (BottomBarVisibility.collapseAllowed(now, wakeLatchUntil)) {
+                    bottomBarMode = BottomBarVisibility.next(
+                        current = bottomBarMode,
+                        event = event,
+                        forceExpanded = state.isBottomBarForceExpanded
+                    )
+                }
+            }
+
+            BottomBarEvent.AutoPanQuiet -> {
+                if (BottomBarVisibility.collapseAllowed(now, wakeLatchUntil)) {
+                    bottomBarMode = BottomBarVisibility.next(
+                        current = bottomBarMode,
+                        event = event,
+                        forceExpanded = state.isBottomBarForceExpanded
+                    )
+                }
+            }
+        }
+    }
     // 手指拖拽的"开始滚动"上报：只认用户手势（镜头自己走 dispatchRawDelta 不会置真）
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .filter { it }
             .collect { reportBottomBarEvent(BottomBarEvent.UserScroll) }
+    }
+
+    // 新回合到达后 3 秒内无人滚动 → 自动收起（收起后计时结束，不再反复触发）
+    LaunchedEffect(cameraFocusTurnKey) {
+        val key = cameraFocusTurnKey ?: return@LaunchedEffect
+        val turnStart = SystemClock.uptimeMillis()
+        delay(AUTO_COLLAPSE_DELAY_MS)
+        val now = SystemClock.uptimeMillis()
+        if (BottomBarVisibility.shouldAutoCollapseAfterTurn(
+                nowMs = now,
+                turnStartMs = turnStart,
+                wakeLatchUntilMs = wakeLatchUntil,
+                lastUserScrollMs = lastUserScrollAt,
+                forceExpanded = state.isBottomBarForceExpanded
+            )
+        ) {
+            bottomBarMode = BottomBarVisibility.next(
+                current = bottomBarMode,
+                event = BottomBarEvent.AutoPanQuiet,
+                forceExpanded = state.isBottomBarForceExpanded
+            )
+        }
     }
 
     // 外部 intent prompt：进入主界面且空闲时触发一次，随后回清并记录序号防止重组重放
