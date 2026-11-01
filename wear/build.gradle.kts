@@ -69,6 +69,8 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // Shizuku UserService 的 IUserService 走 AIDL 生成 Stub，AGP 8+ 默认关闭该开关。
+        aidl = true
     }
     lint {
         checkReleaseBuilds = false
@@ -93,6 +95,8 @@ dependencies {
     implementation(libs.compose.ui.tooling)
     implementation(libs.play.services.wearable)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.shizuku.api)
+    implementation(libs.shizuku.provider)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -39,6 +39,19 @@
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
 
+        <!-- Shizuku 权限服务：authorities 必须是 applicationId 派生，供 Sui/Shizuku 回调绑定。 -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false" />
+
+        <!-- Shizuku UserService：特权命令的执行入口，不导出、无权限、无 intent-filter。 -->
+        <service
+            android:name=".agent.privilege.UserService"
+            android:exported="false" />
+
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
