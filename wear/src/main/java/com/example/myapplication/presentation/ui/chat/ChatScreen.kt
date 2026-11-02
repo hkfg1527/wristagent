@@ -69,7 +69,6 @@ import com.example.myapplication.presentation.ApprovalTone
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
-import com.example.myapplication.presentation.ui.RotaryScrollGain
 import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
 import com.example.myapplication.presentation.ui.WAKE_LATCH_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
@@ -447,11 +446,16 @@ fun ChatScreen(
             }
         }
     }
-    // 手指拖拽的"开始滚动"上报：只认用户手势（镜头自己走 dispatchRawDelta 不会置真）
+    // 用户滚动的唯一上报口：拖拽与表冠同源 —— 官方 RotaryScrollLogic 也在同一把 scroll 互斥锁里驱动，
+    // 两者都会把 isScrollInProgress 置真；镜头自己走 dispatchRawDelta 不会置真，所以这里只认用户。
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }
             .filter { it }
-            .collect { reportBottomBarEvent(BottomBarEvent.UserScroll) }
+            .collect {
+                // 用户接管滚动：自动镜头让路，本轮不再把人推回去
+                cameraPauseUntil = SystemClock.uptimeMillis() + CameraPauseAfterUserScrollMs
+                reportBottomBarEvent(BottomBarEvent.UserScroll)
+            }
     }
 
     // 兜底：惯性甩动到底部时，isScrollInProgress 可能已经变 false 才耗尽动量，
@@ -557,24 +561,7 @@ fun ChatScreen(
             thinkingIntensity = thinkingIntensity,
             isRecordingVoice = state.isRecordingVoice,
             shockwaveProgress = shockwaveAnim.value,
-            gridSpacingDp = liveSpacingDp,
-            onRotaryScroll = { verticalScrollPixels ->
-                // 表冠：dispatchRawDelta 同步吃位移 —— 不排队、不与镜头抢同一把 scroll 互斥锁，
-                // 每格刻度都立刻生效（scope.launch + scroll{} 在高频刻度下会被逐帧滚动挤掉，真表上就像没接上）
-                cameraPauseUntil = SystemClock.uptimeMillis() + CameraPauseAfterUserScrollMs
-                // 表冠刻度 = 用户开始滚动：底栏收起成小白条（强制态下不收）
-                if (abs(verticalScrollPixels) > 0f) reportBottomBarEvent(BottomBarEvent.UserScroll)
-                listState.dispatchRawDelta(verticalScrollPixels)
-                // 门限按原始刻度折算：位移已被 RotaryScrollGain 放大过，震动密度保持原样
-                if (abs(verticalScrollPixels) > 8f * RotaryScrollGain) {
-                    context.getSystemService(Vibrator::class.java)?.let { vib ->
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                        }
-                    }
-                }
-                true
-            }
+            gridSpacingDp = liveSpacingDp
         )
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================

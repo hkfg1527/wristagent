@@ -1,7 +1,5 @@
 package com.example.myapplication.presentation.ui
 
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.foundation.gestures.scrollBy
 import kotlinx.coroutines.launch
 
 import androidx.compose.animation.AnimatedVisibility
@@ -50,12 +48,13 @@ import androidx.compose.foundation.focusable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
@@ -225,7 +224,6 @@ private fun OnboardingConfigPhase(
 
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -239,16 +237,12 @@ private fun OnboardingConfigPhase(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
-                // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件。
-                .onRotaryScrollEvent {
-                    coroutineScope.launch {
-                        listState.scrollBy(rotaryScrollDelta(it.verticalScrollPixels))
-                    }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable(),
+                // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供（自带 focusTarget，
+                // 焦点请求仍由 focusRequester 负责，不要再叠 focusable()）
+                .rotaryScrollable(
+                    behavior = RotaryScrollableDefaults.behavior(listState),
+                    focusRequester = focusRequester
+                ),
             // 顶部让出叉号行高度，滚动内容不会爬到叉号下面
             contentPadding = PaddingValues(
                 start = Wear.Space.Lg,

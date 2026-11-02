@@ -14,19 +14,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
@@ -35,7 +34,6 @@ import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
-import com.example.myapplication.presentation.ui.rotaryScrollDelta
 import com.example.myapplication.presentation.ui.UserChatBubble
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
@@ -104,7 +102,6 @@ internal fun ConversationList(
     isRecordingVoice: Boolean,
     shockwaveProgress: Float,
     gridSpacingDp: Float,
-    onRotaryScroll: (Float) -> Boolean,
     modifier: Modifier = Modifier
 ) {
     ScalingLazyColumn(
@@ -113,9 +110,9 @@ internal fun ConversationList(
         // 本项目曾写死 itemIndex = 0，于是"第 0 项能滚到圆心"变成滚动锚点 —— 每轮新消息到达后
         // 视图被拉回列表开头，新内容落在视口外。关掉后位置控制完全交给"最后一条居中"逻辑。
         autoCentering = null,
-        // 库自带的 rotary（ScalingLazyColumn 默认装 requestFocusOnHierarchyActive + rotaryScrollable）
-        // 会自己抢焦点并把刻度全部吃掉，本文件的处理器就永远收不到事件 —— 关掉它，表冠只由下方
-        // onRotaryScrollEvent 独家接管；同理关掉系统拉伸越界，越界手感统一走 nestedScroll + graphicsLayer。
+        // 关掉库内建的 rotary：表冠由下方 Modifier.rotaryScrollable 显式接管，焦点请求器留在调用方手里
+        // （库内建那条走 requestFocusOnHierarchyActive，与"由调用方 requester 抢焦点"不能混用）；
+        // 系统拉伸越界同样关掉，越界手感统一走 graphicsLayer。
         rotaryScrollableBehavior = null,
         overscrollEffect = null,
         // top 必须让开顶部曲面时钟：14dp 时首条卡片会直接压到时钟上（真表 192dp 屏上尤其明显）；
@@ -168,12 +165,14 @@ internal fun ConversationList(
                 }
             }
             .padding(horizontal = Wear.Space.Lg)
-            // 顺序即作用域：rotary 事件从聚焦节点向外冒泡，处理器必须挂在 focusable 之外，
-            // 写成 focusable().onRotaryScrollEvent{} 会让处理器落在焦点节点内侧，永远收不到事件
-            // （wear 自己的 Modifier.rotaryScrollable 也是 rotaryHandler(...).focusRequester(...).focusable 这个顺序）。
-            .onRotaryScrollEvent { event -> onRotaryScroll(rotaryScrollDelta(event.verticalScrollPixels)) }
-            .focusRequester(focusRequester)
-            .focusable(),
+            // 官方 M3E 表冠：刻度→位移、松手惯性(RotaryFlingHandler + RotaryVelocityTracker)、
+            // 平台触感(RotaryHapticsType.ScrollTick)全部由 behavior 提供，不再自造增益与震动阈值。
+            // 展开后是 rotaryHandler(...).focusRequester(fr).focusTargetWithSemantics()，
+            // 焦点目标已经由它自己装好，后面不能再叠 focusable()（会多出一个收不到 rotary 的焦点节点）。
+            .rotaryScrollable(
+                behavior = RotaryScrollableDefaults.behavior(listState),
+                focusRequester = focusRequester
+            ),
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {

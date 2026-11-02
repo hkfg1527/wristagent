@@ -1,6 +1,5 @@
 package com.example.myapplication.presentation.ui
 
-import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -30,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +36,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.SecurityMode
@@ -50,7 +50,6 @@ import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
 import com.example.myapplication.presentation.ui.settings.ModelConfigContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
-import com.example.myapplication.presentation.ui.settings.RowHapticDecider
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
@@ -145,20 +144,6 @@ fun SettingsScreen(
 
     val listState = rememberScalingLazyListState()
 
-    // 主设置页唯一的滚动震动：中心条目换了一个才震一次；同一索引内的小幅滚动不震，两次之间至少隔 120ms
-    LaunchedEffect(listState) {
-        var previousIndex = listState.centerItemIndex
-        var lastTickMs = RowHapticDecider.NeverTicked
-        snapshotFlow { listState.centerItemIndex }.collect { index ->
-            val nowMs = SystemClock.uptimeMillis()
-            if (RowHapticDecider.shouldTick(previousIndex, index, nowMs, lastTickMs)) {
-                lastTickMs = nowMs
-                context.vibrateTick()
-            }
-            previousIndex = index
-        }
-    }
-
     WearMaterialTheme {
         // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
         PullDownDismissContainer(
@@ -185,15 +170,12 @@ fun SettingsScreen(
                 ScalingLazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
-                        .onRotaryScrollEvent {
-                            // 表冠：同步吃位移（dispatchRawDelta 不受 scroll 互斥锁排队影响，每格刻度都生效）；
-                            // 增益只放大位移，震动统一交给"中心条目换人"判定
-                            listState.dispatchRawDelta(rotaryScrollDelta(it.verticalScrollPixels))
-                            true
-                        }
-                        .focusRequester(settingsFocusRequester)
-                        .focusable(),
+                        // 官方 M3E 表冠：刻度→位移、松手惯性、平台触感（ScrollTick / ScrollLimit）全在 behavior 里。
+                        // 它自带 focusTarget，焦点请求仍由 settingsFocusRequester 负责，不要再叠 focusable()。
+                        .rotaryScrollable(
+                            behavior = RotaryScrollableDefaults.behavior(listState),
+                            focusRequester = settingsFocusRequester
+                        ),
                     state = listState,
                     // 关掉库自带的 rotary 与系统拉伸越界：表冠/越界统一由上面的处理器与 nestedScroll 接管
                     rotaryScrollableBehavior = null,

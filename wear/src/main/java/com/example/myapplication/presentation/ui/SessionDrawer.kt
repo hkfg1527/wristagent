@@ -18,7 +18,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +53,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -65,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.ChatSession
@@ -177,22 +177,12 @@ fun SessionDrawer(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        // 顺序即作用域：处理器必须在 focusable 之外，否则表冠事件冒不进来
-                        .onRotaryScrollEvent {
-                            scope.launch {
-                                listState.scrollBy(rotaryScrollDelta(it.verticalScrollPixels))
-                                if (abs(it.verticalScrollPixels) > 8f) {
-                                    context.getSystemService(Vibrator::class.java)?.let { vib ->
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                            vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                        }
-                                    }
-                                }
-                            }
-                            true
-                        }
-                        .focusRequester(drawerFocusRequester)
-                        .focusable(),
+                        // 官方 M3E 表冠：刻度→位移、松手惯性、平台触感（ScrollTick / ScrollLimit）全在
+                        // behavior 里，不再自造 8f 震动门限；自带 focusTarget，不要再叠 focusable()
+                        .rotaryScrollable(
+                            behavior = RotaryScrollableDefaults.behavior(listState),
+                            focusRequester = drawerFocusRequester
+                        ),
                     contentPadding = PaddingValues(horizontal = Wear.Space.Lg, vertical = Wear.Space.Lg),
                     verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs),
                     horizontalAlignment = Alignment.CenterHorizontally

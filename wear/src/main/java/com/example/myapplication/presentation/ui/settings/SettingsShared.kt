@@ -56,7 +56,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -72,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.IconButton
@@ -86,7 +89,6 @@ import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
-import com.example.myapplication.presentation.ui.rotaryScrollDelta
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
@@ -213,14 +215,12 @@ fun SettingsSubPage(
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
-                .onRotaryScrollEvent {
-                    // 表冠：增益后同步吃位移；子页不再有任何滚动震动
-                    listState.dispatchRawDelta(rotaryScrollDelta(it.verticalScrollPixels))
-                    true
-                }
-                .focusRequester(listFocusRequester)
-                .focusable(),
+                // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供（自带 focusTarget，
+                // 焦点请求仍由 listFocusRequester 负责，不要再叠 focusable()）
+                .rotaryScrollable(
+                    behavior = RotaryScrollableDefaults.behavior(listState),
+                    focusRequester = listFocusRequester
+                ),
             state = listState,
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
@@ -900,6 +900,10 @@ fun PullDownDismissContainer(
     val thresholdPx = with(density) { PullDownDismissThreshold.toPx() }
     val currentEnabled by rememberUpdatedState(enabled)
     val currentDismiss by rememberUpdatedState(onDismiss)
+    // 手指是否按在屏幕上：官方 RotaryScrollLogic 的刻度也走 NestedScrollSource.UserInput
+    // （字节码里是 getUserInput），只看位移分不清表冠和手指。不加这道闸，转到顶再接着转表冠
+    // 会被当成"下拉退出"把整页滑走。这里只读观察，绝不 consume。
+    var isPointerDown by remember { mutableStateOf(false) }
 
     // 关闭时（例如打开子页）立刻清零：不留半截位移，也不让残留累积量参与下一次手势
     LaunchedEffect(enabled) {
@@ -916,8 +920,11 @@ fun PullDownDismissContainer(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                // 只有"列表已到顶还继续向下拽"才会走到这里，其余情况列表自己已经把位移吃干净
-                if (!currentEnabled || isDismissing || available.y <= 0f) return Offset.Zero
+                // 只有"列表已无法向上滚、手指还在继续向下拽"的剩余位移才归容器：onPostScroll 的
+                // available 本来就是列表吃剩的部分，再看 source 只剩 UserInput —— 惯性/回弹(SideEffect)
+                // 的尾巴不算下拉，否则甩到底那一帧会先被拉走再弹回，就是"手感诡异"的来源。
+                if (!currentEnabled || isDismissing || !isPointerDown) return Offset.Zero
+                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
                 pullPx.floatValue = (pullPx.floatValue + available.y).coerceAtLeast(0f)
                 val target = pullPx.floatValue
                 scope.launch { dragY.snapTo(target) }
@@ -935,7 +942,10 @@ fun PullDownDismissContainer(
                     // 速度全部吃掉：退场时列表不该继续惯性滚动
                     return available
                 }
-                if (pull > 0f) dragY.animateTo(0f, spring(0.75f, 350f))
+                // 未达阈值：回弹交给容器自己的协程。绝不在这里 await —— onPreFling 是惯性派发前的
+                // 挂起点，在这里挂 350ms 会把列表自己的 fling 一起拖住，真表上就是"松手先卡一下再滚"。
+                if (pull > 0f) scope.launch { dragY.animateTo(0f, spring(0.75f, 350f)) }
+                // Velocity.Zero = 本节点消费 0，剩余速度全部留给 ScalingLazyColumn 的惯性
                 return Velocity.Zero
             }
         }
@@ -945,6 +955,15 @@ fun PullDownDismissContainer(
         modifier = modifier
             .fillMaxSize()
             .onGloballyPositioned { coords -> pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f) }
+            // 只读观察按下状态（Initial 阶段不允许 consume：7d8dfb7 之前就是在这里吃掉了列表拖动）
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        isPointerDown = event.changes.any { it.pressed }
+                    }
+                }
+            }
             // 手势节点：只有"列表吃不下"的剩余位移会到这里，且不携带任何位移
             .nestedScroll(connection)
     ) {
@@ -976,6 +995,8 @@ fun Modifier.pullDownToDismissOnScroll(
     var pullPx by remember { mutableFloatStateOf(0f) }
     var isDismissing by remember { mutableStateOf(false) }
     var pageHeightPx by remember { mutableFloatStateOf(1f) }
+    // 同 PullDownDismissContainer：表冠刻度同样是 UserInput 来源，必须靠"手指按下"区分
+    var isPointerDown by remember { mutableStateOf(false) }
     val thresholdPx = with(density) { PullDownDismissThreshold.toPx() }
     val currentDismiss by rememberUpdatedState(onDismiss)
 
@@ -986,7 +1007,10 @@ fun Modifier.pullDownToDismissOnScroll(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset {
-                if (isDismissing || available.y <= 0f) return Offset.Zero
+                // 判据与 PullDownDismissContainer 一致：只收"已到顶 + 手指继续下拽"的剩余位移，
+                // 惯性衰减的尾巴（SideEffect）一个像素都不收，否则甩到底会被当成一次下拉。
+                if (isDismissing || !isPointerDown) return Offset.Zero
+                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
                 pullPx = (pullPx + available.y).coerceAtLeast(0f)
                 return Offset(0f, available.y)
             }
@@ -994,10 +1018,12 @@ fun Modifier.pullDownToDismissOnScroll(
             override suspend fun onPreFling(available: Velocity): Velocity {
                 val pull = pullPx
                 pullPx = 0f
-                if (!isDismissing && pull > thresholdPx) {
+                if (isDismissing) return available
+                if (pull > thresholdPx) {
                     isDismissing = true
                     dragY.animateTo(pageHeightPx, tween(140))
                     currentDismiss()
+                    return available
                 }
                 return Velocity.Zero
             }
@@ -1006,6 +1032,15 @@ fun Modifier.pullDownToDismissOnScroll(
 
     return this
         .onGloballyPositioned { coords -> pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f) }
+        // 只读观察按下状态，不消费（同 PullDownDismissContainer）
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    isPointerDown = event.changes.any { it.pressed }
+                }
+            }
+        }
         .graphicsLayer {
             translationY = dragY.value
             alpha = (1f - dragY.value / (pageHeightPx * 1.5f)).coerceIn(0.25f, 1f)
