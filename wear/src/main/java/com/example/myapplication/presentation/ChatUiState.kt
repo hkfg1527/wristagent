@@ -7,6 +7,7 @@ import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.MainInputType
+import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
 
 /** 默认会话首条欢迎语：新建会话与首个会话共用同一条文案。 */
 const val DEFAULT_SESSION_PROMPT = "主人，今天有什么需要解决的技术或生活问题？"
@@ -56,10 +57,18 @@ data class ChatUiState(
     val isSessionDrawerOpen: Boolean,
     val isRecordingVoice: Boolean,
     val draft: TextInputState,
-    val notice: ChatNotice?
+    val notice: ChatNotice?,
+    /**
+     * 已展开的胶囊键（见 CapsuleKeys）：把展开态提升到 ViewModel，
+     * 列表滚动回收、重组、切到设置页再返回都不会把用户点开的胶囊折回去。
+     */
+    val expandedCapsules: Set<String> = emptySet()
 ) {
     /** 时间线交错块：列表分组与镜头跟随的唯一数据源。 */
     val blocks: List<ConversationBlock> get() = agentState.conversationBlocks
+
+    /** 某粒胶囊是否处于展开态。 */
+    fun isCapsuleExpanded(key: String): Boolean = CapsuleExpansion.isExpanded(expandedCapsules, key)
 
     /** 审批沉浸态：居中文字浮层接管，列表退到 35%。 */
     val isApprovalFocus: Boolean get() = bottomBlockMode == BottomBlockMode.ACTION_ALLOW

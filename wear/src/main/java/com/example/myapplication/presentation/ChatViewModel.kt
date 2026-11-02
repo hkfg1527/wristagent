@@ -17,6 +17,8 @@ import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.StreamingThrottleState
+import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
+import com.example.myapplication.presentation.ui.chat.StreamingTail
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -102,10 +104,15 @@ class ChatViewModel(
 
     init {
         gateway.onRequireConfirmation = { toolName, _, risk -> awaitApprovalDecision(toolName, risk) }
+        // 供应商拒收 reasoning_effort：引擎已去掉字段重试，这里只负责把"已忽略"讲清楚
+        gateway.onReasoningEffortIgnored = {
+            showNotice(R.string.wearchat_notice_reasoning_effort_ignored, isError = false)
+        }
     }
 
     override fun onCleared() {
         gateway.onRequireConfirmation = null
+        gateway.onReasoningEffortIgnored = null
         delayedStretchJob?.cancel()
         noticeJob?.cancel()
         pendingContinuation = null
@@ -176,7 +183,7 @@ class ChatViewModel(
      */
     private fun onAgentStateUpdate(newState: AgentExecutionState, updatedTitle: String) {
         val emitNow = throttle.accept(
-            newText = streamingTailText(newState.conversationBlocks),
+            newText = StreamingTail.of(newState.conversationBlocks),
             nowMs = uptimeMs(),
             force = newState.isFinished
         )
@@ -231,10 +238,14 @@ class ChatViewModel(
         }
     }
 
-    /** 正在流式输出的那一段文本：突发判定的基准是"上一帧屏幕上的文字 → 本帧文字"。 */
-    private fun streamingTailText(blocks: List<ConversationBlock>): String {
-        val tail = blocks.lastOrNull { it is ConversationBlock.Text && it.isStreaming } as? ConversationBlock.Text
-        return tail?.content ?: ""
+    // ======================== 胶囊展开态 ========================
+
+    /**
+     * 思考/工具胶囊的展开态：唯一真相在这里，Composable 只回调这个键。
+     * 键与 block id 一对一，因此增量的重写不会把展开态冲掉。
+     */
+    fun toggleCapsule(key: String) {
+        _uiState.update { it.copy(expandedCapsules = CapsuleExpansion.toggle(it.expandedCapsules, key)) }
     }
 
     // ======================== 审批 ========================

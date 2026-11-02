@@ -40,6 +40,8 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
+import com.example.myapplication.presentation.ui.settings.motionSpec
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -152,6 +154,8 @@ fun BottomInteractiveBlock(
     onCollapsedStripTap: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+    // 动画开关：关掉后所有形变/弹射/滑块回弹都走 snap，直接落到目标值，不残留中间态
+    val animationsEnabled = LocalAnimationsEnabled.current
     val isApproval = mode == BottomBlockMode.ACTION_ALLOW
     val isBusy = mode in listOf(BottomBlockMode.RECORDING, BottomBlockMode.THINKING_STOP, BottomBlockMode.ACTION_ALLOW)
 
@@ -164,14 +168,14 @@ fun BottomInteractiveBlock(
     LaunchedEffect(collapsed) {
         if (collapsed && (isSplitExpanded || splitProgress.value > 0f)) {
             isSplitExpanded = false
-            splitProgress.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = 280f))
+            splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(dampingRatio = 0.72f, stiffness = 280f)))
         }
     }
 
     // 录音按压缩放
     val orbScaleAnim by animateFloatAsState(
         targetValue = if (mode == BottomBlockMode.RECORDING) 1.25f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 280f),
+        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.55f, stiffness = 280f)),
         label = "orbRecordScale"
     )
 
@@ -207,11 +211,14 @@ fun BottomInteractiveBlock(
     }
 
     // 审批态按设计稿用 spring(0.7, 280) 变形；其余态保留原有弹簧参数
-    val morphSpring: AnimationSpec<Dp> = if (isApproval) {
-        spring(dampingRatio = 0.7f, stiffness = 280f)
-    } else {
-        spring(dampingRatio = 0.72f, stiffness = 260f)
-    }
+    val morphSpring: AnimationSpec<Dp> = motionSpec(
+        animationsEnabled,
+        if (isApproval) {
+            spring(dampingRatio = 0.7f, stiffness = 280f)
+        } else {
+            spring(dampingRatio = 0.72f, stiffness = 260f)
+        }
+    )
 
     val capsuleWidth by animateDpAsState(
         targetValue = targetWidth,
@@ -222,14 +229,14 @@ fun BottomInteractiveBlock(
     // 主键高度 52dp -> 36dp：变形成横向扁胶囊，比触控热区更扁
     val capsuleHeight by animateDpAsState(
         targetValue = if (isApproval) ApprovalCapsuleHeight else Wear.Size.Orb,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
+        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.7f, stiffness = 280f)),
         label = "capsuleStretchHeight"
     )
 
     // 底栏高度：常驻 58dp；审批态取 [ApprovalBlockHeight]，让滑块落在圆心下方约 48dp 处
     val blockHeight by animateDpAsState(
         targetValue = if (isApproval) ApprovalBlockHeight else 58.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 280f),
+        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.7f, stiffness = 280f)),
         label = "bottomBlockHeight"
     )
 
@@ -259,10 +266,10 @@ fun BottomInteractiveBlock(
                                     if (isSplitExpanded) {
                                         // 反向横滑：收回两翼（方向不限）
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, spring(0.72f, 280f))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
                                     } else {
                                         isSplitExpanded = true
-                                        splitProgress.animateTo(1f, spring(0.65f, 260f))
+                                        splitProgress.animateTo(1f, motionSpec(animationsEnabled, spring(0.65f, 260f)))
                                     }
                                 }
                             }
@@ -304,7 +311,7 @@ fun BottomInteractiveBlock(
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, spring(0.72f, 280f))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
                                     }
                                     // 左副键只负责切换输入方式；"打开输入框"统一归主键，避免一按就被 IME 盖住提示
                                     if (mainInputType == MainInputType.VOICE) {
@@ -342,7 +349,7 @@ fun BottomInteractiveBlock(
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, spring(0.72f, 280f))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
                                     }
                                     onRightActionClick()
                                 }
@@ -409,7 +416,10 @@ fun BottomInteractiveBlock(
                                             isSplitExpanded = true
                                             splitProgress.animateTo(
                                                 targetValue = 1f,
-                                                animationSpec = spring(dampingRatio = 0.65f, stiffness = 260f)
+                                                animationSpec = motionSpec(
+                                                    animationsEnabled,
+                                                    spring(dampingRatio = 0.65f, stiffness = 260f)
+                                                )
                                             )
                                         }
                                     } else {
@@ -420,7 +430,10 @@ fun BottomInteractiveBlock(
                                                 isSplitExpanded = false
                                                 splitProgress.animateTo(
                                                     targetValue = 0f,
-                                                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 280f)
+                                                    animationSpec = motionSpec(
+                                                        animationsEnabled,
+                                                        spring(dampingRatio = 0.72f, stiffness = 280f)
+                                                    )
                                                 )
                                             }
                                         } else if (mode == BottomBlockMode.RECORDING) {
@@ -543,6 +556,7 @@ private fun ApprovalTrack(
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
+    val animationsEnabled = LocalAnimationsEnabled.current
     val dragProgress = remember { Animatable(0f) }
     var trackPx by remember { mutableFloatStateOf(0f) }
 
@@ -615,7 +629,13 @@ private fun ApprovalTrack(
                                     onAllow()
                                 } else {
                                     scope.launch {
-                                        dragProgress.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 280f))
+                                        dragProgress.animateTo(
+                                            0f,
+                                            motionSpec(
+                                                animationsEnabled,
+                                                spring(dampingRatio = 0.7f, stiffness = 280f)
+                                            )
+                                        )
                                     }
                                 }
                             }
@@ -761,22 +781,33 @@ fun MinimalistSoundwaveIcon(
     isRecording: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "waveAnim")
-    val wave1 by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse),
-        label = "w1"
-    )
-    val wave2 by infiniteTransition.animateFloat(
-        initialValue = 0.9f, targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse),
-        label = "w2"
-    )
-    val wave3 by infiniteTransition.animateFloat(
-        initialValue = 0.4f, targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(tween(520, easing = LinearEasing), RepeatMode.Reverse),
-        label = "w3"
-    )
+    val animationsEnabled = LocalAnimationsEnabled.current
+    val wave1: Float
+    val wave2: Float
+    val wave3: Float
+    if (animationsEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "waveAnim")
+        wave1 = infiniteTransition.animateFloat(
+            initialValue = 0.3f, targetValue = 1.0f,
+            animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse),
+            label = "w1"
+        ).value
+        wave2 = infiniteTransition.animateFloat(
+            initialValue = 0.9f, targetValue = 0.4f,
+            animationSpec = infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse),
+            label = "w2"
+        ).value
+        wave3 = infiniteTransition.animateFloat(
+            initialValue = 0.4f, targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(tween(520, easing = LinearEasing), RepeatMode.Reverse),
+            label = "w3"
+        ).value
+    } else {
+        // 关闭动效：三条波形钉在中位，图标形态与开启动画时一致，不会出现"卡在某一帧"的错位
+        wave1 = 0.65f
+        wave2 = 0.65f
+        wave3 = 0.65f
+    }
 
     Canvas(modifier = modifier.size(13.dp, 13.dp)) {
         val barWidth = 1.8.dp.toPx()

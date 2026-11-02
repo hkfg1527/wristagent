@@ -3,6 +3,7 @@ package com.example.myapplication.presentation.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
@@ -49,6 +51,7 @@ import com.example.myapplication.presentation.ui.settings.AdvancedPermissionCont
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
 import com.example.myapplication.presentation.ui.settings.ModelConfigContent
+import com.example.myapplication.presentation.ui.settings.NetworkDiagnosticsContent
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
@@ -60,9 +63,13 @@ import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerStat
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsStatusTextRes
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
+import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
+import com.example.myapplication.presentation.ui.settings.ProviderProfilesContent
+import com.example.myapplication.presentation.ui.settings.RootTitleTopPadding
 import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
 import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.PullDownDismissContainer
+import com.example.myapplication.presentation.ui.settings.isAtScrollTop
 import com.example.myapplication.presentation.ui.settings.WingShortcutContent
 import com.example.myapplication.presentation.ui.settings.rememberSettingsExitController
 import com.example.myapplication.presentation.ui.settings.rememberSettingsRowStaggerState
@@ -98,6 +105,13 @@ fun SettingsScreen(
     var currentTemp by remember { mutableFloatStateOf(preferences.temperature) }
     var currentMaxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
     var currentStreamMode by remember { mutableStateOf(preferences.streamMode) }
+
+    // 动画特效与图片识别内测：本页持有唯一真值，改完立刻落盘并投进 LocalAnimationsEnabled
+    var animationsEnabled by remember { mutableStateOf(preferences.animationsEnabled) }
+    var visionBetaEnabled by remember { mutableStateOf(preferences.visionBetaEnabled) }
+
+    // 供应商 Profile：根页只显示当前选中的那套名字，列表本身在子页里
+    var providerBook by remember { mutableStateOf(preferences.providerProfiles()) }
 
     var asrEnabled by remember { mutableStateOf(preferences.asrEnabled) }
     var asrProviderKey by remember { mutableStateOf(preferences.asrProvider) }
@@ -144,11 +158,18 @@ fun SettingsScreen(
 
     val listState = rememberScalingLazyListState()
 
+    // 顶部对齐诊断：真机看 logcat 的 SettingsTopAnchor 行即可判定"上方有没有空白"
+    SettingsTopAnchorProbe(listState)
+
     WearMaterialTheme {
-        // 下滑退出：收手势的外层节点不位移，位移只作用在内层内容节点，避免局部坐标与自身平移互相放大。
+        // 下滑退出：手势只在真实触摸 + 列表已到顶时累积，表冠不产生指针事件，天然进不来。
         PullDownDismissContainer(
             modifier = modifier,
-            enabled = activeDialog == null && !showVoiceAsr && !exit.isExiting,
+            // 下拉退出只可能由真实触摸触发（表冠不产生指针事件），且必须已滚到顶。
+            // 到顶判据用 isAtScrollTop()：autoCentering 下 canScrollBackward 恒为 true（头部 Spacer 占 lazy index 0）。
+            canPullDown = {
+                activeDialog == null && !showVoiceAsr && !exit.isExiting && listState.isAtScrollTop()
+            },
             onDismiss = { requestExit(onBack) }
         ) {
             Box(
@@ -177,7 +198,9 @@ fun SettingsScreen(
                             focusRequester = settingsFocusRequester
                         ),
                     state = listState,
-                    // 关掉库自带的 rotary 与系统拉伸越界：表冠/越界统一由上面的处理器与 nestedScroll 接管
+                    // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
+                    flingBehavior = ScrollableDefaults.flingBehavior(),
+                    // 关掉库自带的 rotary 与系统拉伸越界：表冠由上面的处理器接管，越界不做拉伸
                     rotaryScrollableBehavior = null,
                     overscrollEffect = null,
                     contentPadding = PaddingValues(
@@ -187,8 +210,10 @@ fun SettingsScreen(
                         bottom = Wear.Size.BottomBarReserve
                     ),
                     verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
-                    // 圆屏官方做法：首项默认对齐视口垂直中心，上下边缘随曲率缩小淡出
-                    autoCentering = AutoCenteringParams(itemIndex = 0)
+                    // itemIndex = 1：自动居中项是第一行设置项，标题不再被居中。
+                    // 首项是 ListHeader 时把它留在顶部是官方推荐的用法；居中只影响两端边界，
+                    // 于是"滚到最顶"时标题贴住 34dp 时钟带下沿，向上滚动离开顶部时行为与原来一致。
+                    autoCentering = AutoCenteringParams(itemIndex = 1)
                 ) {
                     // 顶部标题：本屏唯一的视觉重点（主色 + titleLarge 级），水平居中，压在曲面时钟带以下
                     item {
@@ -197,7 +222,7 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .widthIn(max = SettingsContentWidth)
                                     .fillMaxWidth()
-                                    .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Sm)
+                                    .padding(top = RootTitleTopPadding, bottom = Wear.Space.Sm)
                                     .height(Wear.Size.Touch),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -228,9 +253,24 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 2. 模型参数
+                    // 2. 供应商：多套 baseUrl / apiKey / 模型的一键套用，套用即写回单值偏好
                     item {
                         RootSettingRow(index = 2, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                            SettingsNavRow(
+                                title = stringResource(R.string.settings_provider_profiles),
+                                value = providerBook.active()?.name
+                                    ?: stringResource(R.string.settings_providers_none_active),
+                                onClick = {
+                                    context.vibrateTick()
+                                    activeDialog = SettingsSubDialog.PROVIDER_PROFILES
+                                }
+                            )
+                        }
+                    }
+
+                    // 3. 模型参数
+                    item {
+                        RootSettingRow(index = 3, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_params),
                                 value = "Temp %.1f".format(currentTemp),
@@ -242,9 +282,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 3. 内置工具与 MCP
+                    // 4. 内置工具与 MCP
                     item {
-                        RootSettingRow(index = 3, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 4, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             val activeCount = listOf(
                                 preferences.toolDeviceStatusEnabled,
                                 preferences.toolVibrateEnabled,
@@ -264,9 +304,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 4. 系统提示词
+                    // 5. 系统提示词
                     item {
-                        RootSettingRow(index = 4, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 5, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_system_prompt),
                                 value = if (customPrompt.isBlank()) {
@@ -282,9 +322,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 5. 会话与上下文
+                    // 6. 会话与上下文
                     item {
-                        RootSettingRow(index = 5, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 6, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_memory_management),
                                 value = stringResource(R.string.settings_memory_turns, preferences.maxContextTurns),
@@ -296,9 +336,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 6. 快捷操作
+                    // 7. 快捷操作
                     item {
-                        RootSettingRow(index = 6, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 7, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_side_key),
                                 // 右翼已固定为会话抽屉入口，不再由偏好项决定，此处为只读说明
@@ -311,9 +351,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 7. 操作安全防线
+                    // 8. 操作安全防线
                     item {
-                        RootSettingRow(index = 7, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 8, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_security_policy),
                                 value = when (currentSecurityMode) {
@@ -329,9 +369,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 8. 语音转写
+                    // 9. 语音转写
                     item {
-                        RootSettingRow(index = 8, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 9, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_asr),
@@ -349,9 +389,9 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 9. 重新观看新手引导
+                    // 10. 重新观看新手引导
                     item {
-                        RootSettingRow(index = 9, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 10, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_replay_onboarding),
                                 onClick = {
@@ -364,7 +404,7 @@ fun SettingsScreen(
 
                     // 高级权限：Root / Shizuku 双后端的状态与授权入口
                     item {
-                        RootSettingRow(index = 10, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 11, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_privilege_title),
                                 value = privilegeStatus.activeBackend.name,
@@ -376,9 +416,33 @@ fun SettingsScreen(
                         }
                     }
 
+                    // 网络体检：值显示最近一次结论，进子页后自动重新体检
+                    item {
+                        RootSettingRow(index = 12, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                            val netDiagSummary = remember(activeDialog) {
+                                NetworkDiagnosisStore(context.applicationContext).lastSummary()
+                            }
+                            SettingsNavRow(
+                                title = stringResource(R.string.settings_netdiag_title),
+                                value = when {
+                                    netDiagSummary == null -> stringResource(R.string.settings_netdiag_value_never)
+                                    netDiagSummary.issues == 0 -> stringResource(R.string.settings_netdiag_value_ok)
+                                    else -> stringResource(
+                                        R.string.settings_netdiag_value_issues,
+                                        netDiagSummary.issues
+                                    )
+                                },
+                                onClick = {
+                                    context.vibrateTick()
+                                    activeDialog = SettingsSubDialog.NETWORK_DIAGNOSTICS
+                                }
+                            )
+                        }
+                    }
+
                     // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
                     item {
-                        RootSettingRow(index = 11, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootSettingRow(index = 13, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsActionButton(
                                 label = stringResource(R.string.settings_done_back),
                                 tone = Tone.MUTED,
@@ -404,6 +468,16 @@ fun SettingsScreen(
                                 preferences.baseUrl = base
                             }
                         )
+                        SettingsSubDialog.PROVIDER_PROFILES -> ProviderProfilesContent(
+                            preferences = preferences,
+                            onBack = { activeDialog = null },
+                            onApplied = {
+                                // 套用会改写三个单值偏好：根页缓存的值与 Profile 列表都要立刻跟上
+                                currentModel = preferences.modelName
+                                currentBaseUrl = preferences.baseUrl
+                                providerBook = preferences.providerProfiles()
+                            }
+                        )
                         SettingsSubDialog.HYPER_PARAMS -> HyperParamsContent(
                             preferences = preferences,
                             onBack = { activeDialog = null },
@@ -423,6 +497,16 @@ fun SettingsScreen(
                                 mcpEndpoint = ep
                                 preferences.isMcpEnabled = enabled
                                 preferences.mcpEndpoint = ep
+                            },
+                            animationsEnabled = animationsEnabled,
+                            visionBetaEnabled = visionBetaEnabled,
+                            onToggleAnimations = { enabled ->
+                                animationsEnabled = enabled
+                                preferences.animationsEnabled = enabled
+                            },
+                            onToggleVisionBeta = { enabled ->
+                                visionBetaEnabled = enabled
+                                preferences.visionBetaEnabled = enabled
                             }
                         )
                         SettingsSubDialog.PROMPT_VIEWER -> PromptViewerContent(
@@ -446,6 +530,11 @@ fun SettingsScreen(
                             }
                         )
                         SettingsSubDialog.REMOTE_CONSOLE -> RemoteConsoleContent(
+                            onBack = { activeDialog = null }
+                        )
+                        SettingsSubDialog.NETWORK_DIAGNOSTICS -> NetworkDiagnosticsContent(
+                            privilegeManager = privilegeManager,
+                            baseUrl = { currentBaseUrl },
                             onBack = { activeDialog = null }
                         )
                         SettingsSubDialog.PRIVILEGE -> AdvancedPermissionContent(

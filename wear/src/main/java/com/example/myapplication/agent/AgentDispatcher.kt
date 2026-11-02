@@ -48,6 +48,9 @@ class AgentDispatcher(
     // 审批挂起函数：返回 true 为允许，false 为拒绝。参数包含工具名、动作说明、风险评估
     var onRequireConfirmation: (suspend (toolName: String, actionText: String, risk: RiskAssessment) -> Boolean)? = null
 
+    // 供应商拒收 reasoning_effort 并已去掉该字段重试：上层据此提示"该模型已忽略推理努力"
+    var onReasoningEffortIgnored: (() -> Unit)? = null
+
     @Volatile
     private var isCancelled = false
 
@@ -524,12 +527,6 @@ class AgentDispatcher(
         conversationHistory.addAll(sanitized)
     }
 
-private data class ToolCallAccumulator(
-        var id: String = "",
-        var name: String = "",
-        val arguments: java.lang.StringBuilder = java.lang.StringBuilder()
-    )
-
     private data class ModelTurnResult(
         val content: String,
         val reasoning: String,
@@ -626,23 +623,21 @@ private data class ToolCallAccumulator(
                 preferences.baseUrl + "/chat/completions"
             }
             val url = URL(endpoint)
-            conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Accept", if (preferences.streamMode) "text/event-stream" else "application/json")
-                setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
-                connectTimeout = 15000
-                readTimeout = 40000
-                doOutput = true
-            }
 
-            val requestBody = JSONObject().apply {
+            // 推理努力只在推理模型上发出去；供应商不认这个字段时置空后重试一次
+            var reasoningEffortValue: String? = ReasoningEffortPolicy.bodyValue(
+                preferences.modelName,
+                ReasoningEffort.fromStored(preferences.reasoningEffort)
+            )
+
+            fun buildRequestBody(): JSONObject = JSONObject().apply {
                 put("model", preferences.modelName)
                 put("temperature", preferences.temperature)
                 put("max_tokens", preferences.maxOutputTokens)
                 if (preferences.streamMode) {
                     put("stream", true)
                 }
+                reasoningEffortValue?.let { put("reasoning_effort", it) }
                 val msgs = JSONArray()
                 val turnsLimit = preferences.maxContextTurns
                 val systemMsg = conversationHistory.firstOrNull { it.role == AgentRole.SYSTEM }
@@ -660,19 +655,108 @@ private data class ToolCallAccumulator(
                 }
             }
 
-            OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(requestBody.toString()) }
+            fun openConnection(): HttpURLConnection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", if (preferences.streamMode) "text/event-stream" else "application/json")
+                setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
+                connectTimeout = 15000
+                readTimeout = 40000
+                doOutput = true
+            }
 
-            val responseCode = conn.responseCode
-            if (responseCode !in 200..299) {
-                val errorBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            var droppedEffort = false
+            while (true) {
+                conn?.disconnect()
+                val activeConn = openConnection()
+                conn = activeConn
+                OutputStreamWriter(activeConn.outputStream, "UTF-8").use { it.write(buildRequestBody().toString()) }
+
+                val responseCode = activeConn.responseCode
+                if (responseCode in 200..299) break
+
+                val errorBody = activeConn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                if (!droppedEffort && reasoningEffortValue != null &&
+                    ReasoningEffortPolicy.isUnsupportedFieldError(responseCode, errorBody)
+                ) {
+                    // 供应商明确拒绝 reasoning_effort：去掉字段重试，并把"已忽略"提示交给上层
+                    droppedEffort = true
+                    reasoningEffortValue = null
+                    onReasoningEffortIgnored?.invoke()
+                    continue
+                }
                 return@withContext Result.failure(Exception("HTTP $responseCode: $errorBody"))
             }
 
-            val accumulatedContent = java.lang.StringBuilder()
-            val accumulatedReasoning = java.lang.StringBuilder()
-            val toolCallsMap = mutableMapOf<Int, ToolCallAccumulator>()
+            val accumulator = StreamAccumulator()
             var textBlockId: String? = null
             var thoughtBlockId: String? = null
+            var thoughtStartedAtMs = 0L
+            val showReasoning = preferences.showThoughtChain
+
+            /** 思考胶囊：第一次拿到思考增量时建块，之后每个增量改写同一粒胶囊（折叠态由 UI 侧记忆）。 */
+            fun publishReasoning() {
+                if (!showReasoning) return
+                val reasoning = accumulator.reasoning
+                if (thoughtStartedAtMs == 0L) thoughtStartedAtMs = System.currentTimeMillis()
+                if (thoughtBlockId == null) {
+                    thoughtBlockId = UUID.randomUUID().toString()
+                    blocks.add(
+                        ConversationBlock.Thought(
+                            id = thoughtBlockId!!,
+                            reasoning = reasoning,
+                            isStreaming = true,
+                            startedAtMs = thoughtStartedAtMs
+                        )
+                    )
+                } else {
+                    val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
+                    if (idx != -1) {
+                        blocks[idx] = ConversationBlock.Thought(
+                            id = thoughtBlockId!!,
+                            reasoning = reasoning,
+                            isStreaming = true,
+                            startedAtMs = thoughtStartedAtMs
+                        )
+                    }
+                }
+                onStateUpdate(
+                    currentStateProvider().copy(
+                        thoughtChain = reasoning,
+                        conversationBlocks = blocks.toList()
+                    )
+                )
+            }
+
+            /** 正文块：与思考胶囊同一套增量上屏节奏。 */
+            fun publishContent() {
+                val content = accumulator.content
+                if (textBlockId == null) {
+                    textBlockId = UUID.randomUUID().toString()
+                    blocks.add(
+                        ConversationBlock.Text(
+                            id = textBlockId!!,
+                            content = content,
+                            isStreaming = true
+                        )
+                    )
+                } else {
+                    val idx = blocks.indexOfFirst { it.id == textBlockId }
+                    if (idx != -1) {
+                        blocks[idx] = ConversationBlock.Text(
+                            id = textBlockId!!,
+                            content = content,
+                            isStreaming = true
+                        )
+                    }
+                }
+                onStateUpdate(
+                    currentStateProvider().copy(
+                        finalResponse = content,
+                        conversationBlocks = blocks.toList()
+                    )
+                )
+            }
 
             if (preferences.streamMode) {
                 // 真正的 SSE 实时流式读取 (零 delay 字节到达即刻上屏)
@@ -681,113 +765,21 @@ private data class ToolCallAccumulator(
                 while (reader.readLine().also { line = it } != null) {
                     if (isCancelled) break
                     val currentLine = line?.trim() ?: continue
-                    if (currentLine.isEmpty() || currentLine.startsWith(":")) continue
-                    if (!currentLine.startsWith("data:")) continue
-
-                    val data = currentLine.removePrefix("data:").trim()
-                    if (data == "[DONE]") break
-
-                    try {
-                        val chunkJson = JSONObject(data)
-                        val choices = chunkJson.optJSONArray("choices") ?: continue
-                        if (choices.length() == 0) continue
-                        val choice = choices.getJSONObject(0)
-                        val delta = choice.optJSONObject("delta") ?: continue
-
-                        // 1. 深度思考链流式输出
-                        if (delta.has("reasoning_content")) {
-                            val rPiece = delta.optString("reasoning_content", "")
-                            if (rPiece.isNotEmpty()) {
-                                accumulatedReasoning.append(rPiece)
-                                if (thoughtBlockId == null) {
-                                    thoughtBlockId = UUID.randomUUID().toString()
-                                    blocks.add(
-                                        ConversationBlock.Thought(
-                                            id = thoughtBlockId!!,
-                                            reasoning = accumulatedReasoning.toString()
-                                        )
-                                    )
-                                } else {
-                                    val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
-                                    if (idx != -1) {
-                                        blocks[idx] = ConversationBlock.Thought(
-                                            id = thoughtBlockId!!,
-                                            reasoning = accumulatedReasoning.toString()
-                                        )
-                                    }
-                                }
-                                val updated = currentStateProvider().copy(
-                                    thoughtChain = accumulatedReasoning.toString(),
-                                    conversationBlocks = blocks.toList()
-                                )
-                                onStateUpdate(updated)
-                            }
+                    if (currentLine.isEmpty()) continue
+                    // 一行 SSE -> 结构化事件：思考与正文各走各的通道，工具调用分片交给累加器拼接
+                    val events = accumulator.applyLine(currentLine)
+                    // 供应商的 [DONE] 是流结束标记：不等连接自然关闭，立刻去做收尾翻牌
+                    if (events.any { it === StreamDelta.Done }) break
+                    events.forEach { event ->
+                        when (event) {
+                            is StreamDelta.Reasoning -> publishReasoning()
+                            is StreamDelta.Content -> publishContent()
+                            is StreamDelta.ToolCall -> Unit
+                            StreamDelta.Done -> Unit
                         }
-
-                        // 2. 正文 Token 实时上屏 (彻底废除伪造 delay)
-                        if (delta.has("content")) {
-                            val cPiece = delta.optString("content", "")
-                            if (cPiece.isNotEmpty()) {
-                                accumulatedContent.append(cPiece)
-                                if (textBlockId == null) {
-                                    textBlockId = UUID.randomUUID().toString()
-                                    blocks.add(
-                                        ConversationBlock.Text(
-                                            id = textBlockId!!,
-                                            content = accumulatedContent.toString(),
-                                            isStreaming = true
-                                        )
-                                    )
-                                } else {
-                                    val idx = blocks.indexOfFirst { it.id == textBlockId }
-                                    if (idx != -1) {
-                                        blocks[idx] = ConversationBlock.Text(
-                                            id = textBlockId!!,
-                                            content = accumulatedContent.toString(),
-                                            isStreaming = true
-                                        )
-                                    }
-                                }
-                                val updated = currentStateProvider().copy(
-                                    finalResponse = accumulatedContent.toString(),
-                                    conversationBlocks = blocks.toList()
-                                )
-                                onStateUpdate(updated)
-                            }
-                        }
-
-                        // 3. 工具调用分片拼接
-                        val tcArr = delta.optJSONArray("tool_calls")
-                        if (tcArr != null) {
-                            for (i in 0 until tcArr.length()) {
-                                val item = tcArr.getJSONObject(i)
-                                val idx = item.optInt("index", i)
-                                val acc = toolCallsMap.getOrPut(idx) { ToolCallAccumulator() }
-                                if (item.has("id")) acc.id = item.optString("id")
-                                val fn = item.optJSONObject("function")
-                                if (fn != null) {
-                                    if (fn.has("name")) acc.name += fn.optString("name")
-                                    if (fn.has("arguments")) acc.arguments.append(fn.optString("arguments"))
-                                }
-                            }
-                        }
-                    } catch (_: Exception) {
                     }
                 }
                 reader.close()
-
-                if (textBlockId != null) {
-                    val idx = blocks.indexOfFirst { it.id == textBlockId }
-                    if (idx != -1) {
-                        blocks[idx] = ConversationBlock.Text(
-                            id = textBlockId!!,
-                            content = accumulatedContent.toString(),
-                            isStreaming = false
-                        )
-                        val updated = currentStateProvider().copy(conversationBlocks = blocks.toList())
-                        onStateUpdate(updated)
-                    }
-                }
             } else {
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
                 val sb = java.lang.StringBuilder()
@@ -797,50 +789,63 @@ private data class ToolCallAccumulator(
                 }
                 reader.close()
 
-                val json = JSONObject(sb.toString())
-                val choice = json.optJSONArray("choices")?.optJSONObject(0)
-                val msg = choice?.optJSONObject("message")
-                if (msg != null) {
-                    val rc = msg.optString("reasoning_content", "")
-                    val c = msg.optString("content", "")
-                    if (rc.isNotBlank()) {
-                        accumulatedReasoning.append(rc)
-                        blocks.add(ConversationBlock.Thought(id = UUID.randomUUID().toString(), reasoning = rc))
-                    }
-                    if (c.isNotBlank()) {
-                        accumulatedContent.append(c)
-                        blocks.add(ConversationBlock.Text(id = UUID.randomUUID().toString(), content = c, isStreaming = false))
-                    }
-                    val tArr = msg.optJSONArray("tool_calls")
-                    if (tArr != null) {
-                        for (i in 0 until tArr.length()) {
-                            val obj = tArr.getJSONObject(i)
-                            val acc = toolCallsMap.getOrPut(i) { ToolCallAccumulator() }
-                            acc.id = obj.optString("id")
-                            val fn = obj.optJSONObject("function")
-                            acc.name = fn?.optString("name") ?: ""
-                            acc.arguments.append(fn?.optString("arguments") ?: "")
-                        }
-                    }
-                    onStateUpdate(currentStateProvider().copy(
-                        finalResponse = accumulatedContent.toString(),
-                        thoughtChain = accumulatedReasoning.toString(),
-                        conversationBlocks = blocks.toList()
-                    ))
+                val message = JSONObject(sb.toString())
+                    .optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                if (message != null) {
+                    thoughtStartedAtMs = System.currentTimeMillis()
+                    val events = ModelStreamParser.messageEvents(message)
+                    accumulator.applyAll(events)
+                    if (events.any { it is StreamDelta.Reasoning }) publishReasoning()
+                    if (events.any { it is StreamDelta.Content }) publishContent()
+                    onStateUpdate(
+                        currentStateProvider().copy(
+                            finalResponse = accumulator.content,
+                            thoughtChain = accumulator.reasoning,
+                            conversationBlocks = blocks.toList()
+                        )
+                    )
                 }
             }
 
-            val finalToolCalls = toolCallsMap.values.filter { it.name.isNotBlank() }.map { acc ->
-                ToolCall(
-                    id = acc.id.ifBlank { "call_${UUID.randomUUID().toString().take(8)}" },
-                    name = acc.name,
-                    arguments = acc.arguments.toString()
-                )
+            // 收尾：思考胶囊从"思考中"翻到"思考完成 · Ns"；正文块摘掉流式光标
+            if (thoughtBlockId != null) {
+                val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
+                if (idx != -1) {
+                    val finishedAtMs = System.currentTimeMillis()
+                    blocks[idx] = ConversationBlock.Thought(
+                        id = thoughtBlockId!!,
+                        reasoning = accumulator.reasoning,
+                        durationMs = if (thoughtStartedAtMs > 0L) {
+                            (finishedAtMs - thoughtStartedAtMs).coerceAtLeast(0L)
+                        } else {
+                            0L
+                        },
+                        isStreaming = false,
+                        startedAtMs = thoughtStartedAtMs
+                    )
+                    onStateUpdate(currentStateProvider().copy(conversationBlocks = blocks.toList()))
+                }
             }
 
+            if (textBlockId != null) {
+                val idx = blocks.indexOfFirst { it.id == textBlockId }
+                if (idx != -1) {
+                    blocks[idx] = ConversationBlock.Text(
+                        id = textBlockId!!,
+                        content = accumulator.content,
+                        isStreaming = false
+                    )
+                    onStateUpdate(currentStateProvider().copy(conversationBlocks = blocks.toList()))
+                }
+            }
+
+            val finalToolCalls = accumulator.toolCalls()
+
             Result.success(ModelTurnResult(
-                content = accumulatedContent.toString(),
-                reasoning = accumulatedReasoning.toString(),
+                content = accumulator.content,
+                reasoning = accumulator.reasoning,
                 toolCalls = finalToolCalls
             ))
         } catch (e: Exception) {

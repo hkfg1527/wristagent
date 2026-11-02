@@ -8,5 +8,9 @@
     <string name="wearchat_recognizer_prompt">Speak now, listening...</string>
     <string name="wearchat_notice_input_keyboard">Keyboard input on: tap the main button to type</string>
     <string name="wearchat_notice_input_voice">Voice input on: tap the main button or hold to speak</string>
+    <string name="wearchat_notice_reasoning_effort_ignored">This model ignores the reasoning effort setting</string>
     <string name="wearchat_voice_error">Voice input error: %1$s</string>
+
+    <string name="wearchat_dialog_image">Image (beta)</string>
+    <string name="wearchat_vision_beta_hint">Beta feature: entry only, recognition service is not wired up yet</string>
 </resources>

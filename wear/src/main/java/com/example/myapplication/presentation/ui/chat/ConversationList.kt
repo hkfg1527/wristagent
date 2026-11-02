@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.chat
 
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,8 @@ import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
 import com.example.myapplication.presentation.ui.ThoughtPill
 import com.example.myapplication.presentation.ui.UserChatBubble
+import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
+import com.example.myapplication.presentation.ui.chat.CapsuleKeys
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -102,10 +105,15 @@ internal fun ConversationList(
     isRecordingVoice: Boolean,
     shockwaveProgress: Float,
     gridSpacingDp: Float,
+    /** 已展开的胶囊键（ViewModel 持有）：滚动与重组都不会把它折回去。 */
+    expandedCapsules: Set<String>,
+    onToggleCapsule: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     ScalingLazyColumn(
         state = listState,
+        // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
+        flingBehavior = ScrollableDefaults.flingBehavior(),
         // autoCentering = null：默认 AutoCenteringParams 会为 itemIndex 预留顶部空间，
         // 本项目曾写死 itemIndex = 0，于是"第 0 项能滚到圆心"变成滚动锚点 —— 每轮新消息到达后
         // 视图被拉回列表开头，新内容落在视口外。关掉后位置控制完全交给"最后一条居中"逻辑。
@@ -224,13 +232,23 @@ internal fun ConversationList(
                                     item.blocks.forEach { block ->
                                         when (block) {
                                             is ConversationBlock.Thought -> {
-                                                // 思考微型小胶囊 (带弹性收展动画，内嵌在方框内)
-                                                ThoughtPill(thought = block)
+                                                // 思考小胶囊：标题随流式进度翻牌，展开态由 ViewModel 记住
+                                                val key = CapsuleKeys.of(block)
+                                                ThoughtPill(
+                                                    thought = block,
+                                                    isExpanded = CapsuleExpansion.isExpanded(expandedCapsules, key),
+                                                    onToggle = { onToggleCapsule(key) }
+                                                )
                                             }
 
                                             is ConversationBlock.ToolCall -> {
                                                 // 彩色工具调用小胶囊 (专属颜色、状态干了什么、弹性展开，内嵌在方框内)
-                                                SpringColoredToolPill(toolCall = block)
+                                                val key = CapsuleKeys.of(block)
+                                                SpringColoredToolPill(
+                                                    toolCall = block,
+                                                    isExpanded = CapsuleExpansion.isExpanded(expandedCapsules, key),
+                                                    onToggle = { onToggleCapsule(key) }
+                                                )
                                             }
 
                                             is ConversationBlock.Text -> {

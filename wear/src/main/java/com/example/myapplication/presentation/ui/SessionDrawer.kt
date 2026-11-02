@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -175,6 +176,8 @@ fun SessionDrawer(
             ) {
                 ScalingLazyColumn(
                     state = listState,
+                    // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
+                    flingBehavior = ScrollableDefaults.flingBehavior(),
                     modifier = Modifier
                         .fillMaxSize()
                         // 官方 M3E 表冠：刻度→位移、松手惯性、平台触感（ScrollTick / ScrollLimit）全在

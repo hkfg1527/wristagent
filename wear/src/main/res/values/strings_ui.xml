@@ -36,7 +36,11 @@
     <string name="ui_approval_headline_high">High-risk action</string>
 
     <!-- Tool pill and reasoning pill. -->
-    <string name="ui_thought_process">Reasoning</string>
+    <string name="ui_thought_thinking">Thinking</string>
+    <string name="ui_thought_done">Reasoning done · %1$ds</string>
+    <string name="ui_thought_elapsed">· %1$ds</string>
+    <string name="ui_tool_call_name">Call tool %1$s</string>
+    <string name="ui_tool_running">Running...</string>
     <string name="ui_generating">Generating...</string>
     <string name="ui_tool_executed">Done</string>
     <string name="ui_tool_args">Arguments: %1$s</string>

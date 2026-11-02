@@ -85,6 +85,7 @@ import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.TopClockBar
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
+import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
@@ -132,8 +133,13 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsState()
 
+    // 动画特效总开关（唯一真值来自 AgentPreferences，由 WearAgentApp 注入）：
+    // 关掉后点阵整块不参与组合、激荡进度恒为 -1（没有波），底栏与审批的弹性由各组件自己降级
+    val animationsEnabled = LocalAnimationsEnabled.current
+
     // 底栏激荡波纹：每一轮被接受的新执行播一次 (纯白微晶光波)
     val shockwaveAnim = remember { Animatable(-1f) }
+    val shockwaveProgress = if (animationsEnabled) shockwaveAnim.value else -1f
 
     val thinkingIntensity by animateFloatAsState(
         targetValue = if (state.isThinkingActive) 1f else 0f,
@@ -186,8 +192,8 @@ fun ChatScreen(
     }
 
     // 水波纹自底栏向中心扩散激荡：每一次被接受的执行都在这里起波，入口（键盘/语音/外部 intent）无需各自实现
-    LaunchedEffect(state.isExecuting) {
-        if (state.isExecuting) {
+    LaunchedEffect(state.isExecuting, animationsEnabled) {
+        if (state.isExecuting && animationsEnabled) {
             shockwaveAnim.snapTo(0f)
             shockwaveAnim.animateTo(1f, tween(360, easing = LinearEasing))
         }
@@ -534,17 +540,27 @@ fun ChatScreen(
             .background(Wear.Palette.Bg)
     ) {
         // ================= 1. 全局唯一点阵坐标系 (通体清晰方阵，覆盖全圆屏) =================
-        UnifiedMatrixCanvas(
-            modifier = Modifier.fillMaxSize(),
-            approvalVisualState = state.agentState.approvalVisualState,
-            isTaskCompletedTrigger = state.isTaskCompleted,
-            thinkingIntensity = thinkingIntensity,
-            isRecordingVoice = state.isRecordingVoice,
-            shockwaveProgress = shockwaveAnim.value,
-            gridSpacingDp = liveSpacingDp,
-            // 审批滑块进度直接交给点阵：越往左推，点本身从冷白基色连续变绿变亮，不叠加任何整屏色层
-            approvalProgress = state.approvalProgress
-        )
+        if (animationsEnabled) {
+            UnifiedMatrixCanvas(
+                modifier = Modifier.fillMaxSize(),
+                approvalVisualState = state.agentState.approvalVisualState,
+                isTaskCompletedTrigger = state.isTaskCompleted,
+                thinkingIntensity = thinkingIntensity,
+                isRecordingVoice = state.isRecordingVoice,
+                shockwaveProgress = shockwaveProgress,
+                gridSpacingDp = liveSpacingDp,
+                // 审批滑块进度直接交给点阵：越往左推，点本身从冷白基色连续变绿变亮，不叠加任何整屏色层
+                approvalProgress = state.approvalProgress
+            )
+        } else {
+            // 关闭动效：呼吸、冲击波、审批红瀑、完工掠影全部随点阵一起消失，
+            // 只留底板纯色（不使用静态点阵，避免"最后一个呼吸相位"被当成常驻状态留在屏上）
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Wear.Palette.Bg)
+            )
+        }
 
         // ================= 2. 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除) =================
         ConversationList(
@@ -560,8 +576,10 @@ fun ChatScreen(
             isTaskCompleted = state.isTaskCompleted,
             thinkingIntensity = thinkingIntensity,
             isRecordingVoice = state.isRecordingVoice,
-            shockwaveProgress = shockwaveAnim.value,
-            gridSpacingDp = liveSpacingDp
+            shockwaveProgress = shockwaveProgress,
+            gridSpacingDp = liveSpacingDp,
+            expandedCapsules = state.expandedCapsules,
+            onToggleCapsule = { key -> viewModel.toggleCapsule(key) }
         )
 
         // ================= 3. 顶部弧形微晶时间 (遵循穿戴纯净规范，不再常驻会话胶囊) =================
@@ -711,7 +729,8 @@ fun ChatScreen(
                 draft = state.draft,
                 onChange = { viewModel.changeDraft(it) },
                 onCancel = { viewModel.cancelTextInput() },
-                onSubmit = { viewModel.submitDraft() }
+                onSubmit = { viewModel.submitDraft() },
+                visionBetaEnabled = preferences.visionBetaEnabled
             )
         }
 

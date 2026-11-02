@@ -8,5 +8,9 @@
     <string name="wearchat_recognizer_prompt">请说话，正在倾听...</string>
     <string name="wearchat_notice_input_keyboard">已切换到键盘输入，点主键打开输入框</string>
     <string name="wearchat_notice_input_voice">已切换到语音输入，点主键或长按说话</string>
+    <string name="wearchat_notice_reasoning_effort_ignored">该模型不支持推理努力参数，已忽略</string>
     <string name="wearchat_voice_error">语音输入出错：%1$s</string>
+
+    <string name="wearchat_dialog_image">图片（内测）</string>
+    <string name="wearchat_vision_beta_hint">内测功能：当前仅保留入口，识别服务尚未接入</string>
 </resources>

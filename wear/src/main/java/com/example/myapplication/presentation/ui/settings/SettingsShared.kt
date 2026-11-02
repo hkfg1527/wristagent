@@ -4,8 +4,9 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -14,6 +15,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,13 +42,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -53,9 +56,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -68,10 +68,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
@@ -103,6 +103,25 @@ private val SettingsDividerThickness = 1.dp
 
 /** 分区之间的间距：上一区末行与本区标题之间留 16dp。 */
 private val SettingsSectionGap = Wear.Space.Lg
+
+/**
+ * 根页标题行内的顶部留白：列表顶部内边距 8dp + 行间距 8dp + 本留白 = 34dp 时钟带下沿。
+ *
+ * 行顶边本身已经被列表内边距与行间距压在 16dp，行内只需要补齐差额，
+ * 标题文字才会紧贴时钟带下沿而不是被重新顶到屏幕中部。
+ */
+val RootTitleTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
+    topInsetDp = Wear.Size.TopContentInset.value,
+    contentPaddingTopDp = Wear.Space.Sm.value,
+    itemGapDp = Wear.Space.Sm.value
+).dp
+
+/** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp，行内相应多占 4dp。 */
+val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
+    topInsetDp = Wear.Size.TopContentInset.value,
+    contentPaddingTopDp = Wear.Space.Xs.value,
+    itemGapDp = Wear.Space.Sm.value
+).dp
 
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
 private val DialogFieldMaxHeight = 120.dp
@@ -137,6 +156,7 @@ fun Context.vibrateConfirm() {
  */
 enum class SettingsSubDialog {
     MODEL_CONFIG,
+    PROVIDER_PROFILES,
     HYPER_PARAMS,
     TOOLS_MCP,
     PROMPT_VIEWER,
@@ -144,7 +164,8 @@ enum class SettingsSubDialog {
     WING_SHORTCUT,
     PRIVILEGE,
     REMOTE_CONSOLE,
-    SECURITY_GUARDRAIL
+    SECURITY_GUARDRAIL,
+    NETWORK_DIAGNOSTICS
 }
 
 /** 一条已登记的行：分区标题与内容行必须区分，因为只有内容行之间才画分隔线。 */
@@ -199,6 +220,8 @@ fun SettingsSubPage(
     val listState = rememberScalingLazyListState()
     val listFocusRequester = remember { FocusRequester() }
 
+    SettingsTopAnchorProbe(listState)
+
     // 表冠要焦点：等节点真正挂上树的那一帧再请求
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -209,8 +232,9 @@ fun SettingsSubPage(
         modifier = Modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg)
-            // 下滑退出：由内部列表经 nested scroll 报告"已到顶还剩下的向下位移"才接管
-            .pullDownToDismissOnScroll(onDismiss = onBack)
+            // 下滑退出：只有真实触摸、且列表已到顶时才累积；表冠不产生指针事件，天然进不来。
+            // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
+            .pullDownToDismiss(canPullDown = { listState.isAtScrollTop() }, onDismiss = onBack)
     ) {
         ScalingLazyColumn(
             modifier = Modifier
@@ -222,6 +246,8 @@ fun SettingsSubPage(
                     focusRequester = listFocusRequester
                 ),
             state = listState,
+            // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
+            flingBehavior = ScrollableDefaults.flingBehavior(),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
             contentPadding = PaddingValues(
@@ -231,7 +257,10 @@ fun SettingsSubPage(
                 bottom = Wear.Size.BottomBarReserve
             ),
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
-            autoCentering = AutoCenteringParams(itemIndex = 0)
+            // itemIndex = 1：自动居中项是第一条内容行，头部行不再被居中 ——
+            // 于是滚到最顶时头部贴在上方内容区顶边，而不是停在屏幕正中、上面留半屏空白。
+            // 居中只影响两端边界，滚动过程一像素都不变（详见 SettingsTopAnchorMath）。
+            autoCentering = AutoCenteringParams(itemIndex = 1)
         ) {
             val rowCount = content.size + 2
 
@@ -295,7 +324,7 @@ private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(top = Wear.Size.TopContentInset, bottom = Wear.Space.Xs),
+            .padding(top = SubPageHeaderTopPadding, bottom = Wear.Space.Xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
     ) {
@@ -874,178 +903,204 @@ fun ChevronMark() {
 /** 下滑退出手势阈值：松手时位移超过该值即退场，否则回弹复位。 */
 val PullDownDismissThreshold = 50.dp
 
+/** 临时诊断开关：真机确认手势路径后置 false 即彻底消音（release 包也带日志，便于直接装 release 验证）。 */
+private const val PullDownDismissDebug = true
+
+private const val PullDownDismissLogTag = "PullDownDismiss"
+
 /**
- * 设置页"下滑退出"容器：与"主键上滑进入"对称的反向退出。
- * - 拖动一律先交给列表：[NestedScrollConnection.onPostScroll] 只会收到列表吃不下、还剩下的向下位移
- *   （`available.y > 0`，等价于"已到顶还继续下拽"）。列表还能滚时剩余位移恒为 0，此处一个像素都不吃，
- *   手指拖动的滚动与松手后的惯性衰减全部留在 ScalingLazyColumn 自己手里。
- * - 收位移的节点与做位移的节点分离：外层只挂 nestedScroll 与尺寸测量，位移只作用在内层内容，
- *   避免"节点自身平移又把局部坐标算回去"的正反馈闪屏。
- * - 松手（[NestedScrollConnection.onPreFling]）时位移超过 [PullDownDismissThreshold] 播退场并回调
- *   [onDismiss]，否则回弹复位。
+ * 列表是否停在顶部（= 已无法再向上滚）。
+ *
+ * 不能用 [ScalingLazyListState.canScrollBackward]：它直通底层 LazyListState 的
+ * `firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0`，而 ScalingLazyColumn 在
+ * autoCentering 开启时会额外插入一个头部 Spacer 作为 lazy index 0，并把 scaling index N 映射成
+ * lazy index N+1（ScalingLazyListState 内部 `targetIndex + if (autoCentering != null) 1 else 0`）。
+ * 因此停在本页视觉顶部时 firstVisibleItemIndex 恒为 1 —— canScrollBackward 永远为 true，
+ * 一旦拿它当"到顶"判据，下拉量永远进不了累计：页面不跟手、松手也不退场。
+ *
+ * 改用 scaling 空间的可见项判断：visibleItemsInfo 已剔除两侧 Spacer，首项 index == 0 即视觉顶部。
+ * 列表只要滚离顶部，首项 index 立刻 > 0，中部拖动一个像素都不会被吃。
+ */
+internal fun ScalingLazyListState.isAtScrollTop(): Boolean {
+    val first = layoutInfo.visibleItemsInfo.firstOrNull() ?: return true
+    return first.index == 0
+}
+
+/** 顶部对齐诊断开关：真机确认"滚到最顶不留空白"后置 false 消音（release 包也带日志，便于直接装 release 验证）。 */
+private const val SettingsTopAnchorDebug = true
+
+private const val SettingsTopAnchorLogTag = "SettingsTopAnchor"
+
+/**
+ * 顶部对齐的真机探针：把首项在视口里的几何打出来。
+ *
+ * 判据（配合 [SettingsTopAnchorMath]）：停在顶部时 firstIndex == 0、topItemTopPx 应等于
+ * "列表顶部内边距 + 行间距"（根页 ≈ 16dp、子页 ≈ 12dp 的像素值），而不是半屏；
+ * scale / alpha 应接近 1（说明标题没被当作边缘项缩小淡出）。
  */
 @Composable
-fun PullDownDismissContainer(
-    enabled: Boolean,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    val dragY = remember { Animatable(0f) }
-    val pullPx = remember { mutableFloatStateOf(0f) }
-    var isDismissing by remember { mutableStateOf(false) }
-    var pageHeightPx by remember { mutableFloatStateOf(1f) }
-    val thresholdPx = with(density) { PullDownDismissThreshold.toPx() }
-    val currentEnabled by rememberUpdatedState(enabled)
-    val currentDismiss by rememberUpdatedState(onDismiss)
-    // 手指是否按在屏幕上：官方 RotaryScrollLogic 的刻度也走 NestedScrollSource.UserInput
-    // （字节码里是 getUserInput），只看位移分不清表冠和手指。不加这道闸，转到顶再接着转表冠
-    // 会被当成"下拉退出"把整页滑走。这里只读观察，绝不 consume。
-    var isPointerDown by remember { mutableStateOf(false) }
-
-    // 关闭时（例如打开子页）立刻清零：不留半截位移，也不让残留累积量参与下一次手势
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            pullPx.floatValue = 0f
-            dragY.snapTo(0f)
-        }
-    }
-
-    val connection = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                // 只有"列表已无法向上滚、手指还在继续向下拽"的剩余位移才归容器：onPostScroll 的
-                // available 本来就是列表吃剩的部分，再看 source 只剩 UserInput —— 惯性/回弹(SideEffect)
-                // 的尾巴不算下拉，否则甩到底那一帧会先被拉走再弹回，就是"手感诡异"的来源。
-                if (!currentEnabled || isDismissing || !isPointerDown) return Offset.Zero
-                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
-                pullPx.floatValue = (pullPx.floatValue + available.y).coerceAtLeast(0f)
-                val target = pullPx.floatValue
-                scope.launch { dragY.snapTo(target) }
-                return Offset(0f, available.y)
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (isDismissing) return available
-                val pull = pullPx.floatValue
-                pullPx.floatValue = 0f
-                if (pull > thresholdPx) {
-                    isDismissing = true
-                    dragY.animateTo(pageHeightPx, tween(140))
-                    currentDismiss()
-                    // 速度全部吃掉：退场时列表不该继续惯性滚动
-                    return available
-                }
-                // 未达阈值：回弹交给容器自己的协程。绝不在这里 await —— onPreFling 是惯性派发前的
-                // 挂起点，在这里挂 350ms 会把列表自己的 fling 一起拖住，真表上就是"松手先卡一下再滚"。
-                if (pull > 0f) scope.launch { dragY.animateTo(0f, spring(0.75f, 350f)) }
-                // Velocity.Zero = 本节点消费 0，剩余速度全部留给 ScalingLazyColumn 的惯性
-                return Velocity.Zero
-            }
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .onGloballyPositioned { coords -> pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f) }
-            // 只读观察按下状态（Initial 阶段不允许 consume：7d8dfb7 之前就是在这里吃掉了列表拖动）
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        isPointerDown = event.changes.any { it.pressed }
-                    }
-                }
-            }
-            // 手势节点：只有"列表吃不下"的剩余位移会到这里，且不携带任何位移
-            .nestedScroll(connection)
-    ) {
-        // 内容节点：只做视觉位移与透明度衰减
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    translationY = dragY.value
-                    alpha = (1f - dragY.value / (pageHeightPx * 1.5f)).coerceIn(0.25f, 1f)
-                }
-        ) {
-            content()
+internal fun SettingsTopAnchorProbe(state: ScalingLazyListState) {
+    if (!SettingsTopAnchorDebug) return
+    LaunchedEffect(state) {
+        snapshotFlow {
+            val info = state.layoutInfo
+            val first = info.visibleItemsInfo.firstOrNull()
+            listOf(
+                first?.index ?: -1,
+                info.viewportSize.height,
+                if (first == null) -1 else info.viewportSize.height / 2 + first.offset - first.size / 2,
+                first?.scale ?: 0f,
+                first?.alpha ?: 0f,
+                if (state.isAtScrollTop()) 1 else 0
+            )
+        }.collect { values ->
+            Log.d(
+                SettingsTopAnchorLogTag,
+                "firstIndex=" + values[0] + " viewportPx=" + values[1].toInt() +
+                    " topItemTopPx=" + values[2].toInt() +
+                    " scale=" + values[3] + " alpha=" + values[4] +
+                    " atScrollTop=" + values[5].toInt()
+            )
         }
     }
 }
 
 /**
- * 子页"下滑退出"：子页列表由调用方创建，本组件拿不到它的滚动状态，因此用 nested scroll 判定是否到顶：
- * 列表先吃掉自己能滚的位移，只有"已到顶还剩下向下位移"（[NestedScrollConnection.onPostScroll] 的
- * available.y > 0）时才累积并吃掉这部分事件，列表还能向上滚时一个像素都不吃。
+ * 设置页"下滑退出"的共享手势实现（根页与子页共用同一套判定）。
+ *
+ * - 判定只看指针事件流：按下（[awaitFirstDown]）→ 逐帧位移 → 抬起。表冠/滚轮不产生指针事件，
+ *   因此无论转多少格都进不到这条路径，"转到顶就退页"不可能发生。
+ * - 观察者挂在 [PointerEventPass.Initial] 且永不 consume，也不接 nestedScroll：
+ *   列表的拖动与松手后的惯性一个像素都不经过这里。
+ * - 到顶判据逐帧求值（[canPullDown]）并在一次手势内锁存"曾到顶"：位移发生在到顶那一帧之后时
+ *   仍然计入下拉量，不会因为差一帧读数就整段作废。
+ * - 松手累计超过 [PullDownDismissThreshold] 播退场并回调 [onDismiss]，否则回弹复位。
+ * - 修饰符顺序有意义：pointerInput 在 graphicsLayer 之前，手势读到的是未平移的坐标，
+ *   不会出现"自身平移又把局部坐标算回去"的正反馈闪屏。
  */
 @Composable
-fun Modifier.pullDownToDismissOnScroll(
+private fun Modifier.pullDownDismissGesture(
+    canPullDown: () -> Boolean,
     onDismiss: () -> Unit,
 ): Modifier {
-    val density = LocalDensity.current
-    val dragY = remember { Animatable(0f) }
-    var pullPx by remember { mutableFloatStateOf(0f) }
-    var isDismissing by remember { mutableStateOf(false) }
+    val thresholdPx = with(LocalDensity.current) { PullDownDismissThreshold.toPx() }
+    val scope = rememberCoroutineScope()
+    var offsetPx by remember { mutableFloatStateOf(0f) }
     var pageHeightPx by remember { mutableFloatStateOf(1f) }
-    // 同 PullDownDismissContainer：表冠刻度同样是 UserInput 来源，必须靠"手指按下"区分
-    var isPointerDown by remember { mutableStateOf(false) }
-    val thresholdPx = with(density) { PullDownDismissThreshold.toPx() }
+    var isDismissing by remember { mutableStateOf(false) }
+    val currentCanPullDown by rememberUpdatedState(canPullDown)
     val currentDismiss by rememberUpdatedState(onDismiss)
 
-    val connection = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                // 判据与 PullDownDismissContainer 一致：只收"已到顶 + 手指继续下拽"的剩余位移，
-                // 惯性衰减的尾巴（SideEffect）一个像素都不收，否则甩到底会被当成一次下拉。
-                if (isDismissing || !isPointerDown) return Offset.Zero
-                if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
-                pullPx = (pullPx + available.y).coerceAtLeast(0f)
-                return Offset(0f, available.y)
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                val pull = pullPx
-                pullPx = 0f
-                if (isDismissing) return available
-                if (pull > thresholdPx) {
-                    isDismissing = true
-                    dragY.animateTo(pageHeightPx, tween(140))
-                    currentDismiss()
-                    return available
-                }
-                return Velocity.Zero
-            }
-        }
-    }
-
     return this
-        .onGloballyPositioned { coords -> pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f) }
-        // 只读观察按下状态，不消费（同 PullDownDismissContainer）
+        .onGloballyPositioned { coords ->
+            pageHeightPx = coords.size.height.toFloat().coerceAtLeast(1f)
+        }
         .pointerInput(Unit) {
             awaitPointerEventScope {
                 while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    isPointerDown = event.changes.any { it.pressed }
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial
+                    )
+                    if (isDismissing) continue
+                    var pull = 0f
+                    var lastY = down.position.y
+                    var reachedTop = false
+                    var moves = 0
+                    var aborted = false
+                    var released = false
+                    if (PullDownDismissDebug) {
+                        Log.d(
+                            PullDownDismissLogTag,
+                            "down y=${down.position.y} canPullDown=${currentCanPullDown()}"
+                        )
+                    }
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        if (change == null) {
+                            aborted = true
+                            break
+                        }
+                        val dy = change.position.y - lastY
+                        lastY = change.position.y
+                        moves++
+                        // 到顶判据逐帧求值 + 本次手势内锁存：列表到顶那一帧之后的下拽都要算数
+                        val atTop = currentCanPullDown()
+                        if (atTop) reachedTop = true
+                        if (dy > 0f && (atTop || reachedTop)) {
+                            if (PullDownDismissDebug && pull == 0f) {
+                                Log.d(
+                                    PullDownDismissLogTag,
+                                    "firstPull dy=$dy atTop=$atTop reachedTop=$reachedTop"
+                                )
+                            }
+                            pull += dy
+                            // 受限挂起作用域（awaitPointerEventScope）里不能调 Animatable，
+                            // 直接写状态：零延迟跟随手指，也不占用帧回调
+                            offsetPx = pull
+                        }
+                        if (!change.pressed) {
+                            released = true
+                            break
+                        }
+                    }
+                    if (PullDownDismissDebug) {
+                        Log.d(
+                            PullDownDismissLogTag,
+                            "up pullPx=$pull thresholdPx=$thresholdPx moves=$moves " +
+                                "atTopSeen=$reachedTop released=$released aborted=$aborted " +
+                                "verdict=${if (released && pull > thresholdPx) "dismiss" else "bounce"}"
+                        )
+                    }
+                    when {
+                        aborted -> offsetPx = 0f
+                        released && pull > thresholdPx -> {
+                            isDismissing = true
+                            scope.launch {
+                                animate(offsetPx, pageHeightPx, animationSpec = tween(140)) { value, _ ->
+                                    offsetPx = value
+                                }
+                                currentDismiss()
+                            }
+                        }
+                        pull > 0f -> scope.launch {
+                            animate(pull, 0f, animationSpec = spring(0.75f, 350f)) { value, _ ->
+                                offsetPx = value
+                            }
+                        }
+                    }
                 }
             }
         }
         .graphicsLayer {
-            translationY = dragY.value
-            alpha = (1f - dragY.value / (pageHeightPx * 1.5f)).coerceIn(0.25f, 1f)
+            translationY = offsetPx
+            alpha = (1f - offsetPx / (pageHeightPx * 1.5f)).coerceIn(0.25f, 1f)
         }
-        .nestedScroll(connection)
+}
+
+/** 子页入口：与 [PullDownDismissContainer] 共用同一套手势判定。 */
+@Composable
+fun Modifier.pullDownToDismiss(
+    canPullDown: () -> Boolean,
+    onDismiss: () -> Unit,
+): Modifier = pullDownDismissGesture(canPullDown = canPullDown, onDismiss = onDismiss)
+
+/** 设置页"下滑退出"容器：与"主键上滑进入"对称的反向退出。 */
+@Composable
+fun PullDownDismissContainer(
+    canPullDown: () -> Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pullDownDismissGesture(canPullDown = canPullDown, onDismiss = onDismiss)
+    ) {
+        content()
+    }
 }
 
 /** 设置页状态徽章的资源映射：状态 -> 文案资源，纯函数便于单测。 */

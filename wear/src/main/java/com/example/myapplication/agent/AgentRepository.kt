@@ -12,6 +12,9 @@ interface AgentGateway {
     /** 审批挂起函数：返回 true 为允许，false 为拒绝。与 AgentDispatcher.onRequireConfirmation 同义。 */
     var onRequireConfirmation: (suspend (toolName: String, actionText: String, risk: RiskAssessment) -> Boolean)?
 
+    /** 供应商不支持 reasoning_effort 时的回调：引擎已去掉字段重试，上层负责提示。 */
+    var onReasoningEffortIgnored: (() -> Unit)?
+
     /** 发送用户指令并驱动多轮交错流回调；终态通过 [onStateUpdate] 的 isFinished 告知。 */
     suspend fun send(
         prompt: String,
@@ -57,6 +60,12 @@ class AgentRepository(
         get() = dispatcher.onRequireConfirmation
         set(value) {
             dispatcher.onRequireConfirmation = value
+        }
+
+    override var onReasoningEffortIgnored: (() -> Unit)?
+        get() = dispatcher.onReasoningEffortIgnored
+        set(value) {
+            dispatcher.onReasoningEffortIgnored = value
         }
 
     override suspend fun send(

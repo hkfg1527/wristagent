@@ -20,6 +20,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
+import com.example.myapplication.presentation.ui.chat.ThoughtCapsuleState
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -69,15 +73,50 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
 
+/** 思考胶囊展开后的正文高度上限：圆屏上再多就该给正文让位，全文靠胶囊内部滚动看。 */
+private val ThoughtBodyMaxHeight = 96.dp
+
+/** 思考进行中的秒数刷新节奏。 */
+private const val ThoughtTickMs = 500L
+
 /**
- * 深度思考微型小胶囊 (带弹性展开动画)
+ * 思考小胶囊：进行中标题是「思考中…」并刷已用秒数，结束后翻成「思考完成 · Ns」。
+ * 点开后在胶囊内部流式滚动显示思考文本；展开态由 ViewModel 的展开集合持有，
+ * 因此重组、列表滚动回收、切屏返回都不会把它折回去。
  */
 @Composable
 fun ThoughtPill(
     thought: ConversationBlock.Thought,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isExpanded by remember { mutableStateOf(thought.isExpanded) }
+    val isStreaming = ThoughtCapsuleState.isStreaming(thought)
+    // 秒数只在本胶囊内部读时钟：不把"每秒一次"的刷新扩散到整列列表
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    if (isStreaming) {
+        LaunchedEffect(thought.id) {
+            while (true) {
+                nowMs = System.currentTimeMillis()
+                delay(ThoughtTickMs)
+            }
+        }
+    }
+    val elapsedSeconds = ThoughtCapsuleState.elapsedSeconds(thought, nowMs)
+
+    // 闪烁省略号：0..3 的锯齿帧换算成 1..3 个点
+    val dotsTransition = rememberInfiniteTransition(label = "thoughtDots")
+    val dotsFrame by dotsTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "thoughtDotsFrame"
+    )
+    val dots = if (isStreaming) ThoughtCapsuleState.thinkingDots(dotsFrame.toInt()) else ""
+
     val arrowRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
         animationSpec = spring(
@@ -88,33 +127,45 @@ fun ThoughtPill(
     )
     val shape = RoundedCornerShape(Wear.Radius.Control)
 
+    // 流式思考在胶囊内部滚动：每次增量把可视区推到底部，读到的永远是"最新在想什么"
+    val bodyScroll = rememberScrollState()
+    LaunchedEffect(thought.reasoning, isExpanded) {
+        if (isExpanded) bodyScroll.scrollTo(bodyScroll.maxValue)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = Wear.Space.Xs)
     ) {
-        // 思考胶囊条目：实底 + 描边，整条可点，点击区不小于 44dp
+        // 标题胶囊：实底 + 描边，整条可点，点击区不小于 44dp
         Row(
             modifier = Modifier
                 .clip(shape)
                 .background(Wear.Palette.SurfaceAlt)
                 .border(1.dp, Wear.Palette.Border, shape)
                 .heightIn(min = Wear.Size.Touch)
-                .clickable { isExpanded = !isExpanded }
+                .clickable { onToggle() }
                 .padding(horizontal = Wear.Space.Md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
         ) {
             BasicText(
-                text = stringResource(R.string.ui_thought_process),
+                text = if (isStreaming) {
+                    stringResource(R.string.ui_thought_thinking) + dots
+                } else {
+                    stringResource(R.string.ui_thought_done, elapsedSeconds)
+                },
                 style = Wear.TextCaption,
                 maxLines = 1
             )
-            BasicText(
-                text = if (isExpanded) stringResource(R.string.ui_common_collapse) else stringResource(R.string.ui_common_expand),
-                style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
-                maxLines = 1
-            )
+            if (isStreaming && elapsedSeconds > 0) {
+                BasicText(
+                    text = stringResource(R.string.ui_thought_elapsed, elapsedSeconds),
+                    style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+                    maxLines = 1
+                )
+            }
             BasicText(
                 text = "›",
                 modifier = Modifier.rotate(arrowRotation),
@@ -123,20 +174,22 @@ fun ThoughtPill(
             )
         }
 
-        // 展开后的完整思考链 (弹性收展)
+        // 展开后的思考链：高度封顶 + 内部滚动，增量到达时自动跟到底
         AnimatedVisibility(
             visible = isExpanded,
             enter = expandVertically(spring(dampingRatio = 0.65f, stiffness = 350f)) + fadeIn(),
             exit = shrinkVertically(spring(dampingRatio = 0.75f, stiffness = 420f)) + fadeOut()
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = Wear.Space.Xs)
+                    .heightIn(max = ThoughtBodyMaxHeight)
                     .clip(shape)
                     .background(Wear.Palette.SurfaceAlt)
                     .border(1.dp, Wear.Palette.Border, shape)
                     .padding(Wear.Space.Md)
+                    .verticalScroll(bodyScroll)
             ) {
                 BasicText(
                     text = thought.reasoning,
@@ -170,14 +223,15 @@ private fun toolStatusColor(toolCall: ConversationBlock.ToolCall): Color {
 }
 
 /**
- * 弹性工具调用胶囊 (令牌配色 · 明确操作与生成状态 · 弹性展开与旋转)
+ * 弹性工具调用胶囊 (令牌配色 · 明确调用哪个工具 · 执行中显示进度 · 弹性展开与旋转)
  */
 @Composable
 fun SpringColoredToolPill(
     toolCall: ConversationBlock.ToolCall,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isExpanded by remember { mutableStateOf(toolCall.isExpanded) }
     val isExecuting = toolCall.isExecuting
     val meta = ToolVisualMeta.resolve(toolCall.toolName)
     val statusColor = toolStatusColor(toolCall)
@@ -218,7 +272,7 @@ fun SpringColoredToolPill(
         Box(
             modifier = Modifier
                 .heightIn(min = Wear.Size.Touch)
-                .clickable { isExpanded = !isExpanded }
+                .clickable { onToggle() }
         ) {
             Row(
                 modifier = Modifier
@@ -236,17 +290,19 @@ fun SpringColoredToolPill(
                     drawCircle(color = tagColor, radius = size.minDimension / 2f * dotScale)
                 }
 
-                // 工具展示名（资源化，随系统语言切换；未知工具回落到工具名原文）
+                // 胶囊标题写明"调用哪个工具"：工具名与设置页里的工具项同一个名字
                 BasicText(
-                    text = meta.displayNameRes?.let { stringResource(it) } ?: meta.toolName,
+                    text = stringResource(R.string.ui_tool_call_name, meta.toolName),
+                    modifier = Modifier.weight(1f, fill = false),
                     style = Wear.TextCaption.copy(color = Wear.Palette.TextPrimary),
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 // 状态说明 (running/success/failed 只点缀在文字颜色上)
                 // 摘要只留第一段，宽度不足时缩略摘要而不是工具名，完整信息在展开态
                 val summaryLabel = if (isExecuting) {
-                    stringResource(R.string.ui_generating)
+                    stringResource(R.string.ui_tool_running)
                 } else {
                     primarySummary(toolCall.resultSummary) ?: stringResource(R.string.ui_tool_executed)
                 }
@@ -284,6 +340,14 @@ fun SpringColoredToolPill(
                     .padding(Wear.Space.Md)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
+                    if (toolCall.isExecuting) {
+                        // 执行中：胶囊里先给出进度，参数与返回在拿到之后补上
+                        BasicText(
+                            text = stringResource(R.string.ui_tool_running),
+                            style = Wear.TextMono.copy(color = Wear.Palette.Accent),
+                            maxLines = 1
+                        )
+                    }
                     BasicText(
                         text = stringResource(R.string.ui_tool_args, toolCall.argsJson),
                         style = Wear.TextMono,

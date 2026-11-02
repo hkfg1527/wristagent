@@ -19,7 +19,11 @@ fun ToolsMcpContent(
     isMcpEnabled: Boolean,
     mcpEndpoint: String,
     onBack: () -> Unit,
-    onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit
+    onToggleMcp: (enabled: Boolean, endpoint: String) -> Unit,
+    animationsEnabled: Boolean = true,
+    visionBetaEnabled: Boolean = false,
+    onToggleAnimations: (Boolean) -> Unit = {},
+    onToggleVisionBeta: (Boolean) -> Unit = {}
 ) {
     var toolDeviceStatus by remember { mutableStateOf(preferences.toolDeviceStatusEnabled) }
     var toolVibrate by remember { mutableStateOf(preferences.toolVibrateEnabled) }
@@ -119,5 +123,26 @@ fun ToolsMcpContent(
         }
 
         row { SettingsCaptionRow(text = mcpEndpoint, mono = true) }
+
+        // 界面动效与内测入口：这一页是所有"功能开关"的归口，语义上比推理参数页更贴
+        section(stringResource(R.string.settings_ui_and_beta_header))
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_animations),
+                secondary = stringResource(R.string.settings_animations_secondary),
+                checked = animationsEnabled,
+                onCheckedChange = onToggleAnimations
+            )
+        }
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_vision_beta),
+                secondary = stringResource(R.string.settings_vision_beta_secondary),
+                checked = visionBetaEnabled,
+                onCheckedChange = onToggleVisionBeta
+            )
+        }
     }
 }

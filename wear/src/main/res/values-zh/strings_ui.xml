@@ -36,7 +36,11 @@
     <string name="ui_approval_headline_high">高风险操作</string>
 
     <!-- 工具胶囊与思考胶囊。 -->
-    <string name="ui_thought_process">思考过程</string>
+    <string name="ui_thought_thinking">思考中</string>
+    <string name="ui_thought_done">思考完成 · %1$ds</string>
+    <string name="ui_thought_elapsed">· %1$ds</string>
+    <string name="ui_tool_call_name">调用工具 %1$s</string>
+    <string name="ui_tool_running">执行中...</string>
     <string name="ui_generating">生成中...</string>
     <string name="ui_tool_executed">已执行</string>
     <string name="ui_tool_args">参数: %1$s</string>

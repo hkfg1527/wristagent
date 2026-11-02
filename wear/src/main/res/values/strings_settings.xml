@@ -39,6 +39,13 @@
     <string name="settings_transport">Transport protocol</string>
     <string name="settings_sse_on">Enable SSE streaming</string>
     <string name="settings_sse_off">Turn streaming off</string>
+    <string name="settings_thought_group">Reasoning process</string>
+    <string name="settings_show_thought_process">Show reasoning</string>
+    <string name="settings_reasoning_effort">Reasoning effort</string>
+    <string name="settings_reasoning_effort_low">Low</string>
+    <string name="settings_reasoning_effort_medium">Medium</string>
+    <string name="settings_reasoning_effort_high">High</string>
+    <string name="settings_reasoning_effort_unsupported">This model ignores the reasoning effort setting</string>
 
     <!-- Memory and security sections. -->
     <string name="settings_turns_header">Turns kept per session</string>
@@ -136,4 +143,155 @@
     <string name="settings_remote_console_hint">Open this address in a phone browser on the same Wi-Fi to edit every setting.</string>
     <string name="settings_remote_console_token">Access token</string>
     <string name="settings_remote_console_copy_hint">Tap the address to copy it</string>
+
+    <!-- 多供应商 Profile 与界面动效/内测开关 -->
+    <string name="settings_provider_profiles">Providers</string>
+    <string name="settings_providers_saved">Saved profiles</string>
+    <string name="settings_providers_empty">No saved profile yet — copy the current config to add one</string>
+    <string name="settings_providers_actions">Manage</string>
+    <string name="settings_providers_copy">Copy current config</string>
+    <string name="settings_providers_rename">Rename active profile</string>
+    <string name="settings_providers_delete">Delete active profile</string>
+    <string name="settings_providers_none_active">Not set</string>
+    <string name="settings_providers_default_name">Config %1$d</string>
+    <string name="settings_providers_capacity">%1$d/%2$d</string>
+    <string name="settings_providers_rename_title">Profile name</string>
+    <string name="settings_providers_rename_placeholder">Name this profile</string>
+    <string name="settings_ui_and_beta_header">Interface &amp; beta</string>
+    <string name="settings_animations">Animation effects</string>
+    <string name="settings_animations_secondary">Off stops matrix breathing, shockwave and button springs</string>
+    <string name="settings_vision_beta">Image recognition (beta)</string>
+    <string name="settings_vision_beta_secondary">Entry only: the recognition service is not wired up yet</string>
+<!-- 网络体检：九项检查 + 修复预案 -->
+    <string name="settings_netdiag_title">Network Check</string>
+    <string name="settings_netdiag_subtitle">Diagnose school or complex networks and try to fix them</string>
+    <string name="settings_netdiag_checks_header">Checks</string>
+    <string name="settings_netdiag_plans_header">Repair plans</string>
+    <string name="settings_netdiag_recheck">Re-check</string>
+    <string name="settings_netdiag_repair">Auto fix</string>
+    <string name="settings_netdiag_copy">Copy report</string>
+    <string name="settings_netdiag_copied">Diagnostic report copied</string>
+    <string name="settings_netdiag_running">Checking…</string>
+    <string name="settings_netdiag_value_never">Not checked</string>
+    <string name="settings_netdiag_value_ok">DNS ok · TLS ok</string>
+    <string name="settings_netdiag_value_issues">%1$d issues</string>
+    <string name="settings_netdiag_repair_done">Handled %1$d plan(s)</string>
+    <string name="settings_netdiag_repair_ok">Fixed · %1$s</string>
+    <string name="settings_netdiag_repair_fail">Failed · %1$s</string>
+    <string name="settings_netdiag_repair_manual">Manual · %1$s</string>
+    <string name="settings_netdiag_root_off">No root: network fixes fall back to manual guidance</string>
+    <string name="settings_netdiag_no_plans">No plans</string>
+
+    <string name="settings_netdiag_check_dns">DNS lookup</string>
+    <string name="settings_netdiag_check_tcp">TCP connect</string>
+    <string name="settings_netdiag_check_tls">TLS handshake</string>
+    <string name="settings_netdiag_check_response">Response class</string>
+    <string name="settings_netdiag_check_clock">Clock skew</string>
+    <string name="settings_netdiag_check_proxy">System proxy</string>
+    <string name="settings_netdiag_check_dualstack">Dual stack</string>
+    <string name="settings_netdiag_check_mtu">MTU black hole</string>
+    <string name="settings_netdiag_check_network">Network type</string>
+
+    <string name="settings_netdiag_dns_ok">Resolved · %1$s</string>
+    <string name="settings_netdiag_dns_suspicious">Suspicious result · %1$s</string>
+    <string name="settings_netdiag_dns_fail">Lookup failed · %1$s</string>
+    <string name="settings_netdiag_tcp_ok">Connected · %1$s</string>
+    <string name="settings_netdiag_tcp_timeout">Connect timed out (3s)</string>
+    <string name="settings_netdiag_tcp_refused">Connection refused</string>
+    <string name="settings_netdiag_tcp_fail">Connect failed · %1$s</string>
+    <string name="settings_netdiag_tls_ok">Handshake ok · %1$s</string>
+    <string name="settings_netdiag_tls_cert">Untrusted certificate, possible MITM</string>
+    <string name="settings_netdiag_tls_handshake">Handshake failed · %1$s</string>
+    <string name="settings_netdiag_tls_fail">Handshake error · %1$s</string>
+    <string name="settings_netdiag_response_json_ok">Valid JSON · HTTP %1$s</string>
+    <string name="settings_netdiag_response_redirect">HTTP %1$s redirect, likely portal</string>
+    <string name="settings_netdiag_response_html">HTML body, likely portal hijack</string>
+    <string name="settings_netdiag_response_auth_required">HTTP 511 network auth required</string>
+    <string name="settings_netdiag_response_non_json">Non-JSON body · HTTP %1$s</string>
+    <string name="settings_netdiag_response_fail">No response · %1$s</string>
+    <string name="settings_netdiag_clock_ok">Skew %1$s s</string>
+    <string name="settings_netdiag_clock_drift">Skew %1$s s, over 5 minutes</string>
+    <string name="settings_netdiag_clock_unknown">No Date header, skipped</string>
+    <string name="settings_netdiag_proxy_none">No proxy set</string>
+    <string name="settings_netdiag_proxy_active">Proxy set · %1$s</string>
+    <string name="settings_netdiag_dual_ok">IPv4 and IPv6 reachable</string>
+    <string name="settings_netdiag_dual_no_v6">No AAAA record</string>
+    <string name="settings_netdiag_dual_v6_blackhole">IPv6 black hole, IPv4 fine</string>
+    <string name="settings_netdiag_dual_ipv6_only">IPv6 only</string>
+    <string name="settings_netdiag_dual_both_fail">Neither stack reachable</string>
+    <string name="settings_netdiag_mtu_ok">Large and small payloads passed</string>
+    <string name="settings_netdiag_mtu_blackhole">Large payload failed, small passed</string>
+    <string name="settings_netdiag_mtu_unknown">Inconclusive</string>
+    <string name="settings_netdiag_net_wifi">Wi-Fi</string>
+    <string name="settings_netdiag_net_cellular">Cellular</string>
+    <string name="settings_netdiag_net_none">No network</string>
+    <string name="settings_netdiag_net_metered">Metered</string>
+    <string name="settings_netdiag_net_unmetered">Unmetered</string>
+    <string name="settings_netdiag_net_line">%1$s · %2$s</string>
+
+    <string name="settings_netdiag_plan_no_network">Total outage</string>
+    <string name="settings_netdiag_plan_no_network_why">No usable network connection at all</string>
+    <string name="settings_netdiag_plan_no_network_guide">Turn on Wi-Fi or a phone hotspot, then re-check</string>
+    <string name="settings_netdiag_action_wifi">Open Wi-Fi settings</string>
+
+    <string name="settings_netdiag_plan_portal">Captive portal</string>
+    <string name="settings_netdiag_plan_portal_why">The gateway answered with a login page: not signed in yet</string>
+    <string name="settings_netdiag_plan_portal_guide">Finish the login page; if no browser exists, use a phone hotspot</string>
+    <string name="settings_netdiag_action_portal">Open login page</string>
+
+    <string name="settings_netdiag_plan_proxy">Wrong system proxy</string>
+    <string name="settings_netdiag_plan_proxy_why">A system proxy is set and the network checks fail</string>
+    <string name="settings_netdiag_plan_proxy_guide">Turn the system proxy off, then re-check</string>
+    <string name="settings_netdiag_action_bypass_proxy">Re-test without proxy</string>
+
+    <string name="settings_netdiag_plan_dns">DNS trouble</string>
+    <string name="settings_netdiag_plan_dns_why">Lookup failed or points at a suspicious address</string>
+    <string name="settings_netdiag_plan_dns_guide">Set DNS to 8.8.8.8 or 223.5.5.5, then retry</string>
+    <string name="settings_netdiag_action_doh">Re-test over DoH</string>
+
+    <string name="settings_netdiag_plan_clock">Clock skew</string>
+    <string name="settings_netdiag_plan_clock_why">Device time differs from the server by over 5 minutes</string>
+    <string name="settings_netdiag_plan_clock_guide">Open Settings, System, Date and time, enable automatic time</string>
+    <string name="settings_netdiag_action_clock_root">Enable auto time (root)</string>
+    <string name="settings_netdiag_action_clock_manual">Open date settings</string>
+
+    <string name="settings_netdiag_plan_mitm">Possible MITM</string>
+    <string name="settings_netdiag_plan_mitm_why">The certificate chain is not trusted; the connection may be intercepted</string>
+    <string name="settings_netdiag_plan_mitm_guide">Switch to a phone hotspot; if it persists do not enter the API key</string>
+    <string name="settings_netdiag_action_switch_network">Cannot be fixed here</string>
+
+    <string name="settings_netdiag_plan_v6_blackhole">IPv6 black hole</string>
+    <string name="settings_netdiag_plan_v6_blackhole_why">IPv6 does not connect while IPv4 works</string>
+    <string name="settings_netdiag_plan_v6_blackhole_guide">Disable IPv6 on the router or hotspot</string>
+    <string name="settings_netdiag_action_force_v4">Re-test over IPv4 only</string>
+
+    <string name="settings_netdiag_plan_v6_only">IPv6 only</string>
+    <string name="settings_netdiag_plan_v6_only_why">Only IPv6 connects, IPv4 does not</string>
+    <string name="settings_netdiag_plan_v6_only_guide">Use a dual-stack network or a phone hotspot</string>
+
+    <string name="settings_netdiag_plan_mtu">MTU black hole</string>
+    <string name="settings_netdiag_plan_mtu_why">Large packets are dropped while small ones pass</string>
+    <string name="settings_netdiag_plan_mtu_guide">Use a phone hotspot, or lower the MTU to 1200</string>
+
+    <string name="settings_netdiag_action_hotspot">Use a hotspot</string>
+
+    <string name="settings_netdiag_plan_whitelist">Blocked by gateway</string>
+    <string name="settings_netdiag_plan_whitelist_why">The server answered non-JSON, likely intercepted by the gateway</string>
+    <string name="settings_netdiag_plan_whitelist_guide">Try another base URL, or a network without the restriction</string>
+    <string name="settings_netdiag_action_other_url">Try another base URL</string>
+
+    <string name="settings_netdiag_plan_retry">Timeout or throttling</string>
+    <string name="settings_netdiag_plan_retry_why">The connection timed out or the request was throttled</string>
+    <string name="settings_netdiag_plan_retry_guide">Try again later; if it persists contact the campus network desk</string>
+    <string name="settings_netdiag_action_retry">Retry twice with backoff</string>
+
+    <string name="settings_netdiag_plan_unknown">Unclassified fault</string>
+    <string name="settings_netdiag_plan_unknown_why">Some check failed but no plan matches it</string>
+    <string name="settings_netdiag_plan_unknown_guide">Copy the report and send it to the developer</string>
+    <string name="settings_netdiag_action_none">No automatic fix</string>
+
+    <string name="settings_netdiag_plan_all_ok">All checks passed</string>
+    <string name="settings_netdiag_plan_all_ok_why">All nine checks passed</string>
+    <string name="settings_netdiag_plan_all_ok_guide">Nothing to fix</string>
+    <string name="settings_netdiag_action_probe">Run one real request</string>
 </resources>

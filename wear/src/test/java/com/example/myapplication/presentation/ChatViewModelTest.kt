@@ -31,6 +31,8 @@ private class FakeAgentGateway : AgentGateway {
 
     override var onRequireConfirmation: (suspend (toolName: String, actionText: String, risk: RiskAssessment) -> Boolean)? = null
 
+    override var onReasoningEffortIgnored: (() -> Unit)? = null
+
     val sentPrompts = mutableListOf<String>()
     val sentBlocks = mutableListOf<List<ConversationBlock>>()
     val loadedHistories = mutableListOf<List<ChatMessage>>()

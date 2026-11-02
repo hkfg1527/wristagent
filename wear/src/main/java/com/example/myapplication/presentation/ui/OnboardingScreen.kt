@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -235,6 +236,8 @@ private fun OnboardingConfigPhase(
     ) {
         ScalingLazyColumn(
             state = listState,
+            // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
+            flingBehavior = ScrollableDefaults.flingBehavior(),
             modifier = Modifier
                 .fillMaxSize()
                 // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供（自带 focusTarget，

@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
+import com.example.myapplication.presentation.ui.settings.motionSpec
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -128,10 +130,13 @@ internal fun ApprovalFloatingLayer(
     collapse: Float,
     modifier: Modifier = Modifier
 ) {
+    // 动画开关：关闭后压暗层与文案浮起都直接落到终值，不给"审批流光"留任何进行中的时间线
+    val animationsEnabled = LocalAnimationsEnabled.current
+
     // 只压暗 0.22：点阵保持可见，绿/红一律交给点阵自身的颜色插值，不再有整屏蒙色层
     val scrimAlpha by animateFloatAsState(
         targetValue = if (visible) ApprovalScrimAlpha else 0f,
-        animationSpec = tween(140),
+        animationSpec = motionSpec(animationsEnabled, tween(140)),
         label = "approvalScrimAlpha"
     )
 
@@ -152,8 +157,8 @@ internal fun ApprovalFloatingLayer(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(140)),
-        exit = fadeOut(tween(120)),
+        enter = fadeIn(motionSpec(animationsEnabled, tween(140))),
+        exit = fadeOut(motionSpec(animationsEnabled, tween(120))),
         modifier = modifier.fillMaxSize()
     ) {
         Box(
@@ -290,8 +295,14 @@ private fun FloatingApprovalText(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val animationsEnabled = LocalAnimationsEnabled.current
     val enter = remember { Animatable(0f) }
-    LaunchedEffect(enter) {
+    LaunchedEffect(enter, animationsEnabled) {
+        // 关闭动画时既不排队也不弹簧：四块文案一次性、无位移地出现
+        if (!animationsEnabled) {
+            enter.snapTo(1f)
+            return@LaunchedEffect
+        }
         delay(ApprovalTextStaggerMs * slot)
         enter.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 260f))
     }

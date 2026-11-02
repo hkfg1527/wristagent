@@ -17,12 +17,17 @@ sealed class ConversationBlock {
         val isUser: Boolean = false
     ) : ConversationBlock()
 
-    /** 深度思考小胶囊：平时折叠为紧凑药丸，可点击展开查看详情 */
+    /**
+     * 深度思考小胶囊：平时折叠为紧凑药丸，点开在胶囊内部流式滚动显示思考文本。
+     * [isStreaming] 为真时标题报"思考中"，为假时标题报"思考完成 · Ns"（总耗时取 [durationMs]）。
+     * [startedAtMs] 是该粒胶囊第一次拿到思考增量的墙钟时刻，用于进行中每秒刷新已用时间。
+     */
     data class Thought(
         override val id: String,
         val reasoning: String,
         val durationMs: Long = 0,
-        val isExpanded: Boolean = false
+        val isStreaming: Boolean = false,
+        val startedAtMs: Long = 0L
     ) : ConversationBlock()
 
     /** 工具调用小胶囊：穿插在两段话之间，展示调用状态与清洗后的结果 */
@@ -31,8 +36,7 @@ sealed class ConversationBlock {
         val toolName: String,
         val argsJson: String,
         val resultSummary: String? = null,
-        val isExecuting: Boolean = false,
-        val isExpanded: Boolean = false
+        val isExecuting: Boolean = false
     ) : ConversationBlock()
 }
 

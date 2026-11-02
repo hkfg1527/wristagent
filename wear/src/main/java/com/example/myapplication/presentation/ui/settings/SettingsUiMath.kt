@@ -112,3 +112,54 @@ object SettingsValueMath {
 
     private const val SecretMask = "\u2022\u2022\u2022\u2022"
 }
+
+/**
+ * 设置页顶部对齐：滚到最顶时首项（标题）贴到内容区顶边，而不是停在视口垂直中心。
+ *
+ * 依据（wear compose foundation 1.7.1 `ScalingLazyListState.spaceNeeded` / `calculateTopAutoCenteringPaddingPx`）：
+ * autoCentering 会在自动居中项之前插入
+ * `spacer = (viewportCenter − itemGap − itemOffset − centerItemSize/2 − Σ(前序项 size + itemGap)).coerceAtLeast(0)`，
+ * 首项顶边 `y = contentPaddingTop + spacer + itemGap`。
+ *
+ * itemIndex 取 0（本页原配置）时 spacer 接近半屏，标题被推到中间、上方留下大片空白 —— 这就是用户看到的现象。
+ * itemIndex 取 1（首项是标题，不该被居中，官方文档推荐的 ListHeader 布局）时 spacer 恒为 0，
+ * 标题顶边落在 `contentPaddingTop + itemGap`，上方只剩这一行行间距。
+ */
+object SettingsTopAnchorMath {
+    /** 自动居中在首项之前占用的高度（px）；0 表示首项直接贴到内容区顶边。 */
+    fun topSpacerPx(
+        viewportHeightPx: Int,
+        itemGapPx: Int,
+        autoCenteringItemOffsetPx: Int = 0,
+        centerItemSizePx: Int,
+        sizesAboveCenterItemPx: List<Int> = emptyList()
+    ): Int {
+        if (viewportHeightPx <= 0) return 0
+        var spaceNeeded =
+            viewportHeightPx / 2 - itemGapPx - autoCenteringItemOffsetPx - centerItemSizePx / 2
+        if (spaceNeeded > 0) {
+            sizesAboveCenterItemPx.forEach { spaceNeeded -= itemGapPx + it }
+        }
+        return (spaceNeeded + itemGapPx).coerceAtLeast(0)
+    }
+
+    /** 首项顶边在视口里的 y（px）。 */
+    fun topItemTopPx(
+        contentPaddingTopPx: Int,
+        spacerPx: Int,
+        itemGapPx: Int
+    ): Int = contentPaddingTopPx + spacerPx + itemGapPx
+
+    /**
+     * 标题行内的顶部留白：让标题文字顶边正好落在 [topInsetDp]（34dp 时钟带下沿）。
+     *
+     * 行顶边本身已经被"列表顶部内边距 + 行间距"压在 `contentPaddingTopDp + itemGapDp`，
+     * 行内再留 `topInsetDp − 这两者` 即可对齐；算出来是负数（屏幕/令牌变化）时取 0，不制造负留白。
+     */
+    fun titleTopPaddingDp(
+        topInsetDp: Float,
+        contentPaddingTopDp: Float,
+        itemGapDp: Float
+    ): Float = (topInsetDp - contentPaddingTopDp - itemGapDp).coerceAtLeast(0f)
+}
+

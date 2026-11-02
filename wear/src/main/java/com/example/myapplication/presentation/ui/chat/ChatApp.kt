@@ -27,7 +27,9 @@ import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ui.OnboardingScreen
 import com.example.myapplication.presentation.ui.SettingsScreen
+import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.settings.SettingsScreenVeilMs
+import androidx.compose.runtime.CompositionLocalProvider
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AudioRecordWavCapture
 import com.example.myapplication.voice.VoiceAsrGateway
@@ -134,17 +136,23 @@ fun WearAgentApp(
                 }
 
                 AppScreen.MAIN -> {
-                    ChatScreen(
-                        viewModel = viewModel,
-                        preferences = preferences,
-                        voiceInputManager = voiceInputManager,
-                        liveSpacingDp = liveSpacingDp,
-                        onOpenSettings = { currentScreen = AppScreen.SETTINGS },
-                        announceInputMode = announceInputMode,
-                        onInputModeAnnounced = { announceInputMode = false },
-                        externalPrompt = externalPrompt,
-                        onClearExternalPrompt = onClearExternalPrompt
-                    )
+                    // 动画开关的唯一注入点：点阵、底栏、审批浮层、输入弹窗都只读这个 local，
+                    // 于是"关掉动效"是一件全局的事，不会各页各开关一半生效。
+                    CompositionLocalProvider(
+                        LocalAnimationsEnabled provides preferences.animationsEnabled
+                    ) {
+                        ChatScreen(
+                            viewModel = viewModel,
+                            preferences = preferences,
+                            voiceInputManager = voiceInputManager,
+                            liveSpacingDp = liveSpacingDp,
+                            onOpenSettings = { currentScreen = AppScreen.SETTINGS },
+                            announceInputMode = announceInputMode,
+                            onInputModeAnnounced = { announceInputMode = false },
+                            externalPrompt = externalPrompt,
+                            onClearExternalPrompt = onClearExternalPrompt
+                        )
+                    }
                 }
             }
         }
