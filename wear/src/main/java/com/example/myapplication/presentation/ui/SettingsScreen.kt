@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -47,6 +45,8 @@ import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
+import com.example.myapplication.presentation.ui.settings.RotaryFocusEffect
+import com.example.myapplication.presentation.ui.settings.SettingsItemGap
 import com.example.myapplication.presentation.ui.settings.AdvancedPermissionContent
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
@@ -179,11 +179,16 @@ fun SettingsScreen(
             ) {
                 val settingsFocusRequester = remember { FocusRequester() }
 
-                // 表冠要焦点：等节点真正挂上树的那一帧再请求，首帧直接请求会落到未初始化的 requester 上
-                LaunchedEffect(Unit) {
-                    withFrameNanos { }
-                    runCatching { settingsFocusRequester.requestFocus() }
-                }
+                // 表冠只把事件送给持有焦点的节点：rotaryScrollable 自带 focusTarget 并把
+                // settingsFocusRequester 链在它上面，所以必须显式 requestFocus() 一次。
+                // 触发点绑在二级页状态上：根页在整个开关过程中一直留在树里，onAttach 与
+                // LaunchedEffect(Unit) 都只跑一次，从子页返回后不会重跑 —— 用 activeDialog 当 key，
+                // 返回根页才会重新取焦。二级页盖上来时 enabled=false，根页主动让出焦点不抢。
+                RotaryFocusEffect(
+                    focusRequester = settingsFocusRequester,
+                    refocusKey = activeDialog to showVoiceAsr,
+                    enabled = activeDialog == null && !showVoiceAsr
+                )
 
                 // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
                 val apiKeyConfigured = preferences.apiKey.isNotBlank()
@@ -192,7 +197,8 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         // 官方 M3E 表冠：刻度→位移、松手惯性、平台触感（ScrollTick / ScrollLimit）全在 behavior 里。
-                        // 它自带 focusTarget，焦点请求仍由 settingsFocusRequester 负责，不要再叠 focusable()。
+                        // 它自带 focusTarget，焦点由上面的 RotaryFocusEffect 显式申请：
+                        // 不要再叠 focusable()，也不要叠 requestFocusOnHierarchyActive()（没有下家，等于空操作）。
                         .rotaryScrollable(
                             behavior = RotaryScrollableDefaults.behavior(listState),
                             focusRequester = settingsFocusRequester
@@ -209,7 +215,7 @@ fun SettingsScreen(
                         top = Wear.Space.Sm,
                         bottom = Wear.Size.BottomBarReserve
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+                    verticalArrangement = Arrangement.spacedBy(SettingsItemGap),
                     // itemIndex = 1：自动居中项是第一行设置项，标题不再被居中。
                     // 首项是 ListHeader 时把它留在顶部是官方推荐的用法；居中只影响两端边界，
                     // 于是"滚到最顶"时标题贴住 34dp 时钟带下沿，向上滚动离开顶部时行为与原来一致。

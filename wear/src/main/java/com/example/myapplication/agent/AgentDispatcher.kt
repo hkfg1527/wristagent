@@ -666,8 +666,12 @@ class AgentDispatcher(
             }
 
             var droppedEffort = false
+            // 思考耗时的起点 = 请求真正发出去的那一刻。以它为准，响应多久才回来都记作思考时间，
+            // 非流式回显因此也不会退化成 0s（旧代码把起点记在了响应到达之后）。
+            var requestStartedAtMs = 0L
             while (true) {
                 conn?.disconnect()
+                requestStartedAtMs = System.currentTimeMillis()
                 val activeConn = openConnection()
                 conn = activeConn
                 OutputStreamWriter(activeConn.outputStream, "UTF-8").use { it.write(buildRequestBody().toString()) }
@@ -690,36 +694,23 @@ class AgentDispatcher(
 
             val accumulator = StreamAccumulator()
             var textBlockId: String? = null
-            var thoughtBlockId: String? = null
-            var thoughtStartedAtMs = 0L
+            // 思考胶囊的时间线：每个 reasoning 增量各自提交一次状态，起点固定在请求发出时刻
+            val thoughtTimeline = ThoughtTimeline(requestStartedAtMs)
             val showReasoning = preferences.showThoughtChain
 
-            /** 思考胶囊：第一次拿到思考增量时建块，之后每个增量改写同一粒胶囊（折叠态由 UI 侧记忆）。 */
+            /**
+             * 思考胶囊：第一次拿到思考增量时建块，之后**每个增量都改写同一粒胶囊并提交一次状态**。
+             * 提交粒度就是流式粒度：日志里能看到每块增量各自的"距请求"时刻。
+             */
             fun publishReasoning() {
                 if (!showReasoning) return
                 val reasoning = accumulator.reasoning
-                if (thoughtStartedAtMs == 0L) thoughtStartedAtMs = System.currentTimeMillis()
-                if (thoughtBlockId == null) {
-                    thoughtBlockId = UUID.randomUUID().toString()
-                    blocks.add(
-                        ConversationBlock.Thought(
-                            id = thoughtBlockId!!,
-                            reasoning = reasoning,
-                            isStreaming = true,
-                            startedAtMs = thoughtStartedAtMs
-                        )
-                    )
-                } else {
-                    val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
-                    if (idx != -1) {
-                        blocks[idx] = ConversationBlock.Thought(
-                            id = thoughtBlockId!!,
-                            reasoning = reasoning,
-                            isStreaming = true,
-                            startedAtMs = thoughtStartedAtMs
-                        )
-                    }
-                }
+                if (!thoughtTimeline.onReasoning(blocks, reasoning)) return
+                Log.d(
+                    TAG,
+                    "思考增量 #${thoughtTimeline.incrementCount} +" +
+                        "${reasoning.length} 字, 距请求 ${thoughtTimeline.elapsedMs()}ms"
+                )
                 onStateUpdate(
                     currentStateProvider().copy(
                         thoughtChain = reasoning,
@@ -794,7 +785,6 @@ class AgentDispatcher(
                     ?.optJSONObject(0)
                     ?.optJSONObject("message")
                 if (message != null) {
-                    thoughtStartedAtMs = System.currentTimeMillis()
                     val events = ModelStreamParser.messageEvents(message)
                     accumulator.applyAll(events)
                     if (events.any { it is StreamDelta.Reasoning }) publishReasoning()
@@ -810,23 +800,15 @@ class AgentDispatcher(
             }
 
             // 收尾：思考胶囊从"思考中"翻到"思考完成 · Ns"；正文块摘掉流式光标
-            if (thoughtBlockId != null) {
-                val idx = blocks.indexOfFirst { it.id == thoughtBlockId }
-                if (idx != -1) {
-                    val finishedAtMs = System.currentTimeMillis()
-                    blocks[idx] = ConversationBlock.Thought(
-                        id = thoughtBlockId!!,
-                        reasoning = accumulator.reasoning,
-                        durationMs = if (thoughtStartedAtMs > 0L) {
-                            (finishedAtMs - thoughtStartedAtMs).coerceAtLeast(0L)
-                        } else {
-                            0L
-                        },
-                        isStreaming = false,
-                        startedAtMs = thoughtStartedAtMs
-                    )
-                    onStateUpdate(currentStateProvider().copy(conversationBlocks = blocks.toList()))
-                }
+            run {
+                val finishedAtMs = System.currentTimeMillis()
+                if (!thoughtTimeline.finish(blocks, accumulator.reasoning, finishedAtMs)) return@run
+                Log.d(
+                    TAG,
+                    "思考收尾: 共 ${thoughtTimeline.incrementCount} 块增量, 耗时 " +
+                        "${thoughtTimeline.durationMs(finishedAtMs)}ms"
+                )
+                onStateUpdate(currentStateProvider().copy(conversationBlocks = blocks.toList()))
             }
 
             if (textBlockId != null) {

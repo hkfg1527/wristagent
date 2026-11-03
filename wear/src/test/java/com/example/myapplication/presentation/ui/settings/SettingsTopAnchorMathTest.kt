@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.presentation.ui.theme.Wear
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -104,6 +105,28 @@ class SettingsTopAnchorMathTest {
                 centerItemSizePx = titleRowPx
             )
         )
+    }
+
+    @Test
+    fun rootTitleStillLandsOnTheClockBandAfterTheItemGapWidens() {
+        // 行间距从旧的 8dp 加宽后会把整排往下顶：行内顶部留白必须同步收窄同样多，
+        // 标题文字顶边才能继续压在 34dp 时钟带下沿。这条是"改间距不许顶动标题"的阀门。
+        assertEquals(
+            Wear.Size.TopContentInset.value,
+            Wear.Space.Sm.value + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value,
+            0.001f
+        )
+        assertEquals(14f, RootTitleTopPadding.value, 0.001f)
+    }
+
+    @Test
+    fun subPageHeaderStillLandsOnTheClockBandAfterTheItemGapWidens() {
+        assertEquals(
+            Wear.Size.TopContentInset.value,
+            Wear.Space.Xs.value + SettingsSpacingMath.ItemGapDp + SubPageHeaderTopPadding.value,
+            0.001f
+        )
+        assertEquals(18f, SubPageHeaderTopPadding.value, 0.001f)
     }
 
     private fun assertEquals(message: String, expected: Int, actual: Int) {

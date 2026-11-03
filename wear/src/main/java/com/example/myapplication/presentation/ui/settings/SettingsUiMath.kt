@@ -23,9 +23,6 @@ object SettingsLayoutMath {
     /** 行内相邻元素间距。 */
     const val RowGapDp = 8f
 
-    /** 行与行之间的间距。 */
-    const val ItemGapDp = 8f
-
     /** 状态徽章宽度上限：再宽就会把副标题挤到 96dp 以下。 */
     const val BadgeMaxWidthDp = 40f
 
@@ -161,5 +158,50 @@ object SettingsTopAnchorMath {
         contentPaddingTopDp: Float,
         itemGapDp: Float
     ): Float = (topInsetDp - contentPaddingTopDp - itemGapDp).coerceAtLeast(0f)
+}
+
+/**
+ * 设置页"每行一块"的间距节奏。
+ *
+ * 两条互不重叠的规则：
+ * - **块级留白**（行与行之间、组标题与本组首行之间）必须落在 [GridDp] 网格上，与 [Wear.Space] 的
+ *   "只允许 4 的倍数"约束一致 —— 页面的骨架节奏由此统一，改一个数字就能整体收紧或放松。
+ * - **行内微间距**（标题↔取值、取值↔行尾箭头）与**发丝线**（分隔线、呼吸）不参与网格：
+ *   它们的量级是 1~2dp 的视觉修正，强行对齐到 4dp 网格反而会让"标题↔取值"被拉成两段。
+ *
+ * 组合起来的版面契约：行高下限 [MinRowHeightDp]，块级留白全部落在 [GridDp] 网格上，
+ * 分隔线恒为 [HairlineDp] —— 横线设计保留，行与行之间靠留白而不是容器来切分。
+ */
+object SettingsSpacingMath {
+    /** 块级留白的网格步长。 */
+    const val GridDp = 4f
+
+    /** 分隔线与微呼吸的厚度：唯一离开 [GridDp] 网格的尺寸。 */
+    const val HairlineDp = 1f
+
+    /** 相邻两行之间的垂直留白：旧值 8dp（[Wear.Space.Sm]）再放开 4dp。 */
+    const val ItemGapDp = 12f
+
+    /** 组标题下方到本组首行之间的留白：旧值 4dp（[Wear.Space.Xs]），现在与行间距同档。 */
+    const val SectionHeaderBottomDp = 12f
+
+    /** 行内：主标题与右侧取值之间的呼吸：旧间距 8dp + 1dp 发丝线。 */
+    const val TitleToValueDp = 9f
+
+    /** 行内：取值与行尾标记之间的留白：旧间距 8dp + 2dp。 */
+    const val ValueToTailDp = 10f
+
+    /** 行高下限：低于这个值就不再是可靠触控热区。 */
+    const val MinRowHeightDp = 44f
+
+    /** 必须落在 [GridDp] 网格上的块级留白清单。 */
+    val BlockGapsDp: List<Float> = listOf(ItemGapDp, SectionHeaderBottomDp)
+
+    /** 块级留白是否落在 [GridDp] 网格上：0 与负数不算合法留白。 */
+    fun isOnGrid(valueDp: Float, gridDp: Float = GridDp): Boolean =
+        valueDp > 0f && valueDp % gridDp == 0f
+
+    /** 行高是否满足触控下限。 */
+    fun meetsTouchTarget(rowHeightDp: Float): Boolean = rowHeightDp >= MinRowHeightDp
 }
 

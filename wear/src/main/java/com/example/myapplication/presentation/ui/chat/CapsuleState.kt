@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.chat
 
+import com.example.myapplication.agent.ThoughtDuration
 import com.example.myapplication.agent.contract.ConversationBlock
 
 /**
@@ -26,18 +27,27 @@ object CapsuleExpansion {
     fun isExpanded(expanded: Set<String>, key: String): Boolean = expanded.contains(key)
 }
 
+/**
+ * 思考耗时换算：引擎记下的是墙钟毫秒（起点 = 请求发出时刻），界面只负责换算成"秒"。
+ * 跨度计算复用引擎侧的 [ThoughtDuration]，两层不会算出不同的数。
+ */
+object ThoughtTiming {
+    /** 显示用秒数：向下取整，因此 999ms 仍然报 0s，与"进行中"的读法一致。 */
+    fun seconds(elapsedMs: Long): Int = if (elapsedMs <= 0L) 0 else (elapsedMs / 1000L).toInt()
+}
+
 /** 思考胶囊标题：进行中报已用秒数，结束后报总耗时；点阵省略号按帧循环。 */
 object ThoughtCapsuleState {
     fun isStreaming(thought: ConversationBlock.Thought): Boolean = thought.isStreaming
 
     fun elapsedSeconds(thought: ConversationBlock.Thought, nowMs: Long): Int {
+        // 进行中按墙钟累加（起点 = 请求发出时刻），收尾直接读引擎记下的真实跨度
         val elapsedMs = if (thought.isStreaming) {
-            if (thought.startedAtMs <= 0L) 0L else nowMs - thought.startedAtMs
+            ThoughtDuration.between(thought.startedAtMs, nowMs)
         } else {
             thought.durationMs
         }
-        if (elapsedMs <= 0L) return 0
-        return (elapsedMs / 1000L).toInt()
+        return ThoughtTiming.seconds(elapsedMs)
     }
 
     /** 闪烁省略号的点数：1..3 循环。 */

@@ -72,6 +72,16 @@
     <string name="settings_probe_running">Handshaking...</string>
     <string name="settings_probe_ready">Endpoint ready • %1$dms latency (%2$d models available)</string>
     <string name="settings_probe_failed">Handshake failed, the network timed out</string>
+    <string name="settings_model_refresh_failed">Refresh failed \u00b7 %1$s</string>
+    <string name="settings_model_error_dns">DNS lookup failed</string>
+    <string name="settings_model_error_timeout">Timed out (3s), retried once</string>
+    <string name="settings_model_error_unauthorized">HTTP 401 unauthorized</string>
+    <string name="settings_model_error_non_json">Endpoint did not return a model list</string>
+    <string name="settings_model_error_http">HTTP %1$s</string>
+    <string name="settings_model_error_unknown">Network unavailable</string>
+    <string name="settings_model_source_remote">Remote</string>
+    <string name="settings_model_source_builtin">Built-in default</string>
+    <string name="settings_model_not_in_list">Current model %1$s is not in this list</string>
 
     <!-- Prompt viewer section. -->
     <string name="settings_prompt_presets">Preset roles</string>

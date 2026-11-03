@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
@@ -99,7 +101,19 @@ val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
 val SettingsTouchGap: Dp = Wear.Space.Sm
 
 /** 行与行之间的唯一分隔物：1dp 细线，取代原来的"每行一张卡片"。 */
-private val SettingsDividerThickness = 1.dp
+private val SettingsDividerThickness = SettingsSpacingMath.HairlineDp.dp
+
+/** 相邻两行之间的垂直留白：把每行切成独立的一块，而不是连成一堵墙。 */
+val SettingsItemGap: Dp = SettingsSpacingMath.ItemGapDp.dp
+
+/** 组标题下方到本组首行之间的留白，也是"每组第一行上方"的那一段空气。 */
+private val SettingsSectionHeaderBottomGap: Dp = SettingsSpacingMath.SectionHeaderBottomDp.dp
+
+/** 行内：主标题与右侧取值之间的发丝级呼吸。 */
+private val SettingsTitleValueGap: Dp = SettingsSpacingMath.TitleToValueDp.dp
+
+/** 行内：取值与行尾标记（箭头 / 状态色块）之间的留白。 */
+private val SettingsValueTailGap: Dp = SettingsSpacingMath.ValueToTailDp.dp
 
 /** 分区之间的间距：上一区末行与本区标题之间留 16dp。 */
 private val SettingsSectionGap = Wear.Space.Lg
@@ -113,14 +127,14 @@ private val SettingsSectionGap = Wear.Space.Lg
 val RootTitleTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
     topInsetDp = Wear.Size.TopContentInset.value,
     contentPaddingTopDp = Wear.Space.Sm.value,
-    itemGapDp = Wear.Space.Sm.value
+    itemGapDp = SettingsSpacingMath.ItemGapDp
 ).dp
 
 /** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp，行内相应多占 4dp。 */
 val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
     topInsetDp = Wear.Size.TopContentInset.value,
     contentPaddingTopDp = Wear.Space.Xs.value,
-    itemGapDp = Wear.Space.Sm.value
+    itemGapDp = SettingsSpacingMath.ItemGapDp
 ).dp
 
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
@@ -194,11 +208,40 @@ class SettingsRows internal constructor() {
 }
 
 /**
+ * 表冠用的取焦效果：库只把表冠事件交给**当前持有焦点**的那个 rotary 节点，
+ * 所以每次进入/回到本页都必须显式 requestFocus 一次。
+ *
+ * 为什么不是 requestFocusOnHierarchyActive()：它只对修饰符链上排在它**之后**的那个可聚焦
+ * 元素生效（会把焦点转交给下家）；挂在 rotaryScrollable 之后就是没有下家，等于空操作。
+ *
+ * 为什么不是 onAttach 时序：根页在二级页开关过程中一直留在树里，onAttach 只跑一次，
+ * 从子页返回后不会重跑 —— 用 [refocusKey]（根页喂 activeDialog，子页喂 Unit）驱动重跑，
+ * 时序与"是不是刚挂上树"解耦。首帧节点可能还没上树，因此最多重试 [RotaryFocusRetryFrames]
+ * 帧，而不是把异常吞掉后就地放弃。
+ *
+ * @param refocusKey 变化即重新取焦；子页每次进入都是新组合，传 Unit 即可。
+ * @param enabled 为 false 时不抢焦点（二级页盖在根页上时，根页必须让出焦点）。
+ */
+@Composable
+fun RotaryFocusEffect(focusRequester: FocusRequester, refocusKey: Any?, enabled: Boolean) {
+    LaunchedEffect(refocusKey, enabled) {
+        if (!enabled) return@LaunchedEffect
+        repeat(RotaryFocusRetryFrames) {
+            withFrameNanos { }
+            if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+        }
+    }
+}
+
+/** 取焦重试帧数：首帧节点尚未上树时 requestFocus 会抛，重试几帧足以覆盖挂载抖动。 */
+private const val RotaryFocusRetryFrames = 3
+
+/**
  * 所有子页共用的页面骨架。
  *
  * 版面契约（与 [SettingsLayoutMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
- * - 中部：ScalingLazyColumn，内容宽度上限 168dp，行间距 8dp，行与行之间只有一条 1dp 分隔线；
+ * - 中部：ScalingLazyColumn，内容宽度上限 168dp，行间距 [SettingsItemGap]，行与行之间只有一条 1dp 分隔线；
  * - 分区间距 16dp，只由 [SettingsSectionHeader] 的顶部留白提供；
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
@@ -222,12 +265,6 @@ fun SettingsSubPage(
 
     SettingsTopAnchorProbe(listState)
 
-    // 表冠要焦点：等节点真正挂上树的那一帧再请求
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        runCatching { listFocusRequester.requestFocus() }
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -236,11 +273,18 @@ fun SettingsSubPage(
             // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
             .pullDownToDismiss(canPullDown = { listState.isAtScrollTop() }, onDismiss = onBack)
     ) {
+        // 表冠只把事件交给当前持有焦点的节点：rotaryScrollable 把 listFocusRequester 链在自带的
+        // focusTarget 上之后，必须显式 requestFocus() 一次才算接管。子页每次进入都是全新一次
+        // 组合，因此按 Unit 触发即可，不需要外层再喂变化量。
+        RotaryFocusEffect(focusRequester = listFocusRequester, refocusKey = Unit, enabled = true)
+
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供（自带 focusTarget，
-                // 焦点请求仍由 listFocusRequester 负责，不要再叠 focusable()）
+                // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供。
+                // 不要再叠 focusable()，也不要叠 requestFocusOnHierarchyActive()：
+                // 后者只对"修饰符链上排在它之后"的那个可聚焦元素生效，挂在 rotaryScrollable
+                // 之后是一个没有下家的空修饰符，rotary 节点永远拿不到焦点。
                 .rotaryScrollable(
                     behavior = RotaryScrollableDefaults.behavior(listState),
                     focusRequester = listFocusRequester
@@ -256,7 +300,7 @@ fun SettingsSubPage(
                 top = Wear.Space.Xs,
                 bottom = Wear.Size.BottomBarReserve
             ),
-            verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm),
+            verticalArrangement = Arrangement.spacedBy(SettingsItemGap),
             // itemIndex = 1：自动居中项是第一条内容行，头部行不再被居中 ——
             // 于是滚到最顶时头部贴在上方内容区顶边，而不是停在屏幕正中、上面留半屏空白。
             // 居中只影响两端边界，滚动过程一像素都不变（详见 SettingsTopAnchorMath）。
@@ -376,9 +420,11 @@ fun SettingsBackButton(onClick: () -> Unit) {
 }
 
 /**
- * 分组标题：Caption 级小标题。
+ * 分组标题：Caption 级小标题，主色。
  *
- * 顶部 16dp 就是**分区间距**的唯一来源；下方 4dp 只把标题和本区首行拉开一点。
+ * 顶部 16dp 是**分区间距**的唯一来源；下方 12dp 是"每组第一行上方"的那段空气，
+ * 比行内留白更硬，让标题明显属于它下面那一组，而不是悬在两组之间。
+ * 用主色而不是正文色：标题本身是结构信息，行内容已经全部降为 secondary/muted。
  */
 @Composable
 fun SettingsSectionHeader(text: String) {
@@ -387,8 +433,8 @@ fun SettingsSectionHeader(text: String) {
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(top = SettingsSectionGap, bottom = Wear.Space.Xs),
-        style = Wear.TextCaption,
+            .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
+        style = Wear.TextCaption.copy(color = Wear.Palette.Accent),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -415,8 +461,9 @@ fun SettingsNavRow(
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = Wear.Size.Touch)
             .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+        verticalAlignment = Alignment.CenterVertically
+        // 不用 Arrangement.spacedBy：三段的间距本来就不该一样 —— 统一间距正是"一堵墙"的成因。
+        // 标题↔取值只留一条发丝呼吸，取值↔行尾标记留得更开，行尾因此看起来是独立挂上去的。
     ) {
         BasicText(
             text = title,
@@ -428,6 +475,7 @@ fun SettingsNavRow(
             overflow = TextOverflow.Ellipsis
         )
         if (value != null) {
+            Spacer(Modifier.width(SettingsTitleValueGap))
             BasicText(
                 text = value,
                 // 值收窄到 72dp，把宽度让给标题（原来 96dp 会把标题压到 50dp）
@@ -437,6 +485,7 @@ fun SettingsNavRow(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(Modifier.width(SettingsValueTailGap))
         if (badge != null) {
             SettingsStatusBlock(description = badge.first, tone = badge.second)
         } else {
@@ -743,8 +792,7 @@ fun SettingsTextEntryRow(
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = Wear.Size.Touch)
             .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+        verticalAlignment = Alignment.CenterVertically
     ) {
         BasicText(
             text = label,
@@ -753,6 +801,7 @@ fun SettingsTextEntryRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.width(SettingsTitleValueGap))
         BasicText(
             text = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
             modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
@@ -760,6 +809,7 @@ fun SettingsTextEntryRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.width(SettingsValueTailGap))
         ChevronMark()
     }
 }

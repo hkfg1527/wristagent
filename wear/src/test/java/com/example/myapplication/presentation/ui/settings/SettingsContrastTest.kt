@@ -42,6 +42,12 @@ class SettingsContrastTest {
     }
 
     @Test
+    fun accentSectionHeaderPassesOnThePageBackground() {
+        // 组标题改成主色小字后，它读的就是这一组对比度：必须仍然达到 WCAG AA。
+        assertTrue(contrastRatio(Wear.Palette.Accent, Wear.Palette.Bg) >= 4.5f)
+    }
+
+    @Test
     fun dangerTextPassesOnItsOwnContainer() {
         assertTrue(contrastRatio(Wear.Palette.Danger, Wear.Palette.DangerSurface) >= 4.5f)
     }

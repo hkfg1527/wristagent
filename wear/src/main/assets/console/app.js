@@ -1,6 +1,8 @@
 /* WristAgent 控制台 · 页面化设置面板
  * 纯原生 ES2020，无构建、无依赖、无 CDN。图标全部内联 SVG。
- * 结构：左侧导航 7 页，页内 Section -> Row；写操作统一 POST /api/settings（300ms 防抖）。
+ * 结构：9 页；三档皮肤（<=420px 手表底部标签 / 421~900px 手机顶部标签 / >900px 电脑侧栏），
+ * 页内 Section -> Row；写操作统一 POST /api/settings（300ms 防抖）。
+ * 服务端对未知键回执 ignored：这些键的值保留为本地草稿，绝不因 sync 回填而被冲掉。
  * 任何 fetch 失败都必须落到可读横幅或就地错误，绝不允许白屏。
  */
 'use strict';
@@ -8,11 +10,14 @@
 (function () {
   var LS_PAGE = 'wa_console_page';
   var LS_TOKEN = 'console_token';
+  var LS_DRAFTS = 'wa_console_drafts';
   var SAVE_DEBOUNCE_MS = 300;
   var TOAST_MS = 1600;
   var CUSTOM_MODEL = '__custom__';
   var MODEL_FALLBACK = ['deepseek-chat', 'deepseek-reasoner'];
   var MAX_TOKEN_STEPS = [150, 300, 600, 1200, 2048];
+  var SKIN_WATCH_MAX = 420;   /* <=420px：手表皮肤 */
+  var SKIN_PHONE_MAX = 900;   /* 421~900px：手机皮肤；>900px：电脑皮肤 */
 
   var SVG = 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"';
 
@@ -24,6 +29,8 @@
     tools: '<svg viewBox="0 0 24 24" ' + SVG + ' aria-hidden="true"><path d="M13.4 3 6.3 13.4h4.4L9.9 21l7.2-10.7h-4.6L13.4 3Z"/></svg>',
     iface: '<svg viewBox="0 0 24 24" ' + SVG + ' aria-hidden="true"><rect x="3.6" y="3.6" width="7" height="7" rx="2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2"/></svg>',
     device: '<svg viewBox="0 0 24 24" ' + SVG + ' aria-hidden="true"><rect x="7" y="6.4" width="10" height="11.2" rx="3"/><path d="M9.4 6.2 9.9 3.2h4.2l.5 3"/><path d="M9.4 17.8 9.9 20.8h4.2l.5-3"/><path d="M10.8 12h2.4"/></svg>',
+    provider: '<svg viewBox="0 0 24 24" ' + SVG + ' aria-hidden="true"><rect x="3.6" y="4.2" width="16.8" height="5.6" rx="2"/><rect x="3.6" y="14.2" width="16.8" height="5.6" rx="2"/><path d="M7.1 7h.01"/><path d="M7.1 17h.01"/></svg>',
+    role: '<svg viewBox="0 0 24 24" ' + SVG + ' aria-hidden="true"><circle cx="12" cy="8.4" r="3.6"/><path d="M4.9 20a7.3 7.3 0 0 1 14.2 0"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
     empty: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="21" cy="21" r="9.5"/><path d="M28.2 28.2 38 38"/><path d="M15.5 21h11" opacity=".55"/><path d="M21 15.5v11" opacity=".55"/></svg>',
     eye: '<svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 12S6.1 5.6 12 5.6 21.4 12 21.4 12 17.9 18.4 12 18.4 2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg><svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l16 16"/><path d="M9.7 5.9A9.6 9.6 0 0 1 12 5.6c5.9 0 9.4 6.4 9.4 6.4a17.7 17.7 0 0 1-2.9 3.6"/><path d="M6.5 7.6A17.6 17.6 0 0 0 2.6 12s3.5 6.4 9.4 6.4c1.2 0 2.3-.2 3.3-.7"/><path d="M9.9 14.1a3 3 0 0 1 4.2-4.2"/></svg>'
@@ -39,7 +46,8 @@
     ping: null,
     ready: false,
     rendered: false,
-    page: null
+    page: null,
+    skin: null
   };
 
   var dom = {};
@@ -49,11 +57,22 @@
   var saving = false;
   var banners = new Map();
   var lastFailedBody = null;
+  var drafts = {};   /* 服务端回执 ignored 的键 -> 本地草稿，读值优先于 settings */
   var toastTimer = 0;
   var FIELD_LABEL = {};
   var searchIndex = [];
   var srSel = 0;
   var srHits = [];
+
+  /* 三档皮肤：同一份代码，按视口宽度挂 data-skin，CSS 只做皮肤内差异 */
+  function paintSkin() {
+    var w = window.innerWidth || document.documentElement.clientWidth || 0;
+    var skin = w <= SKIN_WATCH_MAX ? 'watch' : (w <= SKIN_PHONE_MAX ? 'phone' : 'desktop');
+    if (state.skin === skin && document.documentElement.getAttribute('data-skin') === skin) return skin;
+    state.skin = skin;
+    document.documentElement.setAttribute('data-skin', skin);
+    return skin;
+  }
 
   function reduced() {
     try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
@@ -317,18 +336,82 @@
   }
 
   /* ---------------- 字段读写 ---------------- */
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  /* 读值优先级：本地草稿（服务端 ignored 的键）> 服务端快照 > 页面默认值。
+     任一层缺失都回落到下一层，所以后端没有这个字段时页面照常显示默认值。 */
   function readValue(row) {
     var s = state.settings || {};
     for (var i = 0; i < row.keys.length; i++) {
       var k = row.keys[i];
-      if (Object.prototype.hasOwnProperty.call(s, k) && s[k] !== null && s[k] !== undefined) return s[k];
+      if (has(drafts, k)) return drafts[k];
+      if (has(s, k) && s[k] !== null && s[k] !== undefined) return s[k];
     }
     return row.def;
   }
 
+  function loadDrafts() {
+    try {
+      var raw = localStorage.getItem(LS_DRAFTS);
+      var obj = raw ? JSON.parse(raw) : null;
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) drafts = obj;
+    } catch (e) { drafts = {}; }
+  }
+
+  function saveDrafts() {
+    try {
+      if (Object.keys(drafts).length) localStorage.setItem(LS_DRAFTS, JSON.stringify(drafts));
+      else localStorage.removeItem(LS_DRAFTS);
+    } catch (e) { /* 隐私模式下写入失败不影响主流程 */ }
+  }
+
+  /* 服务端已认识（快照里带该键）就把草稿让位给服务端值 */
+  function pruneDrafts() {
+    var s = state.settings || {};
+    var changed = false;
+    Object.keys(drafts).forEach(function (k) {
+      if (has(s, k) && s[k] !== null && s[k] !== undefined) { delete drafts[k]; changed = true; }
+    });
+    if (changed) saveDrafts();
+    return changed;
+  }
+
+  /* 草稿横幅：保存与刷新后都要能解释「为什么这个值没落库」 */
+  function draftBanner(keys) {
+    if (!keys || !keys.length) { clearBanner('draft'); return; }
+    setBanner('draft', {
+      tone: 'warn',
+      title: keys.length + ' 项设置后端暂未支持',
+      text: '服务端回执 ignored：' + keys.join('、') + '。这些输入已保留为本地草稿（刷新页面仍在），后端支持后自动回写落库。',
+      dismissible: true
+    });
+  }
+
+  /* POST 响应里的 ignored 数组就是「后端还没有这个字段」的权威证据 */
+  function noteIgnored(body, res) {
+    var ignored = res && Array.isArray(res.ignored) ? res.ignored : [];
+    var hit = [];
+    ignored.forEach(function (k) {
+      if (has(body, k)) { drafts[k] = body[k]; hit.push(k); }
+    });
+    if (hit.length) saveDrafts();
+    return hit;
+  }
+
   function coerce(row, value) {
     if (row.type === 'switch') return !!value;
-    if (row.type === 'slider') return row.int === false ? Number(value) : Math.round(Number(value));
+    if (row.type === 'slider') {
+      var n = row.int === false ? Number(value) : Math.round(Number(value));
+      if (!isFinite(n)) n = 0;
+      if (row.round) { var f = Math.pow(10, row.round); n = Math.round(n * f) / f; }
+      return n;
+    }
+    if (row.type === 'list') return Array.isArray(value) ? value : [];
+    if (row.type === 'json') {
+      if (value && typeof value === 'object') return value;
+      var t = String(value);
+      try { return JSON.parse(t); } catch (e) { return t; }
+    }
     return String(value);
   }
 
@@ -360,9 +443,17 @@
         state.settings = res.settings;
         state.ready = true;
       }
+      var ignoredHit = noteIgnored(body, res);
+      pruneDrafts();
       state.tokenStatus = 'ok';
       syncAll();
-      showToast('已保存');
+      if (ignoredHit.length) {
+        draftBanner(ignoredHit);
+        showToast('已保存 · ' + ignoredHit.length + ' 项待后端支持', 'warn');
+      } else {
+        draftBanner(Object.keys(drafts));
+        showToast('已保存');
+      }
     } catch (err) {
       if (err.kind === 'unauthorized') {
         state.tokenStatus = 'invalid';
@@ -709,19 +800,207 @@
     return el;
   }
 
+  /* ---------------- 列表行（roleCards / systemPromptLibrary / providerProfiles / mcpServers / 黑名单） ---------------- */
+  function listFieldsOf(row, item) {
+    if (row.fields) return row.fields;
+    if (item && typeof item === 'object' && !Array.isArray(item)) return Object.keys(item);
+    return null;
+  }
+
+  function listBlank(row) {
+    if (row.blank !== undefined) return row.blank;
+    var tpl = Array.isArray(row.def) && row.def.length ? row.def[0] : null;
+    var fields = tpl && typeof tpl === 'object' ? listFieldsOf(row, tpl) : (row.fields || null);
+    if (fields) {
+      var o = {};
+      fields.forEach(function (k) { o[k] = ''; });
+      return o;
+    }
+    return '';
+  }
+
+  function renderListRow(row) {
+    var el = rowShell(row, 'row--block');
+    var box = h('div', { class: 'list' });
+    var count = h('span', { class: 'list-count' });
+    var addBtn = h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: row.addLabel || '添加一项' });
+    var result = h('div', { class: 'action-result', dataset: { tone: 'idle' } });
+    var work = [];
+
+    function clone(v) {
+      return v.map(function (it) { return it && typeof it === 'object' ? JSON.parse(JSON.stringify(it)) : it; });
+    }
+    function snapshot() {
+      var v = readValue(row);
+      return Array.isArray(v) ? clone(v) : [];
+    }
+    function commit() { queueSave(row, work.slice()); }
+    function fieldLabel(fld) { return (row.fieldLabels && row.fieldLabels[fld]) || fld; }
+    function paintCount() { count.textContent = work.length + ' 项'; }
+
+    function paint(focusIdx) {
+      box.textContent = '';
+      work.forEach(function (item, idx) {
+        var node = h('div', { class: 'list-item' });
+        var fields = listFieldsOf(row, item);
+        var first = null;
+        if (fields) {
+          var grid = h('div', { class: 'list-grid' });
+          fields.forEach(function (fld) {
+            var val = item && typeof item === 'object' && item[fld] !== null && item[fld] !== undefined ? String(item[fld]) : '';
+            var input = h('input', { class: 'input input--sm', type: 'text', value: val, 'aria-label': row.label + ' ' + fieldLabel(fld) });
+            input.addEventListener('input', function () {
+              if (!item || typeof item !== 'object') { item = {}; work[idx] = item; }
+              item[fld] = input.value;
+              commit();
+            });
+            if (!first) first = input;
+            grid.appendChild(h('label', { class: 'list-field' }, [
+              h('span', { class: 'list-field-k', text: fieldLabel(fld) }), input
+            ]));
+          });
+          node.appendChild(grid);
+        } else {
+          var one = h('input', { class: 'input input--sm', type: 'text', value: item === null || item === undefined ? '' : String(item), 'aria-label': row.label + ' 第 ' + (idx + 1) + ' 项' });
+          one.addEventListener('input', function () { work[idx] = one.value; commit(); });
+          first = one;
+          node.appendChild(one);
+        }
+        var del = h('button', { type: 'button', class: 'icon-btn list-del', 'aria-label': '删除第 ' + (idx + 1) + ' 项', html: ICONS.x });
+        del.addEventListener('click', function () {
+          work.splice(idx, 1);
+          paint();
+          commit();
+        });
+        node.appendChild(h('div', { class: 'list-item-foot' }, [
+          h('span', { class: 'list-idx', text: '#' + (idx + 1) }), del
+        ]));
+        box.appendChild(node);
+        if (focusIdx === idx && first) first.focus();
+      });
+      if (!work.length) box.appendChild(h('p', { class: 'list-empty', text: row.emptyText || '暂无条目，点下面按钮添加' }));
+      paintCount();
+    }
+
+    work = snapshot();
+    paint();
+
+    addBtn.addEventListener('click', function () {
+      work.push(listBlank(row));
+      paint(work.length - 1);
+      commit();
+    });
+
+    var footKids = [addBtn, count];
+    if (row.actionName) {
+      var actBtn = h('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: row.actionLabel || '测试连接', dataset: { action: row.actionName } });
+      actBtn.addEventListener('click', function () {
+        runAction({ actionName: row.actionName, label: row.actionLabel || row.label, hint: row.actionHint || '' }, actBtn, result);
+      });
+      footKids.push(actBtn);
+    }
+    var kids = [box, h('div', { class: 'list-foot' }, footKids)];
+    if (row.actionName) kids.push(result);
+    el.appendChild(h('div', { class: 'row-control' }, kids));
+
+    registry.push({
+      sync: function () {
+        var v = snapshot();
+        if (JSON.stringify(work) === JSON.stringify(v)) return; /* 值未变不重绘，避免打断输入光标 */
+        work = v;
+        paint();
+      }
+    });
+    return el;
+  }
+
+  /* ---------------- JSON 行（customHeaders）：非法 JSON 不提交，输入原地保留 ---------------- */
+  function renderJsonRow(row) {
+    var el = rowShell(row, 'row--block');
+    var area = h('textarea', { class: 'textarea', rows: String(row.rows || 4), spellcheck: 'false', 'aria-label': row.label });
+    var stateEl = h('span', { class: 'json-state' });
+    var note = h('div', { class: 'field-note' }, [stateEl]);
+
+    function fmt(v) {
+      if (v === null || v === undefined || v === '') return '';
+      if (typeof v === 'object') { try { return JSON.stringify(v, null, 2); } catch (e) { return String(v); } }
+      return String(v);
+    }
+
+    area.value = fmt(readValue(row));
+    area.addEventListener('input', function () {
+      var raw = area.value.trim();
+      if (!raw) { stateEl.textContent = '空对象：不附加任何请求头'; stateEl.dataset.tone = 'ok'; queueSave(row, {}); return; }
+      var obj = null;
+      try { obj = JSON.parse(raw); } catch (e) { obj = null; }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+        stateEl.textContent = 'JSON 不合法，未提交（输入已保留）';
+        stateEl.dataset.tone = 'bad';
+        return;
+      }
+      stateEl.textContent = '已记录 ' + Object.keys(obj).length + ' 个请求头';
+      stateEl.dataset.tone = 'ok';
+      queueSave(row, obj);
+    });
+
+    el.appendChild(h('div', { class: 'row-control' }, [area, note]));
+    registry.push({
+      sync: function () {
+        if (document.activeElement === area) return;
+        area.value = fmt(readValue(row));
+        stateEl.textContent = '';
+        delete stateEl.dataset.tone;
+      }
+    });
+    return el;
+  }
+
   /* ---------------- 页面 / 字段定义 ---------------- */
   var PAGES = [
     {
-      id: 'model', title: '模型与连接', sub: '接口地址、凭据与模型选择', icon: 'model',
+      id: 'model', title: '模型与连接', sub: '接口、凭据、模型列表与采样微调', icon: 'model',
       sections: [{
         title: '接口', rows: [
           { id: 'baseUrl', type: 'text', label: 'API 端点', hint: 'OpenAI 兼容的 Base URL', placeholder: 'https://api.deepseek.com', inputmode: 'url', keys: ['baseUrl', 'apiBaseUrl'], def: 'https://api.deepseek.com', kw: 'api base url 地址 endpoint 接口 服务器' },
           { id: 'apiKey', type: 'secret', label: 'API 密钥', hint: '留空时回退到构建内置密钥', keys: ['apiKey'], def: '', kw: 'key token 密钥 授权 apikey' },
-          { id: 'modelName', type: 'select', label: '模型名', hint: '可下拉选择，也可手填模型 ID', keys: ['modelName'], def: 'deepseek-chat', kw: 'model 模型 deepseek' }
+          { id: 'modelName', type: 'select', label: '模型名', hint: '可下拉选择，也可手填模型 ID', keys: ['modelName'], def: 'deepseek-chat', kw: 'model 模型 deepseek' },
+          { id: 'actModels', type: 'action', label: '刷新模型列表', hint: 'modelListRefresh：从服务商拉取可用模型并回写下拉', actionName: 'refresh-models', actionLabel: '刷新模型', kw: 'model 模型 刷新 拉取 列表 modelListRefresh 下拉' }
         ]
       }, {
         title: '请求', rows: [
           { id: 'streamMode', type: 'switch', label: '流式输出', hint: '边生成边回传，首字更快', keys: ['streamMode'], def: true, kw: 'stream 流式 sse' }
+        ]
+      }, {
+        title: '采样微调', rows: [
+          { id: 'topP', type: 'slider', label: 'topP 核采样', hint: '累积概率上限，1 表示不裁剪', min: 0, max: 1, step: 0.05, int: false, round: 2, fmt: function (v) { return Math.round(Number(v) * 100) + '%'; }, keys: ['topP'], def: 1, kw: 'topP nucleus 核采样 概率 采样' },
+          { id: 'topK', type: 'slider', label: 'topK 候选数', hint: '每步只保留概率最高的 K 个候选，0 表示关闭', min: 0, max: 100, step: 1, unit: '个', keys: ['topK'], def: 0, kw: 'topK 候选 采样 截断 数量' },
+          { id: 'frequencyPenalty', type: 'slider', label: '频率惩罚', hint: '正值抑制重复用词，负值鼓励重复', min: -2, max: 2, step: 0.1, int: false, round: 1, fmt: function (v) { return Number(v).toFixed(1); }, keys: ['frequencyPenalty'], def: 0, kw: 'frequency penalty 频率 惩罚 重复 frequencyPenalty' }
+        ]
+      }]
+    },
+    {
+      id: 'provider', title: '供应商与网络', sub: '五套供应商档案、自定义请求头与代理', icon: 'provider',
+      sections: [{
+        title: '供应商档案', rows: [
+          { id: 'providerProfiles', type: 'list', label: '档案列表', hint: '常用 5 套：名称 / 端点 / 模型，可增删改；下方按钮走 action connection-test', addLabel: '新增供应商', emptyText: '还没有供应商档案', fields: ['name', 'baseUrl', 'model'], fieldLabels: { name: '名称', baseUrl: '端点', model: '模型' }, actionName: 'connection-test', actionLabel: '测试连接', actionHint: 'connectionTest：按当前档案发起一次最小请求', keys: ['providerProfiles'], def: [{ name: 'DeepSeek 主用', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }, { name: 'DeepSeek 备用', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-reasoner' }, { name: '中转节点', baseUrl: 'https://relay.example.com/v1', model: 'deepseek-chat' }, { name: '本地 Ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:7b' }, { name: '自建兼容端', baseUrl: 'http://192.168.1.10:8000/v1', model: 'custom' }], kw: 'provider 供应商 profile 档案 providerProfiles 端点 中转 测试连接 connectionTest 五套' }
+        ]
+      }, {
+        title: '请求头与代理', rows: [
+          { id: 'customHeaders', type: 'json', label: '自定义请求头', hint: 'JSON 对象，逐条附加到模型请求；非法 JSON 不提交', rows: 4, keys: ['customHeaders', 'requestHeaders'], def: {}, kw: 'header 请求头 自定义 customHeaders json 附加' },
+          { id: 'proxyUrl', type: 'text', label: '代理地址', hint: 'HTTP 代理，留空表示直连', placeholder: 'http://127.0.0.1:7890', inputmode: 'url', keys: ['proxyUrl', 'proxy'], def: '', kw: 'proxy 代理 转发 proxyUrl 网络 直连' }
+        ]
+      }]
+    },
+    {
+      id: 'role', title: '角色与提示词', sub: '角色卡组、提示词库与开场白', icon: 'role',
+      sections: [{
+        title: '角色卡组', rows: [
+          { id: 'roleCards', type: 'list', label: '角色卡列表', hint: '每张卡一张人设，切换即换系统提示词', addLabel: '新增角色卡', emptyText: '还没有角色卡', fields: ['name', 'prompt'], fieldLabels: { name: '卡片名', prompt: '提示词' }, keys: ['roleCards'], def: [{ name: '手表助手', prompt: '你是一个在手表上执行任务的工具。回答简短、不寒暄、不总结。' }, { name: '代码速查', prompt: '先给结论，再给最小可运行代码，不解释语法。' }, { name: '极简翻译', prompt: '只输出译文，不解释，不加引号。' }], kw: 'role 角色 卡片 roleCards 人设 卡组' }
+        ]
+      }, {
+        title: '提示词资产', rows: [
+          { id: 'systemPromptLibrary', type: 'list', label: '提示词库', hint: '常用系统提示词模板，一键取用', addLabel: '新增模板', emptyText: '还没有提示词模板', fields: ['name', 'prompt'], fieldLabels: { name: '模板名', prompt: '提示词' }, keys: ['systemPromptLibrary', 'promptLibrary'], def: [{ name: '极简回答', prompt: '最多三行，先结论后细节。' }, { name: '系统排障', prompt: '先给可验证的最小步骤，再给命令。' }, { name: '结构化摘要', prompt: '输出要点列表，每条不超过一行。' }], kw: 'prompt 提示词库 library systemPromptLibrary 模板' },
+          { id: 'openingLine', type: 'textarea', label: '开场白', hint: '新建会话后自动发送的第一句，留空则不发', note: '只影响新会话', rows: 3, keys: ['openingLine'], def: '', kw: 'opening 开场白 第一句 招呼 openingLine' }
         ]
       }]
     },
@@ -736,19 +1015,31 @@
         title: '提示词', rows: [
           { id: 'customSystemPrompt', type: 'textarea', label: '自定义系统提示词', hint: '留空则使用内置提示词', note: '追加到内置系统提示词之前', rows: 5, keys: ['customSystemPrompt', 'systemPrompt'], def: '', kw: 'system prompt 系统提示词 人设 指令' }
         ]
+      }, {
+        title: '上下文', rows: [
+          { id: 'contextWindow', type: 'slider', label: '上下文窗口', hint: '单次请求最多带入的上下文长度', steps: [4096, 8192, 16384, 32768, 65536, 131072], fmt: function (v) { return Math.round(Number(v) / 1024) + 'k'; }, unit: 'tokens', keys: ['contextWindow', 'maxContextTokens'], def: 32768, kw: 'context 上下文 窗口 contextWindow tokens 长度' },
+          { id: 'historyCompressThreshold', type: 'slider', label: '历史压缩阈值', hint: '占用超过该比例后开始压缩历史', min: 0.3, max: 0.95, step: 0.05, int: false, round: 2, fmt: function (v) { return Math.round(Number(v) * 100) + '%'; }, keys: ['historyCompressThreshold', 'compressThreshold'], def: 0.8, kw: 'compress 压缩 阈值 历史 historyCompressThreshold' },
+          { id: 'truncationStrategy', type: 'segmented', label: '截断策略', hint: '超出窗口时优先丢弃哪一端', keys: ['truncationStrategy'], def: 'TRUNCATE_TAIL', options: [{ v: 'TRUNCATE_TAIL', t: '留近期' }, { v: 'TRUNCATE_HEAD', t: '留早期' }, { v: 'SUMMARY', t: '摘要代替' }], kw: 'truncation 截断 策略 truncationStrategy 丢弃 摘要' }
+        ]
       }]
     },
     {
-      id: 'dialog', title: '对话与安全', sub: '安全策略、上下文记忆与输入方式', icon: 'dialog',
+      id: 'dialog', title: '对话与安全', sub: '长期记忆、沙箱等级与命令黑名单', icon: 'dialog',
       sections: [{
-        title: '行为', rows: [
-          { id: 'securityMode', type: 'segmented', label: '安全模式', hint: '严格：全部确认；标准：只读放行；专家：除黑名单直接执行', keys: ['securityMode'], def: 'STANDARD', kw: 'security 安全 novice standard expert 严格 标准 专家', options: [{ v: 'NOVICE', t: '严格' }, { v: 'STANDARD', t: '标准' }, { v: 'EXPERT', t: '专家' }] },
-          { id: 'maxContextTurns', type: 'slider', label: '记忆轮数', hint: '带入上下文的历史轮数', min: 5, max: 50, step: 1, unit: '轮', keys: ['maxContextTurns', 'memoryRounds'], def: 30, kw: 'memory 记忆 上下文 轮数 context' },
-          { id: 'mainInputType', type: 'segmented', label: '主输入方式', hint: '手表端默认唤起的输入控件', keys: ['mainInputType'], def: 'VOICE', kw: 'input 输入 语音 键盘', options: [{ v: 'VOICE', t: '语音' }, { v: 'KEYBOARD', t: '键盘' }] }
+        title: '记忆', rows: [
+          { id: 'longTermMemoryEnabled', type: 'switch', label: '长期记忆', hint: '把要点写入本地长期记忆库', keys: ['longTermMemoryEnabled'], def: false, kw: 'memory 长期记忆 longTermMemoryEnabled 记忆库' },
+          { id: 'memoryNoteCount', type: 'slider', label: '记忆条数上限', hint: '长期记忆最多保留的条目数', min: 0, max: 50, step: 1, unit: '条', keys: ['memoryNoteCount'], def: 10, kw: 'memory 记忆 条数 memoryNoteCount 上限' },
+          { id: 'actClearMemory', type: 'action', danger: true, label: '清空记忆', hint: 'memoryClear：清空会话上下文与本地记忆，不可撤销', actionName: 'clear-memory', actionLabel: '清空记忆', kw: 'clear memory 清空 记忆 重置 memoryClear 删除' }
         ]
       }, {
-        title: '状态', rows: [
-          { id: 'hasCompletedOnboarding', type: 'readonly', label: '引导已完成', hint: '只读，由手表端引导流程写入', keys: ['hasCompletedOnboarding'], def: false, fmt: function (v) { return v ? '已完成' : '未完成'; }, tone: function (v) { return v ? 'ok' : 'bad'; }, kw: 'onboarding 引导 完成' }
+        title: '安全', rows: [
+          { id: 'sandboxLevel', type: 'segmented', label: '沙箱等级', hint: '限制工具调用能触碰的范围', keys: ['sandboxLevel'], def: 'WORKSPACE', kw: 'sandbox 沙箱 等级 sandboxLevel 权限 只读', options: [{ v: 'READ_ONLY', t: '只读' }, { v: 'WORKSPACE', t: '工作区' }, { v: 'FULL', t: '全权限' }] },
+          { id: 'dangerousCommandBlacklist', type: 'list', label: '危险命令黑名单', hint: '命中即拦截，不进入确认流程', addLabel: '新增规则', emptyText: '没有规则时全部放行', keys: ['dangerousCommandBlacklist', 'commandBlacklist'], def: ['rm -rf /', 'mkfs', 'dd of=/dev/block', 'reboot -p', 'pm uninstall --user 0'], kw: 'blacklist 黑名单 危险命令 dangerousCommandBlacklist 拦截 规则' }
+        ]
+      }, {
+        title: '行为', rows: [
+          { id: 'securityMode', type: 'segmented', label: '安全模式', hint: '严格：全部确认；标准：只读放行；专家：除黑名单直接执行', keys: ['securityMode'], def: 'STANDARD', kw: 'security 安全 novice standard expert 严格 标准 专家', options: [{ v: 'NOVICE', t: '严格' }, { v: 'STANDARD', t: '标准' }, { v: 'EXPERT', t: '专家' }] },
+          { id: 'mainInputType', type: 'segmented', label: '主输入方式', hint: '手表端默认唤起的输入控件', keys: ['mainInputType'], def: 'VOICE', kw: 'input 输入 语音 键盘', options: [{ v: 'VOICE', t: '语音' }, { v: 'KEYBOARD', t: '键盘' }] }
         ]
       }]
     },
@@ -777,6 +1068,11 @@
           { id: 'toolWeatherEnabled', type: 'switch', label: '天气', hint: '允许查询天气', keys: ['toolWeatherEnabled'], def: true, kw: 'weather 天气 工具' },
           { id: 'toolWebSearchEnabled', type: 'switch', label: '联网搜索', hint: '允许联网检索网页', keys: ['toolWebSearchEnabled'], def: true, kw: 'web search 联网 搜索 网页 工具' }
         ]
+      }, {
+        title: '外部工具', rows: [
+          { id: 'toolApprovalPolicy', type: 'segmented', label: '审批策略', hint: '哪些工具调用需要人工确认', keys: ['toolApprovalPolicy', 'approvalPolicy'], def: 'RISKY', kw: 'approval 审批 策略 确认 toolApprovalPolicy', options: [{ v: 'ALWAYS', t: '全部确认' }, { v: 'RISKY', t: '风险确认' }, { v: 'NEVER', t: '不确认' }] },
+          { id: 'mcpServers', type: 'list', label: 'MCP 服务列表', hint: '名称 / 端点，逐条连接', addLabel: '新增服务', emptyText: '还没有 MCP 服务', fields: ['name', 'url'], fieldLabels: { name: '名称', url: '端点' }, keys: ['mcpServers', 'mcpServerList'], def: [{ name: 'filesystem', url: 'http://127.0.0.1:8000/sse' }, { name: 'calendar', url: 'http://127.0.0.1:8010/sse' }], kw: 'mcp 服务 列表 mcpServers 端点 sse 工具' }
+        ]
       }]
     },
     {
@@ -804,9 +1100,7 @@
         title: '控制台操作', rows: [
           { id: 'actProbe', type: 'action', label: '运行探针', hint: '检测执行后端与提权是否可用', actionName: 'probe-privilege', actionLabel: '运行探针', kw: 'probe 探针 检测 权限 诊断' },
           { id: 'actAsr', type: 'action', label: '测试语音', hint: '发起一次识别链路自检', actionName: 'test-asr', actionLabel: '测试语音', kw: 'asr 语音 测试 识别 自检' },
-          { id: 'actModels', type: 'action', label: '刷新模型列表', hint: '从服务商拉取可用模型并回写', actionName: 'refresh-models', actionLabel: '刷新模型', kw: 'model 模型 刷新 拉取' },
-          { id: 'actExport', type: 'action', label: '导出设置', hint: '输出当前配置快照，便于备份', actionName: 'export-settings', actionLabel: '导出', kw: 'export 导出 备份 快照' },
-          { id: 'actClear', type: 'action', danger: true, label: '清空记忆', hint: '清空会话上下文，不可撤销', actionName: 'clear-memory', actionLabel: '清空记忆', kw: 'clear memory 清空 记忆 重置 删除' }
+          { id: 'actExport', type: 'action', label: '导出设置', hint: '输出当前配置快照，便于备份', actionName: 'export-settings', actionLabel: '导出', kw: 'export 导出 备份 快照' }
         ]
       }]
     }
@@ -931,6 +1225,8 @@
       case 'readonly': el = renderReadonlyRow(row); break;
       case 'info': el = renderInfoRow(row); break;
       case 'action': el = renderActionRow(row); break;
+      case 'list': el = renderListRow(row); break;
+      case 'json': el = renderJsonRow(row); break;
       default: el = h('div', { class: 'row', text: row.label }); break;
     }
     (Array.isArray(el) ? el : [el]).forEach(function (node) { card.appendChild(node); });
@@ -962,6 +1258,10 @@
       ]));
     });
 
+    /* 卡片入场按索引错峰：--i 交给 CSS 的 calc(--i * 24ms)，最多错 8 档避免长页等待 */
+    Array.prototype.forEach.call(wrap.querySelectorAll('.card'), function (card, i) {
+      card.style.setProperty('--i', String(Math.min(i, 8)));
+    });
     dom.content.appendChild(wrap);
     document.title = p.title + ' · WristAgent 控制台';
     syncAll();
@@ -1156,7 +1456,7 @@
       var res = await openSheet({
         title: row.label,
         message: (row.hint || '') + '　确认后立即执行，无法撤销。',
-        confirmText: '清空记忆',
+        confirmText: row.actionLabel || '确认执行',
         danger: true
       });
       if (!res.ok) return;
@@ -1200,6 +1500,8 @@
     clearBanner('net');
     clearBanner('auth');
     state.settings = st.settings && typeof st.settings === 'object' ? st.settings : {};
+    if (pruneDrafts()) clearBanner('draft');
+    draftBanner(Object.keys(drafts));
     state.capabilities = st.capabilities && typeof st.capabilities === 'object' ? st.capabilities : {};
     state.runtime = st.runtime && typeof st.runtime === 'object' ? st.runtime : {};
     state.ready = true;
@@ -1244,6 +1546,16 @@
     dom.sheetOk = document.getElementById('sheetOk');
 
     if (!dom.content || !dom.nav) return; /* 结构异常时直接放弃，不留白屏脚本错误 */
+
+    loadDrafts();
+    paintSkin();
+    var skinRaf = 0;
+    function onViewport() {
+      if (skinRaf) return;
+      skinRaf = requestAnimationFrame(function () { skinRaf = 0; paintSkin(); });
+    }
+    window.addEventListener('resize', onViewport, { passive: true });
+    window.addEventListener('orientationchange', onViewport, { passive: true });
 
     PAGES.forEach(function (p) {
       p.sections.forEach(function (sec) {

@@ -104,6 +104,16 @@ class AgentPreferences(context: Context) {
         get() = prefs.getString("cached_remote_models", "deepseek-chat,deepseek-reasoner") ?: "deepseek-chat,deepseek-reasoner"
         set(value) = prefs.edit().putString("cached_remote_models", value).apply()
 
+    /**
+     * 缓存里的模型清单是否来自端点实拉。
+     *
+     * false 时 [cachedRemoteModels] 只可能是内置默认名或旧版本写入的值，
+     * 界面据此把内置默认名标成「Built-in default」，不当成用户真实可用的模型。
+     */
+    var modelCatalogFromRemote: Boolean
+        get() = prefs.getBoolean("model_catalog_from_remote", false)
+        set(value) = prefs.edit().putBoolean("model_catalog_from_remote", value).apply()
+
     var toolDeviceStatusEnabled: Boolean
         get() = prefs.getBoolean("tool_device_status_enabled", true)
         set(value) = prefs.edit().putBoolean("tool_device_status_enabled", value).apply()

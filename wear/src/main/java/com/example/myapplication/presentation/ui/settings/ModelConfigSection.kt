@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -9,9 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
-import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
-import com.example.myapplication.presentation.ModelCycle
 import com.example.myapplication.presentation.ui.ModelLabels
 import com.example.myapplication.presentation.ui.components.Tone
 import kotlinx.coroutines.launch
@@ -27,8 +26,10 @@ private val BuiltInEndpoints = listOf(
 
 /**
  * 模型与端点配置：模型单选、端点单选、BaseUrl/API Key 走输入对话框、握手自检。
- * 读写键与副作用保持不变；文本项从"列表内 TextField"改为"一行入口 + 对话框"，
- * 避免眼控/表冠滚动与软键盘抢焦点。
+ *
+ * 模型列表不再是一份写死的名字：进页先渲染缓存，同时后台拉一次 /v1/models；
+ * 成功即回写并换上新列表，失败保留缓存并把原因（DNS / 超时 / 401 / 非 JSON）写进行内提示。
+ * 缓存里没有远端结果时，内置默认名只以「Built-in default」标记出现，不冒充用户真实可用的模型。
  */
 @Composable
 fun ModelConfigContent(
@@ -43,10 +44,46 @@ fun ModelConfigContent(
     var inputBaseUrl by remember { mutableStateOf(currentBaseUrl) }
     var inputApiKey by remember { mutableStateOf(preferences.apiKey) }
     var editingField by remember { mutableStateOf<ModelTextField?>(null) }
+
+    var entries by remember {
+        mutableStateOf(
+            ModelCatalog.entriesFromCache(preferences.cachedRemoteModels, preferences.modelCatalogFromRemote)
+        )
+    }
     var isFetching by remember { mutableStateOf(false) }
+    var failure by remember { mutableStateOf<ModelFetchFailure?>(null) }
+    var failureStatus by remember { mutableStateOf<String?>(null) }
     var fetchResultText by remember { mutableStateOf<String?>(null) }
 
-    val models = ModelCycle.parse(preferences.cachedRemoteModels)
+    val fetcher = remember { ModelCatalogFetcher() }
+
+    suspend fun refresh(baseUrl: String, apiKey: String) {
+        isFetching = true
+        failure = null
+        failureStatus = null
+        fetchResultText = context.getString(R.string.settings_probe_running)
+        when (val outcome = fetcher.fetch(baseUrl, apiKey)) {
+            is ModelFetchOutcome.Success -> {
+                val ids = outcome.modelIds
+                // 回写：缓存必须反映端点此刻真实的清单，而不是上一次或内置默认
+                preferences.cachedRemoteModels = ids.joinToString(",")
+                preferences.modelCatalogFromRemote = true
+                entries = ModelCatalog.merge(ids, emptyList())
+                fetchResultText = context.getString(R.string.settings_probe_ready, outcome.latencyMs, ids.size)
+            }
+            is ModelFetchOutcome.Failure -> {
+                failure = outcome.reason
+                failureStatus = outcome.statusCode?.toString()
+                fetchResultText = null
+            }
+        }
+        isFetching = false
+    }
+
+    // 进入本子页即自动刷新一次（子页每次打开都会重新组合，等价于"每次进页拉一次"）
+    LaunchedEffect(Unit) {
+        refresh(inputBaseUrl, inputApiKey)
+    }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_model_config),
@@ -79,17 +116,25 @@ fun ModelConfigContent(
     ) {
         section(stringResource(R.string.settings_model_pick))
 
-        if (ModelLabels.isEmpty(models)) {
+        if (entries.isEmpty()) {
             row { SettingsCaptionRow(text = stringResource(R.string.settings_no_models)) }
         } else {
-            models.forEach { modelId ->
+            entries.forEach { entry ->
                 row {
                     SettingsRadioRow(
-                        label = ModelLabels.label(modelId),
-                        selected = currentModel == modelId,
+                        label = ModelLabels.label(entry.id),
+                        selected = currentModel == entry.id,
+                        subtitle = modelSourceLabel(entry.source),
                         onSelect = {
-                            onSelect(modelId, inputBaseUrl)
+                            onSelect(entry.id, inputBaseUrl)
                         }
+                    )
+                }
+            }
+            if (ModelCatalog.isCurrentModelMissing(entries, currentModel)) {
+                row {
+                    SettingsCaptionRow(
+                        text = stringResource(R.string.settings_model_not_in_list, currentModel)
                     )
                 }
             }
@@ -141,22 +186,22 @@ fun ModelConfigContent(
                 enabled = !isFetching,
                 tone = Tone.ACCENT,
                 onClick = {
-                    isFetching = true
-                    fetchResultText = context.getString(R.string.settings_probe_running)
-                    scope.launch {
-                        val (timeMs, remoteModels) = AgentDispatcher.fetchRemoteModels(inputBaseUrl, inputApiKey)
-                        isFetching = false
-                        if (timeMs >= 0) {
-                            fetchResultText = context.getString(R.string.settings_probe_ready, timeMs, remoteModels.size)
-                            if (remoteModels.isNotEmpty()) {
-                                preferences.cachedRemoteModels = remoteModels.joinToString(",")
-                            }
-                        } else {
-                            fetchResultText = context.getString(R.string.settings_probe_failed)
-                        }
-                    }
+                    scope.launch { refresh(inputBaseUrl, inputApiKey) }
                 }
             )
+        }
+
+        failure?.let { reason ->
+            val reasonText = if (reason == ModelFetchFailure.HTTP) {
+                stringResource(R.string.settings_model_error_http, failureStatus.orEmpty())
+            } else {
+                stringResource(ModelCatalog.errorTextRes(reason))
+            }
+            row {
+                SettingsCaptionRow(
+                    text = stringResource(R.string.settings_model_refresh_failed, reasonText)
+                )
+            }
         }
 
         fetchResultText?.let { text ->
@@ -164,3 +209,12 @@ fun ModelConfigContent(
         }
     }
 }
+
+/** 列表项的来源标签：远端实拉还是内置默认，一眼能分。 */
+@Composable
+private fun modelSourceLabel(source: ModelSource): String = stringResource(
+    when (source) {
+        ModelSource.REMOTE -> R.string.settings_model_source_remote
+        ModelSource.BUILT_IN -> R.string.settings_model_source_builtin
+    }
+)

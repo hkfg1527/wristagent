@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,11 +61,13 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.chat.ThoughtCapsuleState
+import com.example.myapplication.presentation.ui.chat.ThoughtPillMetrics
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -80,8 +83,9 @@ private val ThoughtBodyMaxHeight = 96.dp
 private const val ThoughtTickMs = 500L
 
 /**
- * 思考小胶囊：进行中标题是「思考中…」并刷已用秒数，结束后翻成「思考完成 · Ns」。
- * 点开后在胶囊内部流式滚动显示思考文本；展开态由 ViewModel 的展开集合持有，
+ * 思考小胶囊：折叠态是一条**全圆细标签**（高度 [ThoughtPillMetrics.CollapsedHeightDp]dp、
+ * 宽度随文字走、不进卡片版心），与正文块拉开层级；进行中标题刷已用秒数，结束后翻成「思考完成 · Ns」。
+ * 点开在胶囊内部流式滚动显示思考文本，展开态由 ViewModel 的展开集合持有，
  * 因此重组、列表滚动回收、切屏返回都不会把它折回去。
  */
 @Composable
@@ -125,30 +129,33 @@ fun ThoughtPill(
         ),
         label = "thoughtArrowSpring"
     )
-    val shape = RoundedCornerShape(Wear.Radius.Control)
 
-    // 流式思考在胶囊内部滚动：每次增量把可视区推到底部，读到的永远是"最新在想什么"
+    // 折叠态几何全部来自 ThoughtPillMetrics：高度 30dp、全圆角、12sp 细标签
+    val pillHeight = ThoughtPillMetrics.CollapsedHeightDp.dp
+    val pillShape = RoundedCornerShape(ThoughtPillMetrics.cornerRadiusDp().dp)
+    val labelStyle = Wear.TextCaption.copy(fontSize = ThoughtPillMetrics.LabelFontSp.sp)
+
+    // 流式思考在胶囊内部滚动：每来一块增量都把可视区推到底，读到的永远是"最新在想什么"
     val bodyScroll = rememberScrollState()
-    LaunchedEffect(thought.reasoning, isExpanded) {
-        if (isExpanded) bodyScroll.scrollTo(bodyScroll.maxValue)
+    // 先让出一帧，等布局把新的 maxValue 提交上来再滚 —— 增量当帧就滚会用上一帧的高度，永远差一截
+    LaunchedEffect(thought.id, thought.reasoning.length, isExpanded) {
+        if (!isExpanded) return@LaunchedEffect
+        withFrameNanos { }
+        bodyScroll.scrollTo(bodyScroll.maxValue)
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = Wear.Space.Xs)
-    ) {
-        // 标题胶囊：实底 + 描边，整条可点，点击区不小于 44dp
+    Column(modifier = modifier.padding(vertical = Wear.Space.Xs)) {
+        // 标题标签：整条可点；宽度只随文字走，看上去是一条细标签而不是一块卡片
         Row(
             modifier = Modifier
-                .clip(shape)
+                .clip(pillShape)
                 .background(Wear.Palette.SurfaceAlt)
-                .border(1.dp, Wear.Palette.Border, shape)
-                .heightIn(min = Wear.Size.Touch)
+                .border(1.dp, Wear.Palette.Border, pillShape)
+                .height(pillHeight)
                 .clickable { onToggle() }
-                .padding(horizontal = Wear.Space.Md),
+                .padding(horizontal = ThoughtPillMetrics.HorizontalPaddingDp.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
         ) {
             BasicText(
                 text = if (isStreaming) {
@@ -156,20 +163,20 @@ fun ThoughtPill(
                 } else {
                     stringResource(R.string.ui_thought_done, elapsedSeconds)
                 },
-                style = Wear.TextCaption,
+                style = labelStyle,
                 maxLines = 1
             )
             if (isStreaming && elapsedSeconds > 0) {
                 BasicText(
                     text = stringResource(R.string.ui_thought_elapsed, elapsedSeconds),
-                    style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+                    style = labelStyle.copy(color = Wear.Palette.TextMuted),
                     maxLines = 1
                 )
             }
             BasicText(
                 text = "›",
                 modifier = Modifier.rotate(arrowRotation),
-                style = Wear.TextCaption.copy(color = Wear.Palette.Accent),
+                style = labelStyle.copy(color = Wear.Palette.Accent),
                 maxLines = 1
             )
         }
@@ -185,9 +192,9 @@ fun ThoughtPill(
                     .fillMaxWidth()
                     .padding(top = Wear.Space.Xs)
                     .heightIn(max = ThoughtBodyMaxHeight)
-                    .clip(shape)
+                    .clip(RoundedCornerShape(Wear.Radius.Control))
                     .background(Wear.Palette.SurfaceAlt)
-                    .border(1.dp, Wear.Palette.Border, shape)
+                    .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Control))
                     .padding(Wear.Space.Md)
                     .verticalScroll(bodyScroll)
             ) {

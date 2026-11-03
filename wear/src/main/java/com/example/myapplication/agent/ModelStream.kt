@@ -1,5 +1,6 @@
 package com.example.myapplication.agent
 
+import com.example.myapplication.agent.contract.ConversationBlock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -131,6 +132,92 @@ class StreamAccumulator {
         var id: String = ""
         val name = StringBuilder()
         val arguments = StringBuilder()
+    }
+}
+
+/**
+ * 思考耗时：以**请求发出**为起点、本轮收尾为终点的墙钟跨度。
+ * 起点缺失或时钟回拨一律算 0，绝不出现负数；换算成"秒"由界面层负责。
+ */
+object ThoughtDuration {
+    fun between(startedAtMs: Long, finishedAtMs: Long): Long =
+        if (startedAtMs <= 0L || finishedAtMs <= startedAtMs) 0L else finishedAtMs - startedAtMs
+}
+
+/**
+ * 思考胶囊时间线：SSE 读取循环与"胶囊怎么长"解耦的纯状态机。
+ *
+ * 每个 reasoning 增量改写同一粒胶囊并返回 true —— 上层据此**每来一块就提交一次状态**，
+ * 这就是"思考流式上屏"的粒度保证；起点固定为**请求发出**的时刻（不是第一个增量到达的时刻，
+ * 更不是响应到达的时刻），于是收尾耗时是这一轮真实的墙钟跨度，不会退化成 0s。
+ */
+class ThoughtTimeline(
+    private val requestStartedAtMs: Long,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val idFactory: () -> String = { UUID.randomUUID().toString() }
+) {
+    private var blockId: String? = null
+    private var startedAtMs = 0L
+
+    /** 已经建起来的胶囊 id；还没收到任何思考增量时为 null。 */
+    val id: String? get() = blockId
+
+    /** 已收到的思考增量块数，用于日志核对"到底流了几块"。 */
+    var incrementCount: Int = 0
+        private set
+
+    /** 距思考起点已经过去多久（进行中给日志与标题用）。 */
+    fun elapsedMs(): Long = ThoughtDuration.between(startedAtMs, clock())
+
+    /** 收尾耗时：请求发出到本轮结束的墙钟跨度。 */
+    fun durationMs(finishedAtMs: Long): Long = ThoughtDuration.between(startedAtMs, finishedAtMs)
+
+    /**
+     * 一个思考增量：第一次建块，之后原地改写。返回 true 表示这次需要向 UI 提交状态。
+     * 空增量不建块也不提交 —— 时间线上不该出现一粒什么都没想的胶囊。
+     */
+    fun onReasoning(blocks: MutableList<ConversationBlock>, reasoning: String): Boolean {
+        if (reasoning.isEmpty()) return false
+        incrementCount++
+        if (startedAtMs <= 0L) startedAtMs = if (requestStartedAtMs > 0L) requestStartedAtMs else clock()
+        val id = blockId
+        if (id == null) {
+            val newId = idFactory()
+            blockId = newId
+            blocks.add(
+                ConversationBlock.Thought(
+                    id = newId,
+                    reasoning = reasoning,
+                    isStreaming = true,
+                    startedAtMs = startedAtMs
+                )
+            )
+            return true
+        }
+        val idx = blocks.indexOfFirst { it.id == id }
+        if (idx == -1) return false
+        blocks[idx] = ConversationBlock.Thought(
+            id = id,
+            reasoning = reasoning,
+            isStreaming = true,
+            startedAtMs = startedAtMs
+        )
+        return true
+    }
+
+    /** 收尾：胶囊从"思考中"翻成"思考完成 · Ns"。返回 true 表示需要提交一次状态。 */
+    fun finish(blocks: MutableList<ConversationBlock>, reasoning: String, finishedAtMs: Long): Boolean {
+        val id = blockId ?: return false
+        val idx = blocks.indexOfFirst { it.id == id }
+        if (idx == -1) return false
+        blocks[idx] = ConversationBlock.Thought(
+            id = id,
+            reasoning = reasoning,
+            durationMs = durationMs(finishedAtMs),
+            isStreaming = false,
+            startedAtMs = startedAtMs
+        )
+        return true
     }
 }
 
