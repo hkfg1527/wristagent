@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -24,10 +25,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -35,8 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
-import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.contract.SecurityMode
@@ -45,7 +46,6 @@ import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
-import com.example.myapplication.presentation.ui.settings.RotaryFocusEffect
 import com.example.myapplication.presentation.ui.settings.SettingsItemGap
 import com.example.myapplication.presentation.ui.settings.AdvancedPermissionContent
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
@@ -179,16 +179,15 @@ fun SettingsScreen(
             ) {
                 val settingsFocusRequester = remember { FocusRequester() }
 
-                // 表冠只把事件送给持有焦点的节点：rotaryScrollable 自带 focusTarget 并把
-                // settingsFocusRequester 链在它上面，所以必须显式 requestFocus() 一次。
-                // 触发点绑在二级页状态上：根页在整个开关过程中一直留在树里，onAttach 与
-                // LaunchedEffect(Unit) 都只跑一次，从子页返回后不会重跑 —— 用 activeDialog 当 key，
-                // 返回根页才会重新取焦。二级页盖上来时 enabled=false，根页主动让出焦点不抢。
-                RotaryFocusEffect(
-                    focusRequester = settingsFocusRequester,
-                    refocusKey = activeDialog to showVoiceAsr,
-                    enabled = activeDialog == null && !showVoiceAsr
-                )
+                // 表冠只把事件送给持有焦点的节点，必须显式 requestFocus() 一次。
+                // 根页在整个开关过程中一直留在树里：LaunchedEffect(Unit) 只跑一次，从子页返回后
+                // 不会重跑，表冠就此失效 —— 所以 key 绑在 activeDialog 上，回到根页时重新取焦。
+                // 二级页/语音页盖上来时主动让出焦点，不抢。
+                LaunchedEffect(activeDialog, showVoiceAsr) {
+                    if (activeDialog != null || showVoiceAsr) return@LaunchedEffect
+                    withFrameNanos { }
+                    runCatching { settingsFocusRequester.requestFocus() }
+                }
 
                 // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
                 val apiKeyConfigured = preferences.apiKey.isNotBlank()
@@ -196,13 +195,14 @@ fun SettingsScreen(
                 ScalingLazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        // 官方 M3E 表冠：刻度→位移、松手惯性、平台触感（ScrollTick / ScrollLimit）全在 behavior 里。
-                        // 它自带 focusTarget，焦点由上面的 RotaryFocusEffect 显式申请：
-                        // 不要再叠 focusable()，也不要叠 requestFocusOnHierarchyActive()（没有下家，等于空操作）。
-                        .rotaryScrollable(
-                            behavior = RotaryScrollableDefaults.behavior(listState),
-                            focusRequester = settingsFocusRequester
-                        ),
+                        // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
+                        .onRotaryScrollEvent {
+                            // 表冠：同步吃位移，每格刻度都生效
+                            listState.dispatchRawDelta(it.verticalScrollPixels)
+                            true
+                        }
+                        .focusRequester(settingsFocusRequester)
+                        .focusable(),
                     state = listState,
                     // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
                     flingBehavior = ScrollableDefaults.flingBehavior(),

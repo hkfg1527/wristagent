@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -75,8 +76,6 @@ import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
-import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.IconButton
@@ -208,35 +207,6 @@ class SettingsRows internal constructor() {
 }
 
 /**
- * 表冠用的取焦效果：库只把表冠事件交给**当前持有焦点**的那个 rotary 节点，
- * 所以每次进入/回到本页都必须显式 requestFocus 一次。
- *
- * 为什么不是 requestFocusOnHierarchyActive()：它只对修饰符链上排在它**之后**的那个可聚焦
- * 元素生效（会把焦点转交给下家）；挂在 rotaryScrollable 之后就是没有下家，等于空操作。
- *
- * 为什么不是 onAttach 时序：根页在二级页开关过程中一直留在树里，onAttach 只跑一次，
- * 从子页返回后不会重跑 —— 用 [refocusKey]（根页喂 activeDialog，子页喂 Unit）驱动重跑，
- * 时序与"是不是刚挂上树"解耦。首帧节点可能还没上树，因此最多重试 [RotaryFocusRetryFrames]
- * 帧，而不是把异常吞掉后就地放弃。
- *
- * @param refocusKey 变化即重新取焦；子页每次进入都是新组合，传 Unit 即可。
- * @param enabled 为 false 时不抢焦点（二级页盖在根页上时，根页必须让出焦点）。
- */
-@Composable
-fun RotaryFocusEffect(focusRequester: FocusRequester, refocusKey: Any?, enabled: Boolean) {
-    LaunchedEffect(refocusKey, enabled) {
-        if (!enabled) return@LaunchedEffect
-        repeat(RotaryFocusRetryFrames) {
-            withFrameNanos { }
-            if (runCatching { focusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
-        }
-    }
-}
-
-/** 取焦重试帧数：首帧节点尚未上树时 requestFocus 会抛，重试几帧足以覆盖挂载抖动。 */
-private const val RotaryFocusRetryFrames = 3
-
-/**
  * 所有子页共用的页面骨架。
  *
  * 版面契约（与 [SettingsLayoutMath] 一一对应）：
@@ -273,22 +243,24 @@ fun SettingsSubPage(
             // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
             .pullDownToDismiss(canPullDown = { listState.isAtScrollTop() }, onDismiss = onBack)
     ) {
-        // 表冠只把事件交给当前持有焦点的节点：rotaryScrollable 把 listFocusRequester 链在自带的
-        // focusTarget 上之后，必须显式 requestFocus() 一次才算接管。子页每次进入都是全新一次
-        // 组合，因此按 Unit 触发即可，不需要外层再喂变化量。
-        RotaryFocusEffect(focusRequester = listFocusRequester, refocusKey = Unit, enabled = true)
+        // 表冠要焦点：等节点真正挂上树的那一帧再请求，首帧直接请求会落到未初始化的 requester 上。
+        // 子页每次进入都是全新组合，按 Unit 触发即可，不需要外层再喂变化量。
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            runCatching { listFocusRequester.requestFocus() }
+        }
 
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                // 官方 M3E 表冠：刻度→位移与松手惯性都由 behavior 提供。
-                // 不要再叠 focusable()，也不要叠 requestFocusOnHierarchyActive()：
-                // 后者只对"修饰符链上排在它之后"的那个可聚焦元素生效，挂在 rotaryScrollable
-                // 之后是一个没有下家的空修饰符，rotary 节点永远拿不到焦点。
-                .rotaryScrollable(
-                    behavior = RotaryScrollableDefaults.behavior(listState),
-                    focusRequester = listFocusRequester
-                ),
+                // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
+                .onRotaryScrollEvent {
+                    // 表冠：同步吃位移，每格刻度都生效
+                    listState.dispatchRawDelta(it.verticalScrollPixels)
+                    true
+                }
+                .focusRequester(listFocusRequester)
+                .focusable(),
             state = listState,
             // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
             flingBehavior = ScrollableDefaults.flingBehavior(),
