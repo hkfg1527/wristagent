@@ -241,7 +241,7 @@ fun SettingsScreen(
                                     // 不再撑 44dp 触摸高度：标题本身不可点，撑高只会把
                                     // 顶部黑带从 12dp 顶回 41dp（旧版实测 0..41.0dp = 屏高 17.6%）
                                     .padding(top = RootTitleTopPadding, bottom = Wear.Space.Sm),
-                                contentAlignment = Alignment.CenterStart
+                                contentAlignment = Alignment.Center
                             ) {
                                 BasicText(
                                     text = stringResource(R.string.settings_title),
@@ -388,6 +388,19 @@ fun SettingsScreen(
                     }
 
                     // 8. 操作安全防线
+                    item {
+                        RootSettingRow(index = 13, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                            SettingsNavRow(
+                                title = stringResource(R.string.settings_remote_console_title),
+                                value = if (consoleServer.isRunning) ":" + consoleServer.port else null,
+                                onClick = {
+                                    context.vibrateTick()
+                                    activeDialog = SettingsSubDialog.REMOTE_CONSOLE
+                                }
+                            )
+                        }
+                    }
+
                     item {
                         RootSettingRow(index = 10, stagger = rowStagger, exit = exit, dividerAbove = true) {
                             SettingsNavRow(
