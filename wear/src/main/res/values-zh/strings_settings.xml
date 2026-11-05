@@ -5,17 +5,26 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
+    <string name="settings_section_models">模型</string>
+    <string name="settings_section_voice_tools">语音与工具</string>
+    <string name="settings_section_system">系统</string>
+    <string name="settings_status_configured">已配置</string>
+    <string name="settings_status_unconfigured">未配置</string>
     <string name="settings_model_params">模型参数</string>
-    <string name="settings_tools_and_mcp">端侧工具与 MCP</string>
-    <string name="settings_tools_enabled_count">%1$d/6 已启用</string>
+    <string name="settings_temperature_value">温度 %1$.1f</string>
+    <string name="settings_tools_and_mcp">工具与 MCP</string>
+    <string name="settings_tools_all_enabled">全部启用</string>
+    <string name="settings_tools_enabled_count">%1$d 项启用</string>
+    <string name="settings_prompt_context">提示词</string>
+    <string name="settings_about">关于</string>
     <string name="settings_system_prompt">系统提示词</string>
     <string name="settings_prompt_default">预置默认</string>
     <string name="settings_prompt_custom">自定义</string>
-    <string name="settings_memory_management">会话记忆管理</string>
+    <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
     <string name="settings_side_key">底栏副键</string>
     <string name="settings_side_key_value">右翼固定打开会话抽屉</string>
-    <string name="settings_security_policy">操作安全策略</string>
+    <string name="settings_security_policy">安全策略</string>
     <string name="settings_mode_strict">严格确认</string>
     <string name="settings_mode_standard">标准提示</string>
     <string name="settings_mode_auto">自动执行</string>
@@ -294,4 +303,65 @@
     <string name="settings_netdiag_plan_all_ok_why">九项检查全部通过</string>
     <string name="settings_netdiag_plan_all_ok_guide">无需修复</string>
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
+    <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
+    <string name="settings_voice_entry">语音与唤醒</string>
+    <string name="settings_sub_voice_entry">语音输入与唤醒</string>
+    <string name="settings_voice_switch_header">语音</string>
+    <string name="settings_voice_asr_enabled">启用语音识别</string>
+    <string name="settings_voice_asr_enabled_secondary">关闭后不录音、不发起网络请求</string>
+    <string name="settings_voice_auto_speak">自动播报回答</string>
+    <string name="settings_voice_auto_speak_secondary">出向能力，与识别开关互相独立</string>
+    <string name="settings_voice_live_transcript">边说边显示文字</string>
+    <string name="settings_voice_live_transcript_secondary">说话过程中实时上屏中间结果</string>
+    <string name="settings_voice_wake_header">唤醒方式</string>
+    <string name="settings_voice_wake_screen">亮屏唤起自动语音输入</string>
+    <string name="settings_voice_wake_lock">锁屏唤起自动语音输入</string>
+    <string name="settings_voice_wake_removed">已移除 · 续航</string>
+    <string name="settings_voice_wake_removed_hint">常驻麦克风会在每次抬腕时唤醒音频链路，两种唤醒已整体移除</string>
+    <string name="settings_voice_entry_header">仅保留显式入口</string>
+    <string name="settings_voice_entry_mic">输入弹窗里的麦克风按钮</string>
+    <string name="settings_voice_entry_main_key">按住主键说话</string>
+    <string name="settings_voice_power">长按电源键</string>
+    <string name="settings_voice_power_value">需系统按键自定义映射</string>
+    <string name="settings_voice_power_hint">应用收不到 KEYCODE_POWER，需在系统设置里把长按电源键映射为本应用</string>
+
+    <string name="settings_appearance">外观与点阵</string>
+    <string name="settings_sub_appearance">外观与点阵</string>
+    <string name="settings_appearance_header">主题</string>
+    <string name="settings_appearance_pure_black">深色下使用纯黑背景</string>
+    <string name="settings_appearance_pure_black_value">恒为纯黑 · 令牌固定</string>
+    <string name="settings_appearance_theme">主题模式</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_appearance_compact">简洁模式</string>
+    <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
+    <string name="settings_appearance_matrix_header">点阵</string>
+    <string name="settings_appearance_matrix_spacing">点阵间距</string>
+    <string name="settings_appearance_web_only">请在手机网页修改</string>
+
+    <string name="settings_web_tools_header">网页工具</string>
+    <string name="settings_flag_on">开</string>
+    <string name="settings_flag_off">关</string>
+
+    <string name="settings_memory_enabled">启用记忆</string>
+    <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
+    <string name="settings_context_compress">自动压缩上下文</string>
+    <string name="settings_context_compress_secondary">占用超过阈值后自动压缩历史</string>
+    <string name="settings_context_usage">上下文用量</string>
+    <string name="settings_context_usage_value">%1$d 轮上限 · 自动压缩%2$s</string>
+    <string name="settings_web_only_header">仅在手机网页可改</string>
+    <string name="settings_context_window_web">上下文窗口：请在手机网页修改</string>
+    <string name="settings_context_truncation_web">压缩阈值与截断策略：请在手机网页修改</string>
+
+    <string name="settings_tools_provider_search">允许模型调用托管搜索</string>
+    <string name="settings_tools_provider_search_secondary">托管不可用时静默回落到内置检索</string>
+
+    <string name="settings_model_default_thinking">默认启用思考</string>
+    <string name="settings_model_default_thinking_secondary">新会话默认发起推理请求</string>
+
+    <string name="settings_role_cards_web">角色卡：请在手机网页修改</string>
+    <string name="settings_prompt_library_web">提示词库：请在手机网页修改</string>
+    <string name="settings_opening_line_web">开场白：请在手机网页修改</string>
+
 </resources>

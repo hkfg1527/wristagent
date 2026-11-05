@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="wearchat_approval_label_call">调用</string>
+    <string name="wearchat_approval_label_command">命令</string>
     <string name="wearchat_approval_label_change">改动</string>
     <string name="wearchat_approval_label_worst_case">最坏情况</string>
     <string name="wearchat_dialog_cancel">取消</string>
@@ -13,4 +14,5 @@
 
     <string name="wearchat_dialog_image">图片（内测）</string>
     <string name="wearchat_vision_beta_hint">内测功能：当前仅保留入口，识别服务尚未接入</string>
+    <string name="wearchat_dialog_mic">语音</string>
 </resources>

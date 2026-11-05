@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.chat
 
+import com.example.myapplication.presentation.ui.theme.Wear
+
 /**
  * 思考胶囊折叠态的几何常量。
  *
@@ -18,6 +20,11 @@ object ThoughtPillMetrics {
     /** 折叠态字号（sp）：细标签档，比正文 bodyMedium 小一档。 */
     const val LabelFontSp = 12
 
-    /** 全圆角：圆角恒等于高度的一半，高度变了圆角跟着变。 */
-    fun cornerRadiusDp(heightDp: Int = CollapsedHeightDp): Float = heightDp / 2f
+    /**
+     * 圆角取令牌 [Wear.Radius.Pill]，不再在页面里算"高度一半"。
+     *
+     * 令牌宣称两档、代码里却并存四种圆角（12 / 15 / 24 / 999）—— 15dp 这一档的来历没人说得清，
+     * 于是把它换成显式的全圆例外，改的人一眼能看出这是"胶囊"而不是又一种圆角档位。
+     */
+    fun cornerRadiusDp(): Float = Wear.Radius.Pill.value
 }

@@ -12,6 +12,7 @@ import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.agent.contract.SecurityGuardrail
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.agent.privilege.PrivilegeManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -38,7 +39,12 @@ import java.util.UUID
 class AgentDispatcher(
     private val context: Context,
     private val toolRegistry: AgentToolRegistry,
-    private val preferences: AgentPreferences
+    private val preferences: AgentPreferences,
+    /**
+     * 特权层：run_shell 与自写工具都从这里拿到 root / Shizuku / 本进程三条后端。
+     * 默认就地建一个，MainActivity 无需改接线即可获得真实权限执行链。
+     */
+    private val privilege: PrivilegeManager = PrivilegeManager(context)
 ) {
     private val TAG = "AgentDispatcher"
     private val memory = AgentMemory(context)
@@ -55,6 +61,9 @@ class AgentDispatcher(
     private var isCancelled = false
 
     init {
+        // 工具层要读自写工具账本与记住清单，也要能执行特权命令：在这里一次接好线
+        toolRegistry.bindPreferences(preferences)
+        toolRegistry.bindShellRunner(PrivilegeShellRunner(privilege))
         initSystemMessage()
     }
 
@@ -96,38 +105,18 @@ class AgentDispatcher(
 
     private fun initSystemMessage() {
         conversationHistory.clear()
-        val memoryHeader = memory.buildSystemMemoryHeader()
-        val telemetryBlock = buildDynamicTelemetryBlock()
-        val basePrompt = if (preferences.customSystemPrompt.isNotBlank()) {
-            preferences.customSystemPrompt
-        } else {
-            """
-            你是运行在 Android Wear OS 智能手表上的 AI 助手。
-            
-            【功能职责】
-            - 宿主环境为圆形表盘穿戴设备，适配手表快速浏览场景。
-            - 回答务必简短、精练、直接，避免冗长铺垫和多余客套。
-            
-            【可用工具】
-            你可以根据用户需求按需调用系统与网络工具（ReAct Function Calling）：
-            - get_device_status: 获取手表电量、充电状态与温度；
-            - query_time_weather: 获取当前时间与天气信息；
-            - vibrate_device: 触发震动反馈（short/double/alert）；
-            - set_system_power_mode: 设置省电模式；
-            - adjust_matrix_density: 调整表盘点阵间距；
-            - web_search: 联网检索实时资讯与知识事实。
-            
-            【行动准则】
-            - 目标明确时按需调用工具，工具返回结果后直接给出精简结论。
-            - 涉及系统设置修改时简述操作目的。
-            
-            【回答风格】
-            回答风格：默认精简。普通问题控制在 60 字以内，一句话能说清就不要展开；
-            除非用户明确要求"详细/展开/列点"，否则不要输出长段落或长列表。
-            """.trimIndent()
+        // 身份 / 能力 / 纪律 / 边界四段放在资源里（values 与 values-zh 各一份），
+        // 长记忆头与实时遥测固定在最前面；customSystemPrompt 非空时整体替换四段。
+        val sections = AgentSystemPrompt.SECTION_RES_IDS.map { resId ->
+            runCatching { context.getString(resId) }.getOrDefault("")
         }
-        val systemPrompt = "$memoryHeader\n\n$telemetryBlock\n\n$basePrompt"
-
+        val systemPrompt = AgentSystemPrompt.compose(
+            sections = sections,
+            // memoryEnabled 关掉时连记忆头都不拼：长期笔记因此也不会进入上下文
+            memoryHeader = MemoryInjection.header(preferences.memoryEnabled, memory.buildSystemMemoryHeader()),
+            telemetryBlock = buildDynamicTelemetryBlock(),
+            customPrompt = preferences.customSystemPrompt
+        )
         conversationHistory.add(ChatMessage(role = AgentRole.SYSTEM, content = systemPrompt))
     }
 
@@ -270,9 +259,18 @@ class AgentDispatcher(
 
                     // 安全审查评估
                     val risk = guardrail.assessTool(call.name, call.arguments, preferences.securityMode)
-                    
-                    // A. 致命黑名单硬拦截
-                    if (risk.isHardBlocked) {
+                    // 特权工具（run_shell / 自写工具 / define_tool）绕开通用分级闸门，走下面的强制审批链
+                    val forcedApproval = toolRegistry.requiresApprovalAlways(call.name)
+                    val shellCommand = toolRegistry.shellCommandOf(call)
+                    val actionDesc = if (shellCommand.isNullOrBlank()) {
+                        "执行 [" + call.name + "]"
+                    } else {
+                        "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+                    }
+
+                    // A. 致命黑名单硬拦截：只对普通工具生效。
+                    // 特权 shell 工具的危险命令一律走审批页——命令原文要给人看见并当场决定，不能被静默拦死。
+                    if (!forcedApproval && risk.isHardBlocked) {
                         val blockedMsg = "致命指令已被安全护栏拦截：${risk.riskSummary}"
                         val toolBlock = ConversationBlock.ToolCall(
                             id = UUID.randomUUID().toString(),
@@ -290,29 +288,75 @@ class AgentDispatcher(
                         continue
                     }
 
-                    // B. 分级审批闸门：AI 风险等级 + 安全模式共同决定是否弹审批。
-                    // 先用启发式判一次：硬拦截/本来就不需要审批的快路径不必花 4 秒去请 AI 定级；
-                    // 只有"可能要人来批"时才请 AI 定级，定级结果可能把操作降为自动放行（例如 LOW）。
-                    val actionDesc = "执行 [${call.name}]"
+                    // B. 分级审批闸门。
+                    // B1 特权 shell 命令：命令原文进审批页，破坏性命令永远要人批；
+                    // B2 define_tool（以及命令为空的 run_shell）：能力面变更与参数错误同样强制审批；
+                    // B3 其余工具沿用原分级闸门（AI 风险等级 + 安全模式）。
                     val heuristicGate = ApprovalGate.decide(risk, preferences.securityMode)
-                    val evaluatedRisk = if (heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
-                        applyNarration(call.name, actionDesc, risk)
-                    } else {
-                        risk
-                    }
-                    val gate = if (heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
-                        ApprovalGate.decide(evaluatedRisk, preferences.securityMode)
-                    } else {
-                        heuristicGate
-                    }
-                    val autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
-                        Log.i(
-                            TAG,
-                            "分级闸门自动放行：tool=${call.name} level=${evaluatedRisk.aiRiskLevel} mode=${preferences.securityMode}"
-                        )
-                        buildAutoAllowNote(call.name, actionDesc, evaluatedRisk)
-                    } else {
-                        null
+                    val gate: ApprovalGate.Decision
+                    val evaluatedRisk: RiskAssessment
+                    val autoAllowNote: String?
+                    when {
+                        shellCommand != null -> {
+                            val baseRisk = ShellPolicy.assess(shellCommand, preferences.securityMode)
+                            val remembered = ShellPolicy.isRemembered(
+                                shellCommand,
+                                preferences.rememberedShellCommandList()
+                            )
+                            gate = ShellPolicy.gate(ShellPolicy.dangerOf(shellCommand), remembered)
+                            // 破坏性命令用确定性文案（不为一次审批多等 4 秒 AI 定级），其余让 AI 补一段更贴切的影响说明
+                            evaluatedRisk = if (
+                                gate == ApprovalGate.Decision.REQUIRE_APPROVAL &&
+                                baseRisk.aiRiskLevel != RiskLevel.CRITICAL
+                            ) {
+                                ShellPolicy.enforceRiskFloor(
+                                    baseRisk,
+                                    applyNarration(call.name, actionDesc, baseRisk)
+                                )
+                            } else {
+                                baseRisk
+                            }
+                            autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
+                                Log.i(TAG, "记住清单命中，跳过审批：tool=${call.name} command=$shellCommand")
+                                "命中已记住命令，跳过审批"
+                            } else {
+                                null
+                            }
+                        }
+
+                        forcedApproval -> {
+                            gate = ApprovalGate.Decision.REQUIRE_APPROVAL
+                            evaluatedRisk = forcedApprovalRisk(call.name)
+                            autoAllowNote = null
+                        }
+
+                        heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL -> {
+                            evaluatedRisk = applyNarration(call.name, actionDesc, risk)
+                            gate = ApprovalGate.decide(evaluatedRisk, preferences.securityMode)
+                            autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
+                                Log.i(
+                                    TAG,
+                                    "分级闸门自动放行：tool=${call.name} level=${evaluatedRisk.aiRiskLevel} mode=${preferences.securityMode}"
+                                )
+                                buildAutoAllowNote(call.name, actionDesc, evaluatedRisk)
+                            } else {
+                                null
+                            }
+                        }
+
+                        else -> {
+                            evaluatedRisk = risk
+                            gate = heuristicGate
+                            autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
+                                Log.i(
+                                    TAG,
+                                    "分级闸门自动放行：tool=${call.name} level=${evaluatedRisk.aiRiskLevel} mode=${preferences.securityMode}"
+                                )
+                                buildAutoAllowNote(call.name, actionDesc, evaluatedRisk)
+                            } else {
+                                null
+                            }
+                        }
                     }
 
                     if (gate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
@@ -465,6 +509,33 @@ class AgentDispatcher(
         ).joinToString(" · ").takeIf { it.isNotBlank() }
     }
 
+    /**
+     * define_tool 这类"不执行命令但扩大能力面"的特权动作的固定文案：
+     * 不为一次审批多等一轮 AI 定级，审批页也永远有话说。
+     */
+    private fun forcedApprovalRisk(toolName: String): RiskAssessment {
+        val isDefineTool = toolName == ShellPolicy.TOOL_DEFINE_TOOL
+        return RiskAssessment(
+            isHardBlocked = false,
+            isHighRisk = true,
+            riskSummary = if (isDefineTool) {
+                "定义新工具：Agent 会获得一个新的可执行入口"
+            } else {
+                "特权工具：执行前必须由人放行"
+            },
+            requireCooldownSeconds = 0,
+            whatItDoes = if (isDefineTool) "注册一个带命令模板的新工具" else "调用特权工具 " + toolName,
+            worstCase = if (isDefineTool) {
+                "新工具会留在工具清单里，之后每次调用都要单独审批"
+            } else {
+                "命令以最高可用权限执行，可能改动系统状态"
+            },
+            aiRiskLevel = RiskLevel.MEDIUM,
+            commandText = "",
+            rememberable = false
+        )
+    }
+
     private fun extractToolSummary(toolName: String, outputJson: String): String {
         return try {
             val json = JSONObject(outputJson)
@@ -475,7 +546,12 @@ class AgentDispatcher(
                 "vibrate_device" -> "触觉脉冲已触发"
                 "set_system_power_mode" -> if (json.optBoolean("ultra_saving_enabled", false)) "极致省电已开启" else "标准性能已恢复"
                 "adjust_matrix_density" -> "点阵网格已更新"
-                else -> json.optString("message", "执行成功")
+                ShellPolicy.TOOL_RUN_SHELL ->
+                    "exit " + json.optInt("exit_code", -1) + " · 后端 " + json.optString("backend", "?")
+                ShellPolicy.TOOL_DEFINE_TOOL -> "已注册工具 " + json.optString("name", "")
+                ShellPolicy.TOOL_LIST_TOOLS -> "自写工具 " + json.optInt("count", 0) + " 个"
+                ShellPolicy.TOOL_REMOVE_TOOL -> "已删除 " + json.optString("removed", "")
+                else -> json.optString("summary", json.optString("message", "执行成功"))
             }
         } catch (_: Exception) {
             "执行成功"
@@ -492,6 +568,24 @@ class AgentDispatcher(
                 ChatMessage(role = AgentRole.TOOL, content = cancelJson, toolCallId = call.id, name = call.name)
             )
         }
+    }
+
+    /**
+     * autoCompressContext 打开且历史超过 maxContextTurns 时，把落盘历史压到请求侧同一上限：
+     * system 头保留、最近 N 轮保留、孤立 tool 回执丢弃（缺回执的 tool_calls 由自愈补齐）。
+     * 开关关闭时这里什么都不做，历史只在请求侧截断。
+     */
+    private fun applyAutoCompaction() {
+        if (!preferences.autoCompressContext) return
+        val compacted = ContextCompactor.trim(
+            history = conversationHistory,
+            maxTurns = preferences.maxContextTurns,
+            enabled = true
+        )
+        if (compacted.size == conversationHistory.size) return
+        Log.i(TAG, "自动压缩上下文：" + conversationHistory.size + " -> " + compacted.size + " 条")
+        conversationHistory.clear()
+        conversationHistory.addAll(compacted)
     }
 
     private fun sanitizeConversationHistory() {
@@ -615,6 +709,7 @@ class AgentDispatcher(
     ): Result<ModelTurnResult> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
+            applyAutoCompaction()
             sanitizeConversationHistory()
 
             val endpoint = if (preferences.baseUrl.endsWith("/")) {
@@ -624,10 +719,12 @@ class AgentDispatcher(
             }
             val url = URL(endpoint)
 
-            // 推理努力只在推理模型上发出去；供应商不认这个字段时置空后重试一次
-            var reasoningEffortValue: String? = ReasoningEffortPolicy.bodyValue(
-                preferences.modelName,
-                ReasoningEffort.fromStored(preferences.reasoningEffort)
+            // 推理努力只在推理模型上发出去，且受 defaultThinkingEnabled 总闸约束；
+            // 供应商不认这个字段时置空后重试一次
+            var reasoningEffortValue: String? = ThinkingPolicy.reasoningEffortBody(
+                enabled = preferences.defaultThinkingEnabled,
+                modelName = preferences.modelName,
+                effort = ReasoningEffort.fromStored(preferences.reasoningEffort)
             )
 
             fun buildRequestBody(): JSONObject = JSONObject().apply {

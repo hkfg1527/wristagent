@@ -169,7 +169,7 @@ fun ThoughtPill(
             if (isStreaming && elapsedSeconds > 0) {
                 BasicText(
                     text = stringResource(R.string.ui_thought_elapsed, elapsedSeconds),
-                    style = labelStyle.copy(color = Wear.Palette.TextMuted),
+                    style = labelStyle.copy(color = Wear.Palette.TextDim),
                     maxLines = 1
                 )
             }
@@ -418,19 +418,26 @@ fun SpringStreamingText(
 }
 
 /**
- * 用户输入气泡 (右对齐 · AccentDim 实底 · 最宽 200dp)
+ * 用户输入气泡（右对齐 · AccentDim 实底 + 1dp 描边 · 最宽 184dp · 内边距 14dp 对称）
+ *
+ * 1dp 描边是把"1.14:1 看不见的色块"变成真卡片的唯一手段：填充色本身不动，
+ * 只加一条与行分隔线同档的边框，气泡边界于是可读。
  */
 @Composable
 fun UserChatBubble(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val shape = RoundedCornerShape(Wear.Radius.Card)
+    val padding = ChatVisualMetrics.BubblePaddingDp.dp
     Box(
         modifier = modifier
-            .widthIn(max = 200.dp)
-            .clip(RoundedCornerShape(Wear.Radius.Card))
+            .widthIn(max = ChatVisualMetrics.BubbleMaxWidthDp.dp)
+            .clip(shape)
             .background(Wear.Palette.AccentDim)
-            .padding(Wear.Space.Md)
+            .border(1.dp, Wear.Palette.Border, shape)
+            // 上下内边距由 16.5/14.5 改成对称 14/14：行距加到 20sp 后两行中文不再顶到边
+            .padding(horizontal = padding, vertical = padding)
     ) {
         content()
     }

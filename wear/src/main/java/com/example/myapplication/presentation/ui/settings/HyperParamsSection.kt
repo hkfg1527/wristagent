@@ -30,6 +30,7 @@ fun HyperParamsContent(
     var maxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
     var isStream by remember { mutableStateOf(preferences.streamMode) }
     var showReasoning by remember { mutableStateOf(preferences.showThoughtChain) }
+    var defaultThinking by remember { mutableStateOf(preferences.defaultThinkingEnabled) }
     var effort by remember { mutableStateOf(ReasoningEffort.fromStored(preferences.reasoningEffort)) }
 
     fun notifyChange() {
@@ -140,6 +141,19 @@ fun HyperParamsContent(
                 }
             )
         }
+
+        row {
+            SettingsSplitToggleRow(
+                label = stringResource(R.string.settings_model_default_thinking),
+                checked = defaultThinking,
+                onCheckedChange = { enabled ->
+                    defaultThinking = enabled
+                    preferences.defaultThinkingEnabled = enabled
+                }
+            )
+        }
+
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_model_default_thinking_secondary)) }
 
         section(stringResource(R.string.settings_reasoning_effort))
 

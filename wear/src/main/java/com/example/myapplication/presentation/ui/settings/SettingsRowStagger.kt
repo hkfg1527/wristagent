@@ -18,8 +18,8 @@ import androidx.compose.ui.platform.LocalDensity
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 
-/** 根设置列表参与逐行动画的内容行数：标题 + 9 个分区入口 + 末尾"完成返回"。 */
-const val SettingsStaggeredRowCount = 11
+/** 根设置列表参与逐行动画的内容行数：标题 + 3 个组标题 + 9 个分区入口 + 末尾"完成返回"。 */
+const val SettingsStaggeredRowCount = 14
 
 /** 进场位移 24dp：从下方浮上来。 */
 private val RowEnterOffset = Wear.Space.Xl

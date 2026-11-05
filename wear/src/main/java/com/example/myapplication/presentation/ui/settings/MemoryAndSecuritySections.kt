@@ -26,6 +26,8 @@ fun MemoryManagerContent(
     val context = LocalContext.current
     var memoryCleared by remember { mutableStateOf(false) }
     var turns by remember { mutableIntStateOf(preferences.maxContextTurns) }
+    var memoryEnabled by remember { mutableStateOf(preferences.memoryEnabled) }
+    var autoCompress by remember { mutableStateOf(preferences.autoCompressContext) }
 
     val turnOptions = listOf(
         4 to R.string.settings_turns_4,
@@ -51,6 +53,49 @@ fun MemoryManagerContent(
                 )
             }
         }
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_memory_enabled),
+                secondary = stringResource(R.string.settings_memory_enabled_secondary),
+                checked = memoryEnabled,
+                onCheckedChange = { enabled ->
+                    memoryEnabled = enabled
+                    preferences.memoryEnabled = enabled
+                }
+            )
+        }
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_context_compress),
+                secondary = stringResource(R.string.settings_context_compress_secondary),
+                checked = autoCompress,
+                onCheckedChange = { enabled ->
+                    autoCompress = enabled
+                    preferences.autoCompressContext = enabled
+                }
+            )
+        }
+
+        // 上下文用量只读回显：轮数上限与自动压缩都是本页真实取值，不做任何估算
+        row {
+            SettingsInfoRow(
+                title = stringResource(R.string.settings_context_usage),
+                value = stringResource(
+                    R.string.settings_context_usage_value,
+                    turns,
+                    stringResource(
+                        if (autoCompress) R.string.settings_flag_on else R.string.settings_flag_off
+                    )
+                )
+            )
+        }
+
+        section(stringResource(R.string.settings_web_only_header))
+
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_context_window_web)) }
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_context_truncation_web)) }
 
         section(stringResource(R.string.settings_memory_clear_header))
 

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="wearchat_approval_label_call">Call</string>
+    <string name="wearchat_approval_label_command">Command</string>
     <string name="wearchat_approval_label_change">Change</string>
     <string name="wearchat_approval_label_worst_case">Worst case</string>
     <string name="wearchat_dialog_cancel">Cancel</string>
@@ -13,4 +14,5 @@
 
     <string name="wearchat_dialog_image">Image (beta)</string>
     <string name="wearchat_vision_beta_hint">Beta feature: entry only, recognition service is not wired up yet</string>
+    <string name="wearchat_dialog_mic">Voice</string>
 </resources>

@@ -19,8 +19,23 @@ import java.util.Locale
  */
 class AgentToolRegistry(
     private val context: Context,
-    private val preferences: AgentPreferences? = null
+    preferences: AgentPreferences? = null,
+    private var shellRunner: PrivilegedCommandRunner? = null
 ) {
+
+    /**
+     * 偏好与特权执行器都支持后接：MainActivity 先造注册表再交给调度器，
+     * 调度器拿到真实 AgentPreferences 后一次绑上，工具清单与审批链路才完整。
+     */
+    private var preferences: AgentPreferences? = preferences
+
+    fun bindPreferences(value: AgentPreferences) {
+        preferences = value
+    }
+
+    fun bindShellRunner(runner: PrivilegedCommandRunner) {
+        shellRunner = runner
+    }
 
     // 观察外部配置或 UI 变化的回调
     var onMatrixDensityChange: ((spacingDp: Float) -> Unit)? = null
@@ -32,7 +47,7 @@ class AgentToolRegistry(
     fun getToolDefinitions(): List<ToolDefinition> {
         val all = mutableListOf<ToolDefinition>()
 
-        if (preferences == null || preferences.toolDeviceStatusEnabled) {
+        if (preferences?.toolDeviceStatusEnabled ?: true) {
             all.add(
                 ToolDefinition(
                     name = "get_device_status",
@@ -46,7 +61,7 @@ class AgentToolRegistry(
             )
         }
 
-        if (preferences == null || preferences.toolVibrateEnabled) {
+        if (preferences?.toolVibrateEnabled ?: true) {
             all.add(
                 ToolDefinition(
                     name = "vibrate_device",
@@ -67,7 +82,7 @@ class AgentToolRegistry(
             )
         }
 
-        if (preferences == null || preferences.toolMatrixDensityEnabled) {
+        if (preferences?.toolMatrixDensityEnabled ?: true) {
             all.add(
                 ToolDefinition(
                     name = "adjust_matrix_density",
@@ -87,7 +102,7 @@ class AgentToolRegistry(
             )
         }
 
-        if (preferences == null || preferences.toolPowerModeEnabled) {
+        if (preferences?.toolPowerModeEnabled ?: true) {
             all.add(
                 ToolDefinition(
                     name = "set_system_power_mode",
@@ -107,7 +122,7 @@ class AgentToolRegistry(
             )
         }
 
-        if (preferences == null || preferences.toolWeatherEnabled) {
+        if (preferences?.toolWeatherEnabled ?: true) {
             all.add(
                 ToolDefinition(
                     name = "query_time_weather",
@@ -126,7 +141,14 @@ class AgentToolRegistry(
             )
         }
 
-        if (preferences == null || preferences.toolWebSearchEnabled) {
+        // 检索工具按两个独立开关裁剪：本地检索与 Provider 托管检索各管各的
+        val searches = SearchToolGate.exposedSearches(
+            localEnabled = preferences?.toolWebSearchEnabled ?: true,
+            providerManagedEnabled = preferences?.providerManagedSearchEnabled
+                ?: AgentPreferences.DEFAULT_PROVIDER_MANAGED_SEARCH
+        )
+
+        if (SearchToolGate.TOOL_LOCAL_SEARCH in searches) {
             all.add(
                 ToolDefinition(
                     name = "web_search",
@@ -146,13 +168,41 @@ class AgentToolRegistry(
             )
         }
 
+        if (SearchToolGate.TOOL_PROVIDER_SEARCH in searches) {
+            all.add(
+                ToolDefinition(
+                    name = SearchToolGate.TOOL_PROVIDER_SEARCH,
+                    description = "由 Provider 侧托管的联网检索。关闭该开关后本工具不会出现在工具清单里；" +
+                        "当前链路在 Provider 不提供托管检索时用本地检索兜底，回执里的 search_route 会注明实际走法",
+                    parametersSchema = JSONObject().apply {
+                        put("type", "object")
+                        val props = JSONObject()
+                        props.put(
+                            "query",
+                            JSONObject().apply {
+                                put("type", "string")
+                                put("description", "精确简练的搜索关键词")
+                            }
+                        )
+                        put("properties", props)
+                        put("required", JSONArray(listOf("query")))
+                    }
+                )
+            )
+        }
+
+        // 特权工具常驻：能力面不靠设置开关裁剪，靠执行前的审批闸门约束
+        all.addAll(privilegedToolDefinitions())
+        // 自写工具每次现读账本：define_tool 落盘后下一轮请求立刻出现在清单里
+        selfDefinedTools().forEach { all.add(it.toToolDefinition()) }
+
         return all
     }
 
     /**
      * 执行指定工具
      */
-    fun executeTool(call: ToolCall): ToolResult {
+    suspend fun executeTool(call: ToolCall): ToolResult {
         return try {
             val args = call.parseArgs()
             val resultJson = when (call.name) {
@@ -164,10 +214,17 @@ class AgentToolRegistry(
                 "set_system_power_mode" -> executeSetPowerMode(args.optBoolean("ultraSaving", true))
                 "query_time_weather" -> executeQueryTimeWeather(args.optString("location", "本地"))
                 "web_search" -> executeWebSearch(args.optString("query", ""))
+                SearchToolGate.TOOL_PROVIDER_SEARCH -> executeProviderWebSearch(args.optString("query", ""))
+                ShellPolicy.TOOL_RUN_SHELL -> executeRunShell(args)
+                ShellPolicy.TOOL_DEFINE_TOOL -> executeDefineTool(args)
+                ShellPolicy.TOOL_LIST_TOOLS -> executeListTools()
+                ShellPolicy.TOOL_REMOVE_TOOL -> executeRemoveTool(args)
                 else -> {
-                    JSONObject().apply {
-                        put("status", "error")
-                        put("message", "未注册的工具函数: ${call.name}")
+                    val selfTool = selfDefinedTool(call.name)
+                    if (selfTool != null) {
+                        executeSelfDefinedTool(selfTool, args)
+                    } else {
+                        errorJson("unknown_tool", "未注册的工具函数: ${call.name}")
                     }
                 }
             }
@@ -364,5 +421,283 @@ class AgentToolRegistry(
                 put("message", "网络检索失败: ${e.localizedMessage ?: "连接超时或网络未就绪"}")
             }
         }
+    }
+
+    /**
+     * Provider 托管检索：当前供应商没有托管检索端点，走同一套本地检索兜底，
+     * 并在回执里如实标注 search_route，避免模型误以为结果来自 Provider 侧。
+     */
+    private fun executeProviderWebSearch(query: String): JSONObject {
+        val result = executeWebSearch(query)
+        result.put("search_route", "local_fallback")
+        return result
+    }
+
+    // ==================== 特权 shell 与自写工具 ====================
+
+    /** 自写工具账本快照：每次现读，不缓存，避免定义与执行看到两份真值。 */
+    fun selfDefinedTools(): List<SelfDefinedTool> = preferences?.selfDefinedToolList().orEmpty()
+
+    fun selfDefinedToolNames(): Set<String> = selfDefinedTools().map { it.name }.toSet()
+
+    fun selfDefinedTool(name: String): SelfDefinedTool? = selfDefinedTools().firstOrNull { it.name == name }
+
+    /** run_shell 与全部自写工具：执行前必须过审批闸门。 */
+    fun isPrivilegedTool(toolName: String): Boolean =
+        ShellPolicy.isPrivilegedTool(toolName, selfDefinedToolNames())
+
+    /** run_shell、自写工具与 define_tool 一律强制审批；元数据类工具回到通用分级闸门。 */
+    fun requiresApprovalAlways(toolName: String): Boolean =
+        ShellPolicy.requiresApprovalAlways(toolName, selfDefinedToolNames())
+
+    /** 真正要执行的命令原文：run_shell 取 command 参数，自写工具按 $1..$9 绑定；其余返回 null。 */
+    fun shellCommandOf(call: ToolCall): String? {
+        val args = call.parseArgs()
+        if (call.name == ShellPolicy.TOOL_RUN_SHELL) {
+            return args.optString("command", "")
+        }
+        val tool = selfDefinedTool(call.name) ?: return null
+        return tool.bind(stringArray(args))
+    }
+
+    private fun privilegedToolDefinitions(): List<ToolDefinition> = listOf(
+        ToolDefinition(
+            name = ShellPolicy.TOOL_RUN_SHELL,
+            description = "执行任意 shell 命令：按 root / Shizuku / 本进程三条后端自动挑能用的那条。" +
+                "任何调用都会弹出审批页并把命令原文给主人看，破坏性命令不可被记住",
+            parametersSchema = JSONObject().apply {
+                put("type", "object")
+                val props = JSONObject()
+                props.put(
+                    "command",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("description", "要执行的 shell 命令原文，原样交给特权层执行")
+                    }
+                )
+                props.put(
+                    "timeout",
+                    JSONObject().apply {
+                        put("type", "integer")
+                        put(
+                            "description",
+                            "可选，超时毫秒数，默认 " + ShellPolicy.DEFAULT_TIMEOUT_MS +
+                                "，允许 " + ShellPolicy.MIN_TIMEOUT_MS + "~" + ShellPolicy.MAX_TIMEOUT_MS
+                        )
+                    }
+                )
+                props.put(
+                    "purpose",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("description", "可选，一句话说明为什么跑这条命令，审批页会显示")
+                    }
+                )
+                put("properties", props)
+                put("required", JSONArray(listOf("command")))
+            }
+        ),
+        ToolDefinition(
+            name = ShellPolicy.TOOL_DEFINE_TOOL,
+            description = "给自己造一个新工具：命令模板里 \$1..\$9 是参数占位符，" +
+                "定义会持久化并立刻出现在下一轮工具清单里。定义动作本身要审批",
+            parametersSchema = JSONObject().apply {
+                put("type", "object")
+                val props = JSONObject()
+                props.put(
+                    "name",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put(
+                            "description",
+                            "工具名：小写字母开头，" + SelfDefinedToolBook.MinNameLength +
+                                "~" + SelfDefinedToolBook.MaxNameLength + " 位，只含 a-z0-9_"
+                        )
+                    }
+                )
+                props.put(
+                    "description",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("description", "给自己看的能力说明，写清它做什么")
+                    }
+                )
+                props.put(
+                    "shellTemplate",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("description", "命令模板，例如 getprop \$1；参数按序填进 \$1..\$9")
+                    }
+                )
+                props.put(
+                    "dangerLevel",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("enum", JSONArray(listOf("safe", "risky", "destructive")))
+                        put("description", "自评危险档位；实际执行时仍按渲染后的命令重新分档")
+                    }
+                )
+                put("properties", props)
+                put("required", JSONArray(listOf("name", "description", "shellTemplate", "dangerLevel")))
+            }
+        ),
+        ToolDefinition(
+            name = ShellPolicy.TOOL_LIST_TOOLS,
+            description = "列出当前所有自写工具（名称、描述、命令模板与危险档位）",
+            parametersSchema = JSONObject().apply {
+                put("type", "object")
+                put("properties", JSONObject())
+                put("required", JSONArray())
+            }
+        ),
+        ToolDefinition(
+            name = ShellPolicy.TOOL_REMOVE_TOOL,
+            description = "删除一个自写工具，释放名额",
+            parametersSchema = JSONObject().apply {
+                put("type", "object")
+                val props = JSONObject()
+                props.put(
+                    "name",
+                    JSONObject().apply {
+                        put("type", "string")
+                        put("description", "要删除的自写工具名")
+                    }
+                )
+                put("properties", props)
+                put("required", JSONArray(listOf("name")))
+            }
+        )
+    )
+
+    private suspend fun executeRunShell(args: JSONObject): JSONObject {
+        val command = args.optString("command", "")
+        ShellPolicy.validate(command)?.let { return errorJson("invalid_command", it) }
+        val runner = shellRunner ?: return errorJson("privilege_unavailable", "特权执行层尚未接线")
+        val requested = if (args.has("timeout")) args.optLong("timeout") else null
+        val run = runner.run(command, ShellPolicy.clampTimeout(requested))
+        return shellResultJson(run)
+    }
+
+    private fun executeDefineTool(args: JSONObject): JSONObject {
+        val prefs = preferences
+            ?: return errorJson("prefs_unavailable", "偏好存储未接线，工具定义无法持久化")
+        val name = args.optString("name", "").trim()
+        val description = args.optString("description", "")
+        val template = args.optString("shellTemplate", args.optString("template", ""))
+        val danger = SelfToolDanger.fromStorage(args.optString("dangerLevel", SelfToolDanger.RISKY.storage))
+        SelfDefinedToolBook.validate(name, description, template)
+            ?.let { return errorJson("invalid_tool", it) }
+
+        val current = prefs.selfDefinedToolList()
+        val next = SelfDefinedToolBook.upsert(
+            current,
+            SelfDefinedTool(name = name, description = description.trim(), shellTemplate = template, danger = danger)
+        )
+        val isNewTool = current.none { it.name == name }
+        if (isNewTool && next.size == current.size) {
+            return errorJson(
+                "too_many_tools",
+                "自写工具已达上限 " + SelfDefinedToolBook.MaxTools + " 个，先 remove_tool 再定义"
+            )
+        }
+        prefs.saveSelfDefinedTools(next)
+        return JSONObject().apply {
+            put("status", "success")
+            put("name", name)
+            put("total", next.size)
+            put("replaced", !isNewTool)
+            put("message", "工具已注册，下一轮工具清单立即生效；调用它同样要审批")
+        }
+    }
+
+    private fun executeListTools(): JSONObject {
+        val tools = selfDefinedTools()
+        val array = JSONArray()
+        tools.forEach { tool ->
+            array.put(
+                JSONObject().apply {
+                    put("name", tool.name)
+                    put("description", tool.description)
+                    put("shell_template", tool.shellTemplate)
+                    put("danger", tool.danger.storage)
+                }
+            )
+        }
+        return JSONObject().apply {
+            put("status", "success")
+            put("count", tools.size)
+            put("max", SelfDefinedToolBook.MaxTools)
+            put("tools", array)
+        }
+    }
+
+    private fun executeRemoveTool(args: JSONObject): JSONObject {
+        val prefs = preferences
+            ?: return errorJson("prefs_unavailable", "偏好存储未接线，工具定义无法持久化")
+        val name = args.optString("name", "").trim()
+        if (name.isEmpty()) return errorJson("invalid_tool", "工具名不可为空")
+        val current = prefs.selfDefinedToolList()
+        val next = SelfDefinedToolBook.remove(current, name)
+        if (next.size == current.size) return errorJson("not_found", "没有名为 " + name + " 的自写工具")
+        prefs.saveSelfDefinedTools(next)
+        return JSONObject().apply {
+            put("status", "success")
+            put("removed", name)
+            put("count", next.size)
+            put("message", "工具已删除，下一轮工具清单不再包含它")
+        }
+    }
+
+    private suspend fun executeSelfDefinedTool(tool: SelfDefinedTool, args: JSONObject): JSONObject {
+        val command = tool.bind(stringArray(args))
+        ShellPolicy.validate(command)?.let { return errorJson("invalid_command", it) }
+        val runner = shellRunner ?: return errorJson("privilege_unavailable", "特权执行层尚未接线")
+        val run = runner.run(command, ShellPolicy.DEFAULT_TIMEOUT_MS)
+        return shellResultJson(run).apply { put("tool", tool.name) }
+    }
+
+    private fun shellResultJson(run: ShellRun): JSONObject = JSONObject().apply {
+        put("status", if (run.isSuccess) "success" else "failed")
+        put("backend", run.backend)
+        put("exit_code", run.exitCode)
+        put("stdout", run.stdout.take(MaxOutputChars))
+        put("stderr", run.stderr.take(MaxOutputChars))
+        if (run.timedOut) put("timed_out", true)
+        put("summary", "exit=" + run.exitCode + " · 后端 " + run.backend)
+    }
+
+    private fun stringArray(args: JSONObject): List<String> {
+        val array = args.optJSONArray("args") ?: return emptyList()
+        return (0 until array.length()).map { index -> array.optString(index, "") }
+    }
+
+    private fun errorJson(code: String, message: String): JSONObject = JSONObject().apply {
+        put("status", "error")
+        put("error_type", code)
+        put("message", message)
+    }
+
+    private fun SelfDefinedTool.toToolDefinition(): ToolDefinition = ToolDefinition(
+        name = name,
+        description = description + "（自写工具，调用必弹审批）",
+        parametersSchema = JSONObject().apply {
+            put("type", "object")
+            val props = JSONObject()
+            props.put(
+                "args",
+                JSONObject().apply {
+                    put("type", "array")
+                    put("description", "按顺序填入命令模板的参数，对应模板里的 \$1..\$9")
+                    put("items", JSONObject().apply { put("type", "string") })
+                }
+            )
+            put("properties", props)
+            put("required", JSONArray())
+        }
+    )
+
+    private companion object {
+        /** 回给模型的输出上限：手表上下文小，超长输出截断但保留退出码与错误。 */
+        const val MaxOutputChars = 4000
     }
 }

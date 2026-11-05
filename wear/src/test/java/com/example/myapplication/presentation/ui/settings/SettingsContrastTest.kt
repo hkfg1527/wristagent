@@ -53,6 +53,56 @@ class SettingsContrastTest {
     }
 
     @Test
+    fun dimGlyphColorPassesAAOnThePageBackground() {
+        // 行尾箭头 / 胶囊秒数：黑底 5.04:1
+        assertTrue(contrastRatio(Wear.Palette.TextDim, Wear.Palette.Bg) >= 4.5f)
+    }
+
+    @Test
+    fun dimGlyphColorStaysAboveTheIconFloorOnRaisedSurfaces() {
+        // 抬升表面（Surface / SurfaceAlt）上它只承载图形，按非文本对比下限 3:1 要求，这里钉 4:1
+        listOf(Wear.Palette.Surface, Wear.Palette.SurfaceAlt).forEach { surface ->
+            assertTrue(
+                "TextDim on " + surface,
+                contrastRatio(Wear.Palette.TextDim, surface) >= 4f
+            )
+        }
+    }
+
+    @Test
+    fun clockArcTextIsDimmerThanTheRowTitleButStillFarAboveAA() {
+        assertTrue(contrastRatio(Wear.Palette.Clock, Wear.Palette.Bg) >= 4.5f)
+        assertTrue(
+            contrastRatio(Wear.Palette.Clock, Wear.Palette.Bg) <
+                contrastRatio(Wear.Palette.TextPrimary, Wear.Palette.Bg)
+        )
+    }
+
+    @Test
+    fun hairlineIsVisibleOnTheOledBackground() {
+        // 旧值 #232A35 只有 1.45:1，OLED 上"时有时无"
+        assertTrue(contrastRatio(Wear.Palette.Border, Wear.Palette.Bg) >= 1.6f)
+    }
+
+    @Test
+    fun accentTrackKeepsStaticIndicatorsReadable() {
+        assertTrue(contrastRatio(Wear.Palette.AccentTrack, Wear.Palette.Bg) >= 4.5f)
+        assertTrue(
+            contrastRatio(Wear.Palette.AccentTrack, Wear.Palette.Bg) <
+                contrastRatio(Wear.Palette.Accent, Wear.Palette.Bg)
+        )
+    }
+
+    @Test
+    fun orbIsStillTheBrightestSurfaceButNoLongerNearPureWhite() {
+        assertTrue(contrastRatio(Wear.Palette.Orb, Wear.Palette.Bg) >= 4.5f)
+        assertTrue(
+            contrastRatio(Wear.Palette.Orb, Wear.Palette.Bg) <
+                contrastRatio(Color(0xFFE8EDF5), Wear.Palette.Bg)
+        )
+    }
+
+    @Test
     fun blackAndWhiteHitTheKnownExtremes() {
         assertEquals(21f, contrastRatio(Color.White, Color.Black), 0.05f)
         assertEquals(1f, contrastRatio(Color.Black, Color.Black), 0.001f)

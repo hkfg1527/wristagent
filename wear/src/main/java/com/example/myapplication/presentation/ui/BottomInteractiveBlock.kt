@@ -388,6 +388,9 @@ fun BottomInteractiveBlock(
                             var isDraggingX = false
                             var isDraggingY = false
 
+                            // 语音起录只能由用户此刻的动作触发（这里按住 340ms，或收起态单触）。
+                            // 亮屏 / 锁屏 / 摇腕 / 常驻监听等自动唤起已因续航整体删除，见 VoiceEntryPolicy：
+                            // 常驻麦克风会在每次抬腕时唤醒音频链路，是手表端唯一不可接受的功耗形态。
                             val longPressJob = scope.launch {
                                 delay(340)
                                 if (!isDraggingX && !isDraggingY && !isSplitExpanded) {
@@ -477,16 +480,21 @@ fun BottomInteractiveBlock(
                         .scale(0.6f + 0.4f * collapseFraction)
                 ) {
                     if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
+                        // 键盘主键：输入框轮廓按同一比例放大到 20×14dp（旧值 16×12dp）
                         MinimalistKeyboardIcon(
                             tint = Wear.Palette.Bg,
-                            modifier = Modifier.size(16.dp, 12.dp)
+                            modifier = Modifier.size(20.dp, 14.dp)
+                        )
+                    } else if (mode == BottomBlockMode.RECORDING) {
+                        // 录音中保留起伏波形：动态反馈比静态图标更能说明"正在收音"
+                        MinimalistSoundwaveIcon(
+                            tint = Wear.Palette.Danger,
+                            isRecording = true,
+                            modifier = Modifier.size(22.dp, 22.dp)
                         )
                     } else {
-                        MinimalistSoundwaveIcon(
-                            tint = if (mode == BottomBlockMode.RECORDING) Wear.Palette.Danger else Wear.Palette.Bg,
-                            isRecording = mode == BottomBlockMode.RECORDING,
-                            modifier = Modifier.size(16.dp, 16.dp)
-                        )
+                        // 待机主键：22dp 麦克风（旧值是 16×11.5dp 的输入框轮廓）
+                        MinimalistMicIcon(tint = Wear.Palette.Bg)
                     }
                 }
             }
@@ -767,6 +775,51 @@ fun MinimalistKeyboardIcon(
             start = Offset(size.width * 0.30f, size.height * 0.72f),
             end = Offset(size.width * 0.70f, size.height * 0.72f),
             strokeWidth = 1.2.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+/**
+ * 极简麦克风图标：胶囊收音头 + 半圆托架 + 短杆，2.5dp 圆头描边，22dp 图形盒。
+ *
+ * 取代原来的"输入框轮廓"（16×11.5dp，只占 52dp 主键圆的 31%，语义也不是"说话"）。
+ * 22 / 52 = 42%，主键圆里第一次有了一个读得出动作的语义图形。
+ */
+@Composable
+fun MinimalistMicIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(ChatVisualMetrics.OrbGlyphDp.dp)) {
+        val stroke = 2.5.dp.toPx()
+        val centerX = size.width / 2f
+        val headWidth = size.width * 0.38f
+        val headHeight = size.height * 0.50f
+        val headTop = 0f
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(centerX - headWidth / 2f, headTop),
+            size = Size(headWidth, headHeight),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(headWidth / 2f, headWidth / 2f),
+            style = Stroke(width = stroke)
+        )
+        val cradleRadius = size.width * 0.31f
+        val cradleCenterY = headTop + headHeight * 0.68f
+        drawArc(
+            color = tint,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(centerX - cradleRadius, cradleCenterY - cradleRadius),
+            size = Size(cradleRadius * 2f, cradleRadius * 2f),
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+        drawLine(
+            color = tint,
+            start = Offset(centerX, cradleCenterY + cradleRadius),
+            end = Offset(centerX, size.height),
+            strokeWidth = stroke,
             cap = StrokeCap.Round
         )
     }

@@ -5,13 +5,22 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
+    <string name="settings_section_models">Models</string>
+    <string name="settings_section_voice_tools">Voice &amp; tools</string>
+    <string name="settings_section_system">System</string>
+    <string name="settings_status_configured">Configured</string>
+    <string name="settings_status_unconfigured">Not configured</string>
     <string name="settings_model_params">Model Parameters</string>
-    <string name="settings_tools_and_mcp">On-device Tools &amp; MCP</string>
-    <string name="settings_tools_enabled_count">%1$d/6 enabled</string>
+    <string name="settings_temperature_value">Temp %1$.1f</string>
+    <string name="settings_tools_and_mcp">Tools &amp; MCP</string>
+    <string name="settings_tools_all_enabled">All enabled</string>
+    <string name="settings_tools_enabled_count">%1$d enabled</string>
+    <string name="settings_prompt_context">Prompt</string>
+    <string name="settings_about">About</string>
     <string name="settings_system_prompt">System Prompt</string>
     <string name="settings_prompt_default">Built-in default</string>
     <string name="settings_prompt_custom">Custom</string>
-    <string name="settings_memory_management">Session Memory</string>
+    <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
     <string name="settings_side_key">Bottom Bar Side Key</string>
     <string name="settings_side_key_value">Right wing opens the session drawer</string>
@@ -304,4 +313,65 @@
     <string name="settings_netdiag_plan_all_ok_why">All nine checks passed</string>
     <string name="settings_netdiag_plan_all_ok_guide">Nothing to fix</string>
     <string name="settings_netdiag_action_probe">Run one real request</string>
+    <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
+    <string name="settings_voice_entry">Voice &amp; Wake</string>
+    <string name="settings_sub_voice_entry">Voice Input &amp; Wake</string>
+    <string name="settings_voice_switch_header">Voice</string>
+    <string name="settings_voice_asr_enabled">Speech recognition</string>
+    <string name="settings_voice_asr_enabled_secondary">Off: no recording, no network request</string>
+    <string name="settings_voice_auto_speak">Speak replies aloud</string>
+    <string name="settings_voice_auto_speak_secondary">Output side, independent of recognition</string>
+    <string name="settings_voice_live_transcript">Show words while speaking</string>
+    <string name="settings_voice_live_transcript_secondary">Intermediate results appear as you talk</string>
+    <string name="settings_voice_wake_header">Wake triggers</string>
+    <string name="settings_voice_wake_screen">Wake on screen on</string>
+    <string name="settings_voice_wake_lock">Wake on lock screen</string>
+    <string name="settings_voice_wake_removed">Removed · battery</string>
+    <string name="settings_voice_wake_removed_hint">An always-on mic wakes the audio path on every raise, so both wake triggers are gone</string>
+    <string name="settings_voice_entry_header">Explicit entries only</string>
+    <string name="settings_voice_entry_mic">Mic button in the input dialog</string>
+    <string name="settings_voice_entry_main_key">Hold the main key to talk</string>
+    <string name="settings_voice_power">Long-press power key</string>
+    <string name="settings_voice_power_value">Needs system button mapping</string>
+    <string name="settings_voice_power_hint">An app cannot receive KEYCODE_POWER; map the system button to this app in system settings</string>
+
+    <string name="settings_appearance">Appearance &amp; Matrix</string>
+    <string name="settings_sub_appearance">Appearance &amp; Dot Matrix</string>
+    <string name="settings_appearance_header">Theme</string>
+    <string name="settings_appearance_pure_black">Pure black background</string>
+    <string name="settings_appearance_pure_black_value">Always on · tokens fixed</string>
+    <string name="settings_appearance_theme">Theme mode</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_appearance_compact">Compact mode</string>
+    <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
+    <string name="settings_appearance_matrix_header">Dot matrix</string>
+    <string name="settings_appearance_matrix_spacing">Matrix spacing</string>
+    <string name="settings_appearance_web_only">Change this on the web console</string>
+
+    <string name="settings_web_tools_header">Web tools</string>
+    <string name="settings_flag_on">on</string>
+    <string name="settings_flag_off">off</string>
+
+    <string name="settings_memory_enabled">Long-term memory</string>
+    <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
+    <string name="settings_context_compress">Auto-compress context</string>
+    <string name="settings_context_compress_secondary">Compress history once occupancy passes the threshold</string>
+    <string name="settings_context_usage">Context usage</string>
+    <string name="settings_context_usage_value">%1$d turns cap · auto-compress %2$s</string>
+    <string name="settings_web_only_header">Web console only</string>
+    <string name="settings_context_window_web">Context window: set on the web console</string>
+    <string name="settings_context_truncation_web">Compress threshold and truncation strategy: web console</string>
+
+    <string name="settings_tools_provider_search">Provider-hosted web search</string>
+    <string name="settings_tools_provider_search_secondary">Falls back to built-in search when unavailable</string>
+
+    <string name="settings_model_default_thinking">Thinking on by default</string>
+    <string name="settings_model_default_thinking_secondary">New sessions request reasoning</string>
+
+    <string name="settings_role_cards_web">Role cards: web console</string>
+    <string name="settings_prompt_library_web">Prompt library: web console</string>
+    <string name="settings_opening_line_web">Opening line: web console</string>
+
 </resources>

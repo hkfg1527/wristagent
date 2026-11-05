@@ -134,6 +134,20 @@ class WearSpacingScaleTest {
     }
 
     @Test
+    fun rowGlyphsShrinkToTheNewTokens() {
+        assertEquals(6f, Wear.Size.StatusBlock.value, 0.001f)
+        assertEquals(10f, Wear.Size.ChevronGlyph.value, 0.001f)
+        assertEquals(44f, Wear.Size.SettingsBottomInset.value, 0.001f)
+        assertEquals(0f, Wear.Size.SettingsBottomInset.value % 2f, 0.001f)
+    }
+
+    @Test
+    fun pillRadiusIsWrittenIntoTheTokensAsAnExplicitException() {
+        assertTrue("Pill=" + Wear.Radius.Pill, Wear.Radius.Pill > Wear.Radius.Card)
+        assertTrue(Wear.Radius.Pill.value >= 999f)
+    }
+
+    @Test
     fun theSettingsScreenMetricsStayOnTheScale() {
         // 顶部时钟带 34dp、底栏预留 76dp、行间距 8dp、分区间距 16dp。
         assertEquals(34f, Wear.Size.TopContentInset.value, 0.001f)

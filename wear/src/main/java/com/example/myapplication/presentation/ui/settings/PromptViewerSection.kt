@@ -103,5 +103,11 @@ fun PromptViewerContent(
                 }
             )
         }
+
+        // 角色卡 / 提示词库 / 开场白是多记录列表与长文本，表端只留入口与去向说明
+        section(stringResource(R.string.settings_web_only_header))
+
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_role_cards_web)) }
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_opening_line_web)) }
     }
 }

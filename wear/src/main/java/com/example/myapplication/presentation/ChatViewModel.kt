@@ -10,6 +10,9 @@ import androidx.annotation.StringRes
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentExecutionState
 import com.example.myapplication.agent.AgentGateway
+import com.example.myapplication.agent.ReplySpeech
+import com.example.myapplication.agent.ReplySpeaker
+import com.example.myapplication.agent.VoiceDraftGate
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
@@ -54,7 +57,12 @@ class ChatViewModel(
     private val workScope: CoroutineScope = scope ?: viewModelScope
 
     private val throttle = StreamingThrottleState()
-    private val _uiState = MutableStateFlow(ChatUiState.initial(initialMainInputType))
+    private val _uiState = MutableStateFlow(
+        ChatUiState.initial(initialMainInputType, gateway.displayPreferences().compactMode)
+    )
+
+    /** 自动播报的 Android 出口：只在真有内容要播时报建，播报失败只记日志。 */
+    private var replySpeaker: ReplySpeaker? = null
 
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -113,6 +121,8 @@ class ChatViewModel(
     override fun onCleared() {
         gateway.onRequireConfirmation = null
         gateway.onReasoningEffortIgnored = null
+        replySpeaker?.release()
+        replySpeaker = null
         delayedStretchJob?.cancel()
         noticeJob?.cancel()
         pendingContinuation = null
@@ -217,6 +227,7 @@ class ChatViewModel(
         }
 
         if (newState.isFinished) {
+            speakReplyIfEnabled(newState.conversationBlocks)
             delayedStretchJob?.cancel()
             _uiState.update {
                 it.copy(
@@ -238,6 +249,16 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * 自动播报：只有设置里打开"自动播报回答"且这一轮确有一段非空助手正文时才朗读。
+     * 没有 TTS 引擎、初始化失败都只记日志（见 [ReplySpeaker]），绝不影响对话链路。
+     */
+    private fun speakReplyIfEnabled(blocks: List<ConversationBlock>) {
+        val text = ReplySpeech.spokenText(gateway.displayPreferences().autoSpeakReplies, blocks) ?: return
+        val speaker = replySpeaker ?: ReplySpeaker(getApplication<Application>()).also { replySpeaker = it }
+        speaker.speak(text)
+    }
+
     // ======================== 胶囊展开态 ========================
 
     /**
@@ -254,7 +275,12 @@ class ChatViewModel(
     private suspend fun awaitApprovalDecision(toolName: String, risk: RiskAssessment): Boolean {
         _uiState.update {
             it.copy(
-                pendingApproval = PendingApproval(toolName = toolName, risk = risk),
+                pendingApproval = PendingApproval(
+                    toolName = toolName,
+                    risk = risk,
+                    command = risk.commandText,
+                    rememberable = risk.rememberable && risk.commandText.isNotBlank()
+                ),
                 bottomBlockMode = BottomBlockMode.ACTION_ALLOW,
                 // 新一轮审批从完整态开始：上一轮放行留下的塌缩进度必须归零
                 isApprovalCollapsing = false
@@ -276,6 +302,22 @@ class ChatViewModel(
             pendingContinuation = null
             _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE) }
         }
+    }
+
+    /**
+     * 记住后放行：先把归一化命令写进 allowlist，再走正常放行。
+     * 破坏性命令写不进去（[AgentPreferences.rememberShellCommand] 直接拒绝），
+     * 因此这条路径不可能把危险命令变成"以后不再问"。
+     */
+    fun approvePendingAndRemember() {
+        val pending = _uiState.value.pendingApproval
+        if (pendingContinuation == null || _uiState.value.isApprovalCollapsing) return
+        if (pending == null || !pending.rememberable || pending.command.isBlank()) {
+            approvePending()
+            return
+        }
+        gateway.updatePreferences { it.rememberShellCommand(pending.command) }
+        approvePending()
     }
 
     /** 拒绝 / 返回键退出审批：立刻交回 false，不走塌缩动画。 */
@@ -400,6 +442,22 @@ class ChatViewModel(
                 isRecordingVoice = listening,
                 bottomBlockMode = if (listening) BottomBlockMode.RECORDING else BottomBlockMode.IDLE
             )
+        }
+    }
+
+    /**
+     * 语音识别的中间结果：只有设置里打开"边说边显示"才写进草稿；
+     * 关闭时草稿一动不动，最终结果仍走 [onVoiceResult] 提交。
+     */
+    fun onVoicePartial(partial: String) {
+        val live = gateway.displayPreferences().asrLiveTranscript
+        _uiState.update { current ->
+            val merged = VoiceDraftGate.merge(current.draft.text, partial, live)
+            if (merged == current.draft.text) {
+                current
+            } else {
+                current.copy(draft = current.draft.reduce(TextInputEvent.Change(merged)))
+            }
         }
     }
 

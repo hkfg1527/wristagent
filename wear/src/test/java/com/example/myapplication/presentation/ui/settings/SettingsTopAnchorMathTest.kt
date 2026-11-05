@@ -95,6 +95,20 @@ class SettingsTopAnchorMathTest {
     }
 
     @Test
+    fun shortTitleRowWouldPushTheWholeListDownUnderAutoCentering() {
+        // 标题行不再为了凑 spacer = 0 而撑到 86dp（那正是顶部 41dp 黑带的来源）。
+        // 行只有约 32dp 时，itemIndex = 1 会让库算出 ~60dp 的顶部 spacer ——
+        // 所以设置页显式传 autoCentering = null，顶部锚点只由 contentPadding.top 决定。
+        val spacerPx = SettingsTopAnchorMath.topSpacerPx(
+            viewportHeightPx = 466, // 233dp @2x 真机
+            itemGapPx = 8, // 4dp 行间距
+            centerItemSizePx = 80, // 组标题行 ~40dp
+            sizesAboveCenterItemPx = listOf(64) // 标题行 ~32dp
+        )
+        assertTrue("spacer=" + spacerPx + "px", spacerPx > 100)
+    }
+
+    @Test
     fun spacerIsZeroBeforeTheViewportIsMeasured() {
         // 首帧还没有视口尺寸：不制造 spacer，避免入场时先被推开一帧
         assertEquals(
@@ -107,26 +121,26 @@ class SettingsTopAnchorMathTest {
         )
     }
 
+    /** 根页顶部只给 24dp 渐变遮罩让位：行内不再额外留白（旧值 14dp，把顶部黑带撑到 41dp）。 */
     @Test
-    fun rootTitleStillLandsOnTheClockBandAfterTheItemGapWidens() {
-        // 行间距从旧的 8dp 加宽后会把整排往下顶：行内顶部留白必须同步收窄同样多，
-        // 标题文字顶边才能继续压在 34dp 时钟带下沿。这条是"改间距不许顶动标题"的阀门。
+    fun rootTitleInnerPaddingDropsToZero() {
+        assertEquals(0f, RootTitleTopPadding.value, 0.001f)
         assertEquals(
-            Wear.Size.TopContentInset.value,
-            Wear.Space.Sm.value + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value,
+            24f + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value,
+            28f,
             0.001f
         )
-        assertEquals(14f, RootTitleTopPadding.value, 0.001f)
     }
 
     @Test
-    fun subPageHeaderStillLandsOnTheClockBandAfterTheItemGapWidens() {
+    fun subPageHeaderClearsTheTopScrim() {
+        // 子页顶部内边距 4dp + 行间距 + 行内留白 == 24dp 遮罩下沿
+        assertEquals(16f, SubPageHeaderTopPadding.value, 0.001f)
         assertEquals(
-            Wear.Size.TopContentInset.value,
+            24f,
             Wear.Space.Xs.value + SettingsSpacingMath.ItemGapDp + SubPageHeaderTopPadding.value,
             0.001f
         )
-        assertEquals(18f, SubPageHeaderTopPadding.value, 0.001f)
     }
 
     private fun assertEquals(message: String, expected: Int, actual: Int) {

@@ -2,20 +2,50 @@ package com.example.myapplication.presentation.ui.settings
 
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * 设置页的几何常量与纯运算：不依赖 Compose，单测可以直接把"副标题不许被挤压""滑块台阶"这类
  * 硬约束钉死，避免以后再靠像素目测回归。
  */
 object SettingsLayoutMath {
-    /** 圆屏基准宽度：192dp。 */
-    const val ScreenWidthDp = 192f
+    /**
+     * 参考屏宽：192dp 是早期小屏的参考值，**不是真机**。
+     * 真机 TicWatch Pro 5 = 466px @320dpi = 233dp。
+     */
+    const val ReferenceScreenDp = 192f
 
     /** 左右安全边：圆屏最外侧不放任何内容。 */
     const val SideInsetDp = 12f
 
-    /** 单行内容宽度上限：192 − 12 × 2 = 168dp。 */
-    const val ContentWidthDp = ScreenWidthDp - SideInsetDp * 2f
+    /**
+     * 内容宽度硬上限 168dp。
+     *
+     * 这个数字不再由"屏宽减两条边距"推出 —— 那个公式在 233dp 屏上给 209dp、在 192dp 屏上给 168dp，
+     * 两种情况都会把内容画到物理圆周外。真正决定宽度的是**圆周**：见 [contentWidthDp]。
+     */
+    const val ContentWidthDp = 168f
+
+    /**
+     * 安全带半高：内容在圆心上下各 80dp 以内必须整体落在圆周内。
+     * 233dp 屏此时的弦长 169.4dp → 被 [ContentWidthDp] 截到 168dp，与真机实测内容盒一致。
+     */
+    const val SafeBandHalfHeightDp = 80f
+
+    /** 顶部渐变遮罩高度：也是设置页真正需要保护的顶部带（本页没有时钟，比聊天的 34dp 矮）。 */
+    const val TopScrimDp = 24f
+
+    /** 底部渐变遮罩高度：低于它内容就落到圆周外。 */
+    const val BottomScrimDp = 28f
+
+    /** 发丝线相对内容盒的左右内缩：线与文字左边缘对齐，而不是比文字宽出一截。 */
+    const val HairlineInsetDp = 8f
+
+    /** 行内左右内边距（行的实际 padding 值）。 */
+    const val RowHorizontalPaddingDp = 8f
+
+    /** 行尾箭头图形盒宽：与 Wear.Size.ChevronGlyph 同值。 */
+    const val ChevronGlyphDp = 10f
 
     /** 行内左右内边距。 */
     const val RowPaddingDp = 12f
@@ -29,10 +59,51 @@ object SettingsLayoutMath {
     /** 副标题可用宽度的硬下限。 */
     const val SubtitleMinWidthDp = 96f
 
-    /** 内容宽度：跟随屏宽收窄，但永远不超过 [ContentWidthDp]。 */
-    fun contentWidthDp(screenWidthDp: Float, sideInsetDp: Float = SideInsetDp): Float {
+    /**
+     * 内容宽度 = 圆周在安全带两端的弦长，且不超过 [ContentWidthDp]。
+     *
+     * 弦长公式 2·sqrt(r² − h²)：r = 屏宽/2、h = [SafeBandHalfHeightDp]。
+     * 屏宽收到 2h 以下时该高度上根本不存在圆周内的横向空间，返回 0 而不是负数。
+     */
+    fun contentWidthDp(screenWidthDp: Float, halfSafeBandDp: Float = SafeBandHalfHeightDp): Float {
         if (screenWidthDp <= 0f) return 0f
-        return (screenWidthDp - sideInsetDp * 2f).coerceIn(0f, ContentWidthDp)
+        val radiusDp = screenWidthDp / 2f
+        if (radiusDp <= halfSafeBandDp) return 0f
+        val chordDp = 2f * sqrt(radiusDp * radiusDp - halfSafeBandDp * halfSafeBandDp)
+        return chordDp.coerceIn(0f, ContentWidthDp)
+    }
+
+    /**
+     * 内容盒的左右内缩：让"屏宽 − 两条内缩"恰好等于 [contentWidthDp]。
+     *
+     * 真机 233dp 屏：(233 − 168) / 2 = 32.5dp —— 与评审实测的实际左右边距 32.5dp 完全一致，
+     * 因此这条公式在真机上不改变任何版面；它修的是窄屏：192dp 屏的弦长只有 106.1dp，
+     * 内缩 42.9dp 之后内容才不会画到物理圆周外。
+     */
+    fun sideInsetDp(screenWidthDp: Float): Float {
+        if (screenWidthDp <= 0f) return SideInsetDp
+        val half = (screenWidthDp - contentWidthDp(screenWidthDp)) / 2f
+        return half.coerceAtLeast(SideInsetDp)
+    }
+
+    /**
+     * 行内三段同行时标题还剩多少宽度：内容宽 − 左右内边距 − 标题↔取值 − 取值自身 − 取值↔尾标 − 尾标。
+     *
+     * 用途是钉住"取值不许无限长"：换成状态词（约 36dp）后标题仍有 87dp，
+     * 而一段 88dp 的裸模型名会把标题压到 35dp —— 那正是"标题折行且取值被截"的成因。
+     */
+    fun titleBudgetDp(
+        valueWidthDp: Float,
+        contentWidthDp: Float = ContentWidthDp,
+        rowPaddingDp: Float = RowHorizontalPaddingDp,
+        titleToValueDp: Float = SettingsSpacingMath.TitleToValueDp,
+        valueToTailDp: Float = SettingsSpacingMath.ValueToTailDp,
+        tailWidthDp: Float = ChevronGlyphDp,
+    ): Float {
+        if (contentWidthDp <= 0f) return 0f
+        val remaining = contentWidthDp - rowPaddingDp * 2f - titleToValueDp - valueWidthDp -
+            valueToTailDp - tailWidthDp
+        return remaining.coerceAtLeast(0f)
     }
 
     /** 徽章与副标题同行时，副标题还剩多少可用宽度。 */
@@ -118,9 +189,10 @@ object SettingsValueMath {
  * `spacer = (viewportCenter − itemGap − itemOffset − centerItemSize/2 − Σ(前序项 size + itemGap)).coerceAtLeast(0)`，
  * 首项顶边 `y = contentPaddingTop + spacer + itemGap`。
  *
- * itemIndex 取 0（本页原配置）时 spacer 接近半屏，标题被推到中间、上方留下大片空白 —— 这就是用户看到的现象。
- * itemIndex 取 1（首项是标题，不该被居中，官方文档推荐的 ListHeader 布局）时 spacer 恒为 0，
- * 标题顶边落在 `contentPaddingTop + itemGap`，上方只剩这一行行间距。
+ * itemIndex 取 0 时 spacer 接近半屏，标题被推到中间、上方留下大片空白。
+ * itemIndex 取 1 只有在"标题行足够高"（旧版为凑这一点把它撑到 86dp）时 spacer 才为 0；
+ * 标题行收到 32dp 之后它会重新撑出 26~60dp 空白 —— 于是设置页最终传 autoCentering = null，
+ * 顶部锚点退回 `contentPaddingTop + itemGap`，位置只由常量决定。下面的公式保留下来当推导工具与决策证据。
  */
 object SettingsTopAnchorMath {
     /** 自动居中在首项之前占用的高度（px）；0 表示首项直接贴到内容区顶边。 */
@@ -179,8 +251,16 @@ object SettingsSpacingMath {
     /** 分隔线与微呼吸的厚度：唯一离开 [GridDp] 网格的尺寸。 */
     const val HairlineDp = 1f
 
-    /** 相邻两行之间的垂直留白：旧值 8dp（[Wear.Space.Sm]）再放开 4dp。 */
-    const val ItemGapDp = 12f
+    /**
+     * 相邻两行之间的垂直留白：4dp，一档最小呼吸。
+     *
+     * 旧值 12dp 让步进变成 57dp —— 233dp 屏每屏只有 ~3 个完整行，14 行要滚 3.4 屏。
+     * 收到 4dp 后步进 49dp，每屏 4.7 行，行高本身（44dp 触控下限）一个像素没动。
+     */
+    const val ItemGapDp = 4f
+
+    /** 正文 CJK 行高（sp）：14sp × 1.43，旧值 1.18 倍让中文行间墨距只剩 3.5dp。 */
+    const val BodyLineHeightSp = 20f
 
     /** 组标题下方到本组首行之间的留白：旧值 4dp（[Wear.Space.Xs]），现在与行间距同档。 */
     const val SectionHeaderBottomDp = 12f
@@ -194,6 +274,9 @@ object SettingsSpacingMath {
     /** 行高下限：低于这个值就不再是可靠触控热区。 */
     const val MinRowHeightDp = 44f
 
+    /** 一行的实际步进：行高 + 发丝线 + 行间距 = 44 + 1 + 4 = 49dp。 */
+    const val RowStepDp = MinRowHeightDp + HairlineDp + ItemGapDp
+
     /** 必须落在 [GridDp] 网格上的块级留白清单。 */
     val BlockGapsDp: List<Float> = listOf(ItemGapDp, SectionHeaderBottomDp)
 
@@ -203,5 +286,9 @@ object SettingsSpacingMath {
 
     /** 行高是否满足触控下限。 */
     fun meetsTouchTarget(rowHeightDp: Float): Boolean = rowHeightDp >= MinRowHeightDp
+
+    /** 一屏能放下多少行：商而不是取整结果，由调用方决定怎么用。 */
+    fun rowsPerScreen(screenHeightDp: Float, rowStepDp: Float = RowStepDp): Float =
+        if (rowStepDp <= 0f) 0f else screenHeightDp / rowStepDp
 }
 

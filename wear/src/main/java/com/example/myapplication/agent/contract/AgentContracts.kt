@@ -73,5 +73,9 @@ data class RiskAssessment(
     val requireCooldownSeconds: Int = 0,      // 审批滑块强制冷却倒计时 (秒)
     val whatItDoes: String = "",              // 这条命令会做什么（AI 生成，<=40 汉字）
     val worstCase: String = "",               // 最坏情况（AI 生成，<=40 汉字）
-    val aiRiskLevel: RiskLevel = RiskLevel.MEDIUM
+    val aiRiskLevel: RiskLevel = RiskLevel.MEDIUM,
+    /** 待执行命令原文：特权 shell 工具才有值，审批页原样展示，也是"记住此命令"的键。 */
+    val commandText: String = "",
+    /** 是否允许被"记住此命令"永久放行；破坏性命令恒为 false。 */
+    val rememberable: Boolean = true
 )

@@ -21,8 +21,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
@@ -31,6 +31,7 @@ import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
 import com.example.myapplication.presentation.ui.CameraCurve
+import com.example.myapplication.presentation.ui.ChatVisualMetrics
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
 import com.example.myapplication.presentation.ui.SpringStreamingText
@@ -40,13 +41,16 @@ import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
 import com.example.myapplication.presentation.ui.chat.CapsuleKeys
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
+import com.example.myapplication.presentation.ui.settings.SettingsSpacingMath
 import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
- * 对话卡片宽度上限：240dp 圆屏减去两侧 [Wear.Space.Lg] 后四周仍留 20dp，
- * 长回复不再贴着圆屏边缘被裁；用户气泡同样收在此宽度内保持右对齐。
+ * 对话卡片宽度上限：184dp（见 [ChatVisualMetrics]）。
+ *
+ * 旧值 200dp = 屏宽 85.8%，最外墨迹半径 113.1dp / 116.5dp —— 只剩 3.4dp 余量，贴边。
+ * 收到 184dp 后左右各留 24.5dp，长回复与用户气泡都不会碰圆周。
  */
-private val ConversationCardMaxWidth = 200.dp
+private val ConversationCardMaxWidth = ChatVisualMetrics.BubbleMaxWidthDp.dp
 
 /**
  * 顶部时钟带遮罩色：不是纯黑，留约 14% 透明让内容隐约透出（用户要求"别那么黑"）。
@@ -203,7 +207,11 @@ internal fun ConversationList(
                             UserChatBubble(modifier = Modifier.widthIn(max = ConversationCardMaxWidth)) {
                                 BasicText(
                                     text = item.block.content,
-                                    style = Wear.TextBody
+                                    // CJK 行距 1.43×：旧值继承 bodyMedium 的 1.18 倍，
+                                    // 中文行间墨距只剩 3.5dp，整段读成一堵灰墙
+                                    style = Wear.TextBody.copy(
+                                        lineHeight = SettingsSpacingMath.BodyLineHeightSp.sp
+                                    )
                                 )
                             }
                         }

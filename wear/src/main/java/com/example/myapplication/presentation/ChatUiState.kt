@@ -24,7 +24,11 @@ const val ApprovalCollapseDurationMs = 220
 /** 审批挂起项：文案浮层与底栏滑轨共用同一份风险评估。 */
 data class PendingApproval(
     val toolName: String,
-    val risk: RiskAssessment
+    val risk: RiskAssessment,
+    /** 待执行命令原文：run_shell 与自写工具才有值，浮层用它替掉"改动"那一块。 */
+    val command: String = "",
+    /** 是否允许"记住此命令"：破坏性命令恒为 false，记住也永不生效。 */
+    val rememberable: Boolean = false
 )
 
 /**
@@ -62,7 +66,12 @@ data class ChatUiState(
      * 已展开的胶囊键（见 CapsuleKeys）：把展开态提升到 ViewModel，
      * 列表滚动回收、重组、切到设置页再返回都不会把用户点开的胶囊折回去。
      */
-    val expandedCapsules: Set<String> = emptySet()
+    val expandedCapsules: Set<String> = emptySet(),
+    /**
+     * 简洁模式：压掉正文块间距与副标题行。纯展示标志，值来自设置项 compactMode，
+     * 内容与排版由 UI 侧消费（本层只保证这个事实只有一个来源）。
+     */
+    val compactMode: Boolean = false
 ) {
     /** 时间线交错块：列表分组与镜头跟随的唯一数据源。 */
     val blocks: List<ConversationBlock> get() = agentState.conversationBlocks
@@ -88,8 +97,8 @@ data class ChatUiState(
     val activeSession: ChatSession get() = sessions.firstOrNull { it.id == activeSessionId } ?: sessions.first()
 
     companion object {
-        /** 启动态：单会话、就绪、空闲底栏。 */
-        fun initial(mainInputType: MainInputType): ChatUiState {
+        /** 启动态：单会话、就绪、空闲底栏；[compactMode] 取设置里的简洁模式。 */
+        fun initial(mainInputType: MainInputType, compactMode: Boolean = false): ChatUiState {
             val firstSession = ChatSession(
                 id = "session_default",
                 title = "当前对话",
@@ -121,7 +130,8 @@ data class ChatUiState(
                 isSessionDrawerOpen = false,
                 isRecordingVoice = false,
                 draft = TextInputState(),
-                notice = null
+                notice = null,
+                compactMode = compactMode
             )
         }
     }

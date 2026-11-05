@@ -37,6 +37,12 @@ interface AgentGateway {
     /** 偏好写入的唯一入口：lambda 直接在真实 AgentPreferences 上生效。 */
     fun updatePreferences(update: (AgentPreferences) -> Unit)
 
+    /**
+     * 展示与出向语音的只读快照（紧凑模式 / 自动播报 / 边说边显示）。
+     * 默认实现给出"全关"，测试替身不必实现就能编译。
+     */
+    fun displayPreferences(): AgentDisplayPreferences = AgentDisplayPreferences()
+
     /** 当前已注册的工具定义。 */
     fun registeredTools(): List<ToolDefinition>
 
@@ -87,6 +93,12 @@ class AgentRepository(
     override fun snapshotHistory(): List<ChatMessage> = dispatcher.getConversationHistory()
 
     override fun updatePreferences(update: (AgentPreferences) -> Unit) = update(preferences)
+
+    override fun displayPreferences(): AgentDisplayPreferences = AgentDisplayPreferences(
+        compactMode = preferences.compactMode,
+        autoSpeakReplies = preferences.autoSpeakReplies,
+        asrLiveTranscript = preferences.asrLiveTranscript
+    )
 
     override fun registeredTools(): List<ToolDefinition> = dispatcher.getRegisteredTools()
 

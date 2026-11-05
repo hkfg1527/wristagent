@@ -75,7 +75,8 @@ fun TopClockBar(
             ),
             maxSweepAngle = CLOCK_MAX_SWEEP_DEGREES,
             // 默认角向（Normal）即为贴合顶缘的 ∩ 弧：两端下垂、中间最高，且字形正立
-            color = Wear.Palette.TextPrimary,
+            // 时钟比行标题暗一档（黑底 9.79:1）：19.57:1 的纯白会和主键白形成两个焦点
+            color = Wear.Palette.Clock,
             // 字号/字重取自主题注入的官方弧形字阶（Typography.arcMedium），不再本地缩放
             fontSize = arcStyle.fontSize,
             fontWeight = arcStyle.fontWeight

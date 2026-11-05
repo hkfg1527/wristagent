@@ -246,13 +246,20 @@ internal fun ApprovalFloatingLayer(
                         )
                     }
 
-                    // 块三：改了什么的直白说明（空文案整块不占位）
-                    if (whatItDoes.isNotBlank()) {
+                    // 块三：特权工具直接展示命令原文（审批的依据就是这条命令），其余工具展示"改动了什么"
+                    val commandText = risk?.commandText.orEmpty()
+                    val blockThreeLabelRes = if (commandText.isNotBlank()) {
+                        R.string.wearchat_approval_label_command
+                    } else {
+                        R.string.wearchat_approval_label_change
+                    }
+                    val blockThreeText = if (commandText.isNotBlank()) commandText else whatItDoes
+                    if (blockThreeText.isNotBlank()) {
                         FloatingApprovalText(slot = 2) {
                             BasicText(
                                 text = approvalParagraph(
-                                    stringResource(R.string.wearchat_approval_label_change),
-                                    whatItDoes,
+                                    stringResource(blockThreeLabelRes),
+                                    blockThreeText,
                                     centeredBody,
                                     Wear.TextCaption
                                 ),

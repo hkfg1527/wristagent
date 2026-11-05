@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -49,8 +50,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
@@ -62,6 +67,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -72,8 +78,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
@@ -93,8 +99,19 @@ import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
-/** 所有设置页共用的内容宽度上限：192dp 圆屏两侧各让出 12dp 安全边。 */
+/** 所有设置页共用的内容宽度上限：按圆周弦长推导，硬上限 168dp。 */
 val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
+
+/**
+ * 当前屏宽下的内容盒左右内缩（dp）：弦长推出来的值，真机 233dp 屏为 32.5dp。
+ *
+ * 用它替代固定的 12dp 内边距，窄屏（192dp）上的内容才不会画到圆周外。
+ */
+@Composable
+fun settingsSideInset(): Dp {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    return SettingsLayoutMath.sideInsetDp(screenWidthDp.toFloat()).dp
+}
 
 /** 单行 44dp 触控热区之间的最小留白。 */
 val SettingsTouchGap: Dp = Wear.Space.Sm
@@ -118,20 +135,28 @@ private val SettingsValueTailGap: Dp = SettingsSpacingMath.ValueToTailDp.dp
 private val SettingsSectionGap = Wear.Space.Lg
 
 /**
- * 根页标题行内的顶部留白：列表顶部内边距 8dp + 行间距 8dp + 本留白 = 34dp 时钟带下沿。
+ * 根页列表顶部内边距：等于顶部渐变遮罩高度。
  *
- * 行顶边本身已经被列表内边距与行间距压在 16dp，行内只需要补齐差额，
- * 标题文字才会紧贴时钟带下沿而不是被重新顶到屏幕中部。
+ * 本页没有曲面时钟，遮罩只需要挡住"内容滚到圆屏最上沿"的那 24dp；
+ * 标题必须从遮罩下沿才开始，否则它自己就被遮罩按住变暗 —— 那会让全屏唯一焦点丢掉对比度。
+ */
+val RootContentTopPadding: Dp = SettingsLayoutMath.TopScrimDp.dp
+
+/**
+ * 根页标题行内的顶部留白：遮罩 24dp + 列表顶部内边距 24dp + 行间距 4dp 之后**不需要**再补。
+ *
+ * 旧值 14dp 是给 34dp 时钟带让位的（本页没有时钟），把它和 8dp 内边距、12dp 行距叠起来
+ * 就是顶部 41dp 纯黑 = 屏高 17.6%。现在归零。
  */
 val RootTitleTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
-    topInsetDp = Wear.Size.TopContentInset.value,
-    contentPaddingTopDp = Wear.Space.Sm.value,
+    topInsetDp = SettingsLayoutMath.TopScrimDp,
+    contentPaddingTopDp = RootContentTopPadding.value,
     itemGapDp = SettingsSpacingMath.ItemGapDp
 ).dp
 
-/** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp，行内相应多占 4dp。 */
+/** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp，行内补齐到 24dp 遮罩下沿。 */
 val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
-    topInsetDp = Wear.Size.TopContentInset.value,
+    topInsetDp = SettingsLayoutMath.TopScrimDp,
     contentPaddingTopDp = Wear.Space.Xs.value,
     itemGapDp = SettingsSpacingMath.ItemGapDp
 ).dp
@@ -178,7 +203,19 @@ enum class SettingsSubDialog {
     PRIVILEGE,
     REMOTE_CONSOLE,
     SECURITY_GUARDRAIL,
-    NETWORK_DIAGNOSTICS
+    NETWORK_DIAGNOSTICS,
+
+    /** 语音与唤醒：显式入口收敛后的唯一设置面。 */
+    VOICE_ENTRY,
+
+    /** 外观与点阵：纯黑 / 主题模式只读回显，简洁模式与点阵间距可改。 */
+    APPEARANCE,
+
+    /** 提示词中转页：系统提示词 + 会话与上下文合并后的根页入口。 */
+    PROMPT_CONTEXT,
+
+    /** 关于中转页：快捷操作 / 重看引导 / 特权执行 / 网络体检的根页入口。 */
+    ABOUT
 }
 
 /** 一条已登记的行：分区标题与内容行必须区分，因为只有内容行之间才画分隔线。 */
@@ -266,17 +303,24 @@ fun SettingsSubPage(
             flingBehavior = ScrollableDefaults.flingBehavior(),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
+            // 曲率缩放关死：边缘行不再缩到 75% 并淡出，同一行在任何滚动位置尺寸一致 ——
+            // 这是"左边缘 41.0 → 52.5dp 连续漂移 11.5dp"的唯一根因（旧默认 edgeScale = 0.5）。
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 1f,
+                edgeAlpha = 1f
+            ),
             contentPadding = PaddingValues(
-                start = Wear.Space.Md,
-                end = Wear.Space.Md,
+                start = settingsSideInset(),
+                end = settingsSideInset(),
                 top = Wear.Space.Xs,
-                bottom = Wear.Size.BottomBarReserve
+                bottom = Wear.Size.SettingsBottomInset
             ),
             verticalArrangement = Arrangement.spacedBy(SettingsItemGap),
-            // itemIndex = 1：自动居中项是第一条内容行，头部行不再被居中 ——
-            // 于是滚到最顶时头部贴在上方内容区顶边，而不是停在屏幕正中、上面留半屏空白。
-            // 居中只影响两端边界，滚动过程一像素都不变（详见 SettingsTopAnchorMath）。
-            autoCentering = AutoCenteringParams(itemIndex = 1)
+            // 关掉 autoCentering：它会在首项之上插入
+            // (viewportCenter − Σ前序高度) 的 spacer。头部行现在只有 32dp（不再为凑 spacer=0 而撑到
+            // 86dp），算出来的 spacer 会是 26dp 级的空白 —— 那正是"顶部一大片黑再出现内容"的老问题。
+            // 传 null 后顶部锚点就是 contentPadding.top，几何完全由常量决定（详见 SettingsTopAnchorMath）。
+            autoCentering = null
         ) {
             val rowCount = content.size + 2
 
@@ -314,8 +358,50 @@ fun SettingsSubPage(
             }
         }
 
+        SettingsEdgeScrim()
+
         overlay()
     }
+}
+
+/**
+ * 顶部/底部渐变遮罩：只在两端各压一条，内容滚到边缘时淡出而不是硬切。
+ *
+ * 纯绘制层，没有任何指针修改器，因此不会抢走列表的拖动、表冠或下拉退出手势。
+ * 参数与 contentPadding 一一对应：遮罩高 [SettingsLayoutMath.TopScrimDp] /
+ * [SettingsLayoutMath.BottomScrimDp]，底部可达高度 [Wear.Size.SettingsBottomInset] 大于后者，
+ * 所以最后一行永远不会停在遮罩里。
+ */
+@Composable
+fun SettingsEdgeScrim(modifier: Modifier = Modifier) {
+    val topPx = SettingsLayoutMath.TopScrimDp.dp
+    val bottomPx = SettingsLayoutMath.BottomScrimDp.dp
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .drawWithContent {
+                val top = topPx.toPx()
+                val bottom = bottomPx.toPx()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Wear.Palette.Bg, Color.Transparent),
+                        startY = 0f,
+                        endY = top
+                    ),
+                    topLeft = Offset.Zero,
+                    size = Size(size.width, top)
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Wear.Palette.Bg),
+                        startY = size.height - bottom,
+                        endY = size.height
+                    ),
+                    topLeft = Offset(0f, size.height - bottom),
+                    size = Size(size.width, bottom)
+                )
+            }
+    )
 }
 
 /** 行间 1dp 分隔线：页面里唯一的"容器"，取代逐行卡片。 */
@@ -325,6 +411,8 @@ fun SettingsRowDivider() {
         modifier = Modifier
             .fillMaxWidth()
             .height(SettingsDividerThickness)
+            // 线内缩到与行内文字同一条左边缘：线比它切的文字宽 8.5dp/侧时，读起来像"看不见的卡片"
+            .padding(horizontal = SettingsLayoutMath.HairlineInsetDp.dp)
             .background(Wear.Palette.Border)
     )
 }
@@ -441,17 +529,18 @@ fun SettingsNavRow(
             text = title,
             modifier = Modifier.weight(1f),
             style = SettingsRowTitleStyle,
-            // 标题允许换行而不是省略：168dp 内容宽下，"端侧工具与 MCP + 6/6 已启用 + 箭头"
-            // 三段挤一行会把标题裁成"端侧工…"，宁可多占一行也要让用户读全。
-            maxLines = 2,
+            // 标题**单行**：折行会让取值钉在 2 行块的中线上"悬空"，而且同一行两处受伤
+            // （标题折行 + 取值被截）。标题放不下时由取值让位（取值上限 88dp + 省略号），
+            // 文案侧同步缩短到 5 个汉字以内。
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (value != null) {
             Spacer(Modifier.width(SettingsTitleValueGap))
             BasicText(
                 text = value,
-                // 值收窄到 72dp，把宽度让给标题（原来 96dp 会把标题压到 50dp）
-                modifier = Modifier.widthIn(max = 72.dp),
+                // 取值上限 88dp：旧 72dp 会把"deepseek-chat"截成 68dp 的墨迹
+                modifier = Modifier.widthIn(max = 88.dp),
                 style = SettingsRowValueStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -466,13 +555,13 @@ fun SettingsNavRow(
     }
 }
 
-/** 行标题统一样式：secondary 色，把视线全部让给页面标题。 */
+/** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
 private val SettingsRowTitleStyle: TextStyle
-    @Composable get() = Wear.TextBody.copy(color = Wear.Palette.TextSecondary)
+    @Composable get() = Wear.TextRowTitle
 
-/** 行值统一样式：muted 色，只做参照，不抢注意力。 */
+/** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
 private val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextCaption.copy(color = Wear.Palette.TextMuted)
+    @Composable get() = Wear.TextRowValue
 
 /** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
 @Composable
@@ -488,7 +577,8 @@ private fun SettingsStatusBlock(description: String, tone: Tone) {
 
 /** [Tone] 到令牌色的唯一映射，避免状态色散落在各处。 */
 private fun Tone.statusBlockColor(): Color = when (this) {
-    Tone.ACCENT -> Wear.Palette.Accent
+    // 静态属性不该是焦点：主色压到 60%（= AccentTrack，黑底 5.29:1），不再满饱和抢页面标题
+    Tone.ACCENT -> Wear.Palette.AccentTrack
     Tone.DANGER -> Wear.Palette.Danger
     Tone.MUTED -> Wear.Palette.TextMuted
 }
@@ -507,14 +597,16 @@ fun SettingsSwitchRow(
         onCheckedChange = onCheckedChange,
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
+        // 容器一律透明：行本身就是"裸行 + 发丝线"，控件再自带一块实底就成了第二层卡片。
+        // 旧值：ON 态 #0E3A4E 整块实色（质量 ≈3–4 条 30dp 胶囊）、OFF 态 #10141A 边界 1.14:1 看不见。
         colors = SwitchButtonDefaults.switchButtonColors(
-            checkedContainerColor = Wear.Palette.AccentDim,
-            checkedContentColor = Wear.Palette.Accent,
-            checkedSecondaryContentColor = Wear.Palette.Accent,
+            checkedContainerColor = Color.Transparent,
+            checkedContentColor = Wear.Palette.TextPrimary,
+            checkedSecondaryContentColor = Wear.Palette.TextSecondary,
             checkedThumbColor = Wear.Palette.Orb,
-            checkedTrackColor = Wear.Palette.Accent,
-            checkedTrackBorderColor = Wear.Palette.Accent,
-            uncheckedContainerColor = Wear.Palette.Surface,
+            checkedTrackColor = Wear.Palette.AccentTrack,
+            checkedTrackBorderColor = Wear.Palette.AccentTrack,
+            uncheckedContainerColor = Color.Transparent,
             uncheckedContentColor = Wear.Palette.TextPrimary,
             uncheckedSecondaryContentColor = Wear.Palette.TextSecondary,
             uncheckedThumbColor = Wear.Palette.TextSecondary,
@@ -599,8 +691,9 @@ fun SettingsSliderRow(
             modifier = Modifier.fillMaxWidth(),
             valueRange = valueRange,
             shape = MaterialTheme.shapes.medium,
+            // 容器透明：滑轨自己就是控件，不需要再垫一块 Surface
             colors = SliderDefaults.sliderColors(
-                containerColor = Wear.Palette.Surface,
+                containerColor = Color.Transparent,
                 buttonIconColor = Wear.Palette.TextPrimary,
                 selectedBarColor = Wear.Palette.Accent,
                 unselectedBarColor = Wear.Palette.SurfaceAlt,
@@ -625,15 +718,16 @@ fun SettingsRadioRow(
         onSelect = onSelect,
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
+        // 同开关：容器透明，选中态只由圆点与文字色表达，不再垫一块实底
         colors = RadioButtonDefaults.radioButtonColors(
-            selectedContainerColor = Wear.Palette.AccentDim,
-            selectedContentColor = Wear.Palette.Accent,
-            selectedSecondaryContentColor = Wear.Palette.Accent,
+            selectedContainerColor = Color.Transparent,
+            selectedContentColor = Wear.Palette.TextPrimary,
+            selectedSecondaryContentColor = Wear.Palette.TextSecondary,
             selectedControlColor = Wear.Palette.Accent,
-            unselectedContainerColor = Wear.Palette.Surface,
+            unselectedContainerColor = Color.Transparent,
             unselectedContentColor = Wear.Palette.TextSecondary,
-            unselectedSecondaryContentColor = Wear.Palette.TextMuted,
-            unselectedControlColor = Wear.Palette.TextMuted
+            unselectedSecondaryContentColor = Wear.Palette.TextSecondary,
+            unselectedControlColor = Wear.Palette.TextDim
         ),
         contentPadding = PaddingValues(
             horizontal = Wear.Space.Md,
@@ -901,10 +995,19 @@ private fun SettingsSecondaryLabel(text: String, maxLines: Int = 1) {
     )
 }
 
-/** 右向折线箭头，与列表行一致。 */
+/**
+ * 右向折线箭头，与列表行一致。
+ *
+ * 几何：10dp 图形盒 + 1.5dp 描边（12dp/2dp 在 12sp 取值旁边偏重），
+ * 并整体下移 1dp 补齐"墨心比同行文字高 1.0dp"的光学偏差。
+ */
 @Composable
 fun ChevronMark() {
-    Canvas(modifier = Modifier.size(Wear.Space.Md)) {
+    Canvas(
+        modifier = Modifier
+            .offset(y = 1.dp)
+            .size(Wear.Size.ChevronGlyph)
+    ) {
         val path = Path().apply {
             moveTo(size.width * 0.3f, size.height * 0.2f)
             lineTo(size.width * 0.7f, size.height * 0.5f)
@@ -912,9 +1015,9 @@ fun ChevronMark() {
         }
         drawPath(
             path = path,
-            color = Wear.Palette.TextMuted,
+            color = Wear.Palette.TextDim,
             style = Stroke(
-                width = 2.dp.toPx(),
+                width = 1.5.dp.toPx(),
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -942,6 +1045,7 @@ private const val PullDownDismissLogTag = "PullDownDismiss"
  *
  * 改用 scaling 空间的可见项判断：visibleItemsInfo 已剔除两侧 Spacer，首项 index == 0 即视觉顶部。
  * 列表只要滚离顶部，首项 index 立刻 > 0，中部拖动一个像素都不会被吃。
+ * （设置页现在传 autoCentering = null，这条判据在新配置下依然成立，因此不必再分两种情形。）
  */
 internal fun ScalingLazyListState.isAtScrollTop(): Boolean {
     val first = layoutInfo.visibleItemsInfo.firstOrNull() ?: return true

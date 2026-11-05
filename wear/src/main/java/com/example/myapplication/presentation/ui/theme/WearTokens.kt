@@ -21,12 +21,24 @@ object Wear {
         val Bg = Color(0xFF000000)
         val Surface = Color(0xFF10141A)
         val SurfaceAlt = Color(0xFF171C24)
-        val Border = Color(0xFF232A35)
+
+        /** 发丝线：黑底 1.73:1，OLED 上"时有时无"的下限，再暗就等于没画。 */
+        val Border = Color(0xFF2E3644)
         val TextPrimary = Color(0xFFF5F7FA)
+
+        /** 行取值：黑底 6.94:1，12sp 小字也过 WCAG AA。 */
         val TextSecondary = Color(0xFF8B95A5)
+
+        /** 旧的行取值色：黑底只有 3.87:1，低于 AA，已不许承载任何文字。 */
         val TextMuted = Color(0xFF5F6B7A)
+
+        /** 次要图形（行尾箭头、胶囊秒数）：黑底 5.04:1，比正文暗一档但仍过 AA。 */
+        val TextDim = Color(0xFF737D8C)
         val Accent = Color(0xFF4FC3F7)
         val AccentDim = Color(0xFF0E3A4E)
+
+        /** 强调色的"轨道位"：等效主色压到 60% 不透明（黑底 5.29:1），用于开关轨道、状态点等静态指示。 */
+        val AccentTrack = Color(0xFF3788AD)
         /** 中度风险黄：审批页中风险等级的标题、危险条与滑轨强调色。 */
         val Warning = Color(0xFFF5B942)
         /** 重度风险黄红：审批页高风险等级的强调色，红之前先亮黄。 */
@@ -36,7 +48,10 @@ object Wear {
         val Success = Color(0xFF4ADE80)
 
         /** 主键冷银白：IDLE 单体键与审批胶囊底条共用，让审批态是同一颗键的延续，而不是另起一条深色胶囊。 */
-        val Orb = Color(0xFFE8EDF5)
+        val Orb = Color(0xFFCDD3DC)
+
+        /** 曲面时钟：比行标题暗一档（黑底 9.79:1），时钟不再和主键抢第二个焦点。 */
+        val Clock = Color(0xFFA8B2C0)
     }
 
     /**
@@ -50,6 +65,12 @@ object Wear {
     object Radius {
         val Control = 12.dp
         val Card = 24.dp
+
+        /**
+         * 全圆例外：取值远大于任何胶囊高度，任何尺寸下渲染结果都是"两端半圆"。
+         * 尺寸可变的胶囊（思考小胶囊）用它，而不是在页面里各写一份"高度一半"。
+         */
+        val Pill = 999.dp
     }
 
     /** 间距令牌：只允许 4 的倍数，取值集合固定为 4 / 8 / 12 / 16 / 24。 */
@@ -71,7 +92,17 @@ object Wear {
         /** 底栏保留区：主键 52dp + 底距 12dp + 12dp 余量，尽量把高度让给正文 */
         val BottomBarReserve = 76.dp
         /** 行尾状态色块：只用一块颜色表示状态，不和大段文字抢注意力 */
-        val StatusBlock = 8.dp
+        val StatusBlock = 6.dp
+
+        /** 行尾箭头图形盒：12dp 在 14sp 正文旁边偏重，收到 10dp。 */
+        val ChevronGlyph = 10.dp
+
+        /**
+         * 设置页底部可达高度：44dp = 底部 28dp 渐变遮罩 + 16dp 余量。
+         *
+         * 不能用聊天页的 [BottomBarReserve] 76dp —— 设置页没有主键，76dp 会把最后一行永久挡在半空。
+         */
+        val SettingsBottomInset = 44.dp
         /**
          * 列表末端可达高度（bottom padding），**恒等于** [BottomBarReserve]。
          *
@@ -109,6 +140,16 @@ object Wear {
 
     /** 说明档：官方 bodySmall。 */
     val TextCaption: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
+
+    /** 设置行标题档：官方 bodyMedium + 主色（黑底 19.57:1），层级由字号而非"整体压暗"承担。 */
+    val TextRowTitle: TextStyle
+        @Composable @ReadOnlyComposable
+        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextPrimary)
+
+    /** 设置行取值档：官方 bodySmall + 次色（黑底 6.94:1），12sp 小字也必须过 AA。 */
+    val TextRowValue: TextStyle
         @Composable @ReadOnlyComposable
         get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
 

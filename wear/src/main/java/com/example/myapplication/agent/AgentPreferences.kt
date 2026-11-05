@@ -11,8 +11,10 @@ import com.example.myapplication.voice.AsrSettings
 /**
  * Agent 与表盘偏好设置持久化仓库
  */
-class AgentPreferences(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("agent_prefs", Context.MODE_PRIVATE)
+class AgentPreferences internal constructor(private val prefs: SharedPreferences) {
+
+    /** 生产入口：真机只有这一个存储后端，[prefs] 注入仅为单测提供纯 JVM 接缝。 */
+    constructor(context: Context) : this(context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE))
 
     var securityMode: SecurityMode
         get() {
@@ -138,6 +140,44 @@ class AgentPreferences(context: Context) {
         get() = prefs.getBoolean("tool_web_search_enabled", true)
         set(value) = prefs.edit().putBoolean("tool_web_search_enabled", value).apply()
 
+    /** Agent 自写工具账本：整块 JSON 落盘，define_tool 写入、每次拼工具清单时读回。 */
+    var selfDefinedTools: String
+        get() = prefs.getString(KEY_SELF_DEFINED_TOOLS, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_SELF_DEFINED_TOOLS, value).apply()
+
+    /** 会话级"记住此命令"清单：整块 JSON 落盘，命中即跳过审批；破坏性命令永不写入。 */
+    var rememberedShellCommands: String
+        get() = prefs.getString(KEY_REMEMBERED_SHELL_COMMANDS, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_REMEMBERED_SHELL_COMMANDS, value).apply()
+
+    fun selfDefinedToolList(): List<SelfDefinedTool> = SelfDefinedToolCodec.decode(selfDefinedTools)
+
+    fun saveSelfDefinedTools(tools: List<SelfDefinedTool>) {
+        selfDefinedTools = SelfDefinedToolCodec.encode(tools)
+    }
+
+    fun rememberedShellCommandList(): List<String> = RememberedCommandCodec.decode(rememberedShellCommands)
+
+    /**
+     * 记住一条命令。返回是否真的记住了：破坏性命令、空命令与满额清单都拒绝写入，
+     * 于是"记住"永远不可能成为绕过危险命令的入口。
+     */
+    fun rememberShellCommand(command: String): Boolean {
+        val key = ShellPolicy.normalize(command)
+        if (key.isEmpty()) return false
+        if (ShellPolicy.dangerOf(key) == ShellDanger.DESTRUCTIVE) return false
+        val current = rememberedShellCommandList()
+        if (current.any { ShellPolicy.normalize(it) == key }) return true
+        if (current.size >= MaxRememberedShellCommands) return false
+        rememberedShellCommands = RememberedCommandCodec.encode(current + key)
+        return true
+    }
+
+    /** 清空记住清单：设置页与"全部忘记"共用。 */
+    fun forgetRememberedShellCommands() {
+        rememberedShellCommands = ""
+    }
+
     /** 语音转写总开关：关闭时上层直接给出中文提示，不发起任何录音或网络请求 */
     var asrEnabled: Boolean
         get() = prefs.getBoolean(KEY_ASR_ENABLED, DEFAULT_ASR_ENABLED)
@@ -170,6 +210,75 @@ class AgentPreferences(context: Context) {
     var visionBetaEnabled: Boolean
         get() = prefs.getBoolean(KEY_VISION_BETA_ENABLED, DEFAULT_VISION_BETA_ENABLED)
         set(value) = prefs.edit().putBoolean(KEY_VISION_BETA_ENABLED, value).apply()
+
+    // ===================== 本轮新增的手表设置项 =====================
+    // 键名全部沿用网页控制台的 camelCase 字段名：控制台写同一个键，表端只回显，两侧共用一份真值。
+
+    /** 自动播报回答：把助手回复读出来（与「启用语音识别」独立，识别是入、播报是出）。 */
+    var autoSpeakReplies: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_SPEAK_REPLIES, DEFAULT_AUTO_SPEAK_REPLIES)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_SPEAK_REPLIES, value).apply()
+
+    /** 边说边显示文字：识别中间结果实时上屏；关闭后只在最终结果出现时刷新。 */
+    var asrLiveTranscript: Boolean
+        get() = prefs.getBoolean(KEY_ASR_LIVE_TRANSCRIPT, DEFAULT_ASR_LIVE_TRANSCRIPT)
+        set(value) = prefs.edit().putBoolean(KEY_ASR_LIVE_TRANSCRIPT, value).apply()
+
+    /**
+     * 亮屏唤起自动语音输入。
+     *
+     * 字段保留只为兼容网页控制台写入与历史数据回显，**运行时没有任何读取点**：
+     * 亮屏即开麦会让音频链路在每次抬腕时唤醒，是手表续航的不可接受形态，该唤起路径已整体删除。
+     * 设置页把这一项画成只读「已移除」，不再提供可写开关。
+     */
+    var voiceWakeOnScreen: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_WAKE_ON_SCREEN, DEFAULT_VOICE_WAKE_ON_SCREEN)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_WAKE_ON_SCREEN, value).apply()
+
+    /** 锁屏唤起自动语音输入：与 [voiceWakeOnScreen] 同理由，路径已删除，仅回显。 */
+    var voiceWakeOnLockScreen: Boolean
+        get() = prefs.getBoolean(KEY_VOICE_WAKE_ON_LOCK, DEFAULT_VOICE_WAKE_ON_LOCK)
+        set(value) = prefs.edit().putBoolean(KEY_VOICE_WAKE_ON_LOCK, value).apply()
+
+    /** 允许模型调用 Provider 托管的联网搜索（关闭时只用内置检索）。 */
+    var providerManagedSearchEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PROVIDER_MANAGED_SEARCH, DEFAULT_PROVIDER_MANAGED_SEARCH)
+        set(value) = prefs.edit().putBoolean(KEY_PROVIDER_MANAGED_SEARCH, value).apply()
+
+    /** 默认启用思考：新会话默认带上推理请求（与只控制显示的 [showThoughtChain] 不同）。 */
+    var defaultThinkingEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DEFAULT_THINKING, DEFAULT_DEFAULT_THINKING)
+        set(value) = prefs.edit().putBoolean(KEY_DEFAULT_THINKING, value).apply()
+
+    /** 长期记忆总开关：关闭后不读不写长期记忆库。 */
+    var memoryEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MEMORY_ENABLED, DEFAULT_MEMORY_ENABLED)
+        set(value) = prefs.edit().putBoolean(KEY_MEMORY_ENABLED, value).apply()
+
+    /** 自动压缩上下文：占用超过阈值后自动压缩历史，关掉则只在用户手动触发时压缩。 */
+    var autoCompressContext: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_COMPRESS_CONTEXT, DEFAULT_AUTO_COMPRESS_CONTEXT)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_COMPRESS_CONTEXT, value).apply()
+
+    /**
+     * 深色模式下使用纯黑背景。
+     *
+     * 当前令牌集的底色恒为 0xFF000000（见 WearTokens.Palette.Bg），因此这一项在表端是只读回显：
+     * 想改令牌值必须走设计侧审批，设置面不提供可写开关，避免出现"开关能拨但屏上无变化"。
+     */
+    var usePureBlack: Boolean
+        get() = prefs.getBoolean(KEY_USE_PURE_BLACK, DEFAULT_USE_PURE_BLACK)
+        set(value) = prefs.edit().putBoolean(KEY_USE_PURE_BLACK, value).apply()
+
+    /** 主题模式三档：表端只有深色令牌集，落在表端的是只读回显，真正的切换在网页端。 */
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromStorage(prefs.getString(KEY_THEME_MODE, DEFAULT_THEME_MODE.storageKey))
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.storageKey).apply()
+
+    /** 简洁模式：压掉次要装饰文案与次级说明行。 */
+    var compactMode: Boolean
+        get() = prefs.getBoolean(KEY_COMPACT_MODE, DEFAULT_COMPACT_MODE)
+        set(value) = prefs.edit().putBoolean(KEY_COMPACT_MODE, value).apply()
 
     /** 多供应商 Profile 账本；纯逻辑在 [ProviderProfileBook]，这里只负责整块读写。 */
     fun providerProfiles(): ProviderProfileBook =
@@ -235,6 +344,32 @@ class AgentPreferences(context: Context) {
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
 
+        const val PreferencesName = "agent_prefs"
+
+        const val KEY_AUTO_SPEAK_REPLIES = "autoSpeakReplies"
+        const val KEY_ASR_LIVE_TRANSCRIPT = "asrLiveTranscript"
+        const val KEY_VOICE_WAKE_ON_SCREEN = "voiceWakeOnScreen"
+        const val KEY_VOICE_WAKE_ON_LOCK = "voiceWakeOnLockScreen"
+        const val KEY_PROVIDER_MANAGED_SEARCH = "providerManagedSearchEnabled"
+        const val KEY_DEFAULT_THINKING = "defaultThinking"
+        const val KEY_MEMORY_ENABLED = "memoryEnabled"
+        const val KEY_AUTO_COMPRESS_CONTEXT = "autoCompressContext"
+        const val KEY_USE_PURE_BLACK = "usePureBlack"
+        const val KEY_THEME_MODE = "themeMode"
+        const val KEY_COMPACT_MODE = "compactMode"
+
+        const val DEFAULT_AUTO_SPEAK_REPLIES = false
+        const val DEFAULT_ASR_LIVE_TRANSCRIPT = true
+        const val DEFAULT_VOICE_WAKE_ON_SCREEN = false
+        const val DEFAULT_VOICE_WAKE_ON_LOCK = false
+        const val DEFAULT_PROVIDER_MANAGED_SEARCH = false
+        const val DEFAULT_DEFAULT_THINKING = true
+        const val DEFAULT_MEMORY_ENABLED = true
+        const val DEFAULT_AUTO_COMPRESS_CONTEXT = true
+        const val DEFAULT_USE_PURE_BLACK = true
+        const val DEFAULT_COMPACT_MODE = false
+        val DEFAULT_THEME_MODE = ThemeMode.DARK
+
         const val KEY_ASR_ENABLED = "asr_enabled"
         const val KEY_ASR_PROVIDER = "asr_provider"
         const val KEY_ASR_BAIDU_API_KEY = "asr_baidu_api_key"
@@ -247,12 +382,31 @@ class AgentPreferences(context: Context) {
         const val DEFAULT_ASR_KEY = ""
 
         /** 控制台字段名与网页端一致，改名前先对 console 侧同步。 */
+        const val KEY_SELF_DEFINED_TOOLS = "self_defined_tools"
+        const val KEY_REMEMBERED_SHELL_COMMANDS = "remembered_shell_commands"
+
+        /** 记住清单上限：手表上不宜无限膨胀，满额后新的"记住"直接不生效。 */
+        const val MaxRememberedShellCommands = 20
+
         const val KEY_ANIMATIONS_ENABLED = "animationsEnabled"
         const val KEY_VISION_BETA_ENABLED = "vision_beta_enabled"
         const val KEY_PROVIDER_PROFILES = "provider_profiles"
 
         const val DEFAULT_ANIMATIONS_ENABLED = true
         const val DEFAULT_VISION_BETA_ENABLED = false
+    }
+}
+
+/** 主题模式三档：跟随系统 / 深色 / 浅色。存储值即枚举名，未知值一律回退深色。 */
+enum class ThemeMode(val storageKey: String) {
+    SYSTEM("SYSTEM"),
+    DARK("DARK"),
+    LIGHT("LIGHT");
+
+    companion object {
+        /** 未知 / 空 / 大小写不符一律回退 [DARK]：宁可停在确定可用的深色，也不猜。 */
+        fun fromStorage(raw: String?): ThemeMode =
+            values().firstOrNull { it.storageKey == raw } ?: DARK
     }
 }
 

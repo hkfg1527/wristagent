@@ -66,7 +66,14 @@ internal fun TextInputDialog(
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
-    visionBetaEnabled: Boolean = false
+    visionBetaEnabled: Boolean = false,
+    /**
+     * 语音入口：唯一保留的显式起麦方式之一（另一处是底栏主键按住说话）。
+     *
+     * 传 null 表示调用方没有接入语音链路，按钮整块不出现；
+     * 亮屏 / 锁屏 / 摇腕 / 常驻监听等自动唤起路径已因续航问题整体删除，这里不存在任何自动触发。
+     */
+    onVoiceInput: (() -> Unit)? = null
 ) {
     val dialogFocusRequester = remember { FocusRequester() }
     val animationsEnabled = LocalAnimationsEnabled.current
@@ -168,6 +175,26 @@ internal fun TextInputDialog(
                         ),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            if (onVoiceInput != null) {
+                // 只有用户手指落到这颗按钮上才起麦：弹窗打开本身不触发录音
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(Wear.Size.Touch)
+                        .clip(RoundedCornerShape(Wear.Radius.Control))
+                        .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Control))
+                        .clickable { onVoiceInput() }
+                        .padding(horizontal = Wear.Space.Sm),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicText(
+                        text = stringResource(R.string.wearchat_dialog_mic),
+                        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
+                        maxLines = 1
                     )
                 }
             }

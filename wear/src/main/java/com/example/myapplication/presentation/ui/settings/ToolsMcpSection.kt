@@ -31,6 +31,7 @@ fun ToolsMcpContent(
     var toolPowerMode by remember { mutableStateOf(preferences.toolPowerModeEnabled) }
     var toolWeather by remember { mutableStateOf(preferences.toolWeatherEnabled) }
     var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
+    var providerManagedSearch by remember { mutableStateOf(preferences.providerManagedSearchEnabled) }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_tools_and_mcp),
@@ -106,6 +107,20 @@ fun ToolsMcpContent(
                 onCheckedChange = { enabled ->
                     toolWebSearch = enabled
                     preferences.toolWebSearchEnabled = enabled
+                }
+            )
+        }
+
+        section(stringResource(R.string.settings_web_tools_header))
+
+        row {
+            SettingsSwitchRow(
+                label = stringResource(R.string.settings_tools_provider_search),
+                secondary = stringResource(R.string.settings_tools_provider_search_secondary),
+                checked = providerManagedSearch,
+                onCheckedChange = { enabled ->
+                    providerManagedSearch = enabled
+                    preferences.providerManagedSearchEnabled = enabled
                 }
             )
         }

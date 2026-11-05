@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.chat
 
+import com.example.myapplication.presentation.ui.theme.Wear
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,19 +29,15 @@ class ThoughtPillMetricsTest {
     }
 
     @Test
-    fun cornerRadiusIsAlwaysHalfTheHeight() {
-        assertEquals(
-            ThoughtPillMetrics.CollapsedHeightDp / 2f,
-            ThoughtPillMetrics.cornerRadiusDp(),
-            0.001f
-        )
+    fun cornerRadiusComesFromThePillToken() {
+        // 全圆例外写进令牌：胶囊圆角不再是"页面里各算一份高度一半"的 15dp
+        assertEquals(Wear.Radius.Pill.value, ThoughtPillMetrics.cornerRadiusDp(), 0.001f)
     }
 
     @Test
-    fun cornerRadiusFollowsHeightChanges() {
-        // 三角验证：换一个高度，圆角必须跟着变成一半，而不是钉死在某个令牌上
-        assertEquals(16f, ThoughtPillMetrics.cornerRadiusDp(32), 0.001f)
-        assertEquals(10f, ThoughtPillMetrics.cornerRadiusDp(20), 0.001f)
+    fun pillTokenStaysFullyRoundedEvenIfThePillGrows() {
+        // Pill 远大于任何胶囊高度：高度翻倍也依然是两端半圆，不会变成圆角矩形
+        assertTrue(Wear.Radius.Pill.value >= ThoughtPillMetrics.CollapsedHeightDp * 2f)
     }
 
     @Test
