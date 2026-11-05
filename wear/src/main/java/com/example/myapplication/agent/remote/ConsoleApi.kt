@@ -49,6 +49,8 @@ class ConsoleApi(
     private val token: () -> String,
     private val serverPort: () -> Int,
     private val uptime: () -> Long,
+    private val throttle: ConsoleAuthThrottle = ConsoleAuthThrottle(),
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
 
     fun handle(request: ConsoleRequest): ConsoleResponse = try {
@@ -62,7 +64,13 @@ class ConsoleApi(
         val path = normalizePath(request.path)
         if (path == "/api" || path.startsWith("/api/")) {
             // 鉴权先于一切：缺 token/错 token 一律 401，不泄露路径是否存在
-            if (!authorized(request)) return errorJson(401, "unauthorized")
+            val nowMs = clock()
+            if (throttle.isLocked(nowMs)) return errorJson(429, "too_many_attempts")
+            if (!authorized(request)) {
+                throttle.onFailure(nowMs)
+                return errorJson(401, "unauthorized")
+            }
+            throttle.onSuccess()
             return when {
                 path == "/api/ping" ->
                     if (method == "GET") ping() else errorJson(405, "method_not_allowed")
