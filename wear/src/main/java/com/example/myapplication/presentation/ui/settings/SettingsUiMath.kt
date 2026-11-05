@@ -65,7 +65,7 @@ object SettingsLayoutMath {
      * 弦长公式 2·sqrt(r² − h²)：r = 屏宽/2、h = [SafeBandHalfHeightDp]。
      * 屏宽收到 2h 以下时该高度上根本不存在圆周内的横向空间，返回 0 而不是负数。
      */
-    fun contentWidthDp(screenWidthDp: Float, halfSafeBandDp: Float = SafeBandHalfHeightDp): Float {
+    fun contentWidthDp(screenWidthDp: Float, halfSafeBandDp: Float = (screenWidthDp * 0.34f).coerceAtMost(SafeBandHalfHeightDp)): Float {
         if (screenWidthDp <= 0f) return 0f
         val radiusDp = screenWidthDp / 2f
         if (radiusDp <= halfSafeBandDp) return 0f

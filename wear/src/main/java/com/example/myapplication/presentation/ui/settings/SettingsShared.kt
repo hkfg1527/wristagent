@@ -304,11 +304,6 @@ fun SettingsSubPage(
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
             // 曲率缩放关死：边缘行不再缩到 75% 并淡出，同一行在任何滚动位置尺寸一致 ——
-            // 这是"左边缘 41.0 → 52.5dp 连续漂移 11.5dp"的唯一根因（旧默认 edgeScale = 0.5）。
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 1f,
-                edgeAlpha = 1f
-            ),
             contentPadding = PaddingValues(
                 start = settingsSideInset(),
                 end = settingsSideInset(),
@@ -535,12 +530,12 @@ fun SettingsNavRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        if (value != null) {
+        if (value != null && LocalConfiguration.current.screenWidthDp > 200) {
             Spacer(Modifier.width(SettingsTitleValueGap))
             BasicText(
                 text = value,
                 // 取值上限 88dp：旧 72dp 会把"deepseek-chat"截成 68dp 的墨迹
-                modifier = Modifier.widthIn(max = 88.dp),
+                modifier = Modifier.weight(0.42f),
                 style = SettingsRowValueStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -557,11 +552,11 @@ fun SettingsNavRow(
 
 /** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
 private val SettingsRowTitleStyle: TextStyle
-    @Composable get() = Wear.TextRowTitle
+    @Composable get() = Wear.TextRowTitle.copy(textAlign = TextAlign.Center)
 
 /** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
 private val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextRowValue
+    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Center)
 
 /** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
 @Composable

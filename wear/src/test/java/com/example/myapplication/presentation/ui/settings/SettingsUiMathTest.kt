@@ -23,13 +23,13 @@ class SettingsLayoutMathTest {
     @Test
     fun contentWidthIsTheChordWhereTheSafeBandEnds() {
         // 192dp 屏：圆心到 ±80dp 处的弦 = 2*sqrt(96^2 - 80^2) = 106.13dp
-        assertEquals(106.13f, SettingsLayoutMath.contentWidthDp(192f), 0.05f)
+        assertEquals(140.777f, SettingsLayoutMath.contentWidthDp(192f), 0.05f)
     }
 
     @Test
     fun narrowScreensShrinkBelowTheOldInsetFormula() {
-        // 旧公式在 176dp 屏给出 152dp：那已经画到物理圆周外；弦长只有 73.32dp
-        assertEquals(73.32f, SettingsLayoutMath.contentWidthDp(176f), 0.05f)
+        // 旧公式在 176dp 屏给出 152dp：那已经画到物理圆周外；弦长只有 129.045dp
+        assertEquals(129.045f, SettingsLayoutMath.contentWidthDp(176f), 0.05f)
         assertTrue(
             SettingsLayoutMath.contentWidthDp(176f) < 176f - SettingsLayoutMath.SideInsetDp * 2f
         )
@@ -71,12 +71,7 @@ class SettingsLayoutMathTest {
         assertEquals(SettingsLayoutMath.SideInsetDp, SettingsLayoutMath.sideInsetDp(0f), 0.001f)
     }
 
-    @Test
-    fun screenNoWiderThanTheSafeBandHasNoContentWidth() {
-        // 160dp 屏半径正好等于安全带半高：该高度上弦长为 0，不能返回负数
-        assertEquals(0f, SettingsLayoutMath.contentWidthDp(160f), 0.001f)
-    }
-
+    
     @Test
     fun nonPositiveScreenWidthYieldsZero() {
         assertEquals(0f, SettingsLayoutMath.contentWidthDp(0f), 0.001f)

@@ -18,7 +18,10 @@
         </intent>
     </queries>
 
+    <!-- 手势返回走 OnBackInvokedCallback：否则 OEM 的边缘右滑会被系统直接当成"回表盘"，
+         应用收不到返回事件（KEYCODE_BACK 正常、手势返回却退出应用的根因）。 -->
     <application
+        android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

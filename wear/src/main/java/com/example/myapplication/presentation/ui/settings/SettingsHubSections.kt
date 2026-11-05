@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,6 +27,9 @@ fun PromptContextContent(
     memoryPage: @Composable (onDismiss: () -> Unit) -> Unit,
 ) {
     var inner by remember { mutableIntStateOf(NoInnerPage) }
+    // 系统返回（右滑）必须与页内返回键一致：先关内层子页，再退中转页。
+    // 少了这一行，右滑会直接把 activeDialog 置空，跳过内层，用户会觉得"退得太狠"。
+    BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
     SettingsSubPage(
         title = stringResource(R.string.settings_prompt_context),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
@@ -70,6 +74,7 @@ fun AboutContent(
     netDiagPage: @Composable (onDismiss: () -> Unit) -> Unit,
 ) {
     var inner by remember { mutableIntStateOf(NoInnerPage) }
+    BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
     SettingsSubPage(
         title = stringResource(R.string.settings_about),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },

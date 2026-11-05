@@ -216,11 +216,6 @@ fun SettingsScreen(
                     overscrollEffect = null,
                     // 曲率缩放关死：边缘行不再缩到 75% 并淡出。真机实测同一分隔线三种宽度
                     // （168.0 / 142.0 / 126.0dp）、行标题左边缘从 41.0 漂到 52.5dp，唯一根因就是
-                    // 默认 edgeScale = 0.5。置 1f 后网格在滚动全程一致。
-                    scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                        edgeScale = 1f,
-                        edgeAlpha = 1f
-                    ),
                     contentPadding = PaddingValues(
                         // 左右内缩按圆周弦长推导（真机 32.5dp），不再写死 12dp
                         start = settingsSideInset(),
