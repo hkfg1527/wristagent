@@ -29,6 +29,7 @@ import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
+import com.example.myapplication.presentation.ChatBodyGeometry
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
 import com.example.myapplication.presentation.ui.ChatVisualMetrics
 import com.example.myapplication.presentation.ui.RenderableConversationItem
@@ -40,7 +41,6 @@ import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
 import com.example.myapplication.presentation.ui.chat.CapsuleKeys
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
-import com.example.myapplication.presentation.ui.settings.SettingsSpacingMath
 import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
@@ -87,8 +87,12 @@ internal fun ConversationList(
     /** 已展开的胶囊键（ViewModel 持有）：滚动与重组都不会把它折回去。 */
     expandedCapsules: Set<String>,
     onToggleCapsule: (String) -> Unit,
+    /** 简洁模式（ChatUiState.compactMode）：只收紧正文行高与块间距，见 [ChatBodyGeometry]。 */
+    compactMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val body = ChatBodyGeometry.of(compactMode)
+
     ScalingLazyColumn(
         state = listState,
         // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
@@ -183,10 +187,8 @@ internal fun ConversationList(
                                 BasicText(
                                     text = item.block.content,
                                     // CJK 行距 1.43×：旧值继承 bodyMedium 的 1.18 倍，
-                                    // 中文行间墨距只剩 3.5dp，整段读成一堵灰墙
-                                    style = Wear.TextBody.copy(
-                                        lineHeight = SettingsSpacingMath.BodyLineHeightSp.sp
-                                    )
+                                    // 中文行间墨距只剩 3.5dp，整段读成一堵灰墙；简洁模式再收 2sp
+                                    style = Wear.TextBody.copy(lineHeight = body.lineHeightSp.sp)
                                 )
                             }
                         }
@@ -210,7 +212,8 @@ internal fun ConversationList(
                             ) {
                                 Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                                    // 段间距随简洁模式收紧：常规 5dp，简洁 1dp
+                                    verticalArrangement = Arrangement.spacedBy(body.blockSpacingDp.dp)
                                 ) {
                                     item.blocks.forEach { block ->
                                         when (block) {

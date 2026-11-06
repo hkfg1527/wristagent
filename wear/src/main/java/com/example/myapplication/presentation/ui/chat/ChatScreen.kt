@@ -78,6 +78,7 @@ import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBarVisibility
 import com.example.myapplication.presentation.ui.ApprovalBlockHeight
 import com.example.myapplication.presentation.ui.CameraCurve
+import com.example.myapplication.presentation.ui.CameraIdle
 import com.example.myapplication.presentation.ui.CollapsedStripHeight
 import com.example.myapplication.presentation.ui.IdleBlockHeight
 import com.example.myapplication.presentation.ui.MainInputType
@@ -97,7 +98,10 @@ import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import com.example.myapplication.voice.VoiceInputManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -348,8 +352,38 @@ fun ChatScreen(
         var lastFrameMillis = 0L
         // 亚像素残余：速度小到每帧不足 1px 时直接 dispatchRawDelta 会被取整丢弃，必须攒够再滚
         var residualPx = 0f
+        // 连续"无事可做"的帧数：攒够 CameraIdle.SLEEP_AFTER_IDLE_FRAMES 帧就休眠。
+        // 镜头是逐帧控制器，但"每帧都要判断"不等于"每帧都要唤醒"：静置时若一直排帧回调，
+        // 一个回合在屏上就等于永久 60 次/秒的空转。
+        var idleStreak = 0
 
         while (isActive) {
+            if (CameraIdle.shouldSleep(idleStreak)) {
+                // ---- 静止休眠：一个帧回调都不排，只等真正的状态变化 ----
+                // 唤醒源全部是 snapshot 状态（不是轮询）：布局变化（胶囊插入/展开、条目尺寸）、
+                // 底栏形变、会话条目变化（新 token / 新回合）、用户开始或结束滚动、沉浸态开关。
+                // drop(1) 丢掉 combine 起播时的"当前快照"，否则会立刻醒来变成空转。
+                combine(
+                    snapshotFlow { listState.layoutInfo },
+                    snapshotFlow { collapseProgress.value },
+                    snapshotFlow { liveConversationItems.value },
+                    snapshotFlow { listState.isScrollInProgress },
+                    snapshotFlow {
+                        listOf(
+                            state.isApprovalFocus,
+                            state.isRecordingVoice,
+                            state.draft.isOpen,
+                            state.isSessionDrawerOpen
+                        )
+                    }
+                ) { _, _, _, _, _ -> }.drop(1).first()
+                // 醒来第一帧必须重新判定：计数、限速器、dt 全部重起算
+                idleStreak = 0
+                speedPxPerSec = 0f
+                residualPx = 0f
+                lastFrameMillis = 0L
+                continue
+            }
             // withFrameMillis 给的是**毫秒**（当纳秒用会把 dt 恒夹成下限，速度掉到设计的 1/4）
             val frameMillis = withFrameMillis { it }
             val dt = if (lastFrameMillis == 0L) {
@@ -366,7 +400,9 @@ fun ChatScreen(
                     camera.onEvent(ReadingCameraEvent.UserScrolled)
                     return@LaunchedEffect
                 }
-                // 暂停窗口内只是"这一帧不抢"，窗口一过镜头自己接回来
+                // 暂停窗口内只是"这一帧不抢"，窗口一过镜头自己接回来。
+                // 这里绝不能计入静止帧：窗口到期是"时间"条件，休眠后没有任何状态变化能叫醒它。
+                idleStreak = 0
                 continue
             }
             if (camera.isStoppedForTurn) return@LaunchedEffect
@@ -377,6 +413,8 @@ fun ChatScreen(
             if (state.isApprovalFocus || state.isRecordingVoice || state.draft.isOpen || state.isSessionDrawerOpen) {
                 speedPxPerSec = 0f
                 residualPx = 0f
+                // 沉浸态本来就不动列表；这些标志的变化本身就是唤醒源，所以这里可以计入静止帧
+                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
                 continue
             }
 
@@ -415,6 +453,7 @@ fun ChatScreen(
             if (plan.isHold) {
                 speedPxPerSec = 0f
                 residualPx = 0f
+                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
                 continue
             }
 
@@ -429,9 +468,13 @@ fun ChatScreen(
             val appliedPx = if (abs(wantPx) < 0.01f) 0f else listState.dispatchRawDelta(wantPx)
             residualPx = wantPx - appliedPx
             if (abs(appliedPx) < 0.5f && abs(wantPx) >= 0.5f) {
-                // 已经顶到列表边界：这段位移物理上走不了，丢掉本帧残余，不卡死也不来回蹭
+                // 已经顶到列表边界：这段位移物理上走不了，丢掉本帧残余，不卡死也不来回蹭；
+                // 同时按"无事可做"计数，免得在边界上空转一整晚
                 residualPx = 0f
                 speedPxPerSec = 0f
+                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
+            } else {
+                idleStreak = 0
             }
         }
     }
@@ -627,6 +670,7 @@ fun ChatScreen(
             shockwaveProgress = shockwaveProgress,
             gridSpacingDp = liveSpacingDp,
             expandedCapsules = state.expandedCapsules,
+            compactMode = state.compactMode,
             onToggleCapsule = { key -> viewModel.toggleCapsule(key) }
         )
 

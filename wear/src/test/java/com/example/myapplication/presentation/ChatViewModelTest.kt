@@ -167,8 +167,8 @@ class ChatViewModelTest {
         val vm = viewModel(gateway) { now }
         vm.triggerAgent("今天几号")
         advanceUntilIdle()
-        // 300ms 后思考态拉长为"停止"胶囊
-        assertEquals(BottomBlockMode.THINKING_STOP, vm.uiState.value.bottomBlockMode)
+        // 执行中：形态派生为"停止"胶囊（底栏只读派生值，不再等 300ms 写库）
+        assertEquals(BottomBlockMode.THINKING_STOP, vm.uiState.value.deriveBottomBlockMode())
 
         now = 500L
         val blocks = vm.uiState.value.blocks
@@ -179,7 +179,7 @@ class ChatViewModelTest {
         assertEquals(false, state.isExecuting)
         assertEquals(false, state.isThinkingActive)
         assertEquals(true, state.isTaskCompleted)
-        assertEquals(BottomBlockMode.IDLE, state.bottomBlockMode)
+        assertEquals(BottomBlockMode.IDLE, state.deriveBottomBlockMode())
         assertEquals("2026 年 3 月 1 日", (state.blocks.last() as ConversationBlock.Text).content)
         // 终态必须同步进会话记录，切走再切回才不丢
         assertEquals(state.blocks, state.activeSession.conversationBlocks)
@@ -395,13 +395,13 @@ class ChatViewModelTest {
 
         vm.onVoiceListeningChanged(true)
         assertEquals(true, vm.uiState.value.isRecordingVoice)
-        assertEquals(BottomBlockMode.RECORDING, vm.uiState.value.bottomBlockMode)
+        assertEquals(BottomBlockMode.RECORDING, vm.uiState.value.deriveBottomBlockMode())
 
         vm.onVoiceError("  启动语音录入失败: missing service  ")
 
         val state = vm.uiState.value
         assertEquals(false, state.isRecordingVoice)
-        assertEquals(BottomBlockMode.IDLE, state.bottomBlockMode)
+        assertEquals(BottomBlockMode.IDLE, state.deriveBottomBlockMode())
         assertEquals(R.string.wearchat_voice_error, state.notice?.textRes)
         assertEquals(
             listOf<Any>("启动语音录入失败: missing service"),
@@ -459,7 +459,7 @@ class ChatViewModelTest {
 
         assertNull(vm.uiState.value.notice)
         assertEquals(false, vm.uiState.value.isRecordingVoice)
-        assertEquals(BottomBlockMode.IDLE, vm.uiState.value.bottomBlockMode)
+        assertEquals(BottomBlockMode.IDLE, vm.uiState.value.deriveBottomBlockMode())
 
         vm.onVoiceError(null)
         assertNull(vm.uiState.value.notice)

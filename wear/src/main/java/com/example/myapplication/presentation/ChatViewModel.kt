@@ -68,7 +68,6 @@ class ChatViewModel(
 
     /** 审批挂起项的续体：放行/拒绝/停止/返回键都通过它交回结论。 */
     private var pendingContinuation: CancellableContinuation<Boolean>? = null
-    private var delayedStretchJob: Job? = null
     private var noticeJob: Job? = null
     private var consumedExternalSeq: Long? = null
 
@@ -123,7 +122,6 @@ class ChatViewModel(
         gateway.onReasoningEffortIgnored = null
         replySpeaker?.release()
         replySpeaker = null
-        delayedStretchJob?.cancel()
         noticeJob?.cancel()
         pendingContinuation = null
     }
@@ -136,7 +134,6 @@ class ChatViewModel(
      */
     fun triggerAgent(prompt: String): Boolean {
         if (_uiState.value.isExecuting) return false
-        delayedStretchJob?.cancel()
 
         val existingBlocks = _uiState.value.activeSession.conversationBlocks
         val sessionTitle = _uiState.value.activeSession.title
@@ -148,17 +145,6 @@ class ChatViewModel(
 
         _uiState.update {
             it.copy(isExecuting = true, isThinkingActive = true, isTaskCompleted = false)
-        }
-
-        delayedStretchJob = workScope.launch {
-            delay(ThinkingStretchDelayMs)
-            _uiState.update {
-                if (it.isExecuting && it.bottomBlockMode != BottomBlockMode.ACTION_ALLOW) {
-                    it.copy(bottomBlockMode = BottomBlockMode.THINKING_STOP)
-                } else {
-                    it
-                }
-            }
         }
 
         // 新一轮从空基线起算：首帧立即可见，突发判定不看上一轮的残留文本
@@ -173,13 +159,17 @@ class ChatViewModel(
         return true
     }
 
-    /** 停止：取消引擎执行 + 拒绝挂起审批 + 底栏回到闲置。 */
+    /** 停止：取消引擎执行 + 拒绝挂起审批 + 放开审批闩锁。 */
     fun stopAgent() {
         gateway.stop()
         pendingContinuation?.resume(false)
         pendingContinuation = null
         _uiState.update {
             it.copy(
+                // 挂起项必须跟停止一起清：底栏强制展开、浮层文案与滑块风险都读它，
+                // 留着等于"按了停止，审批还在等一个永远不会来的结论"。
+                pendingApproval = null,
+                // 闩锁是字段唯一还需要显式放开的写入，形态本身一律派生
                 bottomBlockMode = BottomBlockMode.IDLE,
                 isExecuting = false,
                 isThinkingActive = false
@@ -228,23 +218,18 @@ class ChatViewModel(
 
         if (newState.isFinished) {
             speakReplyIfEnabled(newState.conversationBlocks)
-            delayedStretchJob?.cancel()
             _uiState.update {
                 it.copy(
                     isExecuting = false,
                     isThinkingActive = false,
                     // 触发 30 度表镜掠影反光
-                    isTaskCompleted = true,
-                    bottomBlockMode = BottomBlockMode.IDLE
+                    isTaskCompleted = true
                 )
             }
         } else if (!newState.isThinking && !newState.isExecutingTool) {
+            // 思考/工具阶段收尾：仍挂着审批说明引擎还在等结论，这一格不能抹
             _uiState.update {
-                if (it.bottomBlockMode != BottomBlockMode.ACTION_ALLOW) {
-                    it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null)
-                } else {
-                    it
-                }
+                if (it.isApprovalFocus) it else it.copy(pendingApproval = null)
             }
         }
     }
@@ -437,12 +422,7 @@ class ChatViewModel(
     // ======================== 语音 ========================
 
     fun onVoiceListeningChanged(listening: Boolean) {
-        _uiState.update {
-            it.copy(
-                isRecordingVoice = listening,
-                bottomBlockMode = if (listening) BottomBlockMode.RECORDING else BottomBlockMode.IDLE
-            )
-        }
+        _uiState.update { it.copy(isRecordingVoice = listening) }
     }
 
     /**
@@ -463,14 +443,14 @@ class ChatViewModel(
 
     fun onVoiceResult(recognizedText: String) {
         _uiState.update {
-            it.copy(isRecordingVoice = false, bottomBlockMode = BottomBlockMode.IDLE)
+            it.copy(isRecordingVoice = false)
         }
         triggerAgent(recognizedText)
     }
 
     fun onVoiceError(rawMessage: String?) {
         _uiState.update {
-            it.copy(isRecordingVoice = false, bottomBlockMode = BottomBlockMode.IDLE)
+            it.copy(isRecordingVoice = false)
         }
         SpeechErrorNotice.notice(rawMessage)?.let {
             showNotice(textRes = it.textRes, isError = it.isError, args = it.args)

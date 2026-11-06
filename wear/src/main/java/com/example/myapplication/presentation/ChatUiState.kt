@@ -8,15 +8,13 @@ import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
+import com.example.myapplication.presentation.ui.settings.SettingsSpacingMath
 
 /** 默认会话首条欢迎语：新建会话与首个会话共用同一条文案。 */
 const val DEFAULT_SESSION_PROMPT = "主人，今天有什么需要解决的技术或生活问题？"
 
 /** 瞬时提示可见时长。 */
 const val NOTICE_VISIBLE_MS = 2600L
-
-/** 思考态拉长成"停止"胶囊前的延迟：更快会让刚发出的消息看着像立刻要停。 */
-const val ThinkingStretchDelayMs = 300L
 
 /** 放行塌缩动画时长：动画走完才把结论交回 Agent。 */
 const val ApprovalCollapseDurationMs = 220
@@ -68,8 +66,8 @@ data class ChatUiState(
      */
     val expandedCapsules: Set<String> = emptySet(),
     /**
-     * 简洁模式：压掉正文块间距与副标题行。纯展示标志，值来自设置项 compactMode，
-     * 内容与排版由 UI 侧消费（本层只保证这个事实只有一个来源）。
+     * 简洁模式：只收紧正文行高与块间距（几何映射见 [ChatBodyGeometry.of]）。值来自设置项 compactMode，
+     * 本层只保证这个事实只有一个来源，换算交给纯函数、渲染交给列表读取。
      */
     val compactMode: Boolean = false
 ) {
@@ -79,7 +77,11 @@ data class ChatUiState(
     /** 某粒胶囊是否处于展开态。 */
     fun isCapsuleExpanded(key: String): Boolean = CapsuleExpansion.isExpanded(expandedCapsules, key)
 
-    /** 审批沉浸态：居中文字浮层接管，列表退到 35%。 */
+    /**
+     * 审批沉浸态：居中文字浮层接管，列表退到 35%。
+     * [bottomBlockMode] 现在只作为审批闩锁被写（ACTION_ALLOW / 放行拒绝后清回 IDLE），
+     * 因此它既是沉浸态也是底栏强制展开的唯一输入。
+     */
     val isApprovalFocus: Boolean get() = bottomBlockMode == BottomBlockMode.ACTION_ALLOW
 
     /**
@@ -87,7 +89,7 @@ data class ChatUiState(
      * 这些状态下按钮必须完整展开且不可收起，否则收起的小白条会盖住当前唯一的可交互入口。
      */
     val isBottomBarForceExpanded: Boolean
-        get() = bottomBlockMode != BottomBlockMode.IDLE ||
+        get() = isApprovalFocus ||
             isExecuting ||
             pendingApproval != null ||
             isRecordingVoice ||
@@ -137,13 +139,50 @@ data class ChatUiState(
     }
 }
 
+/** 正文排版几何：只含紧凑模式会动的两个量，其余（字号、颜色、卡片宽度）一律不动。 */
+data class BodyTextGeometry(
+    val lineHeightSp: Float,
+    val blockSpacingDp: Float
+)
+
+/**
+ * [ChatUiState.compactMode] 的几何映射（纯函数，唯一来源）：常规 20sp 行高 + 5dp 块间距，
+ * 紧凑模式行高 20→18sp、块间距 5→1dp（减 4dp）。
+ *
+ * 只做两组定点减法，不按比例缩放：按比例压行高会把中文行间墨距压到 3dp 以下、整段读成一堵灰墙
+ * （行距令牌 [SettingsSpacingMath.BodyLineHeightSp] 的来历就是这个），而字号本身保持不变。
+ */
+object ChatBodyGeometry {
+    /** 常规行高：直接引用设置页的中文行距令牌（20sp），不另立第二个数值。 */
+    const val RegularLineHeightSp = SettingsSpacingMath.BodyLineHeightSp
+
+    /** 紧凑行高：只压 2sp。 */
+    const val CompactLineHeightSp = 18f
+
+    /** 常规正文块间距（dp）：助手回合内多段正文之间。 */
+    const val RegularBlockSpacingDp = 5f
+
+    /** 紧凑态块间距缩减量（dp）。 */
+    const val CompactBlockSpacingReductionDp = 4f
+
+    /** 紧凑块间距（dp）：5 - 4 = 1dp，恒为正，两段正文不会叠在一起。 */
+    const val CompactBlockSpacingDp = RegularBlockSpacingDp - CompactBlockSpacingReductionDp
+
+    fun of(compactMode: Boolean): BodyTextGeometry = if (compactMode) {
+        BodyTextGeometry(lineHeightSp = CompactLineHeightSp, blockSpacingDp = CompactBlockSpacingDp)
+    } else {
+        BodyTextGeometry(lineHeightSp = RegularLineHeightSp, blockSpacingDp = RegularBlockSpacingDp)
+    }
+}
+
 /**
  * 底栏形态的唯一派生来源（纯函数）：审批 > 录音 > 执行中 > 空闲。
  *
  * 四个写者（延迟拉长成停止胶囊、引擎吐字、语音开关、审批续体）以前各自 copy 同一个字段，
  * 后写者能覆盖先写者 —— 真机上表现为"点过按钮之后状态混乱"：录音被思考态抢走、
  * 正文一开始流式就没了停止键、审批放行后按钮回不来。
- * 形态只由快照派生，写入顺序不再影响结果。
+ * 形态只由快照派生，写入顺序不再影响结果；非审批形态的写入因此全部删除，
+ * 字段只剩审批闩锁这一个语义（[isApprovalFocus]），不再有第二个真相。
  */
 fun ChatUiState.deriveBottomBlockMode(): BottomBlockMode = when {
     isApprovalFocus -> BottomBlockMode.ACTION_ALLOW

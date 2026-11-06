@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
@@ -124,9 +123,6 @@ val SettingsItemGap: Dp = SettingsSpacingMath.ItemGapDp.dp
 
 /** 组标题下方到本组首行之间的留白，也是"每组第一行上方"的那一段空气。 */
 private val SettingsSectionHeaderBottomGap: Dp = SettingsSpacingMath.SectionHeaderBottomDp.dp
-
-/** 行内：主标题与右侧取值之间的发丝级呼吸。 */
-private val SettingsTitleValueGap: Dp = SettingsSpacingMath.TitleToValueDp.dp
 
 /** 行内：取值与行尾标记（箭头 / 状态色块）之间的留白。 */
 private val SettingsValueTailGap: Dp = SettingsSpacingMath.ValueToTailDp.dp
@@ -406,7 +402,7 @@ fun SettingsRowDivider() {
         modifier = Modifier
             .fillMaxWidth()
             .height(SettingsDividerThickness)
-            // 线内缩到与行内文字同一条左边缘：线比它切的文字宽 8.5dp/侧时，读起来像"看不见的卡片"
+            // 线只内缩一档：两侧对称内缩，与居中文字的视觉边对齐，不铺满内容盒
             .padding(horizontal = SettingsLayoutMath.HairlineInsetDp.dp)
             .background(Wear.Palette.Border)
     )
@@ -480,26 +476,123 @@ fun SettingsBackButton(onClick: () -> Unit) {
  * 顶部 16dp 是**分区间距**的唯一来源；下方 12dp 是"每组第一行上方"的那段空气，
  * 比行内留白更硬，让标题明显属于它下面那一组，而不是悬在两组之间。
  * 用主色而不是正文色：标题本身是结构信息，行内容已经全部降为 secondary/muted。
+ *
+ * [center] 默认 true：整页的文字轴已经居中，组标题留在左边会成为唯一的例外。
+ * 需要左对齐时显式传 false，既有调用点一个都不用改。
  */
 @Composable
-fun SettingsSectionHeader(text: String) {
+fun SettingsSectionHeader(text: String, center: Boolean = true) {
     BasicText(
         text = text,
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        style = Wear.TextCaption.copy(color = Wear.Palette.Accent),
+        style = if (center) {
+            Wear.TextCaption.copy(color = Wear.Palette.Accent, textAlign = TextAlign.Center)
+        } else {
+            Wear.TextCaption.copy(color = Wear.Palette.Accent)
+        },
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
 }
 
+/** 行尾安全区：箭头图形盒 + 取值↔尾标的呼吸。行内文字左右各让出同样的宽度。 */
+private val SettingsRowTailZone: Dp =
+    (SettingsLayoutMath.ChevronGlyphDp + SettingsSpacingMath.ValueToTailDp).dp
+
+/** 行内两行文字之间的墨距：body 行盒自带上下内边距，这里只补一档最小呼吸。 */
+private val SettingsRowLineGap: Dp = Wear.Space.Xs
+
 /**
- * 可进入行：**没有容器**——只有标题 / 值 / 行尾标记三个元素，行与行之间由 1dp 分隔线切分。
+ * 行取值的可见门槛（屏宽 dp）：更窄的屏上不显示取值。
+ *
+ * 根页与所有子页共用 [SettingsNavRow]，这条规则因此只有一处实现。抽成纯函数是为了把
+ * 200 / 201 的边界钉进单测 —— 写成 >= 在真机上就是 192dp 屏多出一条被截断的取值。
+ */
+internal const val SettingsRowValueMinScreenWidthDp = 200
+
+/** 当前屏宽是否显示行取值：**严格大于** [SettingsRowValueMinScreenWidthDp] 才显示。 */
+internal fun settingsRowShowsValue(screenWidthDp: Int): Boolean =
+    screenWidthDp > SettingsRowValueMinScreenWidthDp
+
+/**
+ * 行骨架：标题 +（可选）取值 + 行尾标记，三段全部相对**整行**居中。
+ *
+ * 取值不和标题挤同一行，是几何上的硬约束：内容盒 168dp 扣掉行内左右各 8dp 只剩 152dp，
+ * 行尾标记还要占掉右端 20dp。同行摆放时标题的盒子只有 87dp（见
+ * [SettingsLayoutMath.titleBudgetDp]），它的中心离整行中心差 32.5dp —— 这正是"加了
+ * textAlign = Center 仍然看着偏左"的成因：textAlign 只在**自己的盒子**里居中。
+ * 取值另起一行后，两行文字落在同一个对称盒子里，视觉中心才与屏幕中心重合。
+ *
+ * 行高：单行行 = 44dp（[Wear.Size.Touch] 兜底），双行行 ≈ 49dp（4+20+4+17+4），
+ * 与 [SettingsSpacingMath.RowStepDp] 的 49dp 一档对得上，不额外吃掉每屏行数 ——
+ * 纵向内边距因此收到 [Wear.Space.Xs]，多出来的一行由这一档消化。
+ */
+@Composable
+private fun SettingsCenteredRow(
+    title: String,
+    value: String?,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    titleMaxLines: Int = 1,
+    valueMaxLines: Int = 1,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .then(
+                if (onClick == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                }
+            )
+            .heightIn(min = Wear.Size.Touch)
+            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Xs)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                // 有行尾标记时左右各让出同宽的安全区：两侧等宽，文字中心才等于整行中心
+                .padding(horizontal = if (trailing == null) 0.dp else SettingsRowTailZone),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            BasicText(
+                text = title,
+                modifier = Modifier.fillMaxWidth(),
+                style = SettingsRowTitleStyle,
+                maxLines = titleMaxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (value != null) {
+                Spacer(Modifier.height(SettingsRowLineGap))
+                BasicText(
+                    text = value,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = SettingsRowValueStyle,
+                    maxLines = valueMaxLines,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (trailing != null) {
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) { trailing() }
+        }
+    }
+}
+
+/**
+ * 可进入行：**没有容器**——只有标题 / 取值 / 行尾标记三个元素，行与行之间由 1dp 分隔线切分。
  *
  * 行尾标记二选一：有状态时是一块 [Wear.Size.StatusBlock] 的色块（状态文案转成无障碍描述，
  * 不再和大段文字抢注意力），没有状态时是右向箭头。
+ *
+ * 版面走 [SettingsCenteredRow]：标题居中，取值居中于下一行；取值只在宽屏显示
+ * （见 [settingsRowShowsValue]），窄屏上整行只剩一行标题 —— 根页与子页是同一份实现。
  */
 @Composable
 fun SettingsNavRow(
@@ -509,45 +602,20 @@ fun SettingsNavRow(
     badge: Pair<String, Tone>? = null,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = Wear.Size.Touch)
-            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically
-        // 不用 Arrangement.spacedBy：三段的间距本来就不该一样 —— 统一间距正是"一堵墙"的成因。
-        // 标题↔取值只留一条发丝呼吸，取值↔行尾标记留得更开，行尾因此看起来是独立挂上去的。
-    ) {
-        BasicText(
-            text = title,
-            modifier = Modifier.weight(1f),
-            style = SettingsRowTitleStyle,
-            // 标题**单行**：折行会让取值钉在 2 行块的中线上"悬空"，而且同一行两处受伤
-            // （标题折行 + 取值被截）。标题放不下时由取值让位（取值上限 88dp + 省略号），
-            // 文案侧同步缩短到 5 个汉字以内。
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (value != null && LocalConfiguration.current.screenWidthDp > 200) {
-            Spacer(Modifier.width(SettingsTitleValueGap))
-            BasicText(
-                text = value,
-                // 取值上限 88dp：旧 72dp 会把"deepseek-chat"截成 68dp 的墨迹
-                modifier = Modifier.weight(0.42f),
-                style = SettingsRowValueStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    SettingsCenteredRow(
+        title = title,
+        value = if (value != null && settingsRowShowsValue(screenWidthDp)) value else null,
+        modifier = modifier,
+        onClick = onClick,
+        trailing = {
+            if (badge != null) {
+                SettingsStatusBlock(description = badge.first, tone = badge.second)
+            } else {
+                ChevronMark()
+            }
         }
-        Spacer(Modifier.width(SettingsValueTailGap))
-        if (badge != null) {
-            SettingsStatusBlock(description = badge.first, tone = badge.second)
-        } else {
-            ChevronMark()
-        }
-    }
+    )
 }
 
 /** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
@@ -737,33 +805,15 @@ fun SettingsRadioRow(
     )
 }
 
-/** 只读说明行：同样没有容器，只有标题与值两个元素。 */
+/** 只读说明行：同样没有容器，标题与取值各自居中成一行。 */
 @Composable
 fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .widthIn(max = SettingsContentWidth)
-            .fillMaxWidth()
-            .heightIn(min = Wear.Size.Touch)
-            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
-    ) {
-        BasicText(
-            text = title,
-            modifier = Modifier.weight(1f),
-            style = SettingsRowTitleStyle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        BasicText(
-            text = value,
-            modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
-            style = SettingsRowValueStyle,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+    SettingsCenteredRow(
+        title = title,
+        value = value,
+        modifier = modifier.widthIn(max = SettingsContentWidth),
+        valueMaxLines = 2
+    )
 }
 
 /** 状态标签/说明文本：统一 2 行上限 + 省略号，长文本不会顶出圆屏。 */
@@ -846,38 +896,37 @@ fun SettingsTextEntryRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .clickable(role = Role.Button, onClick = onClick)
-            .heightIn(min = Wear.Size.Touch)
-            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        BasicText(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = SettingsRowTitleStyle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.width(SettingsTitleValueGap))
-        BasicText(
-            text = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
-            modifier = Modifier.widthIn(max = SettingsLayoutMath.SubtitleMinWidthDp.dp),
-            style = SettingsRowValueStyle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.width(SettingsValueTailGap))
-        ChevronMark()
-    }
+    SettingsCenteredRow(
+        title = label,
+        value = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
+        modifier = modifier,
+        onClick = onClick,
+        trailing = { ChevronMark() }
+    )
+}
+
+/**
+ * 文本对话框草稿：不可变，[edit] 返回新草稿，确认才产出要落盘的值，取消丢掉新草稿即可。
+ *
+ * 纯逻辑、不依赖 Compose，因此"编辑 / 确认 / 取消"三条路径可以直接单测。
+ */
+internal class SettingsDialogDraft(val openedValue: String, val text: String = openedValue) {
+    /** 草稿是否偏离了打开时的值。 */
+    val isDirty: Boolean get() = text != openedValue
+
+    /** 编辑：返回新草稿，原草稿不被修改（取消就是把它丢掉）。 */
+    fun edit(next: String): SettingsDialogDraft = SettingsDialogDraft(openedValue, next)
+
+    /** 确认：返回要落盘的值；null 表示与初值一致、不必写。空串是合法提交，不能当成"没改"。 */
+    fun commitValue(): String? = if (isDirty) text else null
 }
 
 /**
  * 设置页文本输入对话框：遮罩 + 卡片档圆角 + 官方 Button。
- * 逐字符写回由调用方通过 [onValueChange] 完成，取消时回滚到 [initial]。
+ *
+ * **草稿模式**：编辑期间只改本地 [SettingsDialogDraft]，确认才通过 [onValueChange] 落盘，
+ * 取消把草稿整个丢掉、一个字符都不写。旧实现逐字符实时落盘、取消时再写回 [initial] ——
+ * 那是"回滚"不是"取消"：中途写坏的值早就落过盘，回滚只覆盖最后一次。
  */
 @Composable
 fun SettingsTextDialog(
@@ -890,7 +939,8 @@ fun SettingsTextDialog(
     BackHandler { onDismiss() }
 
     val shape = MaterialTheme.shapes.large
-    var draft by remember { mutableStateOf(initial) }
+    // 草稿只活在本地：打开时的值变了（父级换了目标）就重新开一份
+    var draft by remember(initial) { mutableStateOf(SettingsDialogDraft(initial)) }
 
     Box(
         modifier = Modifier
@@ -917,11 +967,9 @@ fun SettingsTextDialog(
                 overflow = TextOverflow.Ellipsis
             )
             BasicTextField(
-                value = draft,
-                onValueChange = {
-                    draft = it
-                    onValueChange(it)
-                },
+                value = draft.text,
+                // 编辑只改草稿：确认之前一个字符都不外泄
+                onValueChange = { draft = draft.edit(it) },
                 textStyle = Wear.TextBody,
                 cursorBrush = SolidColor(Wear.Palette.Accent),
                 modifier = Modifier
@@ -931,7 +979,7 @@ fun SettingsTextDialog(
                     .background(Wear.Palette.SurfaceAlt)
                     .padding(Wear.Space.Md),
                 decorationBox = { innerTextField ->
-                    if (draft.isEmpty()) {
+                    if (draft.text.isEmpty()) {
                         BasicText(
                             text = placeholder,
                             style = Wear.TextCaption,
@@ -950,16 +998,18 @@ fun SettingsTextDialog(
                     label = stringResource(R.string.settings_dialog_cancel),
                     tone = Tone.MUTED,
                     modifier = Modifier.weight(1f),
-                    onClick = {
-                        onValueChange(initial)
-                        onDismiss()
-                    }
+                    // 取消：不碰 onValueChange，草稿随本组合一起销毁
+                    onClick = onDismiss
                 )
                 SettingsActionButton(
                     label = stringResource(R.string.settings_dialog_confirm),
                     tone = Tone.ACCENT,
                     modifier = Modifier.weight(1f),
-                    onClick = onDismiss
+                    // 确认：草稿与初值不同才写；先通知再收尾（部分调用方在 onDismiss 里落库）
+                    onClick = {
+                        draft.commitValue()?.let(onValueChange)
+                        onDismiss()
+                    }
                 )
             }
         }

@@ -298,3 +298,23 @@ class ReadingCamera {
         return phase
     }
 }
+
+/**
+ * 镜头的静止休眠判据（纯逻辑，可单测）。
+ *
+ * 镜头是逐帧控制器，但"每帧都要判断"不等于"每帧都要唤醒"：静置时若无休止地排帧回调，
+ * 一个回合在屏上就等于永久 60 次/秒的空转。这里给出唯一判据：连续 [SLEEP_AFTER_IDLE_FRAMES]
+ * 帧"无事可做"才休眠；任何一帧真的动了，计数立刻归零。
+ */
+object CameraIdle {
+
+    /** 连续多少帧无事可做才允许休眠：12 帧 ≈ 200ms @60Hz。单帧抖动不该让镜头睡下。 */
+    const val SLEEP_AFTER_IDLE_FRAMES = 12
+
+    /** 一帧判定之后的新连续计数：无事可做才累加，动了就归零。 */
+    fun nextStreak(current: Int, isIdle: Boolean): Int = if (isIdle) current + 1 else 0
+
+    /** 是否已经可以休眠。阈值下限为 1，退化输入不许把镜头立刻睡死。 */
+    fun shouldSleep(streak: Int, threshold: Int = SLEEP_AFTER_IDLE_FRAMES): Boolean =
+        threshold.coerceAtLeast(1) <= streak
+}

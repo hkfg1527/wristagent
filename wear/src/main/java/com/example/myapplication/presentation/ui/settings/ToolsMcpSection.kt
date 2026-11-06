@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
-import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.agent.SubAgentPolicy
 
 /**
  * 工具集细粒度放行与 MCP 协议探针：六个内置工具改用官方 SwitchButton，
@@ -34,8 +34,9 @@ fun ToolsMcpContent(
     var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
     var providerManagedSearch by remember { mutableStateOf(preferences.providerManagedSearchEnabled) }
     var subAgentEnabled by remember { mutableStateOf(preferences.subAgentEnabled) }
-    // 子代理只在专家模式生效：其余模式下这一行退化成只读提示，不给可拨开关
-    val subAgentEffective = preferences.securityMode == SecurityMode.EXPERT
+    // 子代理只在专家模式生效：判定交给 SubAgentPolicy 这个唯一真源
+    // （enabled = true 即问"本模式下开关有没有意义"），其余模式下这一行退化成只读提示
+    val subAgentEffective = SubAgentPolicy.isEffective(preferences.securityMode, enabled = true)
 
     SettingsSubPage(
         title = stringResource(R.string.settings_tools_and_mcp),

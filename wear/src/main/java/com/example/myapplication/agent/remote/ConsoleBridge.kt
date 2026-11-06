@@ -8,6 +8,9 @@ import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.ProviderProfile
+import com.example.myapplication.agent.ProviderProfileBook
+import com.example.myapplication.agent.providerProfileId
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.voice.AsrResult
@@ -70,9 +73,20 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "toolWebSearchEnabled" to preferences.toolWebSearchEnabled,
         "isMcpEnabled" to preferences.isMcpEnabled,
         "mcpEndpoint" to preferences.mcpEndpoint,
+        "providerProfiles" to webProviderProfiles(preferences),
         "matrixSpacingDp" to preferences.matrixSpacingDp,
         "mainInputType" to preferences.mainInputType,
         "streamMode" to preferences.streamMode,
+        "animationsEnabled" to preferences.animationsEnabled,
+        "subAgentEnabled" to preferences.subAgentEnabled,
+        "visionBetaEnabled" to preferences.visionBetaEnabled,
+        "compactMode" to preferences.compactMode,
+        "providerManagedSearchEnabled" to preferences.providerManagedSearchEnabled,
+        "autoSpeakReplies" to preferences.autoSpeakReplies,
+        "asrLiveTranscript" to preferences.asrLiveTranscript,
+        "defaultThinkingEnabled" to preferences.defaultThinkingEnabled,
+        "memoryEnabled" to preferences.memoryEnabled,
+        "autoCompressContext" to preferences.autoCompressContext,
         "hasCompletedOnboarding" to preferences.hasCompletedOnboarding,
     )
 
@@ -103,13 +117,77 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
             "toolWebSearchEnabled" -> preferences.toolWebSearchEnabled = value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "isMcpEnabled" -> preferences.isMcpEnabled = value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "mcpEndpoint" -> preferences.mcpEndpoint = value as? String ?: return ConsoleWriteResult.READ_ONLY
+            "providerProfiles" -> if (!saveWebProviderProfiles(preferences, value)) {
+                return ConsoleWriteResult.READ_ONLY
+            }
             "matrixSpacingDp" -> preferences.matrixSpacingDp =
                 (value as? Number)?.toFloat() ?: return ConsoleWriteResult.READ_ONLY
             "mainInputType" -> preferences.mainInputType = value as? String ?: return ConsoleWriteResult.READ_ONLY
             "streamMode" -> preferences.streamMode = value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "animationsEnabled" -> preferences.animationsEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "subAgentEnabled" -> preferences.subAgentEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "visionBetaEnabled" -> preferences.visionBetaEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "compactMode" -> preferences.compactMode =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "providerManagedSearchEnabled" -> preferences.providerManagedSearchEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "autoSpeakReplies" -> preferences.autoSpeakReplies =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "asrLiveTranscript" -> preferences.asrLiveTranscript =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "defaultThinkingEnabled" -> preferences.defaultThinkingEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "memoryEnabled" -> preferences.memoryEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "autoCompressContext" -> preferences.autoCompressContext =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             else -> return ConsoleWriteResult.READ_ONLY
         }
         return ConsoleWriteResult.OK
+    }
+
+    /** 网页端的档案清单：字段名与 app.js 的 providerProfiles 行一致（name / baseUrl / model）。 */
+    private fun webProviderProfiles(preferences: AgentPreferences): List<Map<String, Any?>> =
+        preferences.providerProfiles().profiles.map { profile ->
+            linkedMapOf<String, Any?>(
+                "name" to profile.name,
+                "baseUrl" to profile.baseUrl,
+                "model" to profile.modelName,
+            )
+        }
+
+    /**
+     * 网页提交的是整个档案数组，落点仍是 [AgentPreferences.saveProviderProfiles] 这一个键。
+     *
+     * 按名称复用既有 id 与 apiKey：网页看不到凭据，整块替换不能把它们抹掉；新条目沿用当前单值
+     * apiKey，与「以当前配置新建档案」同义。超过 [ProviderProfileBook.MaxProfiles] 套的尾巴由账本截断。
+     */
+    private fun saveWebProviderProfiles(preferences: AgentPreferences, value: Any): Boolean {
+        val entries = value as? List<*> ?: return false
+        val existing = preferences.providerProfiles()
+        var book = ProviderProfileBook()
+        for (entry in entries) {
+            val row = entry as? Map<*, *> ?: return false
+            val name = (row["name"] as? String)?.trim().orEmpty()
+            if (name.isEmpty()) return false
+            val previous = existing.profiles.firstOrNull { it.name == name }
+            book = book.add(
+                ProviderProfile(
+                    id = previous?.id ?: providerProfileId(),
+                    name = name,
+                    baseUrl = (row["baseUrl"] as? String).orEmpty(),
+                    apiKey = previous?.apiKey ?: preferences.apiKey,
+                    modelName = (row["model"] as? String).orEmpty(),
+                )
+            )
+        }
+        val activeId = existing.activeProfileId?.takeIf { id -> book.profiles.any { it.id == id } }
+            ?: book.profiles.firstOrNull()?.id
+        preferences.saveProviderProfiles(if (activeId == null) book else book.select(activeId))
+        return true
     }
 }
 

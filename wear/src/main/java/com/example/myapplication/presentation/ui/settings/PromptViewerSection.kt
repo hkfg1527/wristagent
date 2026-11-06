@@ -27,35 +27,21 @@ fun PromptViewerContent(
     onSavePrompt: (String) -> Unit
 ) {
     var editorOpen by remember { mutableStateOf(false) }
-    var textValue by remember { mutableStateOf(customPrompt) }
-    // 预设名参与选中比较，先取本地化文案再进 remember，避免在非组合上下文里读资源。
+    // 预设名参与选中比较，先取本地化文案再进比较，避免在非组合上下文里读资源。
     val presetMinimal = stringResource(R.string.settings_preset_minimal)
     val presetArchitect = stringResource(R.string.settings_preset_architect)
     val presetSecretary = stringResource(R.string.settings_preset_secretary)
-    val presetCustom = stringResource(R.string.settings_prompt_custom)
-    var activePreset by remember {
-        mutableStateOf(
-            when {
-                customPrompt.isBlank() -> presetMinimal
-                customPrompt.contains("架构师") -> presetArchitect
-                customPrompt.contains("日常") -> presetSecretary
-                else -> presetCustom
-            }
-        )
-    }
+    val presetClear = stringResource(R.string.settings_preset_clear_test)
 
-    val presets = listOf(
+    val rolePresets = listOf(
         presetMinimal to PromptMinimal,
         presetArchitect to PromptArchitect,
-        presetSecretary to PromptSecretary,
-        stringResource(R.string.settings_preset_clear_test) to ""
+        presetSecretary to PromptSecretary
     )
-
-    fun applyPreset(label: String, prompt: String) {
-        activePreset = label
-        textValue = prompt
-        onSavePrompt(prompt)
-    }
+    // 选中态由当前正文精确反推：点哪一行就亮哪一行，正文被手改过就一行都不亮。
+    // 用 contains 猜会在正文里恰好出现"架构师"时误判；更糟的是极简助手正文永远匹配不上，
+    // 而空正文（初始态 / 预置默认）反倒把极简助手点亮 —— 屏上的选中项与真值完全相反。
+    val selectedPreset = rolePresets.firstOrNull { it.second == customPrompt }?.first
 
     SettingsSubPage(
         title = stringResource(R.string.settings_system_prompt),
@@ -64,13 +50,9 @@ fun PromptViewerContent(
             if (editorOpen) {
                 SettingsTextDialog(
                     title = stringResource(R.string.settings_system_prompt),
-                    initial = textValue,
+                    initial = customPrompt,
                     placeholder = stringResource(R.string.settings_prompt_placeholder),
-                    onValueChange = { value ->
-                        textValue = value
-                        onSavePrompt(value)
-                        activePreset = presetCustom
-                    },
+                    onValueChange = { value -> onSavePrompt(value) },
                     onDismiss = { editorOpen = false }
                 )
             }
@@ -78,14 +60,13 @@ fun PromptViewerContent(
     ) {
         section(stringResource(R.string.settings_prompt_presets))
 
-        presets.forEach { (label, prompt) ->
+        // 清空行是把正文写空的动作，不是一种"当前取值"：正文为空时它是初始态，不该高亮成已选
+        (rolePresets + (presetClear to "")).forEach { (label, prompt) ->
             row {
                 SettingsRadioRow(
                     label = label,
-                    selected = activePreset == label,
-                    onSelect = {
-                        applyPreset(label, prompt)
-                    }
+                    selected = selectedPreset == label,
+                    onSelect = { onSavePrompt(prompt) }
                 )
             }
         }
@@ -93,21 +74,35 @@ fun PromptViewerContent(
         row {
             SettingsTextEntryRow(
                 label = stringResource(R.string.settings_system_prompt),
-                value = if (textValue.isBlank()) {
+                value = if (customPrompt.isBlank()) {
                     stringResource(R.string.settings_prompt_default)
                 } else {
                     stringResource(R.string.settings_prompt_custom)
                 },
-                onClick = {
-                    editorOpen = true
-                }
+                onClick = { editorOpen = true }
             )
         }
 
-        // 角色卡 / 提示词库 / 开场白是多记录列表与长文本，表端只留入口与去向说明
+        // 角色卡 / 提示词库 / 开场白是多记录列表与长文本：表端只读，并把去向写在行里
         section(stringResource(R.string.settings_web_only_header))
 
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_role_cards_web)) }
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_opening_line_web)) }
+        row {
+            SettingsWebOnlyRow(
+                form = WebSettingsForm.WEB_ONLY,
+                raw = stringResource(R.string.settings_role_cards_web)
+            )
+        }
+        row {
+            SettingsWebOnlyRow(
+                form = WebSettingsForm.WEB_ONLY,
+                raw = stringResource(R.string.settings_prompt_library_web)
+            )
+        }
+        row {
+            SettingsWebOnlyRow(
+                form = WebSettingsForm.WEB_ONLY,
+                raw = stringResource(R.string.settings_opening_line_web)
+            )
+        }
     }
 }

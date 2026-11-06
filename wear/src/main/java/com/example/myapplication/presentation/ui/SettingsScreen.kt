@@ -38,6 +38,8 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.ProviderProfileBook
+import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.net.NetworkDiagnosisStore
@@ -125,6 +127,35 @@ fun SettingsScreen(
     // 二级弹窗状态
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
     var showVoiceAsr by remember { mutableStateOf(false) }
+
+    // 清空记忆（[AgentPreferences.resetAll]）直接 clear() 存储，绕过上面这批 remember 缓存：
+    // 缓存不重读，用户下一次点任何一行都会把刚被清掉的旧值写回存储 —— 清空等于没生效。
+    // 回读字段清单只在 [rootSnapshot] 一处维护，单测逐个字段钉死。
+    fun syncFromPreferences() {
+        val snapshot = preferences.rootSnapshot()
+        currentModel = snapshot.modelName
+        currentBaseUrl = snapshot.baseUrl
+        currentSecurityMode = snapshot.securityMode
+        currentRightAction = snapshot.rightButtonAction
+        mcpEndpoint = snapshot.mcpEndpoint
+        isMcpEnabled = snapshot.isMcpEnabled
+        customPrompt = snapshot.customSystemPrompt
+        currentTemp = snapshot.temperature
+        currentMaxTokens = snapshot.maxOutputTokens
+        currentStreamMode = snapshot.streamMode
+        animationsEnabled = snapshot.animationsEnabled
+        visionBetaEnabled = snapshot.visionBetaEnabled
+        providerBook = snapshot.providerBook
+        asrEnabled = snapshot.asrEnabled
+        asrProviderKey = snapshot.asrProviderKey
+        asrKeyReady = snapshot.asrKeyReady
+    }
+
+    // 任何子页 / 语音浮层收起都整体回读一次：清空记忆、远端控制台改设置、外观页写存储等
+    // 所有绕过缓存的路径都在这里收口，回到根页时屏上真值与被改写的存储一致。
+    LaunchedEffect(activeDialog, showVoiceAsr) {
+        syncFromPreferences()
+    }
 
     // 逐行浮动：入场记账本（滚动复用不重播）+ 退场调度器（沉完才切屏）
     val rowStagger = rememberSettingsRowStaggerState()
@@ -231,7 +262,7 @@ fun SettingsScreen(
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
                     autoCentering = null
                 ) {
-                    // 顶部标题：本屏唯一的视觉重点（主色 + titleLarge 级），左对齐到与所有行同一条轴
+                    // 顶部标题：本屏唯一的视觉重点（主色 + titleLarge 级），居中排在内容盒中轴上
                     item {
                         SettingsStaggeredRow(index = 0, stagger = rowStagger, exit = exit) {
                             Box(
@@ -574,7 +605,15 @@ fun SettingsScreen(
                                 )
                             },
                             memoryPage = { dismiss ->
-                                MemoryManagerContent(preferences = preferences, onBack = dismiss)
+                                // 嵌套的「清空记忆」页收起时不换 activeDialog，这里显式回读一次，
+                                // 否则父页仍拿着清空前的旧值，它的保存路径会把旧值写回存储。
+                                MemoryManagerContent(
+                                    preferences = preferences,
+                                    onBack = {
+                                        syncFromPreferences()
+                                        dismiss()
+                                    }
+                                )
                             }
                         )
                         SettingsSubDialog.ABOUT -> {
@@ -655,7 +694,12 @@ fun SettingsScreen(
     }
 }
 
-/** 根页的组标题行：与子页 [SettingsSectionHeader] 同一档，整行参与逐行浮动。 */
+/**
+ * 根页的组标题行：与子页 [SettingsSectionHeader] 同一档，整行参与逐行浮动。
+ *
+ * 组标题居中由共享实现承担：用户要求设置主页面所有文字从中心排版，[SettingsSectionHeader]
+ * 因此默认 center = true —— 根页三处调用都吃这个默认值，不再各自写一遍对齐方式。
+ */
 @Composable
 private fun RootSectionRow(
     index: Int,
@@ -688,4 +732,59 @@ private fun RootSettingRow(
             content()
         }
     }
+}
+
+/**
+ * 根页 remember 缓存的全部偏好：初始化与「清空记忆后回读」共用同一份快照。
+ *
+ * 为什么需要它：[AgentPreferences.resetAll] 是 `prefs.clear()`，它绕过根页这批缓存直接重写存储。
+ * 缓存不重读，屏上就还是清空前的值，而根页每一行的点击回调都是「读缓存 + 写存储」——
+ * 用户随手再点一下，就把刚被清掉的旧值原样写了回去，清空等于失效。
+ */
+internal data class SettingsRootSnapshot(
+    val modelName: String,
+    val baseUrl: String,
+    val securityMode: SecurityMode,
+    val rightButtonAction: RightButtonAction,
+    val mcpEndpoint: String,
+    val isMcpEnabled: Boolean,
+    val customSystemPrompt: String,
+    val temperature: Float,
+    val maxOutputTokens: Int,
+    val streamMode: Boolean,
+    val animationsEnabled: Boolean,
+    val visionBetaEnabled: Boolean,
+    val asrEnabled: Boolean,
+    val asrProviderKey: String,
+    val asrKeyReady: Boolean,
+    val providerBook: ProviderProfileBook
+)
+
+/**
+ * 一次性读出根页缓存需要的全部偏好；纯读，不写存储。
+ *
+ * 字段清单必须与 SettingsScreen 里那批 `by remember { mutableStateOf(...) }` 缓存一一对应：
+ * 单测扫源码钉住「每个缓存初始化用到的 preferences.X 都必须在这里回读」，
+ * 否则以后新增一列缓存又会重新踩回「清空记忆失效」。
+ */
+internal fun AgentPreferences.rootSnapshot(): SettingsRootSnapshot {
+    val asr = asrSettings()
+    return SettingsRootSnapshot(
+        modelName = modelName,
+        baseUrl = baseUrl,
+        securityMode = securityMode,
+        rightButtonAction = rightButtonAction,
+        mcpEndpoint = mcpEndpoint,
+        isMcpEnabled = isMcpEnabled,
+        customSystemPrompt = customSystemPrompt,
+        temperature = temperature,
+        maxOutputTokens = maxOutputTokens,
+        streamMode = streamMode,
+        animationsEnabled = animationsEnabled,
+        visionBetaEnabled = visionBetaEnabled,
+        asrEnabled = asr.enabled,
+        asrProviderKey = asrProvider,
+        asrKeyReady = asr.hasBaiduCredentials,
+        providerBook = providerProfiles()
+    )
 }

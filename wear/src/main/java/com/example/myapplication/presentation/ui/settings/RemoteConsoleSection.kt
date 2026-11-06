@@ -29,13 +29,17 @@ import java.net.NetworkInterface
 fun RemoteConsoleContent(onBack: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val server = remember { ConsoleServer.create(context.applicationContext) }
-    val token = remember { ConsoleTokenStore(context.applicationContext).getOrCreate() }
+    // 全进程只有一个 ConsoleServer（MainActivity 启动时 create + start）：这里只取回同一实例，
+    // 不再 create 第二份监听套接字与线程池。
+    val server = remember { ConsoleServer.peek() ?: ConsoleServer.create(context.applicationContext) }
+    val tokenStore = remember { ConsoleTokenStore(context.applicationContext) }
     // 端口/运行态不是 Compose 状态，进入本页时读一次快照；点按钮后再刷新一次。
     var refreshTick by remember { mutableIntStateOf(0) }
+    val token = remember(refreshTick) { tokenStore.getOrCreate() }
     val port = remember(refreshTick) { server.port }
     val running = remember(refreshTick) { server.isRunning }
     val ip = remember(refreshTick) { localIpv4() ?: "0.0.0.0" }
+    // 令牌走查询参数 t：控制台前端在 initToken() 里用 URLSearchParams 取 t 后立刻从地址栏抹掉
     val url = "http://$ip:$port/?t=$token"
 
     SettingsSubPage(title = stringResource(R.string.settings_remote_console_title), onBack = onBack) {
@@ -84,7 +88,8 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
                 label = if (running) "重新读取端口" else "启动控制台",
                 onClick = {
                     context.vibrateTick()
-                    if (!running) server.start()
+                    // start() 内部幂等；这里读实时状态而不是渲染快照，连点也不会二次绑定端口
+                    if (!server.isRunning) server.start()
                     refreshTick++
                 }
             )

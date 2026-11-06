@@ -86,13 +86,9 @@ class MainActivity : ComponentActivity() {
         if (!apiKey.isNullOrBlank()) {
             preferences.apiKey = apiKey
         }
-        val securityModeStr = intent?.getStringExtra("security_mode")
-        if (!securityModeStr.isNullOrBlank()) {
-            try {
-                preferences.securityMode = SecurityMode.valueOf(securityModeStr)
-            } catch (_: Exception) {
-            }
-        }
+        // 安全等级不接受外部 intent 注入：本 Activity 是 exported 的 LAUNCHER，
+        // 任何应用都能发 -e security_mode EXPERT，而 EXPERT 等于危险操作自动放行，
+        // 这条通道等于把审批闸门对外开关，只能由用户在设置页手动切换。
         val prompt = intent?.getStringExtra("prompt")
         if (!prompt.isNullOrBlank()) {
             // 每次 intent 递增序号：同文本的新 intent 也能再触发，重组则不会重复触发

@@ -35,6 +35,14 @@ fun MemoryManagerContent(
         30 to R.string.settings_turns_30
     )
 
+    // 清空会重写全部偏好：本页三处本地状态必须立刻跟真值对齐，
+    // 否则屏上还留着刚被清掉的值，用户会以为"清空没生效"。
+    fun resyncFromPreferences() {
+        turns = preferences.maxContextTurns
+        memoryEnabled = preferences.memoryEnabled
+        autoCompress = preferences.autoCompressContext
+    }
+
     SettingsSubPage(
         title = stringResource(R.string.settings_memory_management),
         onBack = onBack
@@ -52,6 +60,11 @@ fun MemoryManagerContent(
                     }
                 )
             }
+        }
+
+        // 网页控制台可以写任意轮数：不在三档里就把真值回显出来，不让"三档都不亮"变成没解释的空档
+        if (turnOptions.none { it.first == turns }) {
+            row { SettingsCaptionRow(text = stringResource(R.string.settings_memory_turns, turns)) }
         }
 
         row {
@@ -94,8 +107,18 @@ fun MemoryManagerContent(
 
         section(stringResource(R.string.settings_web_only_header))
 
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_context_window_web)) }
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_context_truncation_web)) }
+        row {
+            SettingsWebOnlyRow(
+                form = WebSettingsForm.WEB_ONLY,
+                raw = stringResource(R.string.settings_context_window_web)
+            )
+        }
+        row {
+            SettingsWebOnlyRow(
+                form = WebSettingsForm.WEB_ONLY,
+                raw = stringResource(R.string.settings_context_truncation_web)
+            )
+        }
 
         section(stringResource(R.string.settings_memory_clear_header))
 
@@ -111,6 +134,7 @@ fun MemoryManagerContent(
                     context.vibrateConfirm()
                     preferences.resetAll()
                     memoryCleared = true
+                    resyncFromPreferences()
                 }
             )
         }

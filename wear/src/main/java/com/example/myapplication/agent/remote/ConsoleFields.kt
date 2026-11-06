@@ -10,12 +10,15 @@ enum class ConsoleFieldType { STRING, FLOAT, INT, BOOLEAN, ENUM }
  * @param key 规范键，与 [com.example.myapplication.agent.AgentPreferences] 的真实属性同名
  * @param readOnly 只读字段：POST 里出现时忽略并回传在 ignored 中
  * @param allowed ENUM 字段的合法取值
+ * @param structured 列表型字段：STRING 承载时也接受对象数组，原值直接交给 Port 编码，
+ *   免得为每一种列表再造一个字段类型
  */
 data class ConsoleField(
     val key: String,
     val type: ConsoleFieldType,
     val readOnly: Boolean = false,
     val allowed: List<String> = emptyList(),
+    val structured: Boolean = false,
 )
 
 enum class ConsoleWriteResult { OK, READ_ONLY }
@@ -41,6 +44,7 @@ object ConsoleFields {
         "maxTokens" to "maxOutputTokens",
         "systemPrompt" to "customSystemPrompt",
         "memoryRounds" to "maxContextTurns",
+        "longTermMemoryEnabled" to "memoryEnabled",
         "asrEngine" to "asrProvider",
     )
 
@@ -65,9 +69,20 @@ object ConsoleFields {
         ConsoleField("toolWebSearchEnabled", ConsoleFieldType.BOOLEAN),
         ConsoleField("isMcpEnabled", ConsoleFieldType.BOOLEAN),
         ConsoleField("mcpEndpoint", ConsoleFieldType.STRING),
+        ConsoleField("providerProfiles", ConsoleFieldType.STRING, structured = true),
         ConsoleField("matrixSpacingDp", ConsoleFieldType.FLOAT),
         ConsoleField("mainInputType", ConsoleFieldType.STRING),
         ConsoleField("streamMode", ConsoleFieldType.BOOLEAN),
+        ConsoleField("animationsEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("subAgentEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("visionBetaEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("compactMode", ConsoleFieldType.BOOLEAN),
+        ConsoleField("providerManagedSearchEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("autoSpeakReplies", ConsoleFieldType.BOOLEAN),
+        ConsoleField("asrLiveTranscript", ConsoleFieldType.BOOLEAN),
+        ConsoleField("defaultThinkingEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("memoryEnabled", ConsoleFieldType.BOOLEAN),
+        ConsoleField("autoCompressContext", ConsoleFieldType.BOOLEAN),
         ConsoleField("hasCompletedOnboarding", ConsoleFieldType.BOOLEAN, readOnly = true),
     )
 
@@ -82,8 +97,11 @@ object ConsoleFields {
     fun field(key: String): ConsoleField? = canonical(key)?.let { byKey[it] }
 
     fun coerce(field: ConsoleField, raw: Any?): ConsoleValue = when (field.type) {
-        ConsoleFieldType.STRING ->
-            if (raw is String) ConsoleValue.Valid(raw) else ConsoleValue.BadType
+        ConsoleFieldType.STRING -> when {
+            raw is String -> ConsoleValue.Valid(raw)
+            field.structured && raw is List<*> && raw.all { it is Map<*, *> } -> ConsoleValue.Valid(raw)
+            else -> ConsoleValue.BadType
+        }
 
         ConsoleFieldType.FLOAT -> when (raw) {
             is Double -> ConsoleValue.Valid(raw.toFloat())
