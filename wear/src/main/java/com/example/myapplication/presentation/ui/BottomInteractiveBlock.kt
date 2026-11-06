@@ -119,6 +119,14 @@ internal val CollapsedStripHeight = 8.dp
 internal val CollapsedStripCorner = 4.dp
 
 /**
+ * 非审批态底栏块高度：常驻 58dp（主键 52dp + 上下余量）。
+ *
+ * 提成常量是因为镜头也要用它 —— 按钮"占住屏幕底部多高"是镜头判断可读区的输入，
+ * 两侧各写一个 58.dp 就会出现"按钮改了、镜头还在按旧高度对齐"。
+ */
+internal val IdleBlockHeight = 58.dp
+
+/**
  * 审批态底栏高度：轨道贴顶、[Wear.Size.BottomBarReserve] 再收 [Wear.Space.Md]。
  * 480px/2.0 密度下屏高 240dp、圆心 120dp，底栏顶边落在 240−12−64=164dp，
  * 32dp 胶囊居中于 44dp 热区后占 170dp..202dp，弦长 2√(120²−82²)≈175dp；
@@ -233,9 +241,9 @@ fun BottomInteractiveBlock(
         label = "capsuleStretchHeight"
     )
 
-    // 底栏高度：常驻 58dp；审批态取 [ApprovalBlockHeight]，让滑块落在圆心下方约 48dp 处
+    // 底栏高度：常驻 [IdleBlockHeight]；审批态取 [ApprovalBlockHeight]，让滑块落在圆心下方约 48dp 处
     val blockHeight by animateDpAsState(
-        targetValue = if (isApproval) ApprovalBlockHeight else 58.dp,
+        targetValue = if (isApproval) ApprovalBlockHeight else IdleBlockHeight,
         animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.7f, stiffness = 280f)),
         label = "bottomBlockHeight"
     )

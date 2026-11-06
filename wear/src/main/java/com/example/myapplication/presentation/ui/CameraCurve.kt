@@ -90,6 +90,51 @@ object CameraCurve {
         return if (targetBelow) distance else -distance
     }
 
+    // ---------------------------------------------------------------------
+    // 底栏形变 → 可读区变化：按钮长成完整主键、扁审批条、还是收成贴底弧条，
+    // 它遮住的屏幕底部高度完全不同。镜头必须知道这件事，否则"按钮在变形、
+    // 正文却按旧的可读区一直往前推"——用户看到的就是镜头不跟着按钮走。
+    // ---------------------------------------------------------------------
+
+    /** 重新对位的触发阈值（dp）：形变超过这个量才算"可读区真的变了"。 */
+    const val REALIGN_THRESHOLD_DP = 0.5f
+
+    /**
+     * 底栏在 y 方向实际占住的高度（dp）= 视觉块高度 × 收展进度 + 底距。
+     *
+     * 收展进度 1 = 完整按钮（块高度 [expandedBlockHeightDp]），0 = 贴底弧条（只剩
+     * [collapsedHeightDp] 那么薄的一条）；中间按同一条时间线插值 —— 与
+     * [com.example.myapplication.presentation.ui.BottomInteractiveBlock] 里主键尺寸
+     * 用的就是同一个进度值，两处不允许出现第二条时间线。
+     */
+    fun barFootprintDp(
+        expandedBlockHeightDp: Float,
+        bottomInsetDp: Float,
+        collapsedHeightDp: Float,
+        collapseProgress: Float
+    ): Float {
+        val p = collapseProgress.coerceIn(0f, 1f)
+        val visual = collapsedHeightDp + (expandedBlockHeightDp - collapsedHeightDp) * p
+        return visual + bottomInsetDp
+    }
+
+    /**
+     * 按钮形变后镜头需要额外补的正向滚动量（px）。
+     *
+     * 只在"占得更多"（展开）方向补：多出来的 Δ 会把原本可读的底部几行压到按钮下面，
+     * 正向滚 Δ 才能把它们重新抬到按钮上沿之上。
+     * 收起方向补 0 —— 底部空出来的地方只是把更多内容露出来，此时再滚就是推着人走。
+     */
+    fun realignCompensationPx(previousFootprintPx: Float, currentFootprintPx: Float): Float =
+        (currentFootprintPx - previousFootprintPx).coerceAtLeast(0f)
+
+    /** 形变是否已经大到值得重新对位：亚像素抖动不该反复抢镜头。 */
+    fun shouldRealign(
+        previousFootprintPx: Float,
+        currentFootprintPx: Float,
+        thresholdPx: Float
+    ): Boolean = abs(currentFootprintPx - previousFootprintPx) >= thresholdPx.coerceAtLeast(0f)
+
     /**
      * 什么时刻该做对齐：最后一项是**紧跟用户提问的助手回合**，且这一回合已经有正文。
      * 只有欢迎语、还没吐字（只有思考/工具胶囊）、正文还是空白，都不算"回复开始出现"。

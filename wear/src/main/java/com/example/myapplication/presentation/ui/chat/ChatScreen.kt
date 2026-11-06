@@ -74,7 +74,10 @@ import com.example.myapplication.presentation.ui.WAKE_LATCH_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
 import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBarVisibility
+import com.example.myapplication.presentation.ui.ApprovalBlockHeight
 import com.example.myapplication.presentation.ui.CameraCurve
+import com.example.myapplication.presentation.ui.CollapsedStripHeight
+import com.example.myapplication.presentation.ui.IdleBlockHeight
 import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.ReadingCamera
@@ -291,6 +294,21 @@ fun ChatScreen(
         ConversationGrouping.groupBlocks(state.blocks)
     }
 
+    // ================= 底栏形态与收展进度（镜头要读，必须声明在镜头循环之前）=================
+    // 底栏形态存在 ViewModel 里：切到设置再回来时不会重置成展开（否则会弹一下）
+    val bottomBarMode by viewModel.bottomBarMode.collectAsState()
+    // ★ 唯一收展进度：1 = 完整主键，0 = 贴底弧条。
+    // 按钮的尺寸/圆角、弧条的圆心/半径/线宽/弧长全部由它插值 —— 一条时间线、一个连续形变。
+    // 镜头也读它：底栏占用高度一变，可读区就变了，正在读的那一行必须重新让出来。
+    val collapseProgress = remember { Animatable(1f) }
+    LaunchedEffect(bottomBarMode) {
+        collapseProgress.animateTo(
+            targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 0f else 1f,
+            // 阻尼 0.62：只允许一次轻微过冲（有弹性但不来回弹两下）
+            animationSpec = spring(dampingRatio = 0.62f, stiffness = 320f)
+        )
+    }
+
     // ================= 提词器镜头：唯一的滚动所有者 =================
     // 只做两件事，且全应用只有这一条链路在动列表：
     //   ① 回复开始出现正文的那一刻，把这一回合卡片的顶边**限速**挪到可读区顶部
@@ -328,7 +346,23 @@ fun ChatScreen(
         // AutoPan 的亚像素残余：6.6dp/s ≈ 0.22px/帧，直接发 dispatchRawDelta 会被取整丢弃，
         // 必须把不足 1px 的部分攒起来，攒够 1px 再滚动一次（平均速度才等于 13.3px/s）。
         var panResidualPx = 0f
-        // 自动下滚开始时刻：持续 3 秒且用户全程无操作，就把底栏自己收起来（用户盯着读，按钮该让位）
+
+        // ---- 按钮形变补偿状态 ----
+        // 底栏占用高度一变（主键长成停止胶囊 / 审批扁条 / 收成贴底弧条），屏幕底部的可读区就变了。
+        // 旧实现只在"首字出现"那一刻对齐一次，之后一直按旧可读区匀速推 —— 这就是
+        // "按钮在变形、镜头不跟着走"。这里把形变换算成一次补偿滚动，走的是对齐阶段同一个限速器。
+        val realignThresholdPx = with(density) { CameraCurve.REALIGN_THRESHOLD_DP.dp.toPx() }
+        fun barFootprintPxNow(): Float = with(density) {
+            CameraCurve.barFootprintDp(
+                expandedBlockHeightDp = (if (state.isApprovalFocus) ApprovalBlockHeight else IdleBlockHeight).value,
+                bottomInsetDp = BottomBarBottomInset.value,
+                collapsedHeightDp = CollapsedStripHeight.value,
+                collapseProgress = collapseProgress.value
+            ).dp.toPx()
+        }
+        var barFootprintPx = barFootprintPxNow()
+        var barRealignPx = 0f
+        var realignSpeedPxPerSec = 0f
 
         while (isActive) {
             // 注意：withFrameMillis 给的是**毫秒**（不是纳秒），除 1e9 会把 dt 恒夹成下限 0.004，
@@ -352,6 +386,35 @@ fun ChatScreen(
                 camera.onEvent(ReadingCameraEvent.Interrupted)
                 return@LaunchedEffect
             }
+            // ---- 按钮形变 → 可读区变化：把被按钮新占掉的那几行重新让出来 ----
+            // 让路规则与自动镜头一致：用户正在拖/刚转过表冠时这里根本走不到（上面已 return），
+            // 因此这里只处理"没有人在动手"的时刻。
+            val footprintPx = barFootprintPxNow()
+            if (CameraCurve.shouldRealign(barFootprintPx, footprintPx, realignThresholdPx)) {
+                barRealignPx += CameraCurve.realignCompensationPx(barFootprintPx, footprintPx)
+                barFootprintPx = footprintPx
+            }
+            if (barRealignPx != 0f) {
+                // 复用对齐阶段的限速器：远快近慢 + 加速度上限 + 单帧不越过目标，绝不瞬移
+                realignSpeedPxPerSec = CameraCurve.nextSpeed(
+                    realignSpeedPxPerSec,
+                    CameraCurve.targetSpeed(barRealignPx, deadZonePx),
+                    dt
+                )
+                val realignStepPx = CameraCurve.stepPx(realignSpeedPxPerSec, dt, barRealignPx)
+                if (realignStepPx != 0f) {
+                    val consumedPx = listState.dispatchRawDelta(realignStepPx)
+                    barRealignPx -= consumedPx
+                    if (abs(consumedPx) < 0.5f && abs(realignStepPx) >= 0.5f) {
+                        // 已经顶到列表边界：这段补偿物理上走不了，丢掉，不卡死也不来回蹭
+                        barRealignPx = 0f
+                    }
+                }
+                if (abs(barRealignPx) <= 0.5f) barRealignPx = 0f
+                // 这一帧只做补偿：不叠加匀速下滚，避免一次形变把正文多推一截
+                continue
+            }
+
             when (camera.phase) {
                 ReadingCameraPhase.AlignToTurnStart -> {
                     val remainingPx = listState.focusRemainingPx(cameraFocusIndex, targetTopPx)
@@ -397,8 +460,6 @@ fun ChatScreen(
     }
 
     // ================= 底栏可见性：滚动即收起成小白条，点条才展开 =================
-    // 底栏形态存在 ViewModel 里：切到设置再回来时不会重置成展开（否则会弹一下）
-    val bottomBarMode by viewModel.bottomBarMode.collectAsState()
     val bottomBarForceExpanded = state.isBottomBarForceExpanded
     // 进入强制态（执行/审批/录音/弹窗/抽屉）立即展开并锁住，离开强制态不自动收起
     LaunchedEffect(bottomBarForceExpanded) {
@@ -601,17 +662,7 @@ fun ChatScreen(
 
         // 收起态：半透明弧线贴着圆屏底缘（Wear M3E 的曲面元素都是沿表盘边缘成弧）。
         // 视觉由这里画，点击热区仍由下面 BottomInteractiveBlock 的 44dp 透明区域承担。
-        // ★ 唯一收展进度：1 = 完整主键，0 = 贴底弧条。
-        // 按钮的尺寸/圆角、弧条的圆心/半径/线宽/弧长全部由它插值 —— 一条时间线、一个连续形变，
-        // 不再出现"下面突然冒出、上面自己收、两边各弹一下"的割裂。
-        val collapseProgress = remember { Animatable(1f) }
-        LaunchedEffect(bottomBarMode) {
-            collapseProgress.animateTo(
-                targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 0f else 1f,
-                // 阻尼 0.62：只允许一次轻微过冲（有弹性但不来回弹两下）
-                animationSpec = spring(dampingRatio = 0.62f, stiffness = 320f)
-            )
-        }
+        // 收展进度已提到 ChatScreen 顶部（镜头共用同一条时间线），这里只取弧条进度
         val arcP = 1f - collapseProgress.value
         // 注意：弧条与它的热区必须画在 BottomInteractiveBlock **之后**（见下方），
         // 否则会被底栏容器（58dp 高）压在下面，点击事件全被容器吃掉 —— 这就是"点弧条没反应"的真因。

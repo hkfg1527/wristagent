@@ -374,4 +374,8 @@
     <string name="settings_prompt_library_web">Prompt library: web console</string>
     <string name="settings_opening_line_web">Opening line: web console</string>
 
+    <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
+    <string name="settings_sub_agent">Sub-agent mode</string>
+    <string name="settings_sub_agent_secondary">Effective in expert mode only</string>
+    <string name="settings_sub_agent_requires_expert">Expert mode only</string>
 </resources>

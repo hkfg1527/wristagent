@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.example.myapplication.agent.contract.SecurityMode
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -35,6 +36,16 @@ class AgentToolRegistry(
 
     fun bindShellRunner(runner: PrivilegedCommandRunner) {
         shellRunner = runner
+    }
+
+    /**
+     * run_subagent 的执行体由调度器注入：嵌套循环需要网络层与工具执行层，注册表自己不具备。
+     * 参数 parentDepth 由调用方给（顶层循环恒为 0），子代理能否再下钻由 SubAgentPolicy 判定。
+     */
+    private var subAgentRunner: (suspend (task: String, focus: String?, parentDepth: Int) -> JSONObject)? = null
+
+    fun bindSubAgentRunner(runner: suspend (task: String, focus: String?, parentDepth: Int) -> JSONObject) {
+        subAgentRunner = runner
     }
 
     // 观察外部配置或 UI 变化的回调
@@ -196,6 +207,14 @@ class AgentToolRegistry(
         // 自写工具每次现读账本：define_tool 落盘后下一轮请求立刻出现在清单里
         selfDefinedTools().forEach { all.add(it.toToolDefinition()) }
 
+        // 子代理：只有专家模式 + 开关打开才整条出现；其余模式下不是灰显，而是根本不在清单里
+        all.addAll(
+            SubAgentPolicy.toolDefinitions(
+                mode = preferences?.securityMode ?: SecurityMode.STANDARD,
+                enabled = preferences?.subAgentEnabled ?: false
+            )
+        )
+
         return all
     }
 
@@ -219,6 +238,7 @@ class AgentToolRegistry(
                 ShellPolicy.TOOL_DEFINE_TOOL -> executeDefineTool(args)
                 ShellPolicy.TOOL_LIST_TOOLS -> executeListTools()
                 ShellPolicy.TOOL_REMOVE_TOOL -> executeRemoveTool(args)
+                SubAgentPolicy.TOOL_NAME -> executeRunSubAgent(args)
                 else -> {
                     val selfTool = selfDefinedTool(call.name)
                     if (selfTool != null) {
@@ -646,6 +666,22 @@ class AgentToolRegistry(
             put("count", next.size)
             put("message", "工具已删除，下一轮工具清单不再包含它")
         }
+    }
+
+    /**
+     * run_subagent：清单里有它才可能被调用，但会话中途改安全模式/开关仍可能让它失效，
+     * 所以执行前按策略再核一次，失效就返回结构化错误而不是硬跑。
+     */
+    private suspend fun executeRunSubAgent(args: JSONObject): JSONObject {
+        val task = args.optString("task", "").trim()
+        if (task.isEmpty()) return errorJson("invalid_task", "子任务描述不可为空")
+        val focus = args.optString("focus", "").trim().ifEmpty { null }
+        val runner = subAgentRunner ?: return errorJson("subagent_unavailable", "子代理执行层尚未接线")
+        val mode = preferences?.securityMode ?: SecurityMode.STANDARD
+        if (!SubAgentPolicy.isEffective(mode, preferences?.subAgentEnabled ?: false)) {
+            return errorJson("subagent_disabled", "子代理模式需要专家模式与非空开关同时打开")
+        }
+        return runner(task, focus, 0)
     }
 
     private suspend fun executeSelfDefinedTool(tool: SelfDefinedTool, args: JSONObject): JSONObject {

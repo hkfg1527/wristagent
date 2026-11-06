@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.contract.SecurityMode
 
 /**
  * 工具集细粒度放行与 MCP 协议探针：六个内置工具改用官方 SwitchButton，
@@ -32,6 +33,9 @@ fun ToolsMcpContent(
     var toolWeather by remember { mutableStateOf(preferences.toolWeatherEnabled) }
     var toolWebSearch by remember { mutableStateOf(preferences.toolWebSearchEnabled) }
     var providerManagedSearch by remember { mutableStateOf(preferences.providerManagedSearchEnabled) }
+    var subAgentEnabled by remember { mutableStateOf(preferences.subAgentEnabled) }
+    // 子代理只在专家模式生效：其余模式下这一行退化成只读提示，不给可拨开关
+    val subAgentEffective = preferences.securityMode == SecurityMode.EXPERT
 
     SettingsSubPage(
         title = stringResource(R.string.settings_tools_and_mcp),
@@ -109,6 +113,26 @@ fun ToolsMcpContent(
                     preferences.toolWebSearchEnabled = enabled
                 }
             )
+        }
+
+        // 子代理模式：非专家模式下列表里连工具都不会出现，设置面也没有可拨的开关
+        row {
+            if (subAgentEffective) {
+                SettingsSwitchRow(
+                    label = stringResource(R.string.settings_sub_agent),
+                    secondary = stringResource(R.string.settings_sub_agent_secondary),
+                    checked = subAgentEnabled,
+                    onCheckedChange = { enabled ->
+                        subAgentEnabled = enabled
+                        preferences.subAgentEnabled = enabled
+                    }
+                )
+            } else {
+                SettingsInfoRow(
+                    title = stringResource(R.string.settings_sub_agent),
+                    value = stringResource(R.string.settings_sub_agent_requires_expert)
+                )
+            }
         }
 
         section(stringResource(R.string.settings_web_tools_header))

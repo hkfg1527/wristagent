@@ -14,7 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -239,6 +241,84 @@ private fun buildMatrixGrid(
 }
 
 /**
+ * 思考行波的连续相位（纯逻辑，可单测）。
+ *
+ * 相位只由"累计毫秒"决定，不挂在无限动画上：
+ *  - 无限动画（`rememberInfiniteTransition`）的相位起点在组合期是**自由**的，
+ *    它的周期（2400ms）与本文件里"波扫满一次可达半径"所需时长并不相等
+ *    （旧实现是 `phase * 1.4R % 1.25R`，一个视觉周期只有 2143ms），于是波形
+ *    是一串"从圆心诞生 → 扫出去 → 淡死"的脉冲，而不是一条持续的行波。
+ *    用户看到的就是"先放一点点，回到初始，再过一遍"。
+ *  - 思考开始/结束在本文件里只是一次**可见性**变化（`thinkingIntensity` 交叉淡入淡出）。
+ *    相位必须接着原来那根时间轴走，绝不能回到 0 —— 那才是真的"重头再来一遍"。
+ */
+internal object ThinkingWave {
+
+    /** 一条行波从圆心走到边界并淡出占用的时长（ms）：与视觉周期严格 1:1。 */
+    const val CYCLE_MS = 2400L
+
+    /** 行波可达半径（相对表盘半径）：1.25 让波在贴边之前就淡完，不外溢到圆外。 */
+    const val REACH_FACTOR = 1.25f
+
+    /** 两端过渡区占可达半径的比例：出生点与抵达边界处 alpha 都必须为 0。 */
+    const val RAMP_FACTOR = 0.18f
+
+    /** 累计毫秒 → 本轮相位（0~1）。取模只出现在这里，波内不再二次取模。 */
+    fun phaseOf(elapsedMs: Long, cycleMs: Long = CYCLE_MS): Float {
+        val cycle = cycleMs.coerceAtLeast(1L)
+        val ms = elapsedMs % cycle
+        val positive = if (ms < 0L) ms + cycle else ms
+        return positive.toFloat() / cycle.toFloat()
+    }
+
+    /** 行波可达半径（px）。 */
+    fun reachPx(maxRadiusPx: Float): Float = maxRadiusPx * REACH_FACTOR
+
+    /** 两端过渡区宽度（px）。 */
+    fun rampPx(maxRadiusPx: Float): Float = reachPx(maxRadiusPx) * RAMP_FACTOR
+
+    /** 累计毫秒 → 行波半径（px）。一个周期恰好扫满一次 [reachPx]，不会额外回绕一次。 */
+    fun travelPx(
+        elapsedMs: Long,
+        maxRadiusPx: Float,
+        cycleMs: Long = CYCLE_MS
+    ): Float = phaseOf(elapsedMs, cycleMs) * reachPx(maxRadiusPx)
+
+    /**
+     * 行波两端包络：出生时从 0 淡入、抵达边界时淡回 0。
+     * 没有它的话，`travel≈0` 时 `|dist-travel| < band` 覆盖的是半径 band 的实心圆盘，
+     * 而能量项在圆心最大，于是每次波从圆心诞生都会"啪"地闪一下。
+     */
+    fun envelope(travelPx: Float, maxRadiusPx: Float): Float {
+        val ramp = rampPx(maxRadiusPx)
+        if (ramp <= 0f) return 0f
+        val rise = (travelPx / ramp).coerceIn(0f, 1f)
+        val fall = ((reachPx(maxRadiusPx) - travelPx) / ramp).coerceIn(0f, 1f)
+        return rise * fall
+    }
+
+    /**
+     * 红瀑是否已经停在静止值（0 = 无红瀑）。
+     *
+     * 只有**静止**时才有资格重置：还在退场途中就 `snapTo(0f)`，等于把一段淡出剪成一次闪。
+     */
+    fun cascadeAtRest(value: Float, tolerance: Float = 0.02f): Boolean =
+        kotlin.math.abs(value) <= tolerance
+
+    /** 完工掠影是否已经扫完（不在可见带内）：只有扫完了才允许重新起一次，否则会"闪一下又重来"。 */
+    fun glintAtRest(value: Float): Boolean = value !in -0.3f..1.3f
+
+    /**
+     * 冲击波是否仍在波中：只有 `[0,1)` 才算在途。
+     *
+     * 1f 是 `animateTo(1f)` 走完后的**终值**，不是"正在波中"。旧判据 `in 0f..1.2f`
+     * 会让第一轮回答结束后 `hasShock` 永久为真 —— 点阵的空闲降频通道从此再也进不去，
+     * 每一帧都重录一遍绘制指令（真表上就是持续的重绘与掉电）。
+     */
+    fun shockInFlight(progress: Float): Boolean = progress >= 0f && progress < 1f
+}
+
+/**
  * 纯圆表盘高亮大微晶方形点阵渲染引擎 (浮于遮罩之上 · 加大高质感光点 · 强烈水波纹扩散 · 四态光相变)
  * 1. 方形阵列：严格基于直角坐标系 (x, y) 均匀栅格排布，以圆心为基准对称排布；
  * 2. 覆盖全圆：完全铺满圆形表盘的所有区域（包括四周圆弧月半弧），无任何方形裁剪框；
@@ -274,16 +354,22 @@ fun UnifiedMatrixCanvas(
         label = "breathCycle"
     )
 
-    // 思考同心行波物理相位：无限平滑周期循环，绝不重置打断，避免启动时闪烁
-    val thinkingWavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "thinkingWavePhase"
-    )
+    // 思考同心行波相位：累计真实毫秒，不挂在无限动画上。
+    // 无限动画的相位起点是自由的，且 2400ms 周期与"扫满一次可达半径"不同步（见 ThinkingWave），
+    // 于是它只能靠包络把诞生/回绕两处藏起来，看起来仍是一串脉冲；换成累计时钟后，
+    // 思考开始/中断/恢复只是同一条时间轴的裁剪 —— 叠加，不重启。
+    val waveElapsedMs = remember { mutableLongStateOf(0L) }
+    val waveRunning = thinkingIntensity > 0.01f
+    LaunchedEffect(waveRunning) {
+        if (!waveRunning) return@LaunchedEffect
+        var previousFrame = withFrameMillis { it }
+        while (true) {
+            val frame = withFrameMillis { it }
+            // 停走期间流逝的时间不补进相位：恢复时接着原来的相位继续，而不是瞬移一大段
+            waveElapsedMs.longValue += (frame - previousFrame).coerceIn(0L, 64L)
+            previousFrame = frame
+        }
+    }
 
     // 空闲降频的相位量化：量化值不变时读端不失效，Compose 直接复用上一帧已录制的绘制指令
     val idleBreathStep by remember {
@@ -298,6 +384,7 @@ fun UnifiedMatrixCanvas(
     LaunchedEffect(approvalVisualState) {
         when (approvalVisualState) {
             ApprovalVisualState.PENDING_CASCADE -> {
+                // 新一次红瀑必须从顶点起算：这是**真的需要重放**，可以重置
                 cascadeAnim.snapTo(0f)
                 cascadeAnim.animateTo(1f, tween(360, easing = LinearEasing))
             }
@@ -308,16 +395,22 @@ fun UnifiedMatrixCanvas(
                 cascadeAnim.animateTo(0f, tween(400, easing = LinearEasing))
             }
             ApprovalVisualState.NONE -> {
-                cascadeAnim.snapTo(0f)
+                // 无审批态不是"重放"，只是一次退场：还在退就让它走完同一段淡出，
+                // 已经停了就什么都不做。旧实现无条件 snapTo(0f)，把没走完的淡出剪成一次闪。
+                if (!ThinkingWave.cascadeAtRest(cascadeAnim.value)) {
+                    cascadeAnim.animateTo(0f, tween(260, easing = LinearEasing))
+                }
             }
         }
     }
 
     LaunchedEffect(isTaskCompletedTrigger) {
-        if (isTaskCompletedTrigger) {
-            glintAnim.snapTo(-0.4f)
-            glintAnim.animateTo(1.4f, tween(380, easing = LinearEasing))
-        }
+        if (!isTaskCompletedTrigger) return@LaunchedEffect
+        // 掠影已经在外扫就不重置：重置会把扫到一半的白光拍回起点，
+        // 真机上就是"闪一下，然后又从头扫一遍"。
+        if (!ThinkingWave.glintAtRest(glintAnim.value)) return@LaunchedEffect
+        glintAnim.snapTo(-0.4f)
+        glintAnim.animateTo(1.4f, tween(380, easing = LinearEasing))
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -371,24 +464,16 @@ fun UnifiedMatrixCanvas(
             // ---- 逐帧不变量的行波参数，一次性算好 ----
             val glintPosition = glintAnim.value * (w + h)
             val cascadeCurrentY = cascadeAnim.value * h
-            val hasShock = shockwaveProgress in 0f..1.2f
+            // 1f 是冲击波走完后的终值，不是"正在波中"：把它算在途会让空闲降频永久失效
+            val hasShock = ThinkingWave.shockInFlight(shockwaveProgress)
             val shockTravel = shockwaveProgress * maxRadius * 2.3f
             val shockEnergy = (1f - shockwaveProgress * 0.35f).coerceIn(0f, 1f)
             val hasRipple = thinkingIntensity > 0.01f
-            val rippleReach = maxRadius * 1.25f
-            // 行波两端包络：出生时淡入、抵达边界时淡出。
-            // 没有它的话，travel≈0 时 |dist-travel| < band 覆盖的是半径 band 的实心圆盘，
-            // 而能量项在中心最大，于是每次波从圆心诞生都会"啪"地闪一下；
-            // 同时 travel 取模回绕是从 reach 瞬移回 0，也会闪。包络让这两处都变成不可见。
-            val rippleRamp = rippleReach * 0.18f
-            // 思考波相位只在真有行波时才读取：空闲待机不建立这条依赖，避免每帧无谓失效
-            val rippleTravel = if (hasRipple) (thinkingWavePhase * maxRadius * 1.4f) % rippleReach else 0f
-            val rippleEnvelope = if (hasRipple) {
-                ((rippleTravel / rippleRamp).coerceIn(0f, 1f) *
-                    ((rippleReach - rippleTravel) / rippleRamp).coerceIn(0f, 1f))
-            } else {
-                0f
-            }
+            val rippleReach = ThinkingWave.reachPx(maxRadius)
+            // 思考波相位只在真有行波时才读取：空闲待机不建立这条依赖，避免每帧无谓失效。
+            // 相位来自累计时钟，一个周期恰好扫满一次 reach，波内不再二次取模。
+            val rippleTravel = if (hasRipple) ThinkingWave.travelPx(waveElapsedMs.longValue, maxRadius) else 0f
+            val rippleEnvelope = if (hasRipple) ThinkingWave.envelope(rippleTravel, maxRadius) else 0f
             val hasGlint = glintAnim.value in -0.3f..1.3f
             val hasCascade = cascadeAnim.value > 0.01f
             val approvedGreen = approvalVisualState == ApprovalVisualState.APPROVED_GREEN

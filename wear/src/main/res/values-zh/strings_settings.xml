@@ -364,4 +364,8 @@
     <string name="settings_prompt_library_web">提示词库：请在手机网页修改</string>
     <string name="settings_opening_line_web">开场白：请在手机网页修改</string>
 
+    <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
+    <string name="settings_sub_agent">子代理模式</string>
+    <string name="settings_sub_agent_secondary">仅专家模式生效</string>
+    <string name="settings_sub_agent_requires_expert">需专家模式</string>
 </resources>

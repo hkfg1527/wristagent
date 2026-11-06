@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.util.Log
+import com.example.myapplication.R
 import com.example.myapplication.agent.contract.AgentMemory
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
@@ -60,10 +61,30 @@ class AgentDispatcher(
     @Volatile
     private var isCancelled = false
 
+    /**
+     * 子代理执行器：请求轮与工具执行都复用本类既有链路，但上下文与 [conversationHistory] 完全隔离
+     * （子代理在自己的 history 里跑），工具集由注册表按"去掉 run_subagent"给出。
+     */
+    private val subAgentRunner = SubAgentRunner(
+        requestTurn = { history, tools -> requestSubAgentTurn(history, tools) },
+        executeTool = { call -> executeSubAgentTool(call) },
+        availableTools = { toolRegistry.getToolDefinitions() },
+        isCancelled = { isCancelled }
+    )
+
     init {
         // 工具层要读自写工具账本与记住清单，也要能执行特权命令：在这里一次接好线
         toolRegistry.bindPreferences(preferences)
         toolRegistry.bindShellRunner(PrivilegeShellRunner(privilege))
+        // run_subagent 的执行体要用网络层 + 工具执行层，只有调度器具备：把嵌套循环接到工具层上
+        toolRegistry.bindSubAgentRunner { task, focus, parentDepth ->
+            subAgentRunner.run(
+                parentDepth = parentDepth,
+                systemPrompt = buildSubAgentSystemPrompt(),
+                task = task,
+                focus = focus
+            ).toJson()
+        }
         initSystemMessage()
     }
 
@@ -187,6 +208,14 @@ class AgentDispatcher(
 
     /**
      * 真实网络 API 循环调用回路 (放开上下文上限，自主决策完成为止)
+     *
+     * 轮数没有上限：主人要求工具轮数不再卡在 5 轮，原来的 `val maxTurns = 5` +
+     * `for (turn in 1..maxTurns)` 硬上限已整体删除。防烧电不靠轮数，靠四条真实退出路径：
+     * 1) cancelCurrentExecution() 置位 isCancelled → while 条件立刻为 false；
+     * 2) 模型不再返回 tool_calls → 走下面的"自主收口"分支 return；
+     * 3) 网络 / 解析异常 → turnResult.isFailure 分支 return；
+     * 4) AgentLoopPolicy：连续 40 轮工具注入一次"立即总结"提示（只提示、不硬中断），
+     *    同一份调用连续重复则先提示、第 5 次才收口——那是空转，不是轮数上限。
      */
     private suspend fun executeInterleavedApiLoop(
         initialState: AgentExecutionState,
@@ -194,10 +223,15 @@ class AgentDispatcher(
     ) {
         var currentState = initialState
         val blocks = currentState.conversationBlocks.toMutableList()
-        val maxTurns = 5 // 穿戴设备严格限额 5 轮，防止死循环大量烧电发热
+        // 轮数无上限：循环只由取消 / 无工具 / 异常 / 能量提示 + 空转检测收口
+        var turn = 0
+        var consecutiveToolTurns = 0
+        var energyHintInjected = false
+        var spinNudgeInjected = false
+        val spinDetector = IdleSpinDetector()
 
-        for (turn in 1..maxTurns) {
-            if (isCancelled) break
+        while (!isCancelled) {
+            turn += 1
 
             currentState = currentState.copy(isThinking = true)
             onStateUpdate(currentState)
@@ -234,6 +268,22 @@ class AgentDispatcher(
 
             // 检查是否有工具调用
             if (currentCalls.isNotEmpty()) {
+
+                // 空转检测：连续同一份调用（名字 + 入参全同）先提示一次，第 5 次才收口。
+                // 这不是轮数上限——换了调用立刻归零。
+                val spin = spinDetector.observe(AgentLoopPolicy.signatureOf(currentCalls))
+                if (spin == IdleSpinDecision.NUDGE && !spinNudgeInjected) {
+                    spinNudgeInjected = true
+                    conversationHistory.add(
+                        ChatMessage(
+                            role = AgentRole.USER,
+                            content = AgentLoopPolicy.idleSpinText(
+                                currentCalls.first().name,
+                                AgentLoopPolicy.IDLE_SPIN_NUDGE_AFTER
+                            )
+                        )
+                    )
+                }
 
                 // 将 assistant 的消息记录加入历史
                 conversationHistory.add(
@@ -471,6 +521,26 @@ class AgentDispatcher(
                         conversationBlocks = blocks.toList()
                     )
                     onStateUpdate(currentState)
+                }
+
+                consecutiveToolTurns += 1
+                // 能量保护：连续 40 轮工具只提示一次，不做硬中断（主人要的是无上限，不是 5 轮）
+                if (AgentLoopPolicy.shouldInjectEnergyHint(consecutiveToolTurns, energyHintInjected)) {
+                    energyHintInjected = true
+                    Log.i(TAG, "连续工具轮 " + consecutiveToolTurns + "，注入一次收尾提示")
+                    conversationHistory.add(
+                        ChatMessage(
+                            role = AgentRole.USER,
+                            content = AgentLoopPolicy.energyHintText(consecutiveToolTurns)
+                        )
+                    )
+                }
+                if (spin == IdleSpinDecision.STOP) {
+                    Log.w(
+                        TAG,
+                        "空转收口：同一份调用连续重复 " + AgentLoopPolicy.IDLE_SPIN_STOP_AFTER + " 次"
+                    )
+                    break
                 }
 
                 // 进入下一轮，将工具结果喂给模型二次反思与自主决策
@@ -934,10 +1004,151 @@ class AgentDispatcher(
         }
     }
 
+    /**
+     * 子代理里的单次工具执行：**不绕过审批**。
+     *
+     * 子代理执行的是同一批工具（run_subagent 之外的全集），所以这里复用主循环的同一组判定原语：
+     * 护栏硬黑名单 → 特权工具强制审批 → ShellPolicy / ApprovalGate 分级闸门 → onRequireConfirmation。
+     * 唯一省略的是主循环里的 AI 风险说明（applyNarration，一次外呼）：少了它只会让审批更保守，
+     * 不会出现"主循环要批、子代理却静默执行"的情况。
+     */
+    private suspend fun executeSubAgentTool(call: ToolCall): ToolResult {
+        val risk = guardrail.assessTool(call.name, call.arguments, preferences.securityMode)
+        val forcedApproval = toolRegistry.requiresApprovalAlways(call.name)
+        val shellCommand = toolRegistry.shellCommandOf(call)
+        val actionDesc = if (shellCommand.isNullOrBlank()) {
+            "执行 [" + call.name + "]"
+        } else {
+            "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+        }
+
+        // 致命黑名单硬拦截：与主循环同一条判定，特权工具的原文仍然走审批页
+        if (!forcedApproval && risk.isHardBlocked) {
+            return rejectedToolResult(call, "致命指令已被安全护栏拦截：" + risk.riskSummary)
+        }
+
+        val gate = when {
+            shellCommand != null -> ShellPolicy.gate(
+                ShellPolicy.dangerOf(shellCommand),
+                ShellPolicy.isRemembered(shellCommand, preferences.rememberedShellCommandList())
+            )
+            forcedApproval -> ApprovalGate.Decision.REQUIRE_APPROVAL
+            else -> ApprovalGate.decide(risk, preferences.securityMode)
+        }
+
+        if (gate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
+            val evaluatedRisk = if (forcedApproval) forcedApprovalRisk(call.name) else risk
+            val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: true
+            if (!allowed) {
+                Log.i(TAG, "子代理工具被拒绝：tool=" + call.name)
+                return rejectedToolResult(call, "主人已在手腕端拒绝执行此操作")
+            }
+        }
+
+        return toolRegistry.executeTool(call)
+    }
+
+    /** 子代理工具被拦下时回给它的结构化回执：让子代理知道这条路走不通，而不是当成功继续编。 */
+    private fun rejectedToolResult(call: ToolCall, message: String): ToolResult = ToolResult(
+        toolCallId = call.id,
+        toolName = call.name,
+        output = JSONObject().apply {
+            put("status", "rejected")
+            put("message", message)
+        }.toString(),
+        isError = true
+    )
+
+    /**
+     * 子代理的模型请求：非流式、单次往返，用子代理自己的 history 与工具集组装请求。
+     * 全程不碰 conversationHistory，主时间线状态也不参与。
+     */
+    private suspend fun requestSubAgentTurn(
+        history: List<ChatMessage>,
+        tools: List<ToolDefinition>
+    ): SubAgentTurn = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
+        try {
+            val endpoint = if (preferences.baseUrl.endsWith("/")) {
+                preferences.baseUrl + "chat/completions"
+            } else {
+                preferences.baseUrl + "/chat/completions"
+            }
+            conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Authorization", "Bearer " + preferences.apiKey.trim())
+                connectTimeout = SUB_AGENT_CONNECT_TIMEOUT_MS
+                readTimeout = SUB_AGENT_READ_TIMEOUT_MS
+                doOutput = true
+            }
+            val body = JSONObject().apply {
+                put("model", preferences.modelName)
+                put("temperature", preferences.temperature)
+                put("max_tokens", preferences.maxOutputTokens)
+                put("stream", false)
+                put("messages", JSONArray().apply { history.forEach { put(it.toJson()) } })
+                if (tools.isNotEmpty()) {
+                    put("tools", JSONArray().apply { tools.forEach { put(it.toJson()) } })
+                    put("tool_choice", "auto")
+                }
+            }
+            OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body.toString()) }
+
+            val responseCode = conn.responseCode
+            if (responseCode !in 200..299) {
+                val errorBody = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                throw IllegalStateException("HTTP " + responseCode + ": " + errorBody.take(200))
+            }
+            val payload = conn.inputStream.bufferedReader().use { it.readText() }
+            val message = JSONObject(payload)
+                .optJSONArray("choices")
+                ?.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?: throw IllegalStateException("响应缺少 choices[0].message")
+
+            // 复用主链路的同一套解析器与累加器：非流式回包的分片拼装规则不需要第二份实现
+            val accumulator = StreamAccumulator()
+            accumulator.applyAll(ModelStreamParser.messageEvents(message))
+            SubAgentTurn(
+                content = accumulator.content,
+                reasoning = accumulator.reasoning,
+                toolCalls = accumulator.toolCalls()
+            )
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    /**
+     * 子代理的 system 头：沿用宿主四段契约与实时遥测，再补一段子代理专属说明。
+     * 子代理看不到主对话，因此必须在提示里明确"自己查清事实再回结论"。
+     */
+    private fun buildSubAgentSystemPrompt(): String {
+        val sections = AgentSystemPrompt.SECTION_RES_IDS.map { resId ->
+            runCatching { context.getString(resId) }.getOrDefault("")
+        }
+        val base = AgentSystemPrompt.compose(
+            sections = sections,
+            memoryHeader = "",
+            telemetryBlock = buildDynamicTelemetryBlock(),
+            customPrompt = preferences.customSystemPrompt
+        )
+        val subAgentRules = runCatching {
+            context.getString(R.string.agent_subagent_system_prompt)
+        }.getOrDefault("")
+        return listOf(base, subAgentRules.trim()).filter { it.isNotEmpty() }.joinToString("\n\n")
+    }
+
     companion object {
         // 审批说明的轻量调用上限：整体 4 秒，套接字单次 3.5 秒，超时即回退启发式
         private const val NARRATION_TIMEOUT_MS = 4000L
         private const val NARRATION_SOCKET_TIMEOUT_MS = 3500
+
+        // 子代理单次请求的连接 / 读取上限；整体时限由 SubAgentRunner.DEFAULT_TIMEOUT_MS 兜底
+        private const val SUB_AGENT_CONNECT_TIMEOUT_MS = 15000
+        private const val SUB_AGENT_READ_TIMEOUT_MS = 60000
 
         suspend fun fetchRemoteModels(baseUrl: String, apiKey: String): Pair<Long, List<String>> = withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()

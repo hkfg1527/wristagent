@@ -211,6 +211,14 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean(KEY_VISION_BETA_ENABLED, DEFAULT_VISION_BETA_ENABLED)
         set(value) = prefs.edit().putBoolean(KEY_VISION_BETA_ENABLED, value).apply()
 
+    /**
+     * 子代理模式开关。可留但不等于生效：是否真的放行由 SubAgentPolicy.isEffective 判定
+     * （只有专家模式 + 本开关打开才生效），避免"开关能拨但没效果"散落成两处判断。
+     */
+    var subAgentEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SUB_AGENT_ENABLED, DEFAULT_SUB_AGENT_ENABLED)
+        set(value) = prefs.edit().putBoolean(KEY_SUB_AGENT_ENABLED, value).apply()
+
     // ===================== 本轮新增的手表设置项 =====================
     // 键名全部沿用网页控制台的 camelCase 字段名：控制台写同一个键，表端只回显，两侧共用一份真值。
 
@@ -391,9 +399,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_ANIMATIONS_ENABLED = "animationsEnabled"
         const val KEY_VISION_BETA_ENABLED = "vision_beta_enabled"
         const val KEY_PROVIDER_PROFILES = "provider_profiles"
+        const val KEY_SUB_AGENT_ENABLED = "subAgentEnabled"
 
         const val DEFAULT_ANIMATIONS_ENABLED = true
         const val DEFAULT_VISION_BETA_ENABLED = false
+        const val DEFAULT_SUB_AGENT_ENABLED = false
     }
 }
 
