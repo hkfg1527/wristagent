@@ -30,7 +30,6 @@ import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ui.AgentSquareBlurBox
-import com.example.myapplication.presentation.ui.CameraCurve
 import com.example.myapplication.presentation.ui.ChatVisualMetrics
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.SpringColoredToolPill
@@ -62,30 +61,6 @@ private val MatMaskColor = Wear.Palette.Bg.copy(alpha = 0.86f)
 internal fun itemKeyOf(item: RenderableConversationItem): String = when (item) {
     is RenderableConversationItem.UserPrompt -> item.block.id
     is RenderableConversationItem.AssistantTurn -> item.key
-}
-
-/**
- * 对齐剩余距离（px，带符号）：[targetIndex] 这一项的**顶边**到"可读区顶部"的差。
- * 正值 = 还要向前滚（把内容往上推），负值 = 目标已经跑到上方，需要反向滚回来。
- *
- * 目标项不在可视区时不给"猜的距离"，而是按它相对可见窗口的方向返回搜寻距离，
- * 让限速模型先找过去（不瞬移），进可视区后再按实际偏移收敛。
- */
-internal fun ScalingLazyListState.focusRemainingPx(targetIndex: Int, targetTopPx: Float): Float {
-    val info = layoutInfo
-    val viewportHeightPx = info.viewportSize.height.toFloat()
-    val target = info.visibleItemsInfo.firstOrNull { it.index == targetIndex }
-    if (target != null) {
-        return CameraCurve.focusRemainingPx(
-            itemCenterOffsetPx = target.offset.toFloat(),
-            itemSizePx = target.size.toFloat(),
-            viewportHeightPx = viewportHeightPx,
-            targetTopPx = targetTopPx
-        )
-    }
-    val lastVisible = info.visibleItemsInfo.lastOrNull()
-        ?: return CameraCurve.seekRemainingPx(viewportHeightPx, targetBelow = true)
-    return CameraCurve.seekRemainingPx(viewportHeightPx, targetBelow = targetIndex > lastVisible.index)
 }
 
 /**

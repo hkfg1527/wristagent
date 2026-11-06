@@ -82,6 +82,19 @@ object CameraCurve {
     }
 
     /**
+     * 条目**底边**在视口中的位置（px）。
+     *
+     * 阅读锚点取的就是这条线：一个助手回合整体是同一个列表条目，正文块从卡片顶边依次往下排，
+     * 因此"最后一条正文的底边" = 该条目底边。取反方向（顶边）会把"整轮刚出现"误判成
+     * "锚点跑到阅读带上面"，镜头就会反向乱拉。
+     */
+    fun itemBottomPx(
+        itemCenterOffsetPx: Float,
+        itemSizePx: Float,
+        viewportHeightPx: Float
+    ): Float = viewportHeightPx / 2f + itemCenterOffsetPx + itemSizePx / 2f
+
+    /**
      * 目标项还没进入可视区时的搜寻距离（带符号）：给到 [MAX_SPEED] 对应的距离，
      * 于是"先限速找过去"不会突然瞬移，进可视区后再按 [focusRemainingPx] 收敛。
      */
@@ -136,6 +149,8 @@ object CameraCurve {
     ): Boolean = abs(currentFootprintPx - previousFootprintPx) >= thresholdPx.coerceAtLeast(0f)
 
     /**
+     * 旧版"对齐到回合顶边"的准入口径（镜头已改用 [readingTurnKey] + 阅读锚点，本函数只作历史契约保留）。
+     *
      * 什么时刻该做对齐：最后一项是**紧跟用户提问的助手回合**，且这一回合已经有正文。
      * 只有欢迎语、还没吐字（只有思考/工具胶囊）、正文还是空白，都不算"回复开始出现"。
      */
@@ -146,6 +161,27 @@ object CameraCurve {
         if (items[items.size - 2] !is RenderableConversationItem.UserPrompt) return null
         val hasBody = last.blocks.any { it is ConversationBlock.Text && it.content.isNotBlank() }
         return if (hasBody) last.key else null
+    }
+
+    /**
+     * 镜头跟随口径：本回合是否已经有**可读内容**。思考胶囊、工具胶囊与正文都算一行正文 ——
+     * 只认正文会让"先出思考/先调工具"的回合整段没有镜头（用户看到的是一条不动的死屏）。
+     */
+    fun readingTurnKey(items: List<RenderableConversationItem>): String? {
+        if (items.size < 2) return null
+        val last = items.last()
+        if (last !is RenderableConversationItem.AssistantTurn) return null
+        if (items[items.size - 2] !is RenderableConversationItem.UserPrompt) return null
+        return if (hasReadableContent(last.blocks)) last.key else null
+    }
+
+    /** 回合里是否已经有可读内容：一条非空正文、一段非空思考、或任意一个工具胶囊。 */
+    fun hasReadableContent(blocks: List<ConversationBlock>): Boolean = blocks.any { block ->
+        when (block) {
+            is ConversationBlock.Text -> block.content.isNotBlank()
+            is ConversationBlock.Thought -> block.reasoning.isNotBlank()
+            is ConversationBlock.ToolCall -> true
+        }
     }
 }
 

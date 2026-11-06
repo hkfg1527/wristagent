@@ -137,6 +137,21 @@ data class ChatUiState(
     }
 }
 
+/**
+ * 底栏形态的唯一派生来源（纯函数）：审批 > 录音 > 执行中 > 空闲。
+ *
+ * 四个写者（延迟拉长成停止胶囊、引擎吐字、语音开关、审批续体）以前各自 copy 同一个字段，
+ * 后写者能覆盖先写者 —— 真机上表现为"点过按钮之后状态混乱"：录音被思考态抢走、
+ * 正文一开始流式就没了停止键、审批放行后按钮回不来。
+ * 形态只由快照派生，写入顺序不再影响结果。
+ */
+fun ChatUiState.deriveBottomBlockMode(): BottomBlockMode = when {
+    isApprovalFocus -> BottomBlockMode.ACTION_ALLOW
+    isRecordingVoice -> BottomBlockMode.RECORDING
+    isExecuting -> BottomBlockMode.THINKING_STOP
+    else -> BottomBlockMode.IDLE
+}
+
 /** 持久化的主键输入方式 -> 枚举：只认 "KEYBOARD"，其余一律语音优先。 */
 fun mainInputTypeFromStored(stored: String?): MainInputType =
     if (stored == "KEYBOARD") MainInputType.KEYBOARD else MainInputType.VOICE

@@ -241,7 +241,7 @@ class ChatViewModel(
         } else if (!newState.isThinking && !newState.isExecutingTool) {
             _uiState.update {
                 if (it.bottomBlockMode != BottomBlockMode.ACTION_ALLOW) {
-                    it.copy(bottomBlockMode = BottomBlockMode.IDLE)
+                    it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null)
                 } else {
                     it
                 }
@@ -300,7 +300,7 @@ class ChatViewModel(
             _uiState.update { it.copy(isApprovalCollapsing = false) }
             pendingContinuation?.resume(true)
             pendingContinuation = null
-            _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE) }
+            _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null) }
         }
     }
 
@@ -324,7 +324,7 @@ class ChatViewModel(
     fun rejectPending() {
         pendingContinuation?.resume(false)
         pendingContinuation = null
-        _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE) }
+        _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null) }
     }
 
     /** 审批滑块进度：0=拒绝，1=放行，由底栏回调驱动点阵着色。 */

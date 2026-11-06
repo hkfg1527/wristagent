@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
@@ -67,6 +68,7 @@ import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.presentation.ApprovalCollapseDurationMs
 import com.example.myapplication.presentation.ApprovalTone
 import com.example.myapplication.presentation.ChatViewModel
+import com.example.myapplication.presentation.deriveBottomBlockMode
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
 import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
@@ -82,8 +84,7 @@ import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.ReadingCamera
 import com.example.myapplication.presentation.ui.ReadingCameraEvent
-import com.example.myapplication.presentation.ui.ReadingCameraPhase
-import com.example.myapplication.presentation.ui.ReadingPace
+import com.example.myapplication.presentation.ui.ReadingAnchor
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.TopClockBar
@@ -309,64 +310,47 @@ fun ChatScreen(
         )
     }
 
-    // ================= 提词器镜头：唯一的滚动所有者 =================
-    // 只做两件事，且全应用只有这一条链路在动列表：
-    //   ① 回复开始出现正文的那一刻，把这一回合卡片的顶边**限速**挪到可读区顶部
-    //      （TopContentInset 34dp 之下再留 8dp，即 42dp）；
-    //   ② 对齐到位后立刻转为按人类阅读速度推导的**恒定慢速下滚**，用户不用动手就能读完。
-    // 到末尾 / 用户自己滚动 / 审批·录音·弹窗·抽屉 一律停住，停在原地不回弹；
-    // 一轮结束不做任何跳转 —— 这里是"提词器"，不是"结算追到结尾"。
+    // ================= 阅读镜头：唯一的滚动所有者 =================
+    // 每帧只做一件事：把「正在读的那一行」保持在阅读带里。
+    //   · 阅读锚点 = 本回合（最后一个紧跟提问的助手回合）正文最后一条的底边，取自 layoutInfo；
+    //   · 阅读带   = 42dp … （视口高 − 底栏实际占用 − 8dp）；
+    //   · 锚点低于带下沿 → 正文上移；高于带上沿 → 正文下移；带内（含 8dp 死区）→ 不滚；
+    //   · 位移一律走 CameraCurve 的限速器（远快近慢 + 加速度上限 + 单帧不越过目标 + 亚像素残余）。
+    // 判定输入只有 layoutInfo 与底栏占用，所以「工具胶囊插入 / 思考胶囊折叠 / 底栏形变 / 逐字吐字」
+    // 这四类布局变化走的是同一条路径：下一帧按锚点重新判定。旧实现"对齐一次 → 恒速下滚"
+    // 只有一次纠错机会，任何一次插入/形变都会让锚点永久离开可读区，这就是"相机不跟随"。
     val density = LocalDensity.current
     // 表冠/拖拽之后的一小段"镜头让路"窗口
     var cameraPauseUntil by remember { mutableLongStateOf(0L) }
 
-    // 只有"紧跟用户提问、且已经吐出正文的助手回合"才接管镜头；null 表示本轮没有接管。
-    val cameraFocusTurnKey = remember(conversationItems) { CameraCurve.replyTurnKey(conversationItems) }
-    val cameraFocusIndex = conversationItems.lastIndex
+    // 只有"紧跟用户提问、且已经有可读内容（正文/思考/工具胶囊）"的助手回合才接管镜头；
+    // null 表示本轮没有接管（欢迎语、翻历史会话）。
+    val readingTurnKey = remember(conversationItems) { CameraCurve.readingTurnKey(conversationItems) }
+    // 条目索引每帧现取：错误提示条会追加在会话条目之后，回合内新增胶囊则不会。
+    val liveConversationItems = rememberUpdatedState(conversationItems)
 
-    LaunchedEffect(cameraFocusTurnKey) {
-        val turnKey = cameraFocusTurnKey ?: return@LaunchedEffect
-        // 每个回合只对齐一次：从设置页返回时 ChatScreen 重新组合，这里必须拦住，
-        // 否则镜头会重新"对齐到回合开头"，看起来像画面抽搐。
-        if (!viewModel.claimCameraTurn(turnKey)) return@LaunchedEffect
-        // 注意：这里**不能**用 isExecuting 当门。提词器的核心场景正是"回复已经结束、用户要读全文"，
-        // 用 isExecuting 会把 AutoPan 永远挡在门外（回复一结束协程就 return）。
-        // 接管条件只看"本轮已经吐出了正文"（由 replyTurnKey 判定），翻历史会话时 replyTurnKey 为 null。
-        val densityScale = density.density
-        val targetTopPx = with(density) { (Wear.Size.TopContentInset + CameraCurve.FOCUS_TOP_MARGIN_DP.dp).toPx() }
-        val deadZonePx = CameraCurve.deadZonePx(densityScale)
-        val panSpeedPxPerSec = ReadingPace.panSpeedPxPerSec(
-            density = densityScale,
-            speedMultiplier = ReadingPace.USER_SPEED_MULTIPLIER
-        )
+    LaunchedEffect(readingTurnKey) {
+        if (readingTurnKey == null) return@LaunchedEffect
+        // 本轮是否已经被用户叫停的唯一判据（isStoppedForTurn）：用户滚过之后不再自动拉回。
+        // 对齐/匀速这两个旧阶段已被"锚点 vs 阅读带"取代，因此这里只用到两个事件。
         val camera = ReadingCamera()
         camera.onEvent(ReadingCameraEvent.TurnBodyAppeared)
+
+        val bandTopPx = with(density) {
+            ReadingAnchor.bandTopPx(
+                topInsetPx = Wear.Size.TopContentInset.toPx(),
+                marginPx = CameraCurve.FOCUS_TOP_MARGIN_DP.dp.toPx()
+            )
+        }
+        val bandGapPx = with(density) { ReadingAnchor.BAND_BOTTOM_GAP_DP.dp.toPx() }
+        val deadZonePx = CameraCurve.deadZonePx(density.density)
         var speedPxPerSec = 0f
         var lastFrameMillis = 0L
-        // AutoPan 的亚像素残余：6.6dp/s ≈ 0.22px/帧，直接发 dispatchRawDelta 会被取整丢弃，
-        // 必须把不足 1px 的部分攒起来，攒够 1px 再滚动一次（平均速度才等于 13.3px/s）。
-        var panResidualPx = 0f
-
-        // ---- 按钮形变补偿状态 ----
-        // 底栏占用高度一变（主键长成停止胶囊 / 审批扁条 / 收成贴底弧条），屏幕底部的可读区就变了。
-        // 旧实现只在"首字出现"那一刻对齐一次，之后一直按旧可读区匀速推 —— 这就是
-        // "按钮在变形、镜头不跟着走"。这里把形变换算成一次补偿滚动，走的是对齐阶段同一个限速器。
-        val realignThresholdPx = with(density) { CameraCurve.REALIGN_THRESHOLD_DP.dp.toPx() }
-        fun barFootprintPxNow(): Float = with(density) {
-            CameraCurve.barFootprintDp(
-                expandedBlockHeightDp = (if (state.isApprovalFocus) ApprovalBlockHeight else IdleBlockHeight).value,
-                bottomInsetDp = BottomBarBottomInset.value,
-                collapsedHeightDp = CollapsedStripHeight.value,
-                collapseProgress = collapseProgress.value
-            ).dp.toPx()
-        }
-        var barFootprintPx = barFootprintPxNow()
-        var barRealignPx = 0f
-        var realignSpeedPxPerSec = 0f
+        // 亚像素残余：速度小到每帧不足 1px 时直接 dispatchRawDelta 会被取整丢弃，必须攒够再滚
+        var residualPx = 0f
 
         while (isActive) {
-            // 注意：withFrameMillis 给的是**毫秒**（不是纳秒），除 1e9 会把 dt 恒夹成下限 0.004，
-            // 导致 AutoPan 实际速度只有设计的 1/4。
+            // withFrameMillis 给的是**毫秒**（当纳秒用会把 dt 恒夹成下限，速度掉到设计的 1/4）
             val frameMillis = withFrameMillis { it }
             val dt = if (lastFrameMillis == 0L) {
                 0.016f
@@ -374,96 +358,99 @@ fun ChatScreen(
                 ((frameMillis - lastFrameMillis) / 1_000f).coerceIn(0.004f, 0.05f)
             }
             lastFrameMillis = frameMillis
-            // 用户接管（手指在拖 / 刚转过表冠）：本轮自动镜头立即作废，绝不把用户推回去
-            if (listState.isScrollInProgress || SystemClock.uptimeMillis() < cameraPauseUntil) {
-                camera.onEvent(ReadingCameraEvent.UserScrolled)
-                return@LaunchedEffect
-            }
-            // 审批 / 录音 / 输入弹窗 / 抽屉：立即停，本轮不再自启
-            val interrupted = state.isApprovalFocus || state.pendingApproval != null ||
-                state.isRecordingVoice || state.draft.isOpen || state.isSessionDrawerOpen
-            if (interrupted) {
-                camera.onEvent(ReadingCameraEvent.Interrupted)
-                return@LaunchedEffect
-            }
-            // ---- 按钮形变 → 可读区变化：把被按钮新占掉的那几行重新让出来 ----
-            // 让路规则与自动镜头一致：用户正在拖/刚转过表冠时这里根本走不到（上面已 return），
-            // 因此这里只处理"没有人在动手"的时刻。
-            val footprintPx = barFootprintPxNow()
-            if (CameraCurve.shouldRealign(barFootprintPx, footprintPx, realignThresholdPx)) {
-                barRealignPx += CameraCurve.realignCompensationPx(barFootprintPx, footprintPx)
-                barFootprintPx = footprintPx
-            }
-            if (barRealignPx != 0f) {
-                // 复用对齐阶段的限速器：远快近慢 + 加速度上限 + 单帧不越过目标，绝不瞬移
-                realignSpeedPxPerSec = CameraCurve.nextSpeed(
-                    realignSpeedPxPerSec,
-                    CameraCurve.targetSpeed(barRealignPx, deadZonePx),
-                    dt
-                )
-                val realignStepPx = CameraCurve.stepPx(realignSpeedPxPerSec, dt, barRealignPx)
-                if (realignStepPx != 0f) {
-                    val consumedPx = listState.dispatchRawDelta(realignStepPx)
-                    barRealignPx -= consumedPx
-                    if (abs(consumedPx) < 0.5f && abs(realignStepPx) >= 0.5f) {
-                        // 已经顶到列表边界：这段补偿物理上走不了，丢掉，不卡死也不来回蹭
-                        barRealignPx = 0f
-                    }
+
+            // ---- 让路：用户手指/表冠在动，或刚滚完还在暂停窗口内 ----
+            if (ReadingAnchor.shouldYield(listState.isScrollInProgress, SystemClock.uptimeMillis(), cameraPauseUntil)) {
+                if (listState.isScrollInProgress) {
+                    // 用户主动接管滚动：本轮作废，绝不把人推回去
+                    camera.onEvent(ReadingCameraEvent.UserScrolled)
+                    return@LaunchedEffect
                 }
-                if (abs(barRealignPx) <= 0.5f) barRealignPx = 0f
-                // 这一帧只做补偿：不叠加匀速下滚，避免一次形变把正文多推一截
+                // 暂停窗口内只是"这一帧不抢"，窗口一过镜头自己接回来
+                continue
+            }
+            if (camera.isStoppedForTurn) return@LaunchedEffect
+
+            // ---- 沉浸态（审批/录音/输入弹窗/抽屉）：这一帧不抢，但**不作废本轮** ----
+            // 审批放行后正文继续吐字、录音结束后回答继续流式，镜头必须能接回来；
+            // 旧实现这里直接 return，镜头从此死到下一轮 —— 用户看到的是"好像也坏了"。
+            if (state.isApprovalFocus || state.isRecordingVoice || state.draft.isOpen || state.isSessionDrawerOpen) {
+                speedPxPerSec = 0f
+                residualPx = 0f
                 continue
             }
 
-            when (camera.phase) {
-                ReadingCameraPhase.AlignToTurnStart -> {
-                    val remainingPx = listState.focusRemainingPx(cameraFocusIndex, targetTopPx)
-                    if (abs(remainingPx) <= deadZonePx) {
-                        speedPxPerSec = 0f
-                        camera.onEvent(ReadingCameraEvent.Aligned)
-                    } else {
-                        speedPxPerSec = CameraCurve.nextSpeed(
-                            speedPxPerSec,
-                            CameraCurve.targetSpeed(remainingPx, deadZonePx),
-                            dt
-                        )
-                        val stepPx = CameraCurve.stepPx(speedPxPerSec, dt, remainingPx)
-                        val consumedPx = if (stepPx == 0f) 0f else listState.dispatchRawDelta(stepPx)
-                        if (stepPx != 0f && abs(consumedPx) < 0.5f) {
-                            // 已经顶到列表边界，物理上无法更靠近目标：本轮作废，不卡死也不来回蹭
-                            camera.onEvent(ReadingCameraEvent.Interrupted)
-                            return@LaunchedEffect
-                        }
-                    }
-                }
+            val info = listState.layoutInfo
+            val viewportHeightPx = info.viewportSize.height.toFloat()
+            if (viewportHeightPx <= 0f) continue
+            val turnIndex = liveConversationItems.value.lastIndex
+            val focusItem = info.visibleItemsInfo.firstOrNull { it.index == turnIndex }
+            // 回合还没进可视区时按"贴着下沿"给距离：它永远排在列表末尾，只可能在下方，
+            // 交给同一个限速器逐帧找过去，绝不瞬移。
+            val anchorBottomPx = focusItem?.let {
+                CameraCurve.itemBottomPx(
+                    itemCenterOffsetPx = it.offset.toFloat(),
+                    itemSizePx = it.size.toFloat(),
+                    viewportHeightPx = viewportHeightPx
+                )
+            } ?: viewportHeightPx
 
-                ReadingCameraPhase.AutoPan -> {
-                    if (!listState.canScrollForward) {
-                        camera.onEvent(ReadingCameraEvent.ReachedEnd)
-                        // 提词器滚到「输出结尾」：正文下方正好空出位置，按钮自动回来。
-                        // 这里绕过唤醒挂起期（挂起只阻止"收起"，不阻止"恢复"），
-                        // 因为这是"读完了"的明确信号，用户此刻最可能想继续操作。
-                        viewModel.setBottomBarMode(BottomBarMode.Expanded)
-                        return@LaunchedEffect
-                    }
+            // 底栏实际占用：与按钮视觉共用同一条 collapseProgress 时间线，不另算第二条曲线
+            val barFootprintPx = with(density) {
+                CameraCurve.barFootprintDp(
+                    expandedBlockHeightDp = (if (state.isApprovalFocus) ApprovalBlockHeight else IdleBlockHeight).value,
+                    bottomInsetDp = BottomBarBottomInset.value,
+                    collapsedHeightDp = CollapsedStripHeight.value,
+                    collapseProgress = collapseProgress.value
+                ).dp.toPx()
+            }
+            val plan = ReadingAnchor.plan(
+                anchorBottomPx = anchorBottomPx,
+                bandTopPx = bandTopPx,
+                bandBottomPx = ReadingAnchor.bandBottomPx(viewportHeightPx, barFootprintPx, bandGapPx),
+                deadZonePx = deadZonePx,
+                canScrollForward = listState.canScrollForward,
+                canScrollBackward = listState.canScrollBackward
+            )
+            if (plan.isHold) {
+                speedPxPerSec = 0f
+                residualPx = 0f
+                continue
+            }
 
-                    // 提词器：恒定慢速，绝不再按剩余距离提速；亚像素增量要累积，否则每帧都被取整丢弃
-                    val wantPx = panSpeedPxPerSec * dt + panResidualPx
-                    val appliedPx = listState.dispatchRawDelta(wantPx)
-                    panResidualPx = wantPx - appliedPx
-
-                }
-
-                ReadingCameraPhase.Idle -> return@LaunchedEffect
+            speedPxPerSec = CameraCurve.nextSpeed(
+                speedPxPerSec,
+                CameraCurve.targetSpeed(plan.deltaPx, deadZonePx),
+                dt
+            )
+            // 单帧位移绝不越过剩余距离，连亚像素残余一起夹住（否则会越过目标再回弹）
+            val wantPx = (CameraCurve.stepPx(speedPxPerSec, dt, plan.deltaPx) + residualPx)
+                .let { if (plan.deltaPx >= 0f) it.coerceIn(0f, plan.deltaPx) else it.coerceIn(plan.deltaPx, 0f) }
+            val appliedPx = if (abs(wantPx) < 0.01f) 0f else listState.dispatchRawDelta(wantPx)
+            residualPx = wantPx - appliedPx
+            if (abs(appliedPx) < 0.5f && abs(wantPx) >= 0.5f) {
+                // 已经顶到列表边界：这段位移物理上走不了，丢掉本帧残余，不卡死也不来回蹭
+                residualPx = 0f
+                speedPxPerSec = 0f
             }
         }
+    }
+
+
+    // ================= 底栏形态的唯一写入口 =================
+    // 形态（闲置 / 录音 / 停止 / 审批）由 state.deriveBottomBlockMode() 这一个纯函数派生
+    // （审批 > 录音 > 执行中 > 空闲）；这里只管"收 / 展"这一维。
+    // 全文件只有这一个函数能写底栏形态：以前五处各自 set，后写者覆盖先写者，
+    // collapseProgress 被来回拉扯 —— 用户看到的就是"点过按钮之后状态混乱"。
+    fun applyBarMode(next: BottomBarMode) {
+        if (bottomBarMode != next) viewModel.setBottomBarMode(next)
     }
 
     // ================= 底栏可见性：滚动即收起成小白条，点条才展开 =================
     val bottomBarForceExpanded = state.isBottomBarForceExpanded
     // 进入强制态（执行/审批/录音/弹窗/抽屉）立即展开并锁住，离开强制态不自动收起
     LaunchedEffect(bottomBarForceExpanded) {
-        if (bottomBarForceExpanded) viewModel.setBottomBarMode(BottomBarMode.Expanded)
+        if (bottomBarForceExpanded) applyBarMode(BottomBarMode.Expanded)
     }
     // 唤醒挂起期：点一次弧条把按钮叫回来后，3 秒内不许再因滚动/静默被自动收走
     var wakeLatchUntil by remember { mutableLongStateOf(0L) }
@@ -477,7 +464,7 @@ fun ChatScreen(
             forceExpanded = state.isBottomBarForceExpanded
         )
         if (next == BottomBarMode.Collapsed && !allowCollapse) return
-        viewModel.setBottomBarMode(next)
+        applyBarMode(next)
     }
 
     val reportBottomBarEvent: (BottomBarEvent) -> Unit = { event ->
@@ -496,7 +483,7 @@ fun ChatScreen(
                 // （内容到底后列表仍能再滚 152px），所以用"最后一条已进入可视区"来判定。
                 val atBottom = isContentEndVisible(listState, conversationItems.size)
                 if (BottomBarVisibility.shouldRestoreAtBottom(atBottom)) {
-                    viewModel.setBottomBarMode(BottomBarMode.Expanded)
+                    applyBarMode(BottomBarMode.Expanded)
                 }
                 applyBarEvent(
                     event,
@@ -531,15 +518,15 @@ fun ChatScreen(
         snapshotFlow { isContentEndVisible(listState, conversationItems.size) }
             .filter { visible -> visible }
             .collect {
-                if (viewModel.bottomBarMode.value == BottomBarMode.Collapsed) {
-                    viewModel.setBottomBarMode(BottomBarMode.Expanded)
+                if (bottomBarMode == BottomBarMode.Collapsed) {
+                    applyBarMode(BottomBarMode.Expanded)
                 }
             }
     }
 
     // 新回合到达后 3 秒内无人滚动 → 自动收起（每个回合只计时一次，返回设置页不会重开）
-    LaunchedEffect(cameraFocusTurnKey) {
-        val key = cameraFocusTurnKey ?: return@LaunchedEffect
+    LaunchedEffect(readingTurnKey) {
+        val key = readingTurnKey ?: return@LaunchedEffect
         if (!viewModel.claimAutoCollapseTurn(key)) return@LaunchedEffect
         val turnStart = SystemClock.uptimeMillis()
         delay(AUTO_COLLAPSE_DELAY_MS)
@@ -552,7 +539,7 @@ fun ChatScreen(
             forceExpanded = state.isBottomBarForceExpanded
         )
         if (shouldCollapse) {
-            viewModel.setBottomBarMode(
+            applyBarMode(
                 BottomBarVisibility.next(
                     current = bottomBarMode,
                     event = BottomBarEvent.AutoPanQuiet,
@@ -670,7 +657,8 @@ fun ChatScreen(
         // ================= 4. 单体演变底栏控制器 =================
         // 文字输入弹窗是模态：打开时底栏整体退场，避免卡片与主键互相压叠
         if (!state.draft.isOpen) BottomInteractiveBlock(
-            mode = state.bottomBlockMode,
+            // 形态只认派生值：底栏不会再被某个写者单独改出"半套"状态
+            mode = state.deriveBottomBlockMode(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = BottomBarBottomInset),
