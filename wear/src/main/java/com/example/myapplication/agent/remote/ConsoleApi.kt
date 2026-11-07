@@ -41,6 +41,9 @@ class ConsoleResponse(
  * 控制台接口的全部纯逻辑：路由匹配、token 校验、settings 读写与校验、action 分发、静态资源。
  * 不引用任何 Android 或传输层类型，因此可以完整地在 JVM 单测里驱动。
  */
+/** Secret fields masked in every console response. */
+private val CONSOLE_SECRET_KEYS = listOf("apiKey", "baiduApiKey", "baiduSecretKey")
+
 class ConsoleApi(
     private val settings: ConsoleSettingsPort,
     private val capabilities: () -> Map<String, Any?>,
@@ -123,7 +126,12 @@ class ConsoleApi(
 
     /** 完整快照：规范键按注册表顺序输出，别名镜像同一份值。 */
     private fun snapshotWithAliases(): Map<String, Any?> {
+        // Secrets are masked here: both /api/state and POST /api/settings build their
+        // response through this map. Returning the API key in clear text would hand it to
+        // anyone who guesses the 4-digit access code.
         val live = runCatching { settings.snapshot() }.getOrNull().orEmpty()
+            .toMutableMap<String, Any?>()
+            .apply { for (secret in CONSOLE_SECRET_KEYS) this[secret] = ConsoleToken.mask(this[secret] as? String) }
         val out = LinkedHashMap<String, Any?>()
         for (field in ConsoleFields.ALL) out[field.key] = live[field.key]
         for ((alias, real) in ConsoleFields.ALIASES) {
