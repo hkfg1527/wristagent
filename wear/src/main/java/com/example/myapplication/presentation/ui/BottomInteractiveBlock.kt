@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.settings.motionSpec
 import androidx.compose.runtime.getValue
@@ -843,31 +844,34 @@ fun MinimalistSoundwaveIcon(
     modifier: Modifier = Modifier
 ) {
     val animationsEnabled = LocalAnimationsEnabled.current
-    val wave1: Float
-    val wave2: Float
-    val wave3: Float
-    if (animationsEnabled) {
+    // 只有真在录音且动效开启时才挂无限动画，并把相位以 State 形式交给绘制阶段读取：
+    // 空闲时既不创建动画，也不因为读相位而重组
+    val wave1: State<Float>
+    val wave2: State<Float>
+    val wave3: State<Float>
+    if (isRecording && animationsEnabled) {
         val infiniteTransition = rememberInfiniteTransition(label = "waveAnim")
         wave1 = infiniteTransition.animateFloat(
             initialValue = 0.3f, targetValue = 1.0f,
             animationSpec = infiniteRepeatable(tween(450, easing = LinearEasing), RepeatMode.Reverse),
             label = "w1"
-        ).value
+        )
         wave2 = infiniteTransition.animateFloat(
             initialValue = 0.9f, targetValue = 0.4f,
             animationSpec = infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse),
             label = "w2"
-        ).value
+        )
         wave3 = infiniteTransition.animateFloat(
             initialValue = 0.4f, targetValue = 0.85f,
             animationSpec = infiniteRepeatable(tween(520, easing = LinearEasing), RepeatMode.Reverse),
             label = "w3"
-        ).value
+        )
     } else {
-        // 关闭动效：三条波形钉在中位，图标形态与开启动画时一致，不会出现"卡在某一帧"的错位
-        wave1 = 0.65f
-        wave2 = 0.65f
-        wave3 = 0.65f
+        // 关闭动效 / 未录音：三条波形钉在中位，形态与动画开启时一致，不会"卡在某一帧"
+        val flat = remember { mutableStateOf(0.65f) }
+        wave1 = flat
+        wave2 = flat
+        wave3 = flat
     }
 
     Canvas(modifier = modifier.size(13.dp, 13.dp)) {
@@ -875,9 +879,9 @@ fun MinimalistSoundwaveIcon(
         val spacing = size.width / 4f
         val centerY = size.height / 2f
 
-        val h1 = if (isRecording) size.height * (0.35f + 0.65f * wave1) else size.height * 0.45f
-        val h2 = if (isRecording) size.height * (0.45f + 0.55f * wave2) else size.height * 0.90f
-        val h3 = if (isRecording) size.height * (0.35f + 0.65f * wave3) else size.height * 0.45f
+        val h1 = if (isRecording) size.height * (0.35f + 0.65f * wave1.value) else size.height * 0.45f
+        val h2 = if (isRecording) size.height * (0.45f + 0.55f * wave2.value) else size.height * 0.90f
+        val h3 = if (isRecording) size.height * (0.35f + 0.65f * wave3.value) else size.height * 0.45f
 
         drawLine(
             color = tint,

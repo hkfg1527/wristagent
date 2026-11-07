@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,18 +109,24 @@ fun ThoughtPill(
     }
     val elapsedSeconds = ThoughtCapsuleState.elapsedSeconds(thought, nowMs)
 
-    // 闪烁省略号：0..3 的锯齿帧换算成 1..3 个点
-    val dotsTransition = rememberInfiniteTransition(label = "thoughtDots")
-    val dotsFrame by dotsTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "thoughtDotsFrame"
-    )
-    val dots = if (isStreaming) ThoughtCapsuleState.thinkingDots(dotsFrame.toInt()) else ""
+    // 闪烁省略号：只在真正流式时挂动画；点数只取整数值，
+    // 一帧一次的相位变化不会引起重组，只有 0→1→2→3 这三次才会
+    val dots = if (isStreaming) {
+        val dotsTransition = rememberInfiniteTransition(label = "thoughtDots")
+        val dotsFrame = dotsTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(900, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "thoughtDotsFrame"
+        )
+        val dotIndex by remember { derivedStateOf { dotsFrame.value.toInt() } }
+        ThoughtCapsuleState.thinkingDots(dotIndex)
+    } else {
+        ""
+    }
 
     val arrowRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
@@ -259,8 +266,9 @@ fun SpringColoredToolPill(
     )
 
     // 执行中：圆点呼吸 (替代原来的旋转齿轮字形，保持无 emoji)
-    val infiniteTransition = rememberInfiniteTransition(label = "executingPulse")
     val dotScale by if (isExecuting) {
+        // 空闲时连 transition 都不创建：它在整个存活期都会请求帧
+        val infiniteTransition = rememberInfiniteTransition(label = "executingPulse")
         infiniteTransition.animateFloat(
             initialValue = 0.55f,
             targetValue = 1f,
