@@ -12,20 +12,28 @@ class VoiceAsrGateway(
     private val maxDurationMs: Int = 8_000
 ) {
 
-    suspend fun transcribe(settings: AsrSettings, systemRecognizerAvailable: Boolean): AsrResult {
+    suspend fun transcribe(
+        settings: AsrSettings,
+        systemRecognizerAvailable: Boolean,
+        finishRequested: () -> Boolean = { false }
+    ): AsrResult {
         return when (val route = AsrServiceRouter.resolve(settings, systemRecognizerAvailable)) {
             is AsrRoute.Unavailable -> AsrResult.Failure(route.reason)
-            is AsrRoute.UseProvider -> runBytePipeline(settings, route.providerId)
+            is AsrRoute.UseProvider -> runBytePipeline(settings, route.providerId, finishRequested)
         }
     }
 
-    private suspend fun runBytePipeline(settings: AsrSettings, providerId: AsrProviderId): AsrResult {
+    private suspend fun runBytePipeline(
+        settings: AsrSettings,
+        providerId: AsrProviderId,
+        finishRequested: () -> Boolean
+    ): AsrResult {
         if (providerId == AsrProviderId.SYSTEM) {
             return AsrResult.Failure(AsrMessages.SYSTEM_PLATFORM_ENTRY)
         }
         val provider = providerFor(settings) ?: return AsrResult.Failure(AsrMessages.NO_PROVIDER)
 
-        val audio = capture.recordWav(sampleRate, maxDurationMs)
+        val audio = capture.recordWav(sampleRate, maxDurationMs, finishRequested)
         val wav = audio.getOrNull()
         if (wav == null) {
             val error = audio.exceptionOrNull()

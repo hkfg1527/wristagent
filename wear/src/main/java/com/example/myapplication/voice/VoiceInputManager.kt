@@ -132,7 +132,7 @@ class VoiceInputManager(
 
         onListeningStateChanged?.invoke(true)
         session.launch {
-            val result = gateway.transcribe(settings, isRecognitionAvailable())
+            val result = gateway.transcribe(settings, isRecognitionAvailable()) { session.isStopRequested }
             // 取消后麦克风已释放，再弹"录音失败"只会误导用户
             if (session.isCancelled) return@launch
             onListeningStateChanged?.invoke(false)
@@ -151,6 +151,8 @@ class VoiceInputManager(
     }
 
     fun stopListening() {
+        // 第三方通道没有"停止即出结果"的识别器：显式请求提前收尾，把已录到的音频送去转写
+        if (session.isRunning) session.requestStop()
         val recognizer = speechRecognizer
         if (recognizer != null) {
             try {

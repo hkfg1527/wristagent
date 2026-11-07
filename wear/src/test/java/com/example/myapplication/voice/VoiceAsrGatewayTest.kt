@@ -26,7 +26,11 @@ class VoiceAsrGatewayTest {
     private class CountingCapture(private val payload: Result<ByteArray>) : AudioCapture {
         var callCount: Int = 0
 
-        override suspend fun recordWav(sampleRate: Int, maxDurationMs: Int): Result<ByteArray> {
+        override suspend fun recordWav(
+            sampleRate: Int,
+            maxDurationMs: Int,
+            finishRequested: () -> Boolean
+        ): Result<ByteArray> {
             callCount++
             return payload
         }

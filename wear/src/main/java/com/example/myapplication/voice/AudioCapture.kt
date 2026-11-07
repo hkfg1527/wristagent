@@ -16,7 +16,16 @@ import java.io.ByteArrayOutputStream
 
 /** 录音抽象：JVM 单测注入假实现，真机使用 AudioRecordWavCapture */
 fun interface AudioCapture {
-    suspend fun recordWav(sampleRate: Int, maxDurationMs: Int): Result<ByteArray>
+    /**
+     * 采集 16kHz 单声道 PCM16。
+     * [finishRequested] 为真时提前收尾并返回已录到的音频（用户按停止）；
+     * 协程取消则返回失败，音频丢弃。
+     */
+    suspend fun recordWav(
+        sampleRate: Int,
+        maxDurationMs: Int,
+        finishRequested: () -> Boolean
+    ): Result<ByteArray>
 }
 
 /** AudioRecord 采集 16kHz 单声道 PCM16 并封装为 WAV；阻塞 IO 全部在 IO 线程完成 */
@@ -25,11 +34,15 @@ class AudioRecordWavCapture(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AudioCapture {
 
-    override suspend fun recordWav(sampleRate: Int, maxDurationMs: Int): Result<ByteArray> =
+    override suspend fun recordWav(
+        sampleRate: Int,
+        maxDurationMs: Int,
+        finishRequested: () -> Boolean
+    ): Result<ByteArray> =
         withContext(ioDispatcher) {
             val context = currentCoroutineContext()
             try {
-                capture(sampleRate, maxDurationMs) { context.isActive }
+                capture(sampleRate, maxDurationMs, { context.isActive }, finishRequested)
             } catch (e: SecurityException) {
                 Result.failure(IllegalStateException(AsrMessages.NO_MIC_PERMISSION))
             } catch (e: IllegalStateException) {
@@ -43,7 +56,8 @@ class AudioRecordWavCapture(
     private fun capture(
         sampleRate: Int,
         maxDurationMs: Int,
-        isActive: () -> Boolean
+        isActive: () -> Boolean,
+        finishRequested: () -> Boolean
     ): Result<ByteArray> {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
@@ -79,17 +93,19 @@ class AudioRecordWavCapture(
             }
             recorder.startRecording()
             while (sink.size() < targetBytes) {
-                // read 是阻塞调用，取消只在两次读之间生效
+                // read 是阻塞调用，取消与提前收尾都只在两次读之间生效
                 if (!isActive()) {
                     cancelled = true
                     break
                 }
+                if (finishRequested()) break
                 val read = recorder.read(chunk, 0, chunk.size)
-                when (CaptureLoop.decide(isActive(), read)) {
+                when (CaptureLoop.decide(isActive(), finishRequested(), read)) {
                     CaptureLoop.Decision.CANCELLED -> {
                         cancelled = true
                         break
                     }
+                    CaptureLoop.Decision.FINISH -> break
                     CaptureLoop.Decision.READ_ERROR -> return Result.failure(
                         IllegalStateException(AsrMessages.RECORD_FAILED + "（错误码 " + read + "）")
                     )
