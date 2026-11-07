@@ -14,6 +14,12 @@ import com.example.myapplication.agent.ReplySpeech
 import com.example.myapplication.agent.ReplySpeaker
 import com.example.myapplication.agent.VoiceDraftGate
 import com.example.myapplication.agent.ChatSession
+import com.example.myapplication.agent.session.SessionStore
+import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBarMode
@@ -55,6 +61,9 @@ class ChatViewModel(
 ) : AndroidViewModel(application) {
 
     private val workScope: CoroutineScope = scope ?: viewModelScope
+    // 没有真实 filesDir 就不碰磁盘：单测里 filesDir 为空，写相对路径会让用例之间互相污染
+    private val sessionStore: SessionStore? =
+        application.filesDir?.let { SessionStore(File(it, "sessions.txt")) }
 
     private val throttle = StreamingThrottleState()
     private val _uiState = MutableStateFlow(
@@ -114,6 +123,39 @@ class ChatViewModel(
         // 供应商拒收 reasoning_effort：引擎已去掉字段重试，这里只负责把"已忽略"讲清楚
         gateway.onReasoningEffortIgnored = {
             showNotice(R.string.wearchat_notice_reasoning_effort_ignored, isError = false)
+        }
+
+        restoreSessions()
+        persistSessions()
+    }
+
+    /** 启动时恢复上次会话；历史同时灌回引擎，于是模型接着上文说，而不是从零开始。 */
+    private fun restoreSessions() {
+        val snapshot = sessionStore?.load() ?: return
+        val active = snapshot.sessions.firstOrNull { it.id == snapshot.activeSessionId }
+            ?: snapshot.sessions.firstOrNull()
+            ?: return
+        _uiState.update { state ->
+            state.copy(
+                sessions = snapshot.sessions,
+                activeSessionId = active.id,
+                agentState = state.agentState.copy(conversationBlocks = active.conversationBlocks)
+            )
+        }
+        gateway.loadSession(active.history)
+    }
+
+    /** 会话一变就落盘；流式回答期间变更密集，用 collectLatest + delay 合并成一次写。 */
+    private fun persistSessions() {
+        val store = sessionStore ?: return
+        workScope.launch {
+            uiState
+                .map { it.sessions to it.activeSessionId }
+                .distinctUntilChanged()
+                .collectLatest { (sessions, activeId) ->
+                    delay(SESSION_SAVE_DEBOUNCE_MS)
+                    store.save(sessions, activeId)
+                }
         }
     }
 
@@ -491,6 +533,9 @@ class ChatViewModel(
     }
 
     companion object {
+        /** 流式回答期间会话高频变化，合并成一次写盘，避免每条增量都碰磁盘。 */
+        private const val SESSION_SAVE_DEBOUNCE_MS = 800L
+
         /**
          * 生产装配：把 Android 侧协作者（引擎 / 偏好）一次性接进 ViewModel。
          * 上下文取 Application —— 引擎内部只用注册广播、剪贴板与系统服务，与 Activity 上下文等价且不泄漏。
