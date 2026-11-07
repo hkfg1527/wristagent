@@ -368,4 +368,14 @@
     <string name="settings_sub_agent">子代理模式</string>
     <string name="settings_sub_agent_secondary">仅专家模式生效</string>
     <string name="settings_sub_agent_requires_expert">需专家模式</string>
+    <string name="settings_model_refresh_failed">刷新失败 · %1$s</string>
+    <string name="settings_model_error_dns">DNS 解析失败</string>
+    <string name="settings_model_error_timeout">请求超时（3 秒），已重试一次</string>
+    <string name="settings_model_error_unauthorized">HTTP 401 未授权</string>
+    <string name="settings_model_error_non_json">接口没有返回模型列表</string>
+    <string name="settings_model_error_http">HTTP %1$s</string>
+    <string name="settings_model_error_unknown">网络不可用</string>
+    <string name="settings_model_source_remote">来自远端</string>
+    <string name="settings_model_source_builtin">内置默认</string>
+    <string name="settings_model_not_in_list">当前模型 %1$s 不在此列表内</string>
 </resources>
