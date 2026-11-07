@@ -547,26 +547,6 @@ fun SettingsScreen(
                                 preferences.visionBetaEnabled = enabled
                             }
                         )
-                        SettingsSubDialog.PROMPT_VIEWER -> PromptViewerContent(
-                            customPrompt = customPrompt,
-                            onBack = { activeDialog = null },
-                            onSavePrompt = { prompt ->
-                                customPrompt = prompt
-                                preferences.customSystemPrompt = prompt
-                            }
-                        )
-                        SettingsSubDialog.MEMORY_MANAGER -> MemoryManagerContent(
-                            preferences = preferences,
-                            onBack = { activeDialog = null }
-                        )
-                        SettingsSubDialog.WING_SHORTCUT -> WingShortcutContent(
-                            currentAction = currentRightAction,
-                            onBack = { activeDialog = null },
-                            onSelect = { action ->
-                                currentRightAction = action
-                                preferences.rightButtonAction = action
-                            }
-                        )
                         SettingsSubDialog.REMOTE_CONSOLE -> RemoteConsoleContent(
                             onBack = { activeDialog = null }
                         )
@@ -658,15 +638,6 @@ fun SettingsScreen(
                                 }
                             )
                         }
-                        SettingsSubDialog.NETWORK_DIAGNOSTICS -> NetworkDiagnosticsContent(
-                            privilegeManager = privilegeManager,
-                            baseUrl = { currentBaseUrl },
-                            onBack = { activeDialog = null }
-                        )
-                        SettingsSubDialog.PRIVILEGE -> AdvancedPermissionContent(
-                            manager = privilegeManager,
-                            onBack = { activeDialog = null }
-                        )
                         SettingsSubDialog.SECURITY_GUARDRAIL -> SecurityGuardrailContent(
                             currentMode = currentSecurityMode,
                             onBack = { activeDialog = null },

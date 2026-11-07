@@ -193,13 +193,8 @@ enum class SettingsSubDialog {
     PROVIDER_PROFILES,
     HYPER_PARAMS,
     TOOLS_MCP,
-    PROMPT_VIEWER,
-    MEMORY_MANAGER,
-    WING_SHORTCUT,
-    PRIVILEGE,
     REMOTE_CONSOLE,
     SECURITY_GUARDRAIL,
-    NETWORK_DIAGNOSTICS,
 
     /** 语音与唤醒：显式入口收敛后的唯一设置面。 */
     VOICE_ENTRY,
