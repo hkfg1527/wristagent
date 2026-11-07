@@ -6,14 +6,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val localProperties = Properties().apply {
-    val localPropFile = rootProject.file("local.properties")
-    if (localPropFile.exists()) {
-        FileInputStream(localPropFile).use { load(it) }
-    }
-}
-val deepseekApiKey: String = localProperties.getProperty("DEEPSEEK_API_KEY") ?: ""
-
 // Release signing credentials come from keystore.properties, which is git-ignored.
 // Without it (CI, fresh clone) the release build type falls back to debug signing so
 // the project still builds.
@@ -41,8 +33,9 @@ android {
         targetSdk = 37
         manifestPlaceholders["wearableLibRequired"] = (compatMinSdk == null).toString()
         versionCode = 1
-        versionName = "1.0"
-        buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepseekApiKey\"")
+        versionName = "0.01"
+        // 任何密钥都不参与构建：API key 只能由用户在应用设置里填，进 SharedPreferences。
+        buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }
 
     signingConfigs {

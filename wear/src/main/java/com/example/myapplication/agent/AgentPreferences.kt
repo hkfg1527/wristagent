@@ -30,12 +30,9 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         }
         set(value) = prefs.edit().putString("right_button_action", value.name).apply()
 
+    /** 唯一的密钥来源：用户在应用设置里填写，绝不参与构建。 */
     var apiKey: String
-        get() {
-            val saved = prefs.getString("api_key", "") ?: ""
-            if (saved.isNotBlank()) return saved
-            return com.example.myapplication.BuildConfig.DEEPSEEK_API_KEY
-        }
+        get() = prefs.getString("api_key", "") ?: ""
         set(value) = prefs.edit().putString("api_key", value).apply()
 
     var baseUrl: String
