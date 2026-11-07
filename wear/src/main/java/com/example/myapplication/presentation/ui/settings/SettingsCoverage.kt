@@ -33,9 +33,9 @@ enum class WebSettingsForm {
 data class WatchCoverage(val pageId: String, val rowId: String, val form: WebSettingsForm)
 
 /**
- * 网页 9 页 / 48 行到手表入口的逐行映射。
+ * 网页 9 页 / 57 行到手表入口的逐行映射。
  *
- * 48 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
+ * 57 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
  * 于是 [missingInWatch] 在真实清单上必须恒为空表 —— 这就是超集关系的证明。
  */
 object SettingsCoverage {
@@ -50,6 +50,11 @@ object SettingsCoverage {
         WatchCoverage("model", "topP", WebSettingsForm.WEB_ONLY),
         WatchCoverage("model", "topK", WebSettingsForm.WEB_ONLY),
         WatchCoverage("model", "frequencyPenalty", WebSettingsForm.WEB_ONLY),
+        // 本轮网页补齐的四行：表端各有对应开关（深度思考 / 托管搜索 / 上下文压缩 / 视觉输入）
+        WatchCoverage("model", "defaultThinkingEnabled", WebSettingsForm.SWITCH),
+        WatchCoverage("model", "providerManagedSearchEnabled", WebSettingsForm.SWITCH),
+        WatchCoverage("model", "autoCompressContext", WebSettingsForm.SWITCH),
+        WatchCoverage("model", "visionBetaEnabled", WebSettingsForm.SWITCH),
 
         // provider · 供应商与网络：套用档案在表端可做，请求头与代理要键盘输入
         WatchCoverage("provider", "providerProfiles", WebSettingsForm.SELECT),
@@ -73,6 +78,7 @@ object SettingsCoverage {
         WatchCoverage("dialog", "longTermMemoryEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("dialog", "memoryNoteCount", WebSettingsForm.WEB_ONLY),
         WatchCoverage("dialog", "actClearMemory", WebSettingsForm.ACTION),
+        WatchCoverage("dialog", "subAgentEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("dialog", "sandboxLevel", WebSettingsForm.WEB_ONLY),
         WatchCoverage("dialog", "dangerousCommandBlacklist", WebSettingsForm.WEB_ONLY),
         WatchCoverage("dialog", "securityMode", WebSettingsForm.TRI_STATE),
@@ -98,6 +104,10 @@ object SettingsCoverage {
         WatchCoverage("interface", "isMcpEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("interface", "mcpEndpoint", WebSettingsForm.READ_ONLY),
         WatchCoverage("interface", "matrixSpacingDp", WebSettingsForm.SLIDER),
+        WatchCoverage("interface", "animationsEnabled", WebSettingsForm.SWITCH),
+        WatchCoverage("interface", "compactMode", WebSettingsForm.SWITCH),
+        WatchCoverage("interface", "autoSpeakReplies", WebSettingsForm.SWITCH),
+        WatchCoverage("interface", "asrLiveTranscript", WebSettingsForm.SWITCH),
 
         // device · 设备与控制台：三项运行状态只读回显，探针与语音自检可点，导出留在网页
         WatchCoverage("device", "infoRoot", WebSettingsForm.READ_ONLY),

@@ -23,8 +23,8 @@ class ConsoleSettingsParityGuardTest {
     fun pagesParseMatchesTheDocumentedShape() {
         val rows = consoleRows()
         assertEquals("网页 PAGES 页数", 9, rows.map { it.pageId }.toSet().size)
-        assertEquals("网页 PAGES 行数", 48, rows.size)
-        assertEquals("带设置键的行数", 40, rows.count { it.keys.isNotEmpty() })
+        assertEquals("网页 PAGES 行数", 57, rows.size)
+        assertEquals("带设置键的行数", 49, rows.count { it.keys.isNotEmpty() })
         assertEquals(
             "无键的行必须是纯动作 / 只读回显：",
             expectedUnkeyedRows,

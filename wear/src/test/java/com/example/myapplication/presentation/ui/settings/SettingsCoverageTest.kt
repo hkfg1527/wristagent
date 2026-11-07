@@ -15,19 +15,19 @@ class SettingsCoverageTest {
 
     @Test
     fun fixtureMatchesWebConsoleShape() {
-        // 9 页 / 48 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
+        // 9 页 / 57 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
         assertEquals(9, WebFixture.pages.size)
-        assertEquals(48, WebFixture.pages.sumOf { it.rows.size })
+        assertEquals(57, WebFixture.pages.sumOf { it.rows.size })
         assertEquals(
             listOf(
-                "model" to 8,
+                "model" to 12,
                 "provider" to 3,
                 "role" to 3,
                 "generate" to 6,
-                "dialog" to 7,
+                "dialog" to 8,
                 "voice" to 4,
                 "tools" to 8,
-                "interface" to 3,
+                "interface" to 7,
                 "device" to 6
             ),
             WebFixture.pages.map { it.id to it.rows.size }
@@ -63,8 +63,8 @@ class SettingsCoverageTest {
         // 超集的第二半：手表可写的行严格少于网页可写的行
         val watchWritable = SettingsCoverage.watchWritable(WebFixture.pages)
         assertTrue(SettingsCoverage.isStrictSuperset(WebFixture.pages))
-        assertEquals(26, watchWritable.size)
-        assertEquals(48 - 26, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
+        assertEquals(35, watchWritable.size)
+        assertEquals(57 - 35, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
             .count { it !in watchWritable })
         // 手表可写的每一行都必须真实存在于网页端（不能凭空造出手表独有的可写项）
         val webIds = WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }.toSet()
@@ -73,7 +73,7 @@ class SettingsCoverageTest {
 
     @Test
     fun watchSideSplitsIntoWritableReadOnlyAndWebOnly() {
-        assertEquals(26, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
+        assertEquals(35, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
         assertEquals(4, SettingsCoverage.byForm(listOf(WebSettingsForm.READ_ONLY)).size)
         assertEquals(18, SettingsCoverage.byForm(listOf(WebSettingsForm.WEB_ONLY)).size)
     }
@@ -102,7 +102,9 @@ class SettingsCoverageTest {
                 listOf(
                     row("baseUrl", "text"), row("apiKey", "secret"), row("modelName", "select"),
                     row("actModels", "action"), row("streamMode", "switch"), row("topP", "slider"),
-                    row("topK", "slider"), row("frequencyPenalty", "slider")
+                    row("topK", "slider"), row("frequencyPenalty", "slider"),
+                    row("defaultThinkingEnabled", "switch"), row("providerManagedSearchEnabled", "switch"),
+                    row("autoCompressContext", "switch"), row("visionBetaEnabled", "switch")
                 )
             ),
             WebSettingsPage(
@@ -127,7 +129,7 @@ class SettingsCoverageTest {
                     row("longTermMemoryEnabled", "switch"), row("memoryNoteCount", "slider"),
                     row("actClearMemory", "action"), row("sandboxLevel", "segmented"),
                     row("dangerousCommandBlacklist", "list"), row("securityMode", "segmented"),
-                    row("mainInputType", "segmented")
+                    row("mainInputType", "segmented"), row("subAgentEnabled", "switch")
                 )
             ),
             WebSettingsPage(
@@ -148,7 +150,11 @@ class SettingsCoverageTest {
             ),
             WebSettingsPage(
                 "interface",
-                listOf(row("isMcpEnabled", "switch"), row("mcpEndpoint", "text"), row("matrixSpacingDp", "slider"))
+                listOf(
+                    row("isMcpEnabled", "switch"), row("mcpEndpoint", "text"), row("matrixSpacingDp", "slider"),
+                    row("animationsEnabled", "switch"), row("compactMode", "switch"),
+                    row("autoSpeakReplies", "switch"), row("asrLiveTranscript", "switch")
+                )
             ),
             WebSettingsPage(
                 "device",

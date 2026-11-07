@@ -968,7 +968,11 @@
         ]
       }, {
         title: '请求', rows: [
-          { id: 'streamMode', type: 'switch', label: '流式输出', hint: '边生成边回传，首字更快', keys: ['streamMode'], def: true, kw: 'stream 流式 sse' }
+          { id: 'streamMode', type: 'switch', label: '流式输出', hint: '边生成边回传，首字更快', keys: ['streamMode'], def: true, kw: 'stream 流式 sse' },
+          { id: 'defaultThinkingEnabled', type: 'switch', label: '默认深度思考', hint: '新会话默认开启思考链', keys: ['defaultThinkingEnabled'], def: false, kw: 'think 思考 推理 reasoning 默认' },
+          { id: 'providerManagedSearchEnabled', type: 'switch', label: '供应商托管搜索', hint: '由服务商执行联网，本机不发搜索请求', keys: ['providerManagedSearchEnabled'], def: false, kw: 'search 搜索 联网 托管 供应商' },
+          { id: 'autoCompressContext', type: 'switch', label: '自动压缩上下文', hint: '超出轮数上限时摘要旧对话，不丢开头', keys: ['autoCompressContext'], def: true, kw: 'compress 压缩 上下文 摘要 context' },
+          { id: 'visionBetaEnabled', type: 'switch', label: '视觉输入', hint: '允许随消息附带图片（实验）', keys: ['visionBetaEnabled'], def: false, kw: 'vision 视觉 图片 图像 多模态 beta' }
         ]
       }, {
         title: '采样微调', rows: [
@@ -1027,7 +1031,7 @@
       id: 'dialog', title: '对话与安全', sub: '长期记忆、沙箱等级与命令黑名单', icon: 'dialog',
       sections: [{
         title: '记忆', rows: [
-          { id: 'longTermMemoryEnabled', type: 'switch', label: '长期记忆', hint: '把要点写入本地长期记忆库', keys: ['longTermMemoryEnabled'], def: false, kw: 'memory 长期记忆 longTermMemoryEnabled 记忆库' },
+          { id: 'longTermMemoryEnabled', type: 'switch', label: '长期记忆', hint: '把要点写入本地长期记忆库', keys: ['longTermMemoryEnabled', 'memoryEnabled'], def: false, kw: 'memory 长期记忆 longTermMemoryEnabled memoryEnabled 记忆库 总开关' },
           { id: 'memoryNoteCount', type: 'slider', label: '记忆条数上限', hint: '长期记忆最多保留的条目数', min: 0, max: 50, step: 1, unit: '条', keys: ['memoryNoteCount'], def: 10, kw: 'memory 记忆 条数 memoryNoteCount 上限' },
           { id: 'actClearMemory', type: 'action', danger: true, label: '清空记忆', hint: 'memoryClear：清空会话上下文与本地记忆，不可撤销', actionName: 'clear-memory', actionLabel: '清空记忆', kw: 'clear memory 清空 记忆 重置 memoryClear 删除' }
         ]
@@ -1039,7 +1043,8 @@
       }, {
         title: '行为', rows: [
           { id: 'securityMode', type: 'segmented', label: '安全模式', hint: '严格：全部确认；标准：只读放行；专家：除黑名单直接执行', keys: ['securityMode'], def: 'STANDARD', kw: 'security 安全 novice standard expert 严格 标准 专家', options: [{ v: 'NOVICE', t: '严格' }, { v: 'STANDARD', t: '标准' }, { v: 'EXPERT', t: '专家' }] },
-          { id: 'mainInputType', type: 'segmented', label: '主输入方式', hint: '手表端默认唤起的输入控件', keys: ['mainInputType'], def: 'VOICE', kw: 'input 输入 语音 键盘', options: [{ v: 'VOICE', t: '语音' }, { v: 'KEYBOARD', t: '键盘' }] }
+          { id: 'mainInputType', type: 'segmented', label: '主输入方式', hint: '手表端默认唤起的输入控件', keys: ['mainInputType'], def: 'VOICE', kw: 'input 输入 语音 键盘', options: [{ v: 'VOICE', t: '语音' }, { v: 'KEYBOARD', t: '键盘' }] },
+          { id: 'subAgentEnabled', type: 'switch', label: '子代理', hint: '仅标准/专家模式生效，允许派发只读子任务', keys: ['subAgentEnabled'], def: false, kw: 'sub agent 子代理 子任务 并行 subAgentEnabled' }
         ]
       }]
     },
@@ -1084,7 +1089,11 @@
         ]
       }, {
         title: '界面', rows: [
-          { id: 'matrixSpacingDp', type: 'slider', label: '点阵间距', hint: '点阵信息密度，越大越疏', min: 4, max: 16, step: 1, unit: 'dp', keys: ['matrixSpacingDp'], def: 16, kw: 'matrix spacing 点阵 间距 dp 排版' }
+          { id: 'matrixSpacingDp', type: 'slider', label: '点阵间距', hint: '点阵信息密度，越大越疏', min: 4, max: 16, step: 1, unit: 'dp', keys: ['matrixSpacingDp'], def: 16, kw: 'matrix spacing 点阵 间距 dp 排版' },
+          { id: 'animationsEnabled', type: 'switch', label: '动画效果', hint: '关闭后点阵呼吸、思考省略号与波形全部静止', keys: ['animationsEnabled'], def: true, kw: 'animation 动画 动效 省电 animationsEnabled' },
+          { id: 'compactMode', type: 'switch', label: '紧凑排版', hint: '缩小正文字号，单屏放更多内容', keys: ['compactMode'], def: false, kw: 'compact 紧凑 排版 字号 密度' },
+          { id: 'autoSpeakReplies', type: 'switch', label: '自动朗读', hint: '回复结束后自动播报', keys: ['autoSpeakReplies'], def: false, kw: 'speak 朗读 播报 tts 语音' },
+          { id: 'asrLiveTranscript', type: 'switch', label: '实时字幕', hint: '录音时边转写边显示', keys: ['asrLiveTranscript'], def: false, kw: 'asr 字幕 实时 转写 录音' }
         ]
       }]
     },
