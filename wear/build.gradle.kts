@@ -58,7 +58,7 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            isMinifyEnabled = false
+            isMinifyEnabled = true
         }
     }
     compileOptions {
