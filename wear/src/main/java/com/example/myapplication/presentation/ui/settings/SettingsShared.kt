@@ -531,8 +531,8 @@ private fun SettingsCenteredRow(
     value: String?,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    titleMaxLines: Int = 1,
-    valueMaxLines: Int = 1,
+    titleMaxLines: Int = 2,
+    valueMaxLines: Int = 2,
     trailing: (@Composable () -> Unit)? = null
 ) {
     Box(
