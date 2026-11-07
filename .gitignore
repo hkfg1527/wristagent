@@ -64,3 +64,9 @@ Thumbs.db
 *.patch
 *.diff
 watch_preview.html
+
+# local scratch (agents/screenshots/scripts)
+_ui_review/
+_*.py
+_*.ps1
+_eta_strings.txt
