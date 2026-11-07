@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全边界说明
+    url: https://github.com/hkfg1527/wristagent#安全边界务必阅读
+    about: 本项目可执行任意 shell 命令，提交前请先阅读该节

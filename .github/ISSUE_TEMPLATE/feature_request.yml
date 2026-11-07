@@ -1,0 +1,41 @@
+name: 建议 / 改进
+description: 交互、功能、文案、架构上的任何意见
+title: "[Suggestion] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个仓库的核心目的就是收集反馈。批评同样是有效反馈，不需要客气。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及方面
+      options:
+        - 交互手势
+        - 界面 / 视觉
+        - Agent 行为与工具
+        - 安全与审批
+        - 设置与控制台
+        - 文档
+        - 其它
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 现状是什么
+      description: 现在的表现，或你不满意的地方
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: 你希望变成什么样
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 截图、参考实现、相关 Issue 链接

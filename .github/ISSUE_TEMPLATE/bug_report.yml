@@ -1,0 +1,57 @@
+name: 设备兼容性 / 运行问题
+description: 装不上、闪退、功能异常——请附设备与日志
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。本项目**只在一台设备上验证过**，你的报告是判断能否移植的唯一依据。
+        请尽量填全，尤其是系统版本和日志。
+  - type: input
+    id: device
+    attributes:
+      label: 手表型号
+      placeholder: 例如 TicWatch Pro 5 / OPPO Watch 3 / 小米手表 S3
+    validations:
+      required: true
+  - type: input
+    id: sdk
+    attributes:
+      label: 系统版本（API Level）
+      description: 手表连上电脑后执行 adb shell getprop ro.build.version.sdk
+      placeholder: 例如 33
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: 使用的安装包
+      options:
+        - 主包 WristAgent-0.01.apk（minSdk 33）
+        - 实验包 WristAgent-0.01-compat-api30.apk（minSdk 30）
+        - 自己从源码构建
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 具体现象
+      description: 是装不上、启动闪退、还是某个功能不对？
+    validations:
+      required: true
+  - type: textarea
+    id: logcat
+    attributes:
+      label: 日志片段
+      description: |
+        崩溃请附：adb logcat -d | grep -E "FATAL|AndroidRuntime"
+        安装失败请附：adb install 的完整输出
+      render: shell
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我已阅读 README 的设备支持说明，了解这是测试版本
+          required: true
