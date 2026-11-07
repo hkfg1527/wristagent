@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -22,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.SettingsChangeBus
 import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
@@ -64,6 +66,9 @@ fun WearAgentApp(
     }
 
     var liveSpacingDp by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
+
+    // 网页控制台改设置后，界面必须立刻跟上：版本号一变就重读偏好
+    val settingsRevision by SettingsChangeBus.revision.collectAsState()
 
     // 主键输入方式提示只在本次启动播报一次：从设置页返回主界面不重复打扰
     var announceInputMode by remember { mutableStateOf(true) }
@@ -139,7 +144,9 @@ fun WearAgentApp(
                     // 动画开关的唯一注入点：点阵、底栏、审批浮层、输入弹窗都只读这个 local，
                     // 于是"关掉动效"是一件全局的事，不会各页各开关一半生效。
                     CompositionLocalProvider(
-                        LocalAnimationsEnabled provides preferences.animationsEnabled
+                        LocalAnimationsEnabled provides remember(settingsRevision) {
+                            preferences.animationsEnabled
+                        }
                     ) {
                         ChatScreen(
                             viewModel = viewModel,

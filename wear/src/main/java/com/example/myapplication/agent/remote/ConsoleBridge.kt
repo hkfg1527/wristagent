@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.SettingsChangeBus
 import com.example.myapplication.agent.ProviderProfile
 import com.example.myapplication.agent.ProviderProfileBook
 import com.example.myapplication.agent.providerProfileId
@@ -146,6 +147,8 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             else -> return ConsoleWriteResult.READ_ONLY
         }
+        // 写入成功后通知界面重读：否则运行中的界面要等重启才看到新值
+        SettingsChangeBus.bump()
         return ConsoleWriteResult.OK
     }
 
