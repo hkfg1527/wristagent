@@ -9,6 +9,8 @@ import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
@@ -25,8 +27,9 @@ class AudioRecordWavCapture(
 
     override suspend fun recordWav(sampleRate: Int, maxDurationMs: Int): Result<ByteArray> =
         withContext(ioDispatcher) {
+            val context = currentCoroutineContext()
             try {
-                capture(sampleRate, maxDurationMs)
+                capture(sampleRate, maxDurationMs) { context.isActive }
             } catch (e: SecurityException) {
                 Result.failure(IllegalStateException(AsrMessages.NO_MIC_PERMISSION))
             } catch (e: IllegalStateException) {
@@ -37,7 +40,11 @@ class AudioRecordWavCapture(
         }
 
     @Suppress("DEPRECATION")
-    private fun capture(sampleRate: Int, maxDurationMs: Int): Result<ByteArray> {
+    private fun capture(
+        sampleRate: Int,
+        maxDurationMs: Int,
+        isActive: () -> Boolean
+    ): Result<ByteArray> {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -65,22 +72,35 @@ class AudioRecordWavCapture(
             bufferSize
         )
 
+        var cancelled = false
         try {
             if (recorder.state != AudioRecord.STATE_INITIALIZED) {
                 return Result.failure(IllegalStateException(AsrMessages.RECORD_FAILED + "：麦克风未初始化"))
             }
             recorder.startRecording()
             while (sink.size() < targetBytes) {
+                // read 是阻塞调用，取消只在两次读之间生效
+                if (!isActive()) {
+                    cancelled = true
+                    break
+                }
                 val read = recorder.read(chunk, 0, chunk.size)
-                if (read < 0) {
-                    return Result.failure(
+                when (CaptureLoop.decide(isActive(), read)) {
+                    CaptureLoop.Decision.CANCELLED -> {
+                        cancelled = true
+                        break
+                    }
+                    CaptureLoop.Decision.READ_ERROR -> return Result.failure(
                         IllegalStateException(AsrMessages.RECORD_FAILED + "（错误码 " + read + "）")
                     )
+                    CaptureLoop.Decision.CONTINUE -> Unit
                 }
                 if (read == 0) break
                 sink.write(chunk, 0, read)
             }
             recorder.stop()
+
+            if (cancelled) return Result.failure(IllegalStateException(AsrMessages.CANCELLED))
 
             val pcm = sink.toByteArray()
             return if (pcm.isEmpty()) {

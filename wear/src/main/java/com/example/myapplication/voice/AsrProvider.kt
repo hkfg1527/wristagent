@@ -71,6 +71,7 @@ object AsrMessages {
     const val RECORD_FAILED = "录音失败，请检查麦克风是否被占用"
     const val UNSUPPORTED_SAMPLE_RATE = "麦克风不支持 16kHz 单声道录音"
     const val NO_PROVIDER = "没有可用的语音转写服务，请到设置中检查语音转写配置"
+    const val CANCELLED = "录音已取消"
     const val BAIDU_BAD_RESPONSE = "百度语音返回内容无法解析，请稍后重试"
     const val BAIDU_EMPTY_RESULT = "百度语音未识别到有效语音，请重说一遍"
 }

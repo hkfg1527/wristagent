@@ -12,7 +12,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 
 /**
  * 手表语音输入交互管理器（系统识别通道 + 可插拔第三方 ASR 通道）
@@ -22,7 +21,8 @@ import kotlinx.coroutines.launch
  */
 class VoiceInputManager(
     private val context: Context,
-    private val asrGateway: VoiceAsrGateway? = null
+    private val asrGateway: VoiceAsrGateway? = null,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) {
 
     var onSpeechResult: ((String) -> Unit)? = null
@@ -30,7 +30,7 @@ class VoiceInputManager(
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
 
     private var speechRecognizer: SpeechRecognizer? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val session = AsrSession(scope)
 
     val sampleVoiceCommands = listOf(
         "帮我检查手表的电量和当前天气。如果电量充足且天气晴朗，就把表盘点阵网格调整为微距14dp，并双击振动马达提醒我出门散步。",
@@ -131,8 +131,10 @@ class VoiceInputManager(
         }
 
         onListeningStateChanged?.invoke(true)
-        scope.launch {
+        session.launch {
             val result = gateway.transcribe(settings, isRecognitionAvailable())
+            // 取消后麦克风已释放，再弹"录音失败"只会误导用户
+            if (session.isCancelled) return@launch
             onListeningStateChanged?.invoke(false)
             when (result) {
                 is AsrResult.Success -> {
@@ -161,10 +163,12 @@ class VoiceInputManager(
     }
 
     fun cancel() {
+        session.cancel()
         stopListening()
     }
 
     fun destroy() {
+        session.cancel()
         scope.cancel()
         val recognizer = speechRecognizer
         speechRecognizer = null
