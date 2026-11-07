@@ -1,5 +1,10 @@
 package com.example.myapplication.presentation
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.lifecycle.lifecycleScope
+import android.view.WindowManager
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -46,7 +51,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Keep-screen-on only while the app is actually working: an always-on screen plus a
+        // per-frame wake lock is the single biggest battery cost on a watch. Idle lets the
+        // system dim and sleep as usual; running / recording / approval keeps it awake.
+        lifecycleScope.launch {
+            chatViewModel.uiState
+                .map { it.isExecuting || it.isRecordingVoice }
+                .distinctUntilChanged()
+                .collect { keepOn ->
+                    if (keepOn) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
+        }
         // 输入法由 Compose insets 驱动避让：窗口不整体平移，也不二次压缩内容高度
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
