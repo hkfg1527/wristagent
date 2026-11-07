@@ -32,10 +32,14 @@ android {
         version = release(37)
     }
 
+    // 实验包：-PcompatMinSdk=30 出给非 Wear OS / API 30 手表试装；默认仍是 33 的主包
+    val compatMinSdk = providers.gradleProperty("compatMinSdk").orNull?.toIntOrNull()
+
     defaultConfig {
         applicationId = "dev.ghr.wristagent"
-        minSdk = 33
+        minSdk = compatMinSdk ?: 33
         targetSdk = 37
+        manifestPlaceholders["wearableLibRequired"] = (compatMinSdk == null).toString()
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepseekApiKey\"")
