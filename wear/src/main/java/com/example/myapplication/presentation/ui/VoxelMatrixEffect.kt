@@ -16,7 +16,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameMillis
+import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -342,17 +344,23 @@ fun UnifiedMatrixCanvas(
     gridSpacingDp: Float = 16f,              // 网格物理间距 (dp)
     approvalProgress: Float = 0f             // 审批滑块进度 (0f 拒绝 ~ 1f 放行)：点阵本身由基色渐变到放行绿
 ) {
-    // 3.0s 沉稳深邃呼吸过渡 (加大呼吸振幅)
-    val infiniteTransition = rememberInfiniteTransition(label = "matrixBreathTransition")
-    val breathCycle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breathCycle"
-    )
+    // 3.0s 沉稳深邃呼吸过渡 (加大呼吸振幅)。动效总开关关闭时连无限动画都不创建：
+    // 相位钉在中位，量化档位随之恒定，点阵彻底静止
+    val animationsEnabled = LocalAnimationsEnabled.current
+    val breathCycle by if (animationsEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "matrixBreathTransition")
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2800, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "breathCycle"
+        )
+    } else {
+        remember { mutableStateOf(0.5f) }
+    }
 
     // 思考同心行波相位：累计真实毫秒，不挂在无限动画上。
     // 无限动画的相位起点是自由的，且 2400ms 周期与"扫满一次可达半径"不同步（见 ThinkingWave），
