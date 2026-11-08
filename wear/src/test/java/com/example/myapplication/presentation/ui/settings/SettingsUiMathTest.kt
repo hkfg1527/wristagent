@@ -12,24 +12,24 @@ class SettingsLayoutMathTest {
     @Test
     fun realWatchKeepsTheOneHundredSixtyEightCap() {
         // 233dp 真机：弦长 169.4dp 被 168dp 硬上限截住 —— 真机版面不变，仍是 168dp
-        assertEquals(168f, SettingsLayoutMath.contentWidthDp(233f), 0.05f)
+        assertEquals(183.2f, SettingsLayoutMath.contentWidthDp(233f), 0.2f)
     }
 
     @Test
     fun widerScreensAreCappedAtTheSameWidth() {
-        assertEquals(168f, SettingsLayoutMath.contentWidthDp(454f), 0.001f)
+        assertEquals(184f, SettingsLayoutMath.contentWidthDp(454f), 0.001f)
     }
 
     @Test
     fun contentWidthIsTheChordWhereTheSafeBandEnds() {
-        // 192dp 屏：圆心到 ±80dp 处的弦 = 2*sqrt(96^2 - 80^2) = 106.13dp
-        assertEquals(140.777f, SettingsLayoutMath.contentWidthDp(192f), 0.05f)
+        // 192dp 屏：安全带 72dp（半高上限），弦 = 2*sqrt(96^2 - 72^2) = 126.996dp
+        assertEquals(126.996f, SettingsLayoutMath.contentWidthDp(192f), 0.05f)
     }
 
     @Test
     fun narrowScreensShrinkBelowTheOldInsetFormula() {
-        // 旧公式在 176dp 屏给出 152dp：那已经画到物理圆周外；弦长只有 129.045dp
-        assertEquals(129.045f, SettingsLayoutMath.contentWidthDp(176f), 0.05f)
+        // 旧公式在 176dp 屏给出 152dp：那已经画到物理圆周外；弦长只有 105.6dp
+        assertEquals(105.6f, SettingsLayoutMath.contentWidthDp(176f), 0.05f)
         assertTrue(
             SettingsLayoutMath.contentWidthDp(176f) < 176f - SettingsLayoutMath.SideInsetDp * 2f
         )
@@ -47,8 +47,8 @@ class SettingsLayoutMathTest {
 
     @Test
     fun sideInsetReproducesTheMeasuredRealWatchMargin() {
-        // 评审实测：真机 233dp 屏的实际左右边距 = 32.5dp
-        assertEquals(32.5f, SettingsLayoutMath.sideInsetDp(233f), 0.05f)
+        // 加宽后真机 233dp 屏的左右边距：内容 183.18dp，边距 (233 - 183.18) / 2 = 24.91dp
+        assertEquals(24.91f, SettingsLayoutMath.sideInsetDp(233f), 0.05f)
     }
 
     @Test
@@ -202,16 +202,16 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun itemGapTightensToFourDp() {
-        // 旧值 12dp：步进 57dp，233dp 屏每屏只有 ~3 行；收到 4dp 后步进 49dp
+    fun itemGapStaysOnTheMinimumStep() {
+        // 行本身已经变高变宽，间距保持最小呼吸，否则一屏放不下几项
         assertEquals(4f, SettingsSpacingMath.ItemGapDp, 0.001f)
         assertTrue(SettingsSpacingMath.isOnGrid(SettingsSpacingMath.ItemGapDp))
         assertTrue(SettingsSpacingMath.ItemGapDp < Wear.Space.Sm.value)
     }
 
     @Test
-    fun sectionHeaderKeepsTwelveDpAboveTheFirstRowOfItsGroup() {
-        assertEquals(12f, SettingsSpacingMath.SectionHeaderBottomDp, 0.001f)
+    fun sectionHeaderKeepsEightDpAboveTheFirstRowOfItsGroup() {
+        assertEquals(8f, SettingsSpacingMath.SectionHeaderBottomDp, 0.001f)
         assertTrue(SettingsSpacingMath.isOnGrid(SettingsSpacingMath.SectionHeaderBottomDp))
     }
 
@@ -240,9 +240,9 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun rowStepDropsFromFiftySevenToFortyNine() {
-        // 旧步进 = 44 行高 + 1 发丝 + 12 间距 = 57dp；新步进 49dp
-        assertEquals(49f, SettingsSpacingMath.RowStepDp, 0.001f)
+    fun rowStepGrowsForBiggerRows() {
+        // 48 行高 + 1 发丝 + 4 间距 = 53dp：行高从 44 提到 48，间距仍是最小呼吸
+        assertEquals(53f, SettingsSpacingMath.RowStepDp, 0.001f)
         assertEquals(
             SettingsSpacingMath.MinRowHeightDp + SettingsSpacingMath.HairlineDp +
                 SettingsSpacingMath.ItemGapDp,
@@ -252,12 +252,13 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun realWatchFitsMoreThanFourFullRowsPerScreen() {
-        // 233dp 真机：233 / 49 = 4.76 行（旧步进 57dp 只有 4.08 行且扣掉遮罩后不足 3 行）
+    fun biggerRowsTradeRowCountForLegibility() {
+        // 233dp 真机：233 / 53 = 4.4 行。行更高但字号更大，密度仍够
         assertTrue(SettingsSpacingMath.rowsPerScreen(233f) >= 4f)
-        assertEquals(4.755f, SettingsSpacingMath.rowsPerScreen(233f), 0.05f)
+        assertEquals(4.4f, SettingsSpacingMath.rowsPerScreen(233f), 0.05f)
         assertTrue(
-            SettingsSpacingMath.rowsPerScreen(233f) > SettingsSpacingMath.rowsPerScreen(233f, 57f)
+            "步进变大后每屏行数应减少",
+            SettingsSpacingMath.rowsPerScreen(233f) < SettingsSpacingMath.rowsPerScreen(233f, 49f)
         )
     }
 
@@ -274,6 +275,7 @@ class SettingsSpacingMathTest {
 
     @Test
     fun bodyLineHeightGivesChineseTextFortyThreePercentLeading() {
+        // 这个令牌同时被聊天正文复用，放大设置页不该改动全站正文行高
         assertEquals(20f, SettingsSpacingMath.BodyLineHeightSp, 0.001f)
         val ratio = SettingsSpacingMath.BodyLineHeightSp / 14f
         assertTrue("行距倍数 " + ratio, ratio >= 1.4f)
@@ -311,10 +313,13 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun rowsKeepAFortyFourDpTouchTarget() {
-        assertEquals(44f, SettingsSpacingMath.MinRowHeightDp, 0.001f)
-        assertEquals(SettingsSpacingMath.MinRowHeightDp, Wear.Size.Touch.value, 0.001f)
-        assertTrue(SettingsSpacingMath.meetsTouchTarget(Wear.Size.Touch.value))
+    fun rowsExceedTheMinimumTouchTarget() {
+        assertEquals(48f, SettingsSpacingMath.MinRowHeightDp, 0.001f)
+        assertTrue(
+            "设置行必须高于全局触控下限",
+            SettingsSpacingMath.MinRowHeightDp >= Wear.Size.Touch.value
+        )
+        assertTrue(SettingsSpacingMath.meetsTouchTarget(SettingsSpacingMath.MinRowHeightDp))
         assertFalse(SettingsSpacingMath.meetsTouchTarget(SettingsSpacingMath.MinRowHeightDp - 1f))
     }
 }

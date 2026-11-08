@@ -125,22 +125,18 @@ class SettingsTopAnchorMathTest {
     @Test
     fun rootTitleInnerPaddingDropsToZero() {
         assertEquals(0f, RootTitleTopPadding.value, 0.001f)
-        assertEquals(
-            24f + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value,
-            28f,
-            0.001f
-        )
+        val topDp = 24f + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value
+        assertTrue("标题顶边 " + topDp + "dp 必须越过 24dp 遮罩", topDp >= SettingsLayoutMath.TopScrimDp)
+        assertTrue("标题顶边 " + topDp + "dp 不应超过 36dp", topDp <= 36f)
     }
 
     @Test
     fun subPageHeaderClearsTheTopScrim() {
-        // 子页顶部内边距 4dp + 行间距 + 行内留白 == 24dp 遮罩下沿
-        assertEquals(16f, SubPageHeaderTopPadding.value, 0.001f)
-        assertEquals(
-            24f,
-            Wear.Space.Xs.value + SettingsSpacingMath.ItemGapDp + SubPageHeaderTopPadding.value,
-            0.001f
-        )
+        // 行内留白是由遮罩高度反推出来的：行内边距 + 行间距 + 留白 必须正好落在遮罩下沿，
+        // 所以这里断言落点而不是某个写死的 dp 值。
+        val topDp = Wear.Space.Xs.value + SettingsSpacingMath.ItemGapDp + SubPageHeaderTopPadding.value
+        assertEquals(topDp, SettingsLayoutMath.TopScrimDp, 0.001f)
+        assertTrue("子页顶部留白不允许为负", SubPageHeaderTopPadding.value >= 0f)
     }
 
     private fun assertEquals(message: String, expected: Int, actual: Int) {

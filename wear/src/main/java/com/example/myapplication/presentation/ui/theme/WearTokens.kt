@@ -143,15 +143,15 @@ object Wear {
         @Composable @ReadOnlyComposable
         get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
 
-    /** 设置行标题档：官方 bodyMedium + 主色（黑底 19.57:1），层级由字号而非"整体压暗"承担。 */
+    /** 设置行标题档：上一档正文 + 主色（黑底 19.57:1），层级由字号而非"整体压暗"承担。 */
     val TextRowTitle: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.bodyLarge.withTokenColor(Palette.TextPrimary)
 
-    /** 设置行取值档：官方 bodySmall + 次色（黑底 6.94:1），12sp 小字也必须过 AA。 */
+    /** 设置行取值档：正文档 + 次色（黑底 6.94:1），小字也必须过 AA。 */
     val TextRowValue: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
+        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextSecondary)
 
     /** 等宽档：官方 bodySmall 换等宽字族，用于端点、密钥掩码与探针输出。 */
     val TextMono: TextStyle

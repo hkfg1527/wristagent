@@ -546,7 +546,7 @@ private fun SettingsCenteredRow(
                     Modifier.clickable(role = Role.Button, onClick = onClick)
                 }
             )
-            .heightIn(min = Wear.Size.Touch)
+            .heightIn(min = SettingsSpacingMath.MinRowHeightDp.dp)
             .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Xs)
     ) {
         Column(

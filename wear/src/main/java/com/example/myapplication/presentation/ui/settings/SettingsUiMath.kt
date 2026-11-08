@@ -24,13 +24,13 @@ object SettingsLayoutMath {
      * 这个数字不再由"屏宽减两条边距"推出 —— 那个公式在 233dp 屏上给 209dp、在 192dp 屏上给 168dp，
      * 两种情况都会把内容画到物理圆周外。真正决定宽度的是**圆周**：见 [contentWidthDp]。
      */
-    const val ContentWidthDp = 168f
+    const val ContentWidthDp = 184f
 
     /**
      * 安全带半高：内容在圆心上下各 80dp 以内必须整体落在圆周内。
      * 233dp 屏此时的弦长 169.4dp → 被 [ContentWidthDp] 截到 168dp，与真机实测内容盒一致。
      */
-    const val SafeBandHalfHeightDp = 80f
+    const val SafeBandHalfHeightDp = 72f
 
     /** 顶部渐变遮罩高度：也是设置页真正需要保护的顶部带（本页没有时钟，比聊天的 34dp 矮）。 */
     const val TopScrimDp = 24f
@@ -65,7 +65,7 @@ object SettingsLayoutMath {
      * 弦长公式 2·sqrt(r² − h²)：r = 屏宽/2、h = [SafeBandHalfHeightDp]。
      * 屏宽收到 2h 以下时该高度上根本不存在圆周内的横向空间，返回 0 而不是负数。
      */
-    fun contentWidthDp(screenWidthDp: Float, halfSafeBandDp: Float = (screenWidthDp * 0.34f).coerceAtMost(SafeBandHalfHeightDp)): Float {
+    fun contentWidthDp(screenWidthDp: Float, halfSafeBandDp: Float = (screenWidthDp * 0.40f).coerceAtMost(SafeBandHalfHeightDp)): Float {
         if (screenWidthDp <= 0f) return 0f
         val radiusDp = screenWidthDp / 2f
         if (radiusDp <= halfSafeBandDp) return 0f
@@ -263,7 +263,7 @@ object SettingsSpacingMath {
     const val BodyLineHeightSp = 20f
 
     /** 组标题下方到本组首行之间的留白：旧值 4dp（[Wear.Space.Xs]），现在与行间距同档。 */
-    const val SectionHeaderBottomDp = 12f
+    const val SectionHeaderBottomDp = 8f
 
     /** 行内：主标题与右侧取值之间的呼吸：旧间距 8dp + 1dp 发丝线。 */
     const val TitleToValueDp = 9f
@@ -272,7 +272,7 @@ object SettingsSpacingMath {
     const val ValueToTailDp = 10f
 
     /** 行高下限：低于这个值就不再是可靠触控热区。 */
-    const val MinRowHeightDp = 44f
+    const val MinRowHeightDp = 48f
 
     /** 一行的实际步进：行高 + 发丝线 + 行间距 = 44 + 1 + 4 = 49dp。 */
     const val RowStepDp = MinRowHeightDp + HairlineDp + ItemGapDp
