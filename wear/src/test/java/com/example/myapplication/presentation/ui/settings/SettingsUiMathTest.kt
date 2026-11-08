@@ -202,15 +202,16 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun itemGapStaysOnTheMinimumStep() {
-        // 行本身已经变高变宽，间距保持最小呼吸，否则一屏放不下几项
-        assertEquals(4f, SettingsSpacingMath.ItemGapDp, 0.001f)
+    fun itemGapKeepsRowsApart() {
+        // 行高 56dp 之后，行间 8dp 才分得开；组内 6dp : 组间 24dp ≈ 1:4
+        assertEquals(8f, SettingsSpacingMath.ItemGapDp, 0.001f)
         assertTrue(SettingsSpacingMath.isOnGrid(SettingsSpacingMath.ItemGapDp))
-        assertTrue(SettingsSpacingMath.ItemGapDp < Wear.Space.Sm.value)
+        assertTrue(SettingsSpacingMath.ItemGapDp <= Wear.Space.Sm.value)
     }
 
     @Test
     fun sectionHeaderKeepsEightDpAboveTheFirstRowOfItsGroup() {
+        // 233dp 圆屏放不下卡片式组间距：24dp 会让一屏只剩一行半
         assertEquals(8f, SettingsSpacingMath.SectionHeaderBottomDp, 0.001f)
         assertTrue(SettingsSpacingMath.isOnGrid(SettingsSpacingMath.SectionHeaderBottomDp))
     }
@@ -241,8 +242,8 @@ class SettingsSpacingMathTest {
 
     @Test
     fun rowStepGrowsForBiggerRows() {
-        // 48 行高 + 1 发丝 + 4 间距 = 53dp：行高从 44 提到 48，间距仍是最小呼吸
-        assertEquals(53f, SettingsSpacingMath.RowStepDp, 0.001f)
+        // 56 行高 + 1 发丝 + 8 间距 = 65dp
+        assertEquals(65f, SettingsSpacingMath.RowStepDp, 0.001f)
         assertEquals(
             SettingsSpacingMath.MinRowHeightDp + SettingsSpacingMath.HairlineDp +
                 SettingsSpacingMath.ItemGapDp,
@@ -253,9 +254,9 @@ class SettingsSpacingMathTest {
 
     @Test
     fun biggerRowsTradeRowCountForLegibility() {
-        // 233dp 真机：233 / 53 = 4.4 行。行更高但字号更大，密度仍够
-        assertTrue(SettingsSpacingMath.rowsPerScreen(233f) >= 4f)
-        assertEquals(4.4f, SettingsSpacingMath.rowsPerScreen(233f), 0.05f)
+        // 233dp 真机：233 / 65 = 3.58 行
+        assertTrue(SettingsSpacingMath.rowsPerScreen(233f) >= 3.5f)
+        assertEquals(3.58f, SettingsSpacingMath.rowsPerScreen(233f), 0.02f)
         assertTrue(
             "步进变大后每屏行数应减少",
             SettingsSpacingMath.rowsPerScreen(233f) < SettingsSpacingMath.rowsPerScreen(233f, 49f)
@@ -314,7 +315,7 @@ class SettingsSpacingMathTest {
 
     @Test
     fun rowsExceedTheMinimumTouchTarget() {
-        assertEquals(48f, SettingsSpacingMath.MinRowHeightDp, 0.001f)
+        assertEquals(56f, SettingsSpacingMath.MinRowHeightDp, 0.001f)
         assertTrue(
             "设置行必须高于全局触控下限",
             SettingsSpacingMath.MinRowHeightDp >= Wear.Size.Touch.value

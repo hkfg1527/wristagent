@@ -34,6 +34,9 @@ object Wear {
 
         /** 次要图形（行尾箭头、胶囊秒数）：黑底 5.04:1，比正文暗一档但仍过 AA。 */
         val TextDim = Color(0xFF737D8C)
+
+    /** 设置行取值：小字专用，比 [TextSecondary] 亮一档（约 9:1），抬腕一瞬间也要读得清。 */
+    val TextValue = Color(0xFFA3ADBD)
         val Accent = Color(0xFF4FC3F7)
         val AccentDim = Color(0xFF0E3A4E)
 
@@ -151,7 +154,7 @@ object Wear {
     /** 设置行取值档：正文档 + 次色（黑底 6.94:1），小字也必须过 AA。 */
     val TextRowValue: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextSecondary)
+        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextValue)
 
     /** 等宽档：官方 bodySmall 换等宽字族，用于端点、密钥掩码与探针输出。 */
     val TextMono: TextStyle

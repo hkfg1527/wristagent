@@ -257,7 +257,7 @@ object SettingsSpacingMath {
      * 旧值 12dp 让步进变成 57dp —— 233dp 屏每屏只有 ~3 个完整行，14 行要滚 3.4 屏。
      * 收到 4dp 后步进 49dp，每屏 4.7 行，行高本身（44dp 触控下限）一个像素没动。
      */
-    const val ItemGapDp = 4f
+    const val ItemGapDp = 8f
 
     /** 正文 CJK 行高（sp）：14sp × 1.43，旧值 1.18 倍让中文行间墨距只剩 3.5dp。 */
     const val BodyLineHeightSp = 20f
@@ -272,7 +272,7 @@ object SettingsSpacingMath {
     const val ValueToTailDp = 10f
 
     /** 行高下限：低于这个值就不再是可靠触控热区。 */
-    const val MinRowHeightDp = 48f
+    const val MinRowHeightDp = 56f
 
     /** 一行的实际步进：行高 + 发丝线 + 行间距 = 44 + 1 + 4 = 49dp。 */
     const val RowStepDp = MinRowHeightDp + HairlineDp + ItemGapDp

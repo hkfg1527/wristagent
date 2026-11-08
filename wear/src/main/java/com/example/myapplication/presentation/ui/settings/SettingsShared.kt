@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -603,19 +604,21 @@ fun SettingsNavRow(
         value = if (value != null && settingsRowShowsValue(screenWidthDp)) value else null,
         modifier = modifier,
         onClick = onClick,
-        trailing = {
-            if (badge != null) {
-                SettingsStatusBlock(description = badge.first, tone = badge.second)
-            } else {
-                ChevronMark()
-            }
+        // 居中的版式里，右侧箭头是孤立元素：没有状态块就什么都不放，文字也不必让出尾区
+        trailing = if (badge == null) {
+            null
+        } else {
+            { SettingsStatusBlock(description = badge.first, tone = badge.second) }
         }
     )
 }
 
 /** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
 private val SettingsRowTitleStyle: TextStyle
-    @Composable get() = Wear.TextRowTitle.copy(textAlign = TextAlign.Center)
+    @Composable get() = Wear.TextRowTitle.copy(
+        textAlign = TextAlign.Center,
+        fontWeight = FontWeight.Medium
+    )
 
 /** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
 private val SettingsRowValueStyle: TextStyle
@@ -895,8 +898,7 @@ fun SettingsTextEntryRow(
         title = label,
         value = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
         modifier = modifier,
-        onClick = onClick,
-        trailing = { ChevronMark() }
+        onClick = onClick
     )
 }
 
