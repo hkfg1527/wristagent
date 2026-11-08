@@ -18,20 +18,20 @@ class ApprovalToneTest {
     fun riskTokensMatchDesign() {
         // 令牌本身即设计稿色值，其余 UI 只允许引用令牌
         assertEquals(Color(0xFFF5B942), Wear.Palette.Warning)
-        assertEquals(Color(0xFFFB6B4B), Wear.Palette.Critical)
+        assertEquals(Color(0xFFFF6B6B), Wear.Palette.Danger)
     }
 
     @Test
     fun accentFollowsRiskLevel() {
         assertEquals(Wear.Palette.Success, ApprovalTone.accentOf(RiskLevel.LOW))
         assertEquals(Wear.Palette.Warning, ApprovalTone.accentOf(RiskLevel.MEDIUM))
-        assertEquals(Wear.Palette.Critical, ApprovalTone.accentOf(RiskLevel.HIGH))
+        assertEquals(Wear.Palette.Danger, ApprovalTone.accentOf(RiskLevel.HIGH))
         assertEquals(Wear.Palette.Danger, ApprovalTone.accentOf(RiskLevel.CRITICAL))
     }
 
     @Test
     fun trackStartsAtLevelToneAndAlwaysEndsGreen() {
-        for (tone in listOf(Wear.Palette.Warning, Wear.Palette.Critical, Wear.Palette.Danger)) {
+        for (tone in listOf(Wear.Palette.Warning, Wear.Palette.Danger, Wear.Palette.Danger)) {
             assertEquals(tone, ApprovalTrackTone.colorOf(tone, 0f))
             // 滑到底恒为放行绿，与等级无关
             assertEquals(Wear.Palette.Success, ApprovalTrackTone.colorOf(tone, 1f))

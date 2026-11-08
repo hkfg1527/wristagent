@@ -6,6 +6,7 @@ import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Shapes
 import androidx.wear.compose.material3.Typography
+import androidx.compose.ui.unit.sp
 
 /**
  * Wear Material3 配色：每个槽位都映射自 [Wear.Palette] 令牌。
@@ -46,13 +47,25 @@ val WearMaterialColorScheme: ColorScheme = ColorScheme().copy(
 )
 
 /**
- * 字号的唯一权威：官方 M3E Wear 阶梯原样下发，不覆盖任何一档。
+ * 字号的唯一权威：在官方 M3E Wear 阶梯上显式声明四档。
  *
- * 之前主题只注入 colorScheme，官方组件吃库默认字号、页面又用自造的 Wear.Text*，
- * 于是同一屏上并存两套排版权威 —— 这正是"排版散装"的来源。这里把官方阶梯定为唯一来源，
- * [Wear.TextDisplay] 等令牌只是对它的映射。
+ * 官方默认阶梯 12 / 14 / 16 / 18 / 30 的相邻差只有 16.7% / 14.3% / 12.5%，
+ * 低于"相邻层级字号差 >= 20%"的排版判据，读起来是糊在一起的一片。
+ * 这里把页面实际用到的四档拉成 12 / 15 / 18 / 24（差 25% / 20% / 33%），
+ * 第五档 displayMedium 取官方 30（与 24 差 25%）。
+ * 行高按 1.25~1.33 显式给出，避免只放大字号后中文被行高裁掉。
+ *
+ * [Wear.TextDisplay] 等令牌只是对这套阶梯的映射，页面不得再自带 sp。
  */
-val WearTypography: Typography = Typography()
+val WearTypography: Typography = Typography().let { official ->
+    official.copy(
+        bodySmall = official.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+        bodyMedium = official.bodyMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+        bodyLarge = official.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp),
+        titleMedium = official.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
+        titleLarge = official.titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp)
+    )
+}
 
 /**
  * 形状的唯一权威：官方五档全部收敛到两档圆角。

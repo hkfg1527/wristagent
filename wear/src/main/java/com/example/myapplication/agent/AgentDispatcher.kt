@@ -1,5 +1,7 @@
 package com.example.myapplication.agent
 
+import com.example.myapplication.presentation.ErrorMessage
+
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -248,9 +250,10 @@ class AgentDispatcher(
             if (turnResult.isFailure) {
                 val err = turnResult.exceptionOrNull()?.message ?: "网络通信异常"
                 Log.e(TAG, "API 调用失败 (第 $turn 轮): $err")
+                // 只说人话：err 里是 provider 的原始 JSON，绝不进气泡（映射规则见 ErrorMessage）
                 val errorBlock = ConversationBlock.Text(
                     id = UUID.randomUUID().toString(),
-                    content = "网络请求失败: $err"
+                    content = ErrorMessage.display(err)
                 )
                 currentState = currentState.copy(
                     isThinking = false,

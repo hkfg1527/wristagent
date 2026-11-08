@@ -399,8 +399,8 @@ fun SettingsRowDivider() {
         modifier = Modifier
             .fillMaxWidth()
             .height(SettingsDividerThickness)
-            // 线只内缩一档：两侧对称内缩，与居中文字的视觉边对齐，不铺满内容盒
-            .padding(horizontal = SettingsLayoutMath.HairlineInsetDp.dp)
+            // 分隔线内缩与行文字同一条左边界，不再用独立的 HairlineInset
+            .padding(horizontal = SettingsRowInset)
             .background(Wear.Palette.Border)
     )
 }
@@ -486,38 +486,30 @@ fun SettingsSectionHeader(text: String, center: Boolean = false) {
                 .widthIn(max = SettingsContentWidth)
                 .fillMaxWidth()
                 .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-            style = Wear.TextCaption.copy(color = Wear.Palette.Accent, textAlign = TextAlign.Center),
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         return
     }
-    // 左对齐 + 前置短线：组标题是结构标记而不是内容，靠一条 12dp 的横线与文字形成轴，
-    // 不再用强调色争抢行标题的注意力。
-    Row(
+    // 不再画前置短线：那 12dp 横线 + 8dp 空隙把标题文字推到 20dp，
+    // 而行文字在 8dp，同一屏就出现两条左轴（实测偏差 12dp，肉眼可见）。
+    // 分组现在只靠上方 16dp 留白区分（亲密性原则：组间 > 组内），标题与行共用同一条左边界。
+    BasicText(
+        text = text,
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
+            .padding(start = SettingsRowInset)
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = SectionRuleWidth, height = SectionRuleThickness)
-                .background(Wear.Palette.Border)
-        )
-        Spacer(Modifier.width(Wear.Space.Sm))
-        BasicText(
-            text = text,
-            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
-private val SectionRuleWidth = 12.dp
-private val SectionRuleThickness = 1.5.dp
+/** 行的左右内缩：组标题、行文字、分隔线共用这一条左边界。 */
+private val SettingsRowInset = Wear.Space.Sm
 
 /** 行尾安全区：箭头图形盒 + 取值↔尾标的呼吸。行内文字左右各让出同样的宽度。 */
 private val SettingsRowTailZone: Dp =
@@ -582,9 +574,9 @@ private fun SettingsCenteredRow(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // 有行尾标记时左右各让出同宽的安全区：两侧等宽，文字中心才等于整行中心
-                .padding(horizontal = if (trailing == null) 0.dp else SettingsRowTailZone),
-            horizontalAlignment = Alignment.CenterHorizontally
+                // 左对齐体系：只有右侧给行尾控件让位，左边界与组标题、分隔线共用同一条线
+                .padding(end = if (trailing == null) 0.dp else SettingsRowTailZone),
+            horizontalAlignment = Alignment.Start
         ) {
             BasicText(
                 text = title,
@@ -645,13 +637,13 @@ fun SettingsNavRow(
 /** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
 private val SettingsRowTitleStyle: TextStyle
     @Composable get() = Wear.TextRowTitle.copy(
-        textAlign = TextAlign.Center,
+        textAlign = TextAlign.Start,
         fontWeight = FontWeight.Medium
     )
 
 /** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
 private val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Center)
+    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Start)
 
 /** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
 @Composable
@@ -794,7 +786,13 @@ fun SettingsSliderRow(
     }
 }
 
-/** 单选行：官方 RadioButton，选中态取 Accent（primary 色）。 */
+/**
+ * 单选行：并进居中版式，不再用官方 RadioButton。
+ *
+ * 官方 RadioButton 自带 12dp/8dp 内边距与左对齐文字，和全站其余居中的文字行混在一起，
+ * 同一屏出现两套对齐与两套行高。这里改成同一行组件 + 行尾圆点，
+ * 行高、内边距、文字对齐全部跟随 [SettingsCenteredRow]。
+ */
 @Composable
 fun SettingsRadioRow(
     label: String,
@@ -803,34 +801,40 @@ fun SettingsRadioRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null
 ) {
-    RadioButton(
-        selected = selected,
-        onSelect = onSelect,
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        // 同开关：容器透明，选中态只由圆点与文字色表达，不再垫一块实底
-        colors = RadioButtonDefaults.radioButtonColors(
-            selectedContainerColor = Color.Transparent,
-            selectedContentColor = Wear.Palette.TextPrimary,
-            selectedSecondaryContentColor = Wear.Palette.TextSecondary,
-            selectedControlColor = Wear.Palette.Accent,
-            unselectedContainerColor = Color.Transparent,
-            unselectedContentColor = Wear.Palette.TextSecondary,
-            unselectedSecondaryContentColor = Wear.Palette.TextSecondary,
-            unselectedControlColor = Wear.Palette.TextDim
-        ),
-        contentPadding = PaddingValues(
-            horizontal = Wear.Space.Md,
-            vertical = Wear.Space.Sm
-        ),
-        secondaryLabel = if (subtitle == null) {
-            null
-        } else {
-            { SettingsSecondaryLabel(text = subtitle, maxLines = 2) }
-        },
-        label = { SettingsPrimaryLabel(text = label) }
+    SettingsCenteredRow(
+        title = label,
+        value = subtitle,
+        modifier = modifier.widthIn(max = SettingsContentWidth),
+        onClick = onSelect,
+        valueMaxLines = 2,
+        trailing = { SettingsRadioDot(selected) }
     )
 }
+
+/** 单选圆点：空心环 + 选中实心点，只表达状态，不做容器。 */
+@Composable
+private fun SettingsRadioDot(selected: Boolean) {
+    val ring = if (selected) Wear.Palette.Accent else Wear.Palette.TextMuted
+    Box(
+        modifier = Modifier
+            .size(SettingsRadioDotSize)
+            .clip(CircleShape)
+            .border(SettingsRadioStroke, ring, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .size(SettingsRadioDotSize / 2)
+                    .clip(CircleShape)
+                    .background(Wear.Palette.Accent)
+            )
+        }
+    }
+}
+
+private val SettingsRadioDotSize = 18.dp
+private val SettingsRadioStroke = 2.dp
 
 /** 只读说明行：同样没有容器，标题与取值各自居中成一行。 */
 @Composable
@@ -1086,7 +1090,7 @@ fun ChevronMark() {
         }
         drawPath(
             path = path,
-            color = Wear.Palette.TextDim,
+            color = Wear.Palette.TextMuted,
             style = Stroke(
                 width = 1.5.dp.toPx(),
                 cap = StrokeCap.Round,

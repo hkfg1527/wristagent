@@ -55,7 +55,7 @@ class SettingsContrastTest {
     @Test
     fun dimGlyphColorPassesAAOnThePageBackground() {
         // 行尾箭头 / 胶囊秒数：黑底 5.04:1
-        assertTrue(contrastRatio(Wear.Palette.TextDim, Wear.Palette.Bg) >= 4.5f)
+        assertTrue(contrastRatio(Wear.Palette.TextMuted, Wear.Palette.Bg) >= 4.5f)
     }
 
     @Test
@@ -64,16 +64,16 @@ class SettingsContrastTest {
         listOf(Wear.Palette.Surface, Wear.Palette.SurfaceAlt).forEach { surface ->
             assertTrue(
                 "TextDim on " + surface,
-                contrastRatio(Wear.Palette.TextDim, surface) >= 4f
+                contrastRatio(Wear.Palette.TextMuted, surface) >= 4f
             )
         }
     }
 
     @Test
     fun clockArcTextIsDimmerThanTheRowTitleButStillFarAboveAA() {
-        assertTrue(contrastRatio(Wear.Palette.Clock, Wear.Palette.Bg) >= 4.5f)
+        assertTrue(contrastRatio(Wear.Palette.TextSecondary, Wear.Palette.Bg) >= 4.5f)
         assertTrue(
-            contrastRatio(Wear.Palette.Clock, Wear.Palette.Bg) <
+            contrastRatio(Wear.Palette.TextSecondary, Wear.Palette.Bg) <
                 contrastRatio(Wear.Palette.TextPrimary, Wear.Palette.Bg)
         )
     }

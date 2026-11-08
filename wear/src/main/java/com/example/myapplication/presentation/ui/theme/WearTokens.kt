@@ -19,42 +19,37 @@ object Wear {
     /** 颜色令牌。 */
     object Palette {
         val Bg = Color(0xFF000000)
-        val Surface = Color(0xFF10141A)
-        val SurfaceAlt = Color(0xFF171C24)
+        val Surface = Color(0xFF0D1014)
+        val SurfaceAlt = Color(0xFF1B212A)
 
         /** 发丝线：黑底 1.73:1，OLED 上"时有时无"的下限，再暗就等于没画。 */
-        val Border = Color(0xFF2E3644)
+        val Border = Color(0xFF32363E)
         val TextPrimary = Color(0xFFF5F7FA)
 
-        /** 行取值：黑底 6.94:1，12sp 小字也过 WCAG AA。 */
-        val TextSecondary = Color(0xFF8B95A5)
+        /** 行取值 / 次要图形 / 曲面时钟：黑底 9.28:1，抬腕一瞬间也要读得清。 */
+        val TextSecondary = Color(0xFFA3ADBD)
 
-        /** 旧的行取值色：黑底只有 3.87:1，低于 AA，已不许承载任何文字。 */
-        val TextMuted = Color(0xFF5F6B7A)
-
-        /** 次要图形（行尾箭头、胶囊秒数）：黑底 5.04:1，比正文暗一档但仍过 AA。 */
-        val TextDim = Color(0xFF737D8C)
-
-    /** 设置行取值：小字专用，比 [TextSecondary] 亮一档（约 9:1），抬腕一瞬间也要读得清。 */
-    val TextValue = Color(0xFFA3ADBD)
+        /** 最暗一档可读文字：黑底 5.76:1，仍过 WCAG AA 4.5:1；再暗就不许承载文字。 */
+        val TextMuted = Color(0xFF7C8798)
         val Accent = Color(0xFF4FC3F7)
         val AccentDim = Color(0xFF0E3A4E)
 
-        /** 强调色的"轨道位"：等效主色压到 60% 不透明（黑底 5.29:1），用于开关轨道、状态点等静态指示。 */
+        /** 强调色的轨道位：等效主色压到 60% 不透明（黑底 5.29:1），用于开关轨道、状态点等静态指示。 */
         val AccentTrack = Color(0xFF3788AD)
+
         /** 中度风险黄：审批页中风险等级的标题、危险条与滑轨强调色。 */
         val Warning = Color(0xFFF5B942)
-        /** 重度风险黄红：审批页高风险等级的强调色，红之前先亮黄。 */
-        val Critical = Color(0xFFFB6B4B)
         val Danger = Color(0xFFFF6B6B)
         val DangerSurface = Color(0xFF2A1215)
         val Success = Color(0xFF4ADE80)
 
-        /** 主键冷银白：IDLE 单体键与审批胶囊底条共用，让审批态是同一颗键的延续，而不是另起一条深色胶囊。 */
-        val Orb = Color(0xFFCDD3DC)
-
-        /** 曲面时钟：比行标题暗一档（黑底 9.79:1），时钟不再和主键抢第二个焦点。 */
-        val Clock = Color(0xFFA8B2C0)
+        /**
+         * 主键底色：**必须暗于正文**（黑底 6.93:1，正文 18.9:1）。
+         *
+         * 旧值 #CDD3DC 是整屏最亮的东西，比正文还亮 —— 一屏出现「主键 + 正文」两个焦点。
+         * 现在「亮」只表示「此刻可以动作」：录音 / 发送中才提亮到 TextPrimary。
+         */
+        val Orb = Color(0xFF8C96A6)
     }
 
     /**
@@ -154,7 +149,7 @@ object Wear {
     /** 设置行取值档：正文档 + 次色（黑底 6.94:1），小字也必须过 AA。 */
     val TextRowValue: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextValue)
+        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextSecondary)
 
     /** 等宽档：官方 bodySmall 换等宽字族，用于端点、密钥掩码与探针输出。 */
     val TextMono: TextStyle

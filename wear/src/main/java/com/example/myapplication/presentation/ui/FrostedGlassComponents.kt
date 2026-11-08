@@ -49,7 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -176,7 +178,7 @@ fun ThoughtPill(
             if (isStreaming && elapsedSeconds > 0) {
                 BasicText(
                     text = stringResource(R.string.ui_thought_elapsed, elapsedSeconds),
-                    style = labelStyle.copy(color = Wear.Palette.TextDim),
+                    style = labelStyle.copy(color = Wear.Palette.TextMuted),
                     maxLines = 1
                 )
             }
@@ -440,10 +442,10 @@ fun UserChatBubble(
     val padding = ChatVisualMetrics.BubblePaddingDp.dp
     Box(
         modifier = modifier
-            .widthIn(max = ChatVisualMetrics.BubbleMaxWidthDp.dp)
+            .widthIn(max = ChatVisualMetrics.userBubbleWidthDp().dp)
             .clip(shape)
+            // 去描边：边框是版面里最贵的装饰，吃掉 2dp 宽度还把气泡封成一个盒子
             .background(Wear.Palette.AccentDim)
-            .border(1.dp, Wear.Palette.Border, shape)
             // 上下内边距由 16.5/14.5 改成对称 14/14：行距加到 20sp 后两行中文不再顶到边
             .padding(horizontal = padding, vertical = padding)
     ) {
@@ -466,15 +468,24 @@ fun AgentSquareBlurBox(
     gridSpacingDp: Float = 16f,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(Wear.Radius.Card)
+    // 回答不用卡片：底色 + 描边是两个最贵的装饰，它们把回复切成了一个盒子，
+    // 还让"用户靠右 / 助手靠左"彻底看不出来。左侧一条 2dp 竖线就够标记"这是回答"。
+    val ruleColor = if (approvalVisualState == ApprovalVisualState.NONE) {
+        Wear.Palette.Border
+    } else {
+        borderColor
+    }
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(Wear.Palette.Surface)
-            .border(1.dp, borderColor, shape)
-            .padding(Wear.Space.Md)
+            .drawBehind {
+                drawRect(
+                    color = ruleColor,
+                    topLeft = Offset.Zero,
+                    size = Size(2.dp.toPx(), size.height)
+                )
+            }
+            .padding(start = Wear.Space.Md, top = Wear.Space.Sm, bottom = Wear.Space.Sm)
     ) {
         content()
     }

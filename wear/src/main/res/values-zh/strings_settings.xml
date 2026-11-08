@@ -35,9 +35,9 @@
     <string name="settings_asr_system">系统识别</string>
     <string name="settings_replay_onboarding">重新观看操作引导</string>
     <string name="settings_done_back">完成返回</string>
-    <string name="settings_sub_model_config">模型与端点设置</string>
-    <string name="settings_sub_hyper_params">模型推理参数</string>
-    <string name="settings_sub_wing_shortcut">快捷操作绑定</string>
+    <string name="settings_sub_model_config">模型与端点</string>
+    <string name="settings_sub_hyper_params">推理参数</string>
+    <string name="settings_sub_wing_shortcut">快捷操作</string>
 
     <!-- 推理参数。 -->
     <string name="settings_temperature">采样温度</string>
@@ -305,7 +305,7 @@
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
     <string name="settings_voice_entry">语音与唤醒</string>
-    <string name="settings_sub_voice_entry">语音输入与唤醒</string>
+    <string name="settings_sub_voice_entry">语音输入</string>
     <string name="settings_voice_switch_header">语音</string>
     <string name="settings_voice_asr_enabled">启用语音识别</string>
     <string name="settings_voice_asr_enabled_secondary">关闭后不录音、不发起网络请求</string>

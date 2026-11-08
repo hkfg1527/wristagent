@@ -18,18 +18,25 @@ import org.junit.Test
 class WearTypographyAuthorityTest {
 
     @Test
-    fun themeTypographyIsTheOfficialLadderUntouched() {
-        // 与官方默认逐槽位相等 —— 也就是没有哪一档被本地改过字号。
-        assertEquals(Typography(), WearTypography)
+    fun theLadderIsTheFourDeclaredSteps() {
+        // 官方默认 12/14/16/18/30 的相邻差不足 20%，这里显式声明成 12/15/18/24(+30)。
+        assertEquals(12f, WearTypography.bodySmall.fontSize.value, 0.001f)
+        assertEquals(15f, WearTypography.bodyMedium.fontSize.value, 0.001f)
+        assertEquals(18f, WearTypography.bodyLarge.fontSize.value, 0.001f)
+        assertEquals(18f, WearTypography.titleMedium.fontSize.value, 0.001f)
+        assertEquals(24f, WearTypography.titleLarge.fontSize.value, 0.001f)
+        assertEquals(30f, WearTypography.displayMedium.fontSize.value, 0.001f)
     }
 
     @Test
-    fun theLadderPagesRelyOnKeepsTheOfficialSizes() {
-        assertEquals(12f, WearTypography.bodySmall.fontSize.value, 0.001f)
-        assertEquals(14f, WearTypography.bodyMedium.fontSize.value, 0.001f)
-        assertEquals(16f, WearTypography.titleMedium.fontSize.value, 0.001f)
-        assertEquals(18f, WearTypography.titleLarge.fontSize.value, 0.001f)
-        assertEquals(30f, WearTypography.displayMedium.fontSize.value, 0.001f)
+    fun neighbouringLevelsDifferByAtLeastTwentyPercent() {
+        val ladder = listOf(12f, 15f, 18f, 24f, 30f)
+        ladder.zipWithNext().forEach { (lower, upper) ->
+            assertTrue(
+                lower.toString() + " -> " + upper + " 只差 " + ((upper / lower - 1f) * 100f).toInt() + "%，层级会糊",
+                upper / lower >= 1.20f
+            )
+        }
     }
 
     @Test

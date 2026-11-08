@@ -12,7 +12,7 @@ internal object ApprovalTone {
     fun accentOf(level: RiskLevel): Color = when (level) {
         RiskLevel.LOW -> Wear.Palette.Success
         RiskLevel.MEDIUM -> Wear.Palette.Warning
-        RiskLevel.HIGH -> Wear.Palette.Critical
+        RiskLevel.HIGH -> Wear.Palette.Danger
         RiskLevel.CRITICAL -> Wear.Palette.Danger
     }
 

@@ -386,8 +386,11 @@ fun BottomInteractiveBlock(
                     // 收起态（collapseFraction→0）由 ChatScreen 画贴底弧线，这里的实心块淡出，只保留热区
                     .shadow(elevation = 8.dp * collapseFraction, shape = RoundedCornerShape(keyCorner))
                     .clip(RoundedCornerShape(keyCorner))
-                    // 冷银白主键底色（品牌识别），与审批胶囊共用同一令牌
-                    .background(Wear.Palette.Orb.copy(alpha = collapseFraction))
+                    // 静息用 Orb（暗于正文），只有「此刻在录」才提亮到正文白：亮 = 现在可以动作
+                    .background(
+                        (if (mode == BottomBlockMode.RECORDING) Wear.Palette.TextPrimary else Wear.Palette.Orb)
+                            .copy(alpha = collapseFraction)
+                    )
                     .pointerInput(isSplitExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)

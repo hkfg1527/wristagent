@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.chat
 
+import com.example.myapplication.presentation.ErrorMessage
+
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -183,7 +185,11 @@ internal fun ConversationList(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.CenterEnd
                         ) {
-                            UserChatBubble(modifier = Modifier.widthIn(max = ConversationCardMaxWidth)) {
+                            UserChatBubble(
+                                modifier = Modifier.widthIn(
+                                    max = ChatVisualMetrics.userBubbleWidthDp().dp
+                                )
+                            ) {
                                 BasicText(
                                     text = item.block.content,
                                     // CJK 行距 1.43×：旧值继承 bodyMedium 的 1.18 倍，
@@ -199,7 +205,7 @@ internal fun ConversationList(
                         // 思考胶囊、工具调用与逐字流式文本 100% 完整包含在卡片内部
                         Box(
                             modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.CenterStart
                         ) {
                             AgentSquareBlurBox(
                                 modifier = Modifier.widthIn(max = ConversationCardMaxWidth),
@@ -258,7 +264,8 @@ internal fun ConversationList(
 
         // 错误提示 (随列表一体滚动)
         if (!errorMessage.isNullOrBlank()) {
-            item { WearBanner(text = "[ALERT] $errorMessage", tone = Tone.DANGER) }
+            // 只说人话：原始 provider JSON 不进气泡（映射规则见 ErrorMessage）
+            item { WearBanner(text = ErrorMessage.display(errorMessage), tone = Tone.DANGER) }
         }
     }
 }

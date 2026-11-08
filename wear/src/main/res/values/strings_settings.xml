@@ -35,9 +35,9 @@
     <string name="settings_asr_system">System recognizer</string>
     <string name="settings_replay_onboarding">Replay the guided tour</string>
     <string name="settings_done_back">Done</string>
-    <string name="settings_sub_model_config">Model &amp; Endpoint Settings</string>
-    <string name="settings_sub_hyper_params">Inference Parameters</string>
-    <string name="settings_sub_wing_shortcut">Quick Action Binding</string>
+    <string name="settings_sub_model_config">Model &amp; Endpoint</string>
+    <string name="settings_sub_hyper_params">Inference</string>
+    <string name="settings_sub_wing_shortcut">Quick Action</string>
 
     <!-- Hyper parameters. -->
     <string name="settings_temperature">Sampling temperature</string>
@@ -315,7 +315,7 @@
     <string name="settings_netdiag_action_probe">Run one real request</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
     <string name="settings_voice_entry">Voice &amp; Wake</string>
-    <string name="settings_sub_voice_entry">Voice Input &amp; Wake</string>
+    <string name="settings_sub_voice_entry">Voice Input</string>
     <string name="settings_voice_switch_header">Voice</string>
     <string name="settings_voice_asr_enabled">Speech recognition</string>
     <string name="settings_voice_asr_enabled_secondary">Off: no recording, no network request</string>

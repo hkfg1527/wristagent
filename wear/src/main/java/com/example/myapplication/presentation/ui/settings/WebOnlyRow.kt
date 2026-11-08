@@ -81,13 +81,13 @@ internal fun SettingsWebOnlyRow(form: WebSettingsForm, raw: String) {
         Column(verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
             BasicText(
                 text = parts.label,
-                style = Wear.TextRowTitle.copy(textAlign = TextAlign.Center),
+                style = Wear.TextRowTitle.copy(textAlign = TextAlign.Start),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             BasicText(
                 text = parts.guidance,
-                style = Wear.TextRowValue.copy(textAlign = TextAlign.Center),
+                style = Wear.TextRowValue.copy(textAlign = TextAlign.Start),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )

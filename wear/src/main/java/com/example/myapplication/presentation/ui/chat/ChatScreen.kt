@@ -89,6 +89,7 @@ import com.example.myapplication.presentation.ui.ReadingAnchor
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.TopClockBar
+import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.VoiceListeningOverlay
@@ -625,13 +626,22 @@ fun ChatScreen(
 
 
 
+    // 点阵是"活动状态"的指示器，不是墙纸：只在思考 / 录音 / 审批 / 完工 / 冲击波时出现。
+    // 静息态纯黑：省电、消掉文字背后的摩尔纹，也不再每帧重绘数百个点
+    // （dumpsys gfxinfo 里 Slow issue draw commands 16/67 帧，头号嫌疑就是它）。
+    val matrixActive = thinkingIntensity > 0.01f ||
+        state.isRecordingVoice ||
+        state.agentState.approvalVisualState != ApprovalVisualState.NONE ||
+        state.isTaskCompleted ||
+        shockwaveProgress >= 0f
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg)
     ) {
-        // ================= 1. 全局唯一点阵坐标系 (通体清晰方阵，覆盖全圆屏) =================
-        if (animationsEnabled) {
+        // ================= 1. 全局唯一点阵坐标系 (仅活动状态可见) =================
+        if (animationsEnabled && matrixActive) {
             UnifiedMatrixCanvas(
                 modifier = Modifier.fillMaxSize(),
                 approvalVisualState = state.agentState.approvalVisualState,

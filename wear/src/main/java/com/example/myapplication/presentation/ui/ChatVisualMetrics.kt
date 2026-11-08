@@ -8,6 +8,18 @@ object ChatVisualMetrics {
     /** 气泡与助手卡片的最大宽度（dp）：233dp 屏左右各留 24.5dp（旧值 200dp 只剩 3.4dp）。 */
     const val BubbleMaxWidthDp = 184f
 
+    /**
+     * 用户气泡最大宽度（dp）：内容盒的 78%。
+     *
+     * 旧值等于内容盒宽度（184dp），于是"用户靠右、助手靠左"在视觉上完全不可见 ——
+     * 两种气泡左右边缘都贴满内容盒，只能靠 3% 的底色差区分谁在说话。
+     */
+    const val UserBubbleMaxWidthRatio = 0.78f
+
+    /** 用户气泡宽度：按比例算，跟着内容盒走，不写死。 */
+    fun userBubbleWidthDp(contentWidthDp: Float = BubbleMaxWidthDp): Float =
+        contentWidthDp * UserBubbleMaxWidthRatio
+
     /** 气泡内边距（dp）：四边对称，不再上下 16.5 / 14.5。 */
     const val BubblePaddingDp = 14f
 
