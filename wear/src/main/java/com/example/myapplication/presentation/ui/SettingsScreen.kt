@@ -262,27 +262,8 @@ fun SettingsScreen(
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
                     autoCentering = null
                 ) {
-                    // 顶部标题：本屏唯一的视觉重点（主色 + titleLarge 级），居中排在内容盒中轴上
-                    item {
-                        SettingsStaggeredRow(index = 0, stagger = rowStagger, exit = exit) {
-                            Box(
-                                modifier = Modifier
-                                    .widthIn(max = SettingsContentWidth)
-                                    .fillMaxWidth()
-                                    // 不再撑 44dp 触摸高度：标题本身不可点，撑高只会把
-                                    // 顶部黑带从 12dp 顶回 41dp（旧版实测 0..41.0dp = 屏高 17.6%）
-                                    .padding(top = RootTitleTopPadding, bottom = Wear.Space.Sm),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                BasicText(
-                                    text = stringResource(R.string.settings_title),
-                                    style = Wear.TextDisplayTitle,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
+                    // 页面标题已移除：它不承载信息（滑进来就知道在设置页），却占掉 25dp 高度
+                    // 并抢走视觉第一落点，属于层级倒置。返回靠手势与系统返回键。
 
                     // ================= 模型 =================
                     item {

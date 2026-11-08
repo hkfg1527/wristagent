@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
@@ -477,22 +478,46 @@ fun SettingsBackButton(onClick: () -> Unit) {
  * 需要左对齐时显式传 false，既有调用点一个都不用改。
  */
 @Composable
-fun SettingsSectionHeader(text: String, center: Boolean = true) {
-    BasicText(
-        text = text,
+fun SettingsSectionHeader(text: String, center: Boolean = false) {
+    if (center) {
+        BasicText(
+            text = text,
+            modifier = Modifier
+                .widthIn(max = SettingsContentWidth)
+                .fillMaxWidth()
+                .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
+            style = Wear.TextCaption.copy(color = Wear.Palette.Accent, textAlign = TextAlign.Center),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
+    // 左对齐 + 前置短线：组标题是结构标记而不是内容，靠一条 12dp 的横线与文字形成轴，
+    // 不再用强调色争抢行标题的注意力。
+    Row(
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        style = if (center) {
-            Wear.TextCaption.copy(color = Wear.Palette.Accent, textAlign = TextAlign.Center)
-        } else {
-            Wear.TextCaption.copy(color = Wear.Palette.Accent)
-        },
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = SectionRuleWidth, height = SectionRuleThickness)
+                .background(Wear.Palette.Border)
+        )
+        Spacer(Modifier.width(Wear.Space.Sm))
+        BasicText(
+            text = text,
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
+
+private val SectionRuleWidth = 12.dp
+private val SectionRuleThickness = 1.5.dp
 
 /** 行尾安全区：箭头图形盒 + 取值↔尾标的呼吸。行内文字左右各让出同样的宽度。 */
 private val SettingsRowTailZone: Dp =
