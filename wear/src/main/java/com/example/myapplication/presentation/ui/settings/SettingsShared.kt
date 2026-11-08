@@ -524,7 +524,10 @@ private val SettingsRowTailZone: Dp =
     (SettingsLayoutMath.ChevronGlyphDp + SettingsSpacingMath.ValueToTailDp).dp
 
 /** 行内两行文字之间的墨距：body 行盒自带上下内边距，这里只补一档最小呼吸。 */
-private val SettingsRowLineGap: Dp = Wear.Space.Xs
+private val SettingsRowLineGap: Dp = 2.dp
+
+/** 行上下内边距：从 4dp 收到 2dp，把纵向预算还给内容。 */
+private val RowVerticalPadding: Dp = 2.dp
 
 /**
  * 行取值的可见门槛（屏宽 dp）：更窄的屏上不显示取值。
@@ -573,7 +576,8 @@ private fun SettingsCenteredRow(
                 }
             )
             .heightIn(min = SettingsSpacingMath.MinRowHeightDp.dp)
-            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Xs)
+            // 字号不动，只收 chrome：上下各 2dp 已经够把两行文字包住
+            .padding(horizontal = Wear.Space.Sm, vertical = RowVerticalPadding)
     ) {
         Column(
             modifier = Modifier
