@@ -96,11 +96,18 @@ fun WearAgentApp(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Wear.Palette.Bg)
+    // 动画开关必须包住三个屏幕：之前只包 MAIN，设置页与引导页拿不到这个 local，
+    // 「关掉动效」在它们身上完全无效（设置页的逐行进场、引导页的粒子呼吸都照跑）。
+    CompositionLocalProvider(
+        LocalAnimationsEnabled provides remember(settingsRevision) {
+            preferences.animationsEnabled
+        }
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Wear.Palette.Bg)
+        ) {
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
@@ -172,6 +179,7 @@ fun WearAgentApp(
                     }
                 }
             }
+        }
         }
     }
 }
