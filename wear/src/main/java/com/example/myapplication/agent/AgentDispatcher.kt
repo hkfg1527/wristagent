@@ -119,7 +119,7 @@ class AgentDispatcher(
         return """
         [宿主物理环境与实时感知 Telemetry]:
         - 当前精准系统时刻: $nowStr
-        - 宿主设备物理形态: Wear OS 圆屏穿戴设备 (Pixel Watch 2 / 圆形表盘)
+        - 宿主设备物理形态: Wear OS 圆屏穿戴设备（圆形表盘；具体型号不写死，避免告知模型错误事实）
         - 电池遥测状态: $batteryLevel
         - 剪贴板最新文字: "$clipSnippet"
         在回答主人关于时间、日期、电量或刚才复制的内容时，直接引用上述客观事实，无需重复反问。

@@ -626,14 +626,9 @@ fun ChatScreen(
 
 
 
-    // 点阵是"活动状态"的指示器，不是墙纸：只在思考 / 录音 / 审批 / 完工 / 冲击波时出现。
-    // 静息态纯黑：省电、消掉文字背后的摩尔纹，也不再每帧重绘数百个点
-    // （dumpsys gfxinfo 里 Slow issue draw commands 16/67 帧，头号嫌疑就是它）。
-    val matrixActive = thinkingIntensity > 0.01f ||
-        state.isRecordingVoice ||
-        state.agentState.approvalVisualState != ApprovalVisualState.NONE ||
-        state.isTaskCompleted ||
-        shockwaveProgress >= 0f
+    // 点阵常驻做空间底（低对比），审批态让位给遮罩（见下方 isApprovalFocus 判断）。
+    // 曾经算过一个 matrixActive 想只在活动态显示，但那个变量从未被消费 —— 已删除，
+    // 免得注释和行为对不上。
 
     Box(
         modifier = Modifier
@@ -641,11 +636,15 @@ fun ChatScreen(
             .background(Wear.Palette.Bg)
     ) {
         // ================= 1. 全局唯一点阵坐标系 (仅活动状态可见) =================
-        if (animationsEnabled) {
+        // 审批弹层的首帧最贵：全屏遮罩组合 + 模糊层 + 点阵切到审批绘制路径（红瀑）三件事同时发生。
+        // 审批期间点阵直接让位成纯色底，把首帧的绘制预算全部留给遮罩，弹出不再卡一下。
+        if (animationsEnabled && !isApprovalFocus) {
             UnifiedMatrixCanvas(
                 modifier = Modifier.fillMaxSize(),
                 approvalVisualState = state.agentState.approvalVisualState,
-                isTaskCompletedTrigger = state.isTaskCompleted,
+                // 完工掠影已删除：它和消息卡收尾动画抢同一时刻，两个动效叠加看起来"诡异"。
+                // 一个动作只允许一组动效（收尾交给消息卡自己的 160ms 亮度回落）。
+                isTaskCompletedTrigger = false,
                 thinkingIntensity = thinkingIntensity,
                 isRecordingVoice = state.isRecordingVoice,
                 shockwaveProgress = shockwaveProgress,
@@ -849,7 +848,7 @@ fun ChatScreen(
         if (state.isRecordingVoice) {
             VoiceListeningOverlay(
                 onCancel = {
-                    voiceInputManager.stopListening()
+                    voiceInputManager.cancel()
                     viewModel.onVoiceListeningChanged(false)
                 }
             )

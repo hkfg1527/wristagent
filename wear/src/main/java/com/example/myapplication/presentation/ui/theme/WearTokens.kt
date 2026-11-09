@@ -1,5 +1,10 @@
 package com.example.myapplication.presentation.ui.theme
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.TweenSpec
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
@@ -69,6 +74,27 @@ object Wear {
          * 尺寸可变的胶囊（思考小胶囊）用它，而不是在页面里各写一份"高度一半"。
          */
         val Pill = 999.dp
+    }
+
+    /**
+     * 动效令牌：全站只允许三档 + 两个特例。
+     *
+     * 之前 17 组不同弹簧参数散落在 12 个文件、83 处调用（0.55/280、0.65/260、0.7/280、
+     * 0.72/280、0.75/350、0.78/250、0.8/320、0.82/260 …），差值肉眼无法分辨，
+     * 却让「关动画」「统一手感」都无从下手。
+     */
+    object Motion {
+        /** 小元素：按钮、图标、副键、行内状态切换。约 120ms 落定，带一次轻微过冲。 */
+        fun <T> micro(): SpringSpec<T> = spring(dampingRatio = 0.85f, stiffness = 700f)
+
+        /** 整页 / 浮层进出。220ms，减速曲线，不做弹性。 */
+        fun <T> page(): TweenSpec<T> = tween(durationMillis = 220, easing = FastOutSlowInEasing)
+
+        /** 列表逐项错峰：第 n 项的启动延迟。 */
+        const val Stagger = 40L
+
+        /** 引导页入场专用，保留 1.1s（它是叙事节奏，不是交互反馈）。 */
+        fun <T> intro(): TweenSpec<T> = tween(durationMillis = 1100, easing = FastOutSlowInEasing)
     }
 
     /** 间距令牌：只允许 4 的倍数，取值集合固定为 4 / 8 / 12 / 16 / 24。 */

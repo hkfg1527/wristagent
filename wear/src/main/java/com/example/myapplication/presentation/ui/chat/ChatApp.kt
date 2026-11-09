@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +70,15 @@ fun WearAgentApp(
 
     // 网页控制台改设置后，界面必须立刻跟上：版本号一变就重读偏好
     val settingsRevision by SettingsChangeBus.revision.collectAsState()
+
+    // 网页端改设置会 bump 这个 revision：之前只有 animationsEnabled 读了它，
+    // 点阵网格间距等字段仍然是 remember 一次的快照，网页改完必须杀进程才生效。
+    LaunchedEffect(settingsRevision) {
+        if (settingsRevision > 0L) {
+            liveSpacingDp = preferences.matrixSpacingDp
+            viewModel.syncCompactMode(preferences.compactMode)
+        }
+    }
 
     // 主键输入方式提示只在本次启动播报一次：从设置页返回主界面不重复打扰
     var announceInputMode by remember { mutableStateOf(true) }

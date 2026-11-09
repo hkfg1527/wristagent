@@ -177,7 +177,7 @@ fun BottomInteractiveBlock(
     LaunchedEffect(collapsed) {
         if (collapsed && (isSplitExpanded || splitProgress.value > 0f)) {
             isSplitExpanded = false
-            splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(dampingRatio = 0.72f, stiffness = 280f)))
+            splitProgress.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.micro()))
         }
     }
 
@@ -221,13 +221,13 @@ fun BottomInteractiveBlock(
         else -> Wear.Size.Orb
     }
 
-    // 审批态按设计稿用 spring(0.7, 280) 变形；其余态保留原有弹簧参数
+    // 审批态按设计稿用 Wear.Motion.micro() 变形；其余态保留原有弹簧参数
     val morphSpring: AnimationSpec<Dp> = motionSpec(
         animationsEnabled,
         if (isApproval) {
-            spring(dampingRatio = 0.7f, stiffness = 280f)
+            Wear.Motion.micro()
         } else {
-            spring(dampingRatio = 0.72f, stiffness = 260f)
+            Wear.Motion.micro()
         }
     )
 
@@ -240,14 +240,14 @@ fun BottomInteractiveBlock(
     // 主键高度 52dp -> 36dp：变形成横向扁胶囊，比触控热区更扁
     val capsuleHeight by animateDpAsState(
         targetValue = if (isApproval) ApprovalCapsuleHeight else Wear.Size.Orb,
-        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.7f, stiffness = 280f)),
+        animationSpec = motionSpec(animationsEnabled, Wear.Motion.micro()),
         label = "capsuleStretchHeight"
     )
 
     // 底栏高度：常驻 [IdleBlockHeight]；审批态取 [ApprovalBlockHeight]，让滑块落在圆心下方约 48dp 处
     val blockHeight by animateDpAsState(
         targetValue = if (isApproval) ApprovalBlockHeight else IdleBlockHeight,
-        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.7f, stiffness = 280f)),
+        animationSpec = motionSpec(animationsEnabled, Wear.Motion.micro()),
         label = "bottomBlockHeight"
     )
 
@@ -277,10 +277,10 @@ fun BottomInteractiveBlock(
                                     if (isSplitExpanded) {
                                         // 反向横滑：收回两翼（方向不限）
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.micro()))
                                     } else {
                                         isSplitExpanded = true
-                                        splitProgress.animateTo(1f, motionSpec(animationsEnabled, spring(0.65f, 260f)))
+                                        splitProgress.animateTo(1f, motionSpec(animationsEnabled, Wear.Motion.micro()))
                                     }
                                 }
                             }
@@ -322,7 +322,7 @@ fun BottomInteractiveBlock(
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.micro()))
                                     }
                                     // 左副键只负责切换输入方式；"打开输入框"统一归主键，避免一按就被 IME 盖住提示
                                     if (mainInputType == MainInputType.VOICE) {
@@ -360,7 +360,7 @@ fun BottomInteractiveBlock(
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
-                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, spring(0.72f, 280f)))
+                                        splitProgress.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.micro()))
                                     }
                                     onRightActionClick()
                                 }
@@ -378,6 +378,9 @@ fun BottomInteractiveBlock(
             // 避免中间态停在一块"宽圆角矩形"上（那会和随后淡入的弧条同时出现，看起来像被拆成两个东西）。
             val collapseProgressRaw = collapseProgress.coerceIn(0f, 1f)
             val collapseFraction = collapseProgressRaw * collapseProgressRaw
+            // 收起态（< 0.5）时触摸归贴底白条：主键只剩 56×8dp 的视觉条，
+            // 但它的手势节点原本常驻，会和白条热区同时命中 —— 于是"展开底栏"和"开始录音"一起发生。
+            val isCollapsed = collapseFraction < 0.5f
             val keyWidth = lerpDp(CollapsedStripWidth, capsuleWidth, collapseFraction)
             val keyHeight = lerpDp(CollapsedStripHeight, Wear.Size.Orb, collapseFraction)
             val keyCorner = lerpDp(CollapsedStripCorner, Wear.Size.Orb / 2, collapseFraction)
@@ -393,7 +396,7 @@ fun BottomInteractiveBlock(
                         (if (mode == BottomBlockMode.RECORDING) Wear.Palette.TextPrimary else Wear.Palette.Orb)
                             .copy(alpha = collapseFraction)
                     )
-                    .pointerInput(isSplitExpanded) {
+                    .pointerInput(isSplitExpanded, isCollapsed) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val startX = down.position.x
@@ -435,7 +438,7 @@ fun BottomInteractiveBlock(
                                                 targetValue = 1f,
                                                 animationSpec = motionSpec(
                                                     animationsEnabled,
-                                                    spring(dampingRatio = 0.65f, stiffness = 260f)
+                                                    Wear.Motion.micro()
                                                 )
                                             )
                                         }
@@ -449,10 +452,12 @@ fun BottomInteractiveBlock(
                                                     targetValue = 0f,
                                                     animationSpec = motionSpec(
                                                         animationsEnabled,
-                                                        spring(dampingRatio = 0.72f, stiffness = 280f)
+                                                        Wear.Motion.micro()
                                                     )
                                                 )
                                             }
+                                        } else if (isCollapsed) {
+                                            // 收起态的轻触交给贴底白条，主键不抢
                                         } else if (mode == BottomBlockMode.RECORDING) {
                                             // 正在录音时单触：结束录音并触发
                                             onVoiceStopAndTrigger()
@@ -473,6 +478,12 @@ fun BottomInteractiveBlock(
                                 // 拖动期间独占指针流：不消费则 Wear 系统的"右滑返回"会把横向拖动抢成返回手势
                                 change.consume()
 
+                                // 上滑与长按在同一次触摸里竞争：慢速上滑时，长按 340ms 会先到期，
+                                // 于是整个手势被判成"录音"，设置页打不开（实测连续 3 次失败）。
+                                // 只要手指上移超过 8dp 就立刻取消长按计时，把这次触摸让给上滑判定。
+                                if (!isLongPressActive && deltaY < -8.dp.toPx()) {
+                                    longPressJob.cancel()
+                                }
                                 if (!isDraggingX && !isDraggingY && !isLongPressActive) {
                                     if (abs(deltaX) > 22.dp.toPx() && abs(deltaX) > abs(deltaY) * 1.4f) {
                                         isDraggingX = true
@@ -655,7 +666,7 @@ private fun ApprovalTrack(
                                             0f,
                                             motionSpec(
                                                 animationsEnabled,
-                                                spring(dampingRatio = 0.7f, stiffness = 280f)
+                                                Wear.Motion.micro()
                                             )
                                         )
                                     }

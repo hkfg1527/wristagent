@@ -108,7 +108,9 @@ class ChatViewModel(
      * 列表的滚动位置。同样必须跨屏存活：ChatScreen 切走即销毁，
      * ScalingLazyListState 跟着一起没，返回时列表会跳回顶部 —— 用户看到的是"镜头抽搐/内容错位"。
      */
-    var savedCenterItemIndex: Int = 0
+    // Int.MAX_VALUE 会被 ScalingLazyListState 夹到最后一项：冷启动直接落在最底部，
+    // 不再"先渲染顶部再滚到底"（那是首次 0 -> 列表末尾的定位过程）。
+    var savedCenterItemIndex: Int = Int.MAX_VALUE
         private set
     var savedCenterItemScrollOffset: Int = 0
         private set
@@ -116,6 +118,18 @@ class ChatViewModel(
     fun saveListPosition(centerItemIndex: Int, centerItemScrollOffset: Int) {
         savedCenterItemIndex = centerItemIndex
         savedCenterItemScrollOffset = centerItemScrollOffset
+    }
+
+    /**
+     * 设置里改「简洁模式」要立刻生效。
+     *
+     * 以前 compactMode 只在 init 时读一次，之后全仓没有任何回写路径 ——
+     * 打开开关后正文行高不变，必须杀进程重启。
+     */
+    fun syncCompactMode(enabled: Boolean) {
+        if (_uiState.value.compactMode != enabled) {
+            _uiState.update { it.copy(compactMode = enabled) }
+        }
     }
 
     init {
@@ -203,6 +217,8 @@ class ChatViewModel(
 
     /** 停止：取消引擎执行 + 拒绝挂起审批 + 放开审批闩锁。 */
     fun stopAgent() {
+        // 决策锁：塌缩动画期间"放行"已经生效，停止键不允许再把它改写成拒绝
+        if (_uiState.value.isApprovalCollapsing) return
         gateway.stop()
         pendingContinuation?.resume(false)
         pendingContinuation = null
@@ -349,6 +365,9 @@ class ChatViewModel(
 
     /** 拒绝 / 返回键退出审批：立刻交回 false，不走塌缩动画。 */
     fun rejectPending() {
+        // 决策锁：放行后的 220ms 塌缩窗口内按返回/点拒绝，会把已生效的"放行"改写成"拒绝"
+        // （危险命令被真正拒绝，与用户刚才的操作相反）。锁用已有的塌缩状态，不新增字段。
+        if (_uiState.value.isApprovalCollapsing) return
         pendingContinuation?.resume(false)
         pendingContinuation = null
         _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null) }
