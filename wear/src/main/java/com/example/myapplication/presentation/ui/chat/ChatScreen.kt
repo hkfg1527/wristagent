@@ -638,7 +638,10 @@ fun ChatScreen(
         // ================= 1. 全局唯一点阵坐标系 (仅活动状态可见) =================
         // 审批弹层的首帧最贵：全屏遮罩组合 + 模糊层 + 点阵切到审批绘制路径（红瀑）三件事同时发生。
         // 审批期间点阵直接让位成纯色底，把首帧的绘制预算全部留给遮罩，弹出不再卡一下。
-        if (animationsEnabled && !isApprovalFocus) {
+        // 滚动期间冻结背景：点阵的无限呼吸没有空闲退出条件，每帧要重绘数百个点，
+        // 和列表渲染叠加后 Slow UI thread 从 7 涨到 33（实测）。滚动时列表本身在动，
+        // 背景静止肉眼无感，但省掉整屏重绘。
+        if (animationsEnabled && !isApprovalFocus && !listState.isScrollInProgress) {
             UnifiedMatrixCanvas(
                 modifier = Modifier.fillMaxSize(),
                 approvalVisualState = state.agentState.approvalVisualState,
