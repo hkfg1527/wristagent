@@ -146,8 +146,8 @@ data class BodyTextGeometry(
 )
 
 /**
- * [ChatUiState.compactMode] 的几何映射（纯函数，唯一来源）：常规 20sp 行高 + 5dp 块间距，
- * 紧凑模式行高 20→18sp、块间距 5→1dp（减 4dp）。
+ * [ChatUiState.compactMode] 的几何映射（纯函数，唯一来源）：常规 22sp 行高 + 5dp 块间距，
+ * 紧凑模式行高 22→20sp、块间距 5→1dp（减 4dp）。
  *
  * 只做两组定点减法，不按比例缩放：按比例压行高会把中文行间墨距压到 3dp 以下、整段读成一堵灰墙
  * （行距令牌 [SettingsSpacingMath.BodyLineHeightSp] 的来历就是这个），而字号本身保持不变。
@@ -156,8 +156,8 @@ object ChatBodyGeometry {
     /** 常规行高：直接引用设置页的中文行距令牌（20sp），不另立第二个数值。 */
     const val RegularLineHeightSp = SettingsSpacingMath.BodyLineHeightSp
 
-    /** 紧凑行高：只压 2sp。 */
-    const val CompactLineHeightSp = 18f
+    /** 紧凑行高：只压 2sp，从常规行高派生 —— 行距令牌改一次这里自动跟，不会再漂。 */
+    const val CompactLineHeightSp = SettingsSpacingMath.BodyLineHeightSp - 2f
 
     /** 常规正文块间距（dp）：助手回合内多段正文之间。 */
     const val RegularBlockSpacingDp = 5f

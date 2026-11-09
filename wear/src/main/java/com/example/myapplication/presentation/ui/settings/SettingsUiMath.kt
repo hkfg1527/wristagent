@@ -260,7 +260,7 @@ object SettingsSpacingMath {
     const val ItemGapDp = 4f
 
     /** 正文 CJK 行高（sp）：14sp × 1.43，旧值 1.18 倍让中文行间墨距只剩 3.5dp。 */
-    const val BodyLineHeightSp = 20f
+    const val BodyLineHeightSp = 22f
 
     /** 组标题下方到本组首行之间的留白：旧值 4dp（[Wear.Space.Xs]），现在与行间距同档。 */
     const val SectionHeaderBottomDp = 8f

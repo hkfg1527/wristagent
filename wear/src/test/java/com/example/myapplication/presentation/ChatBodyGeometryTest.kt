@@ -16,14 +16,14 @@ class ChatBodyGeometryTest {
     @Test
     fun `常规模式沿用行距令牌_块间距 5dp`() {
         val body = ChatBodyGeometry.of(compactMode = false)
-        assertEquals(20f, body.lineHeightSp, 0.001f)
+        assertEquals(22f, body.lineHeightSp, 0.001f)
         assertEquals(5f, body.blockSpacingDp, 0.001f)
     }
 
     @Test
     fun `简洁模式行高 18sp_块间距减 4dp`() {
         val body = ChatBodyGeometry.of(compactMode = true)
-        assertEquals(18f, body.lineHeightSp, 0.001f)
+        assertEquals(20f, body.lineHeightSp, 0.001f)
         assertEquals(1f, body.blockSpacingDp, 0.001f)
     }
 
@@ -38,7 +38,7 @@ class ChatBodyGeometryTest {
             0.001f
         )
         // 常规行高就是设置页的中文行距令牌，不是另立的第二个数值
-        assertEquals(20f, ChatBodyGeometry.RegularLineHeightSp, 0.001f)
+        assertEquals(22f, ChatBodyGeometry.RegularLineHeightSp, 0.001f)
     }
 
     @Test

@@ -641,7 +641,7 @@ fun ChatScreen(
             .background(Wear.Palette.Bg)
     ) {
         // ================= 1. 全局唯一点阵坐标系 (仅活动状态可见) =================
-        if (animationsEnabled && matrixActive) {
+        if (animationsEnabled) {
             UnifiedMatrixCanvas(
                 modifier = Modifier.fillMaxSize(),
                 approvalVisualState = state.agentState.approvalVisualState,

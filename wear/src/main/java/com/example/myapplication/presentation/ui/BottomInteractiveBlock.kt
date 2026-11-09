@@ -183,8 +183,10 @@ fun BottomInteractiveBlock(
 
     // 录音按压缩放
     val orbScaleAnim by animateFloatAsState(
-        targetValue = if (mode == BottomBlockMode.RECORDING) 1.25f else 1.0f,
-        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.55f, stiffness = 280f)),
+        targetValue = if (mode == BottomBlockMode.RECORDING) 1.08f else 1.0f,
+        // 弹性手感：阻尼 0.62 保留一次轻微过冲，抬手时是"弹回来"而不是生硬复位；
+        // 旧值 1.25 倍在 52dp 键上等于放大 13dp，视觉上像整颗键"炸开"，改成 1.08 只做呼吸式起伏。
+        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.62f, stiffness = 420f)),
         label = "orbRecordScale"
     )
 

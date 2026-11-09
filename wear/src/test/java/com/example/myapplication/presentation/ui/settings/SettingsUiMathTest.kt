@@ -275,12 +275,13 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun bodyLineHeightGivesChineseTextFortyThreePercentLeading() {
-        // 这个令牌同时被聊天正文复用，放大设置页不该改动全站正文行高
-        assertEquals(20f, SettingsSpacingMath.BodyLineHeightSp, 0.001f)
-        val ratio = SettingsSpacingMath.BodyLineHeightSp / 14f
+    fun bodyLineHeightGivesChineseTextFortySevenPercentLeading() {
+        // 这个令牌同时被聊天正文复用：字号从 14sp 提到 15sp 后，行高同步 20 -> 22（1.47），
+        // 两处必须一起改，只改一边会让中文行间墨距塌成灰墙。
+        assertEquals(22f, SettingsSpacingMath.BodyLineHeightSp, 0.001f)
+        val ratio = SettingsSpacingMath.BodyLineHeightSp / 15f
         assertTrue("行距倍数 " + ratio, ratio >= 1.4f)
-        assertEquals(1.43f, ratio, 0.01f)
+        assertEquals(1.47f, ratio, 0.01f)
     }
 
     @Test

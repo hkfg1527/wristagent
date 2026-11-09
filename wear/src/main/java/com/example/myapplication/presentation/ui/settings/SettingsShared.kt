@@ -500,9 +500,8 @@ fun SettingsSectionHeader(text: String, center: Boolean = false) {
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(start = SettingsRowInset)
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
+        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -575,8 +574,9 @@ private fun SettingsCenteredRow(
             modifier = Modifier
                 .fillMaxWidth()
                 // 左对齐体系：只有右侧给行尾控件让位，左边界与组标题、分隔线共用同一条线
-                .padding(end = if (trailing == null) 0.dp else SettingsRowTailZone),
-            horizontalAlignment = Alignment.Start
+                // 对称尾区：左右各让出同宽，文字视觉中心仍落在屏幕中线
+                .padding(horizontal = if (trailing == null) 0.dp else SettingsRowTailZone),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             BasicText(
                 text = title,
@@ -637,13 +637,13 @@ fun SettingsNavRow(
 /** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
 private val SettingsRowTitleStyle: TextStyle
     @Composable get() = Wear.TextRowTitle.copy(
-        textAlign = TextAlign.Start,
+        textAlign = TextAlign.Center,
         fontWeight = FontWeight.Medium
     )
 
 /** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
 private val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Start)
+    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Center)
 
 /** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
 @Composable

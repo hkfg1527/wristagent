@@ -470,22 +470,18 @@ fun AgentSquareBlurBox(
 ) {
     // 回答不用卡片：底色 + 描边是两个最贵的装饰，它们把回复切成了一个盒子，
     // 还让"用户靠右 / 助手靠左"彻底看不出来。左侧一条 2dp 竖线就够标记"这是回答"。
-    val ruleColor = if (approvalVisualState == ApprovalVisualState.NONE) {
-        Wear.Palette.Border
-    } else {
-        borderColor
-    }
+    // 回答是一层"面"：实心 Surface + 发丝描边，把正文从背景里托起来。
+    // 曾经为了"去装饰"把面和边一起删掉，结果文字直接浮在纯黑上 —— 没有前后关系，也就没有空间感。
+    val shape = RoundedCornerShape(Wear.Radius.Card)
+    val edge = if (approvalVisualState == ApprovalVisualState.NONE) Wear.Palette.Border else borderColor
 
     Box(
         modifier = modifier
-            .drawBehind {
-                drawRect(
-                    color = ruleColor,
-                    topLeft = Offset.Zero,
-                    size = Size(2.dp.toPx(), size.height)
-                )
-            }
-            .padding(start = Wear.Space.Md, top = Wear.Space.Sm, bottom = Wear.Space.Sm)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Wear.Palette.Surface)
+            .border(1.dp, edge, shape)
+            .padding(Wear.Space.Md)
     ) {
         content()
     }
