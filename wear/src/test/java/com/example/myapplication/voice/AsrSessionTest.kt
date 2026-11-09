@@ -1,5 +1,6 @@
 package com.example.myapplication.voice
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
@@ -50,5 +51,30 @@ class AsrSessionTest {
         assertTrue("块体必须被执行", ran)
         assertFalse("自然结束后不应报告运行中", session.isRunning)
         assertFalse("自然结束不属于取消", session.isCancelled)
+    }
+
+    @Test
+    fun relaunchCancelsPreviousJob() = runTest {
+        val session = AsrSession(backgroundScope)
+        var firstCancelled = false
+
+        session.launch {
+            try {
+                awaitCancellation()
+            } catch (e: CancellationException) {
+                firstCancelled = true
+                throw e
+            }
+        }
+        testScheduler.advanceUntilIdle()
+        assertTrue("首次启动后应处于运行中", session.isRunning)
+
+        session.launch { awaitCancellation() }
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(
+            "重开必须先取消上一次的转写 Job：否则两条录音同时读麦克风，丢弃的那次也会把结果送上屏",
+            firstCancelled
+        )
     }
 }

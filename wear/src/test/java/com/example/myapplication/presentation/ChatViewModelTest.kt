@@ -13,6 +13,7 @@ import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.presentation.ui.BottomBlockMode
 import com.example.myapplication.presentation.ui.MainInputType
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -227,6 +228,38 @@ class ChatViewModelTest {
         assertEquals("审批结论必须交回放行", true, answer)
         assertEquals(false, vm.uiState.value.isApprovalCollapsing)
         assertEquals(BottomBlockMode.IDLE, vm.uiState.value.bottomBlockMode)
+        approval.join()
+    }
+
+    @Test
+    fun `放行后引擎立刻发起下一次审批时，第二次审批不被清空`() = runTest {
+        val gateway = FakeAgentGateway()
+        val vm = viewModel(gateway)
+        var first: Boolean? = null
+        var second: Boolean? = null
+
+        // Unconfined：结论一交回就地继续跑，把"引擎在别的线程上并发继续"的时序固定成可复现的确定顺序
+        val approval = launch(Dispatchers.Unconfined) {
+            first = gateway.requestApproval("adjust_matrix_density", matrixDensityRisk)
+            second = gateway.requestApproval("set_system_power_mode", matrixDensityRisk)
+        }
+        advanceUntilIdle()
+        assertEquals("adjust_matrix_density", vm.uiState.value.pendingApproval?.toolName)
+
+        vm.approvePending()
+        advanceUntilIdle()
+
+        assertEquals(true, first)
+        assertEquals(
+            "第二次审批必须留在屏幕上：清状态晚于交回结论会把新审批连同续体一起抹掉，引擎永远等不到结论",
+            "set_system_power_mode",
+            vm.uiState.value.pendingApproval?.toolName
+        )
+        assertEquals(BottomBlockMode.ACTION_ALLOW, vm.uiState.value.bottomBlockMode)
+
+        vm.rejectPending()
+        advanceUntilIdle()
+        assertEquals(false, second)
         approval.join()
     }
 
