@@ -4,9 +4,7 @@
     <string name="ui_common_delete">删除</string>
     <string name="ui_common_continue">继续</string>
     <string name="ui_common_skip">跳过</string>
-    <string name="ui_common_collapse">收起</string>
-    <string name="ui_common_expand">展开</string>
-
+        
     <!-- 会话抽屉。 -->
     <string name="ui_drawer_title">模型与会话管理</string>
     <string name="ui_drawer_current_model">当前模型</string>
@@ -41,8 +39,7 @@
     <string name="ui_thought_elapsed">· %1$ds</string>
     <string name="ui_tool_call_name">调用工具 %1$s</string>
     <string name="ui_tool_running">执行中...</string>
-    <string name="ui_generating">生成中...</string>
-    <string name="ui_tool_executed">已执行</string>
+        <string name="ui_tool_executed">已执行</string>
     <string name="ui_tool_args">参数: %1$s</string>
     <string name="ui_tool_result">结果: %1$s</string>
 

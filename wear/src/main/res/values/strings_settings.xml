@@ -1,7 +1,6 @@
 <resources>
     <!-- Settings entry titles, sub-page titles and status text (SettingsScreen + settings/ sections). -->
-    <string name="settings_title">Settings</string>
-    <string name="settings_model_and_service">Models &amp; Services</string>
+        <string name="settings_model_and_service">Models &amp; Services</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
@@ -47,8 +46,7 @@
     <string name="settings_max_tokens">Max output tokens</string>
     <string name="settings_transport">Transport protocol</string>
     <string name="settings_sse_on">Enable SSE streaming</string>
-    <string name="settings_sse_off">Turn streaming off</string>
-    <string name="settings_thought_group">Reasoning process</string>
+        <string name="settings_thought_group">Reasoning process</string>
     <string name="settings_show_thought_process">Show reasoning</string>
     <string name="settings_reasoning_effort">Reasoning effort</string>
     <string name="settings_reasoning_effort_low">Low</string>
@@ -194,8 +192,7 @@
     <string name="settings_netdiag_value_never">Not checked</string>
     <string name="settings_netdiag_value_ok">DNS ok · TLS ok</string>
     <string name="settings_netdiag_value_issues">%1$d issues</string>
-    <string name="settings_netdiag_repair_done">Handled %1$d plan(s)</string>
-    <string name="settings_netdiag_repair_ok">Fixed · %1$s</string>
+        <string name="settings_netdiag_repair_ok">Fixed · %1$s</string>
     <string name="settings_netdiag_repair_fail">Failed · %1$s</string>
     <string name="settings_netdiag_repair_manual">Manual · %1$s</string>
     <string name="settings_netdiag_root_off">No root: network fixes fall back to manual guidance</string>

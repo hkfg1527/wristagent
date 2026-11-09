@@ -1,7 +1,6 @@
 <resources>
     <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
-    <string name="settings_title">系统设置</string>
-    <string name="settings_model_and_service">模型与服务</string>
+        <string name="settings_model_and_service">模型与服务</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
@@ -47,8 +46,7 @@
     <string name="settings_max_tokens">最大输出 Token</string>
     <string name="settings_transport">传输协议</string>
     <string name="settings_sse_on">开启 SSE 流式</string>
-    <string name="settings_sse_off">关闭流式</string>
-    <string name="settings_thought_group">思考过程</string>
+        <string name="settings_thought_group">思考过程</string>
     <string name="settings_show_thought_process">显示思考过程</string>
     <string name="settings_reasoning_effort">推理努力</string>
     <string name="settings_reasoning_effort_low">低</string>
@@ -184,8 +182,7 @@
     <string name="settings_netdiag_value_never">未体检</string>
     <string name="settings_netdiag_value_ok">DNS 正常 · TLS 正常</string>
     <string name="settings_netdiag_value_issues">%1$d 项异常</string>
-    <string name="settings_netdiag_repair_done">已处理 %1$d 条预案</string>
-    <string name="settings_netdiag_repair_ok">已修复 · %1$s</string>
+        <string name="settings_netdiag_repair_ok">已修复 · %1$s</string>
     <string name="settings_netdiag_repair_fail">失败 · %1$s</string>
     <string name="settings_netdiag_repair_manual">需手动 · %1$s</string>
     <string name="settings_netdiag_root_off">无 root，网络类修复降级为手动指引</string>

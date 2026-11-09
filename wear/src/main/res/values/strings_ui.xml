@@ -4,9 +4,7 @@
     <string name="ui_common_delete">Delete</string>
     <string name="ui_common_continue">Continue</string>
     <string name="ui_common_skip">Skip</string>
-    <string name="ui_common_collapse">Collapse</string>
-    <string name="ui_common_expand">Expand</string>
-
+        
     <!-- Session drawer. -->
     <string name="ui_drawer_title">Models &amp; Sessions</string>
     <string name="ui_drawer_current_model">Current model</string>
@@ -41,8 +39,7 @@
     <string name="ui_thought_elapsed">· %1$ds</string>
     <string name="ui_tool_call_name">Call tool %1$s</string>
     <string name="ui_tool_running">Running...</string>
-    <string name="ui_generating">Generating...</string>
-    <string name="ui_tool_executed">Done</string>
+        <string name="ui_tool_executed">Done</string>
     <string name="ui_tool_args">Arguments: %1$s</string>
     <string name="ui_tool_result">Result: %1$s</string>
 
