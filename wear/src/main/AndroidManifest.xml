@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
@@ -67,6 +70,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-    </application>
+        <!-- 网页控制台必须由前台服务承载：绑在 Activity 生命周期上时，进程回收后端口立即消失，
+         手机侧表现为「加载很久然后失败」（实测 force-stop 后 17ms 关连接）。 -->
+    <service
+        android:name=".agent.remote.ConsoleService"
+        android:foregroundServiceType="specialUse"
+        android:exported="false">
+        <property
+            android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+            android:value="Local web console for on-device settings" />
+    </service>
+</application>
 
 </manifest>

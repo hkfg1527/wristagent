@@ -18,6 +18,7 @@ import com.example.myapplication.agent.AgentRepository
 import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.remote.ConsoleServer
+import com.example.myapplication.agent.remote.ConsoleService
 import com.example.myapplication.presentation.theme.MyApplicationTheme
 import com.example.myapplication.presentation.ui.chat.WearAgentApp
 
@@ -86,11 +87,12 @@ class MainActivity : ComponentActivity() {
         }
         handleIntent(intent)
         // 监听失败（端口全占）时 start() 不抛异常、port 保持 -1，App 照常可用
-        consoleServer.start()
+        // 走前台服务：Activity 销毁不再带走控制台
+        ConsoleService.start(this)
     }
 
     override fun onDestroy() {
-        consoleServer.stop()
+        // 不在这里 stop：前台服务自理，用户从设置页关闭开关时才停
         super.onDestroy()
     }
 
