@@ -107,8 +107,8 @@ fun SessionDrawer(
 
     AnimatedVisibility(
         visible = isOpen,
-        enter = fadeIn(tween(180)) + slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it },
-        exit = fadeOut(tween(160)) + slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it }
+        enter = fadeIn(Wear.Motion.base()) + slideInHorizontally(Wear.Motion.page()) { it },
+        exit = fadeOut(Wear.Motion.base()) + slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { it }
     ) {
         val listState = rememberScalingLazyListState()
         val drawerFocusRequester = remember { FocusRequester() }
@@ -138,7 +138,7 @@ fun SessionDrawer(
                                 // 退场朝手指实际拖拽的方向滑出，而不是固定向右
                                 val direction = if (offset >= 0f) 1f else -1f
                                 scope.launch {
-                                    dragOffsetX.animateTo(direction * screenWidthPx, tween(140))
+                                    dragOffsetX.animateTo(direction * screenWidthPx, Wear.Motion.quick())
                                     onClose()
                                 }
                             } else {

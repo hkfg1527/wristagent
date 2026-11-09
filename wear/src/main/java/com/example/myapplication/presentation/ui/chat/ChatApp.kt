@@ -119,11 +119,11 @@ fun WearAgentApp(
                     // 离开设置：设置页已先把各行逐行沉出，这里只需要一层很短的淡出盖住切换瞬间，
                     // 目标屏保持它原有的入场（主界面入场未改）
                     initialState == AppScreen.SETTINGS ->
-                        (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
+                        (slideInVertically(Wear.Motion.page()) { -it / 5 } + fadeIn(Wear.Motion.base()))
                             .togetherWith(fadeOut(tween(SettingsScreenVeilMs)))
                     else ->
-                        (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -it / 5 } + fadeIn(tween(180)))
-                            .togetherWith(slideOutVertically(tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180)))
+                        (slideInVertically(Wear.Motion.page()) { -it / 5 } + fadeIn(Wear.Motion.base()))
+                            .togetherWith(slideOutVertically(Wear.Motion.page()) { it } + fadeOut(Wear.Motion.base()))
                 }
             },
             label = "screenTransition"

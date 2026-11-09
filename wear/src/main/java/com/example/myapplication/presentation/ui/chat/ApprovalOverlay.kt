@@ -136,7 +136,7 @@ internal fun ApprovalFloatingLayer(
     // 只压暗 0.22：点阵保持可见，绿/红一律交给点阵自身的颜色插值，不再有整屏蒙色层
     val scrimAlpha by animateFloatAsState(
         targetValue = if (visible) ApprovalScrimAlpha else 0f,
-        animationSpec = motionSpec(animationsEnabled, tween(140)),
+        animationSpec = motionSpec(animationsEnabled, Wear.Motion.quick()),
         label = "approvalScrimAlpha"
     )
 
@@ -157,8 +157,8 @@ internal fun ApprovalFloatingLayer(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(motionSpec(animationsEnabled, tween(140))),
-        exit = fadeOut(motionSpec(animationsEnabled, tween(120))),
+        enter = fadeIn(motionSpec(animationsEnabled, Wear.Motion.quick())),
+        exit = fadeOut(motionSpec(animationsEnabled, Wear.Motion.quick())),
         modifier = modifier.fillMaxSize()
     ) {
         Box(

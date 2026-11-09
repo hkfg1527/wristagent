@@ -145,7 +145,7 @@ fun OnboardingScreen(
         AnimatedVisibility(
             visible = phase == 2,
             enter = fadeIn(tween(260)) + scaleIn(Wear.Motion.micro()),
-            exit = fadeOut(tween(200)) + scaleOut(Wear.Motion.micro())
+            exit = fadeOut(Wear.Motion.page()) + scaleOut(Wear.Motion.micro())
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -201,7 +201,7 @@ fun OnboardingScreen(
         AnimatedVisibility(
             visible = phase == 3,
             enter = fadeIn(tween(280)) + slideInVertically(Wear.Motion.micro()) { it / 3 },
-            exit = fadeOut(tween(200))
+            exit = fadeOut(Wear.Motion.page())
         ) {
             // 阶段内的"完成并进入主界面"自行写回输入框后再调用 onFinish；顶部叉号"跳过"直接调用 onFinish
             OnboardingConfigPhase(

@@ -168,7 +168,7 @@ fun ChatScreen(
     // 列表退场渐变：审批态 1f -> 35%，与遮罩同一条 180ms 曲线，不做硬切
     val listAlpha by animateFloatAsState(
         targetValue = if (isApprovalFocus) ApprovalListAlpha else 1f,
-        animationSpec = tween(180),
+        animationSpec = Wear.Motion.base(),
         label = "conversationListAlpha"
     )
 

@@ -87,6 +87,12 @@ object Wear {
         /** 小元素：按钮、图标、副键、行内状态切换。约 120ms 落定，带一次轻微过冲。 */
         fun <T> micro(): SpringSpec<T> = spring(dampingRatio = 0.85f, stiffness = 700f)
 
+        /** 微交互：按下反馈、行内淡入淡出、遮罩显隐的快速档。140ms。 */
+        fun <T> quick(): TweenSpec<T> = tween(durationMillis = 140, easing = FastOutSlowInEasing)
+
+        /** 过渡档：屏幕切换遮罩、卡片入场。180ms。 */
+        fun <T> base(): TweenSpec<T> = tween(durationMillis = 180, easing = FastOutSlowInEasing)
+
         /** 整页 / 浮层进出。220ms，减速曲线，不做弹性。 */
         fun <T> page(): TweenSpec<T> = tween(durationMillis = 220, easing = FastOutSlowInEasing)
 

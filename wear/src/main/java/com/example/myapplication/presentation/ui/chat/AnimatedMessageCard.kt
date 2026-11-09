@@ -31,7 +31,7 @@ internal fun AnimatedMessageCard(
             scale.animateTo(1f, Wear.Motion.micro())
         }
         launch {
-            alpha.animateTo(1f, tween(160))
+            alpha.animateTo(1f, Wear.Motion.base())
         }
     }
 
