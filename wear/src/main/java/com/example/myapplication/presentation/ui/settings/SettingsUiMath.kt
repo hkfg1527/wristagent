@@ -13,7 +13,6 @@ object SettingsLayoutMath {
      * 参考屏宽：192dp 是早期小屏的参考值，**不是真机**。
      * 真机 TicWatch Pro 5 = 466px @320dpi = 233dp。
      */
-    const val ReferenceScreenDp = 192f
 
     /** 左右安全边：圆屏最外侧不放任何内容。 */
     const val SideInsetDp = 12f

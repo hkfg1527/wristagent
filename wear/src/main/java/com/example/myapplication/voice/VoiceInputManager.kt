@@ -32,12 +32,6 @@ class VoiceInputManager(
     private var speechRecognizer: SpeechRecognizer? = null
     private val session = AsrSession(scope)
 
-    val sampleVoiceCommands = listOf(
-        "帮我检查手表的电量和当前天气。如果电量充足且天气晴朗，就把表盘点阵网格调整为微距14dp，并双击振动马达提醒我出门散步。",
-        "诊断当前电池电量和温控，如果正常，开启极致省电模式并短脉冲振动确认。",
-        "把表盘点阵网格密度调整为20dp宽广模式，并触发一次长振动。",
-        "查询当前本地系统时间和天气状况。"
-    )
 
     fun isRecognitionAvailable(): Boolean {
         return SpeechRecognizer.isRecognitionAvailable(context)

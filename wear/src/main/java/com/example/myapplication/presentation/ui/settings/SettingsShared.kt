@@ -115,7 +115,6 @@ fun settingsSideInset(): Dp {
 }
 
 /** 单行 44dp 触控热区之间的最小留白。 */
-val SettingsTouchGap: Dp = Wear.Space.Sm
 
 /** 行与行之间的唯一分隔物：1dp 细线，取代原来的"每行一张卡片"。 */
 private val SettingsDividerThickness = SettingsSpacingMath.HairlineDp.dp
