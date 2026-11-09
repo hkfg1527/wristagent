@@ -1,5 +1,7 @@
 package com.example.myapplication.agent.privilege
 
+import com.example.myapplication.agent.ShellPolicy
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -11,6 +13,6 @@ class DirectShell(private val timeoutMs: Long = DEFAULT_TIMEOUT_MS) : Privileged
     }
 
     companion object {
-        const val DEFAULT_TIMEOUT_MS = 15_000L
+        const val DEFAULT_TIMEOUT_MS = ShellPolicy.DEFAULT_TIMEOUT_MS
     }
 }

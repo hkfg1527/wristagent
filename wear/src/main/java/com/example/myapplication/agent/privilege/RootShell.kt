@@ -1,5 +1,7 @@
 package com.example.myapplication.agent.privilege
 
+import com.example.myapplication.agent.ShellPolicy
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -104,7 +106,7 @@ class RootShell(
     }
 
     companion object {
-        const val DEFAULT_TIMEOUT_MS = 15_000L
+        const val DEFAULT_TIMEOUT_MS = ShellPolicy.DEFAULT_TIMEOUT_MS
         const val AVAILABILITY_TIMEOUT_MS = 2_000L
         private const val ID_COMMAND = "id"
         private const val UNAVAILABLE = "root 不可用：未取得 su 会话"
