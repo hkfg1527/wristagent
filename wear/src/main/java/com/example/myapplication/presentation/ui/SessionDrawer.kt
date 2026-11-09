@@ -143,13 +143,13 @@ fun SessionDrawer(
                                 }
                             } else {
                                 scope.launch {
-                                    dragOffsetX.animateTo(0f, spring(0.75f, 350f))
+                                    dragOffsetX.animateTo(0f, Wear.Motion.micro())
                                 }
                             }
                         },
                         onDragCancel = {
                             scope.launch {
-                                dragOffsetX.animateTo(0f, spring(0.75f, 350f))
+                                dragOffsetX.animateTo(0f, Wear.Motion.micro())
                             }
                         },
                         onHorizontalDrag = { change, dragAmount ->

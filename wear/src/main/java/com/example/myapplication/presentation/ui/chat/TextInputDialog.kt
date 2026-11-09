@@ -92,7 +92,7 @@ internal fun TextInputDialog(
         // 关闭动画时直接落到 1f：浮起距离、缩放与遮罩同一条时间线，不会留下半透明的入场残影
         dialogEnter.animateTo(
             targetValue = 1f,
-            animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.78f, stiffness = 250f))
+            animationSpec = motionSpec(animationsEnabled, Wear.Motion.micro())
         )
     }
 

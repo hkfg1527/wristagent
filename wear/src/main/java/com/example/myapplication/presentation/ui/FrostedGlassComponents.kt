@@ -193,8 +193,8 @@ fun ThoughtPill(
         // 展开后的思考链：高度封顶 + 内部滚动，增量到达时自动跟到底
         AnimatedVisibility(
             visible = isExpanded,
-            enter = expandVertically(spring(dampingRatio = 0.65f, stiffness = 350f)) + fadeIn(),
-            exit = shrinkVertically(spring(dampingRatio = 0.75f, stiffness = 420f)) + fadeOut()
+            enter = expandVertically(Wear.Motion.micro()) + fadeIn(),
+            exit = shrinkVertically(Wear.Motion.micro()) + fadeOut()
         ) {
             Column(
                 modifier = Modifier
@@ -344,8 +344,8 @@ fun SpringColoredToolPill(
         // 弹性展开详情卡片
         AnimatedVisibility(
             visible = isExpanded,
-            enter = expandVertically(spring(dampingRatio = 0.65f, stiffness = 350f)) + fadeIn(),
-            exit = shrinkVertically(spring(dampingRatio = 0.75f, stiffness = 420f)) + fadeOut()
+            enter = expandVertically(Wear.Motion.micro()) + fadeIn(),
+            exit = shrinkVertically(Wear.Motion.micro()) + fadeOut()
         ) {
             Box(
                 modifier = Modifier

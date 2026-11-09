@@ -311,7 +311,7 @@ fun ChatScreen(
         collapseProgress.animateTo(
             targetValue = if (bottomBarMode == BottomBarMode.Collapsed) 0f else 1f,
             // 阻尼 0.62：只允许一次轻微过冲（有弹性但不来回弹两下）
-            animationSpec = spring(dampingRatio = 0.62f, stiffness = 320f)
+            animationSpec = Wear.Motion.micro()
         )
     }
 

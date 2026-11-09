@@ -1266,7 +1266,7 @@ private fun Modifier.pullDownDismissGesture(
                             }
                         }
                         pull > 0f -> scope.launch {
-                            animate(pull, 0f, animationSpec = spring(0.75f, 350f)) { value, _ ->
+                            animate(pull, 0f, animationSpec = Wear.Motion.micro()) { value, _ ->
                                 offsetPx = value
                             }
                         }

@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.chat
 
+import com.example.myapplication.presentation.ui.theme.Wear
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -26,7 +28,7 @@ internal fun AnimatedMessageCard(
 
     LaunchedEffect(key) {
         launch {
-            scale.animateTo(1f, spring(0.8f, 320f))
+            scale.animateTo(1f, Wear.Motion.micro())
         }
         launch {
             alpha.animateTo(1f, tween(160))

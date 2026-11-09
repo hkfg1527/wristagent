@@ -311,7 +311,7 @@ private fun FloatingApprovalText(
             return@LaunchedEffect
         }
         delay(ApprovalTextStaggerMs * slot)
-        enter.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 260f))
+        enter.animateTo(1f, Wear.Motion.micro())
     }
     Box(
         modifier = modifier.graphicsLayer {

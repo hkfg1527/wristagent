@@ -144,8 +144,8 @@ fun OnboardingScreen(
         // ================= 3. 阶段 2: 中心变圆，显示中间黑字与继续按钮 =================
         AnimatedVisibility(
             visible = phase == 2,
-            enter = fadeIn(tween(260)) + scaleIn(spring(dampingRatio = 0.75f, stiffness = 300f)),
-            exit = fadeOut(tween(200)) + scaleOut(spring(dampingRatio = 0.8f, stiffness = 400f))
+            enter = fadeIn(tween(260)) + scaleIn(Wear.Motion.micro()),
+            exit = fadeOut(tween(200)) + scaleOut(Wear.Motion.micro())
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -200,7 +200,7 @@ fun OnboardingScreen(
         // ================= 4. 阶段 3: 圆缩小回中心点，浮现“欢迎配置”，下方滑出 URL 配置框 =================
         AnimatedVisibility(
             visible = phase == 3,
-            enter = fadeIn(tween(280)) + slideInVertically(spring(dampingRatio = 0.8f, stiffness = 320f)) { it / 3 },
+            enter = fadeIn(tween(280)) + slideInVertically(Wear.Motion.micro()) { it / 3 },
             exit = fadeOut(tween(200))
         ) {
             // 阶段内的"完成并进入主界面"自行写回输入框后再调用 onFinish；顶部叉号"跳过"直接调用 onFinish
