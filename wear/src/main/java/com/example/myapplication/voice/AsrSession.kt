@@ -29,6 +29,9 @@ internal class AsrSession(private val scope: CoroutineScope) {
     val isRunning: Boolean get() = job?.isActive == true
 
     fun launch(block: suspend () -> Unit) {
+        // 重开必须先掐掉上一次的 Job：只覆盖引用的话，上一次的采集协程还活着，
+        // 两条录音同时读麦克风，被丢弃那次的回调仍会把结果送上屏。
+        job?.cancel()
         cancelled = false
         stopRequested = false
         job = scope.launch { block() }

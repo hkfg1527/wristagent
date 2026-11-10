@@ -3,6 +3,7 @@ package com.example.myapplication.voice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,11 +67,16 @@ class AsrSessionTest {
                 throw e
             }
         }
+        // coroutines-test 1.9 的 advanceUntilIdle 不推进 backgroundScope 里的任务：
+        // 只有在测试体让出调度（yield）时后台协程才会真正跑起来。这里补上让出，
+        // 断言不变 —— 否则第一次会话根本没启动，取消与否都观测不到。
         testScheduler.advanceUntilIdle()
+        yield()
         assertTrue("首次启动后应处于运行中", session.isRunning)
 
         session.launch { awaitCancellation() }
         testScheduler.advanceUntilIdle()
+        yield()
 
         assertTrue(
             "重开必须先取消上一次的转写 Job：否则两条录音同时读麦克风，丢弃的那次也会把结果送上屏",
