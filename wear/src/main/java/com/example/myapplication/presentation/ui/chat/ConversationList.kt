@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
@@ -171,6 +172,9 @@ internal fun ConversationList(
     ) {
         // 顶部不再保留大留白：正文允许与弧形时钟重叠，只由列表自身的边缘缩放淡出收敛
         // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形框，工具调用完整内嵌)
+        // 自适应对齐：同屏有用户消息时，回答靠左（对话感）；整屏只剩回答时，居中（独白感）
+        val hasUserPrompt = items.any { it is RenderableConversationItem.UserPrompt }
+
         items(
             count = items.size,
             key = { index -> itemKeyOf(items[index]) }
@@ -205,7 +209,7 @@ internal fun ConversationList(
                         // 思考胶囊、工具调用与逐字流式文本 100% 完整包含在卡片内部
                         Box(
                             modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.CenterStart
+                            contentAlignment = if (hasUserPrompt) Alignment.CenterStart else Alignment.Center
                         ) {
                             AgentSquareBlurBox(
                                 modifier = Modifier.widthIn(max = ConversationCardMaxWidth),
@@ -248,6 +252,7 @@ internal fun ConversationList(
                                                 SpringStreamingText(
                                                     text = block.content,
                                                     isStreaming = block.isStreaming,
+                                                    textAlign = if (hasUserPrompt) TextAlign.Start else TextAlign.Center,
                                                     // 单次刷新吐出十几字以上就是"过快"：不做逐字动画，只直接刷新文本
                                             
                                                 )

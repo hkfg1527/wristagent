@@ -495,17 +495,33 @@ fun SettingsSectionHeader(text: String, center: Boolean = false) {
     // 不再画前置短线：那 12dp 横线 + 8dp 空隙把标题文字推到 20dp，
     // 而行文字在 8dp，同一屏就出现两条左轴（实测偏差 12dp，肉眼可见）。
     // 分组现在只靠上方 16dp 留白区分（亲密性原则：组间 > 组内），标题与行共用同一条左边界。
-    BasicText(
-        text = text,
+    // 分组锚点：标题 + 下方一条 20dp 的强调色细线。
+    // 纯黑页面上全是灰字会显得空，一条 2dp 的色线给出「这一组的名字」这个结构信息，
+    // 且不占用行宽、不破坏居中轴（不能加左竖条，那会把重心推回左边）。
+    Column(
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        BasicText(
+            text = text,
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(Wear.Space.Xs))
+        Box(
+            modifier = Modifier
+                .size(width = SectionAccentWidth, height = SectionAccentThickness)
+                .background(Wear.Palette.Accent)
+        )
+    }
 }
+
+private val SectionAccentWidth = 20.dp
+private val SectionAccentThickness = 2.dp
 
 /** 行的左右内缩：组标题、行文字、分隔线共用这一条左边界。 */
 private val SettingsRowInset = Wear.Space.Sm
@@ -563,7 +579,11 @@ private fun SettingsCenteredRow(
                 if (onClick == null) {
                     Modifier
                 } else {
-                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                    // 可点的行给一块极浅底：纯黑上只有文字时，行与行之间靠一条发丝线区分，
+                    // 用户反馈「每个选项和每个选项区分不够大」。底块让每一行成为一块可点的区域。
+                    Modifier
+                        .background(Wear.Palette.Surface)
+                        .clickable(role = Role.Button, onClick = onClick)
                 }
             )
             .heightIn(min = SettingsSpacingMath.MinRowHeightDp.dp)

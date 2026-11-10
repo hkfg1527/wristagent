@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui
 
+import androidx.compose.ui.text.style.TextAlign
+
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.animation.AnimatedVisibility
@@ -394,7 +396,9 @@ fun SpringStreamingText(
     text: String,
     isStreaming: Boolean,
     modifier: Modifier = Modifier,
-    animateCursor: Boolean = true
+    animateCursor: Boolean = true,
+    // 自适应对齐：整屏只剩回答时居中，有用户消息时靠左（见 ConversationList 的 hasUserPrompt）
+    textAlign: TextAlign = TextAlign.Start
 ) {
     // 增量清洗 + 记忆化：
     //  1) StreamMarkdownStripper 只处理新增的完整行（否则 2000 字回复每 32ms 全量重算是 O(n²)）；
@@ -423,7 +427,7 @@ fun SpringStreamingText(
     BasicText(
         modifier = modifier,
         text = annotated,
-        style = Wear.TextBody
+        style = Wear.TextBody.copy(textAlign = textAlign)
     )
 }
 
