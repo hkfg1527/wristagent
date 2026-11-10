@@ -340,10 +340,18 @@ class ChatViewModel(
         _uiState.update { it.copy(isApprovalCollapsing = true) }
         workScope.launch {
             delay(approvalCollapseMs)
-            _uiState.update { it.copy(isApprovalCollapsing = false) }
-            pendingContinuation?.resume(true)
+            // 先摘掉本轮的状态与续体，最后才交回结论：resume 会就地继续引擎，
+            // 引擎可能立刻挂上第二次审批，晚一步清状态会把新审批连同它的续体一起抹掉。
+            val answered = pendingContinuation
             pendingContinuation = null
-            _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null) }
+            _uiState.update {
+                it.copy(
+                    isApprovalCollapsing = false,
+                    bottomBlockMode = BottomBlockMode.IDLE,
+                    pendingApproval = null
+                )
+            }
+            answered?.resume(true)
         }
     }
 
@@ -368,9 +376,11 @@ class ChatViewModel(
         // 决策锁：放行后的 220ms 塌缩窗口内按返回/点拒绝，会把已生效的"放行"改写成"拒绝"
         // （危险命令被真正拒绝，与用户刚才的操作相反）。锁用已有的塌缩状态，不新增字段。
         if (_uiState.value.isApprovalCollapsing) return
-        pendingContinuation?.resume(false)
+        // 与放行同一条顺序：先摘状态与续体再交回结论，否则引擎就地发起的下一次审批会被这里抹掉。
+        val answered = pendingContinuation
         pendingContinuation = null
         _uiState.update { it.copy(bottomBlockMode = BottomBlockMode.IDLE, pendingApproval = null) }
+        answered?.resume(false)
     }
 
     /** 审批滑块进度：0=拒绝，1=放行，由底栏回调驱动点阵着色。 */
