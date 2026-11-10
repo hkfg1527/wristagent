@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
@@ -64,6 +63,7 @@ import com.example.myapplication.presentation.ui.settings.SettingsRowDivider
 import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.SettingsEdgeScrim
 import com.example.myapplication.presentation.ui.settings.SettingsSectionHeader
+import com.example.myapplication.presentation.ui.settings.settingsScalingParams
 import com.example.myapplication.presentation.ui.settings.settingsSideInset
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
@@ -245,8 +245,9 @@ fun SettingsScreen(
                     // 关掉库自带的 rotary 与系统拉伸越界：表冠由上面的处理器接管，越界不做拉伸
                     rotaryScrollableBehavior = null,
                     overscrollEffect = null,
-                    // 曲率缩放关死：边缘行不再缩到 75% 并淡出。真机实测同一分隔线三种宽度
-                    // （168.0 / 142.0 / 126.0dp）、行标题左边缘从 41.0 漂到 52.5dp，唯一根因就是
+                    // 曲率缩放关死：edgeScale / edgeAlpha 都传 1，边缘行不再缩到 75% 并淡出，
+                    // 同一行在任何滚动位置尺寸一致（真机实测同一分隔线曾有 168.0 / 142.0 / 126.0dp 三种宽度）
+                    scalingParams = settingsScalingParams(),
                     contentPadding = PaddingValues(
                         // 左右内缩按圆周弦长推导（真机 32.5dp），不再写死 12dp
                         start = settingsSideInset(),

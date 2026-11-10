@@ -80,7 +80,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
@@ -295,7 +294,9 @@ fun SettingsSubPage(
             flingBehavior = ScrollableDefaults.flingBehavior(),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
-            // 曲率缩放关死：边缘行不再缩到 75% 并淡出，同一行在任何滚动位置尺寸一致 ——
+            // 曲率缩放关死：edgeScale / edgeAlpha 都传 1，边缘行不再缩到 75% 并淡出，
+            // 同一行在任何滚动位置尺寸一致
+            scalingParams = settingsScalingParams(),
             contentPadding = PaddingValues(
                 start = settingsSideInset(),
                 end = settingsSideInset(),
