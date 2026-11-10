@@ -604,6 +604,7 @@ fun ChatScreen(
         voiceInputManager.onListeningStateChanged = { listening ->
             viewModel.onVoiceListeningChanged(listening)
         }
+        voiceInputManager.onSpeechPartial = { partial -> viewModel.onVoicePartial(partial) }
         voiceInputManager.onSpeechResult = { recognizedText ->
             viewModel.onVoiceResult(recognizedText)
         }

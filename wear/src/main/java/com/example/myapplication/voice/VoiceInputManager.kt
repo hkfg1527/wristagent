@@ -26,6 +26,9 @@ class VoiceInputManager(
 ) {
 
     var onSpeechResult: ((String) -> Unit)? = null
+
+    /** 中间结果回调：仅在设置里打开「边说边显示」时会有值，由 ChatScreen 接到 ViewModel。 */
+    var onSpeechPartial: ((String) -> Unit)? = null
     var onSpeechError: ((String) -> Unit)? = null
     var onListeningStateChanged: ((Boolean) -> Unit)? = null
 
@@ -90,7 +93,15 @@ class VoiceInputManager(
                         }
                     }
 
-                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        // 边说边显示：把中间结果抛给上层，是否落屏由 asrLiveTranscript 闸门决定
+                        val matches = partialResults
+                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull()?.trim()
+                        if (!text.isNullOrBlank()) {
+                            onSpeechPartial?.invoke(text)
+                        }
+                    }
 
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
@@ -98,7 +109,8 @@ class VoiceInputManager(
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                // 必须为 true 才可能收到 onPartialResults；关掉开关时上层会忽略这些回调
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             }
             speechRecognizer?.startListening(intent)
         } catch (e: SecurityException) {
