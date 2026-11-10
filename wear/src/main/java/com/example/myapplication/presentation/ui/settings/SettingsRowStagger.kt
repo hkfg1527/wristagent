@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -31,25 +32,60 @@ private const val RowEnterDampingRatio = 0.75f
 private const val RowEnterStiffness = 320f
 
 /**
- * 「本屏内每行是否已经播过入场」的记账本。
+ * 入场记账本 + 入场窗口。
  *
- * ScalingLazyColumn 只保留可见项，滚出再滚回会重新组合；用屏幕级的集合而不是行内 remember，
- * 才能保证同一行在滚动复用后不再重播。集合是普通 MutableSet（不是 snapshot state）：
- * 它在组合期只写不读，不参与快照观察，也不会触发重组。
+ * 入场只属于「页面刚进来时首屏看得见的那批行」。ScalingLazyColumn 只保留可见项，屏幕外的行是
+ * **滚动把它带进视口时**才第一次组合的：只要第一次组合就播入场，手指一滑就会看到一串行同时从
+ * +24dp 处淡入浮起（表冠一格一行慢慢过，症状不明显），这正是「手指滑动时组件全部飞起来」。
+ *
+ * 所以窗口在页面首帧之后立刻关闭（[closeEntry]）：此后第一次组合的行直接落在终态，不播位移也不播淡入。
+ * 集合是普通 MutableSet（不是 snapshot state）：它在组合期只写不读，不参与快照观察，也不触发重组。
  */
 @Stable
 class SettingsRowStaggerState internal constructor() {
     private val playedIndices = mutableSetOf<Int>()
 
-    /** 首次调用返回 true（该行可以播入场），之后恒为 false。 */
-    internal fun claimEnter(index: Int): Boolean = playedIndices.add(index)
+    private var entryOpen = true
 
-    /** 诊断用：该行是否已播过入场。 */
+    /**
+     * 该行能不能播入场：返回 true 当且仅当入场窗口还开着，且这个 index 是第一次组合。
+     *
+     * 首个条件把「滚动带进视口的行」全部挡在外面；第二个条件保证同一行滚出再滚回不重播。
+     */
+    internal fun claimEnter(index: Int): Boolean {
+        val firstComposition = playedIndices.add(index)
+        return entryOpen && firstComposition
+    }
+
+    /** 关闭入场窗口：页面首屏已经组合完成，之后进来的行都是滚动带来的，不应该再有入场位移。 */
+    internal fun closeEntry() {
+        entryOpen = false
+    }
+
+    /** 诊断用：入场窗口是否还开着。 */
+    internal fun isEntryOpen(): Boolean = entryOpen
+
+    /** 诊断用：该行是否已经组合过（不代表它播过入场）。 */
     fun hasPlayedEnter(index: Int): Boolean = index in playedIndices
 }
 
+/**
+ * 页面级入场窗口：两帧之后关闭。
+ *
+ * 首屏可见项在首帧的 measure 里就组合完了（lazy 项的组合发生在 measure 阶段），
+ * 因此等满两帧再关窗，既不会切掉首屏那批行的入场，又保证之后才组合的行（一定是滚动进来的）
+ * 不再播入场。
+ */
 @Composable
-fun rememberSettingsRowStaggerState(): SettingsRowStaggerState = remember { SettingsRowStaggerState() }
+fun rememberSettingsRowStaggerState(): SettingsRowStaggerState {
+    val state = remember { SettingsRowStaggerState() }
+    LaunchedEffect(state) {
+        withFrameNanos { }
+        withFrameNanos { }
+        state.closeEntry()
+    }
+    return state
+}
 
 /**
  * 退场调度器：把"离开设置页"拆成两段 —— 先让各行沉下去，动画跑完才真正切屏。
@@ -80,6 +116,9 @@ class SettingsExitController internal constructor() {
     }
 
     internal suspend fun run() {
+        // 上一次退场跑完时 elapsed 停在总时长上：不归零就直接 animateTo(同一个值)
+        // 会立刻返回，第二次退场既没有动画，页面也会停在 alpha=0 的透明态。
+        elapsed.snapTo(0f)
         elapsed.animateTo(
             targetValue = SettingsRowExitTotalMs.toFloat(),
             animationSpec = tween(durationMillis = SettingsRowExitTotalMs, easing = LinearEasing)
@@ -105,6 +144,7 @@ fun rememberSettingsExitController(): SettingsExitController {
  * 不进组合、不进布局，滚动时也不会有额外开销。
  *
  * [index] 是内容行序号，用于算进场/退场延迟；分隔线传入其上一行的序号，跟着上一行一起浮。
+ * 入场是否播放由 [SettingsRowStaggerState] 的窗口决定，滚动带进来的行一律直接落位。
  */
 @Composable
 fun SettingsStaggeredRow(
