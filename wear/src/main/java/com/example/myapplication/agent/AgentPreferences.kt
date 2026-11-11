@@ -2,7 +2,6 @@ package com.example.myapplication.agent
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.voice.AsrLanguage
 import com.example.myapplication.voice.AsrProviderId
@@ -22,13 +21,6 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             return SecurityMode.values().firstOrNull { it.name == stored } ?: SecurityMode.STANDARD
         }
         set(value) = prefs.edit().putString("security_mode", value.name).apply()
-
-    var rightButtonAction: RightButtonAction
-        get() {
-            val stored = prefs.getString("right_button_action", RightButtonAction.MODEL_SWITCH.name)
-            return RightButtonAction.values().firstOrNull { it.name == stored } ?: RightButtonAction.MODEL_SWITCH
-        }
-        set(value) = prefs.edit().putString("right_button_action", value.name).apply()
 
     /** 唯一的密钥来源：用户在应用设置里填写，绝不参与构建。 */
     var apiKey: String
@@ -85,10 +77,6 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
     var maxContextTurns: Int
         get() = prefs.getInt("max_context_turns", 30)
         set(value) = prefs.edit().putInt("max_context_turns", value).apply()
-
-    var mainInputType: String
-        get() = prefs.getString("main_input_type", "VOICE") ?: "VOICE"
-        set(value) = prefs.edit().putString("main_input_type", value).apply()
 
     /** 默认 2048：300 会把正常长度的回复硬截断 */
     var maxOutputTokens: Int
@@ -170,10 +158,24 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         return true
     }
 
-    /** 清空记住清单：设置页与"全部忘记"共用。 */
+    /** 清空记住清单：设置页的显式"忘掉全部"入口与手势动作共用。 */
     fun forgetRememberedShellCommands() {
         rememberedShellCommands = ""
     }
+
+    /**
+     * 已记住的命令条数。
+     *
+     * 存在的理由是"上限不可见"：清单满 [MaxRememberedShellCommands] 条之后
+     * [rememberShellCommand] 会静默返回 false，用户以为记住了、其实命令照旧走审批。
+     * 设置面把当前条数与上限一起显示，满额时用 Warning 色点明。
+     */
+    val rememberedShellCommandCount: Int
+        get() = rememberedShellCommandList().size
+
+    /** 记住清单是否已满：满额后新的"记住"一律被拒绝。 */
+    val rememberedShellCommandsFull: Boolean
+        get() = rememberedShellCommandCount >= MaxRememberedShellCommands
 
     /** 语音转写总开关：关闭时上层直接给出中文提示，不发起任何录音或网络请求 */
     var asrEnabled: Boolean
@@ -203,11 +205,6 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean(KEY_ANIMATIONS_ENABLED, DEFAULT_ANIMATIONS_ENABLED)
         set(value) = prefs.edit().putBoolean(KEY_ANIMATIONS_ENABLED, value).apply()
 
-    /** 图片识别内测开关：只放开入口，识别服务尚未接入 */
-    var visionBetaEnabled: Boolean
-        get() = prefs.getBoolean(KEY_VISION_BETA_ENABLED, DEFAULT_VISION_BETA_ENABLED)
-        set(value) = prefs.edit().putBoolean(KEY_VISION_BETA_ENABLED, value).apply()
-
     /**
      * 子代理模式开关。可留但不等于生效：是否真的放行由 SubAgentPolicy.isEffective 判定
      * （只有专家模式 + 本开关打开才生效），避免"开关能拨但没效果"散落成两处判断。
@@ -228,22 +225,6 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
     var asrLiveTranscript: Boolean
         get() = prefs.getBoolean(KEY_ASR_LIVE_TRANSCRIPT, DEFAULT_ASR_LIVE_TRANSCRIPT)
         set(value) = prefs.edit().putBoolean(KEY_ASR_LIVE_TRANSCRIPT, value).apply()
-
-    /**
-     * 亮屏唤起自动语音输入。
-     *
-     * 字段保留只为兼容网页控制台写入与历史数据回显，**运行时没有任何读取点**：
-     * 亮屏即开麦会让音频链路在每次抬腕时唤醒，是手表续航的不可接受形态，该唤起路径已整体删除。
-     * 设置页把这一项画成只读「已移除」，不再提供可写开关。
-     */
-    var voiceWakeOnScreen: Boolean
-        get() = prefs.getBoolean(KEY_VOICE_WAKE_ON_SCREEN, DEFAULT_VOICE_WAKE_ON_SCREEN)
-        set(value) = prefs.edit().putBoolean(KEY_VOICE_WAKE_ON_SCREEN, value).apply()
-
-    /** 锁屏唤起自动语音输入：与 [voiceWakeOnScreen] 同理由，路径已删除，仅回显。 */
-    var voiceWakeOnLockScreen: Boolean
-        get() = prefs.getBoolean(KEY_VOICE_WAKE_ON_LOCK, DEFAULT_VOICE_WAKE_ON_LOCK)
-        set(value) = prefs.edit().putBoolean(KEY_VOICE_WAKE_ON_LOCK, value).apply()
 
     /** 允许模型调用 Provider 托管的联网搜索（关闭时只用内置检索）。 */
     var providerManagedSearchEnabled: Boolean
@@ -266,19 +247,63 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         set(value) = prefs.edit().putBoolean(KEY_AUTO_COMPRESS_CONTEXT, value).apply()
 
     /**
-     * 深色模式下使用纯黑背景。
+     * 压缩阈值：上下文占用超过"轮数预算 × 该比例"才开始压缩历史。
      *
-     * 当前令牌集的底色恒为 0xFF000000（见 WearTokens.Palette.Bg），因此这一项在表端是只读回显：
-     * 想改令牌值必须走设计侧审批，设置面不提供可写开关，避免出现"开关能拨但屏上无变化"。
+     * 写入时按 [CompressPolicy.clampThreshold] 夹到 0.3..0.95：网页控制台可以写任意浮点，
+     * 越界值落在盘上会让 [CompressPolicy.shouldCompress] 永远为真或永远为假，等于把功能关死。
      */
-    var usePureBlack: Boolean
-        get() = prefs.getBoolean(KEY_USE_PURE_BLACK, DEFAULT_USE_PURE_BLACK)
-        set(value) = prefs.edit().putBoolean(KEY_USE_PURE_BLACK, value).apply()
+    var historyCompressThreshold: Float
+        get() = prefs.getFloat(KEY_HISTORY_COMPRESS_THRESHOLD, DEFAULT_HISTORY_COMPRESS_THRESHOLD)
+        set(value) = prefs.edit()
+            .putFloat(KEY_HISTORY_COMPRESS_THRESHOLD, CompressPolicy.clampThreshold(value))
+            .apply()
 
-    /** 主题模式三档：表端只有深色令牌集，落在表端的是只读回显，真正的切换在网页端。 */
-    var themeMode: ThemeMode
-        get() = ThemeMode.fromStorage(prefs.getString(KEY_THEME_MODE, DEFAULT_THEME_MODE.storageKey))
-        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.storageKey).apply()
+    /** 工具审批策略三档：全部确认 / 只确认风险项 / 从不确认（网页 tools.toolApprovalPolicy 同键）。 */
+    var toolApprovalPolicy: ToolApprovalPolicy
+        get() = ToolApprovalPolicy.fromStorage(
+            prefs.getString(KEY_TOOL_APPROVAL_POLICY, DEFAULT_TOOL_APPROVAL_POLICY.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_TOOL_APPROVAL_POLICY, value.storageKey).apply()
+
+    /** 沙箱等级三档：只读 / 工作区 / 全权限，决定工具调用能触碰的范围（网页 dialog.sandboxLevel 同键）。 */
+    var sandboxLevel: SandboxLevel
+        get() = SandboxLevel.fromStorage(
+            prefs.getString(KEY_SANDBOX_LEVEL, DEFAULT_SANDBOX_LEVEL.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_SANDBOX_LEVEL, value.storageKey).apply()
+
+    /** 长按绑定：手势落点由 [GestureBindingGate] 解析，默认不绑定任何动作。 */
+    var longPressAction: GestureAction
+        get() = GestureAction.fromStorage(
+            prefs.getString(KEY_LONG_PRESS_ACTION, DEFAULT_LONG_PRESS_ACTION.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_LONG_PRESS_ACTION, value.storageKey).apply()
+
+    var doubleTapAction: GestureAction
+        get() = GestureAction.fromStorage(
+            prefs.getString(KEY_DOUBLE_TAP_ACTION, DEFAULT_DOUBLE_TAP_ACTION.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_DOUBLE_TAP_ACTION, value.storageKey).apply()
+
+    var sideKeyShortAction: GestureAction
+        get() = GestureAction.fromStorage(
+            prefs.getString(KEY_SIDE_KEY_SHORT_ACTION, DEFAULT_SIDE_KEY_SHORT_ACTION.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_SIDE_KEY_SHORT_ACTION, value.storageKey).apply()
+
+    var sideKeyLongAction: GestureAction
+        get() = GestureAction.fromStorage(
+            prefs.getString(KEY_SIDE_KEY_LONG_ACTION, DEFAULT_SIDE_KEY_LONG_ACTION.storageKey)
+        )
+        set(value) = prefs.edit().putString(KEY_SIDE_KEY_LONG_ACTION, value.storageKey).apply()
+
+    /** 四条手势绑定的整体快照：一次读完，避免解析出一半新一半旧的组合。 */
+    fun gestureBindings(): GestureBindings = GestureBindings(
+        longPress = longPressAction,
+        doubleTap = doubleTapAction,
+        sideKeyShort = sideKeyShortAction,
+        sideKeyLong = sideKeyLongAction
+    )
 
     /** 简洁模式：压掉次要装饰文案与次级说明行。 */
     var compactMode: Boolean
@@ -349,31 +374,48 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
 
+        /**
+         * 长期记忆条目的硬上限。
+         *
+         * remember_fact 是唯一的写入方，超限一律拒绝并回 memory_full —— 没有上限的记忆库
+         * 会把每一轮请求的系统提示词撑爆。控制台那条「记忆条数上限」滑杆尚未接线，
+         * 真正的闸门是这里这个常量。
+         */
+        const val MAX_MEMORY_FACTS = 50
+
         const val PreferencesName = "agent_prefs"
 
         const val KEY_AUTO_SPEAK_REPLIES = "autoSpeakReplies"
         const val KEY_ASR_LIVE_TRANSCRIPT = "asrLiveTranscript"
-        const val KEY_VOICE_WAKE_ON_SCREEN = "voiceWakeOnScreen"
-        const val KEY_VOICE_WAKE_ON_LOCK = "voiceWakeOnLockScreen"
         const val KEY_PROVIDER_MANAGED_SEARCH = "providerManagedSearchEnabled"
         const val KEY_DEFAULT_THINKING = "defaultThinking"
         const val KEY_MEMORY_ENABLED = "memoryEnabled"
         const val KEY_AUTO_COMPRESS_CONTEXT = "autoCompressContext"
-        const val KEY_USE_PURE_BLACK = "usePureBlack"
-        const val KEY_THEME_MODE = "themeMode"
         const val KEY_COMPACT_MODE = "compactMode"
 
         const val DEFAULT_AUTO_SPEAK_REPLIES = false
         const val DEFAULT_ASR_LIVE_TRANSCRIPT = true
-        const val DEFAULT_VOICE_WAKE_ON_SCREEN = false
-        const val DEFAULT_VOICE_WAKE_ON_LOCK = false
         const val DEFAULT_PROVIDER_MANAGED_SEARCH = false
         const val DEFAULT_DEFAULT_THINKING = true
         const val DEFAULT_MEMORY_ENABLED = true
         const val DEFAULT_AUTO_COMPRESS_CONTEXT = true
-        const val DEFAULT_USE_PURE_BLACK = true
         const val DEFAULT_COMPACT_MODE = false
-        val DEFAULT_THEME_MODE = ThemeMode.DARK
+
+        const val KEY_HISTORY_COMPRESS_THRESHOLD = "historyCompressThreshold"
+        const val KEY_TOOL_APPROVAL_POLICY = "toolApprovalPolicy"
+        const val KEY_SANDBOX_LEVEL = "sandboxLevel"
+        const val KEY_LONG_PRESS_ACTION = "longPressAction"
+        const val KEY_DOUBLE_TAP_ACTION = "doubleTapAction"
+        const val KEY_SIDE_KEY_SHORT_ACTION = "sideKeyShortAction"
+        const val KEY_SIDE_KEY_LONG_ACTION = "sideKeyLongAction"
+
+        const val DEFAULT_HISTORY_COMPRESS_THRESHOLD = CompressPolicy.DefaultThreshold
+        val DEFAULT_TOOL_APPROVAL_POLICY = ToolApprovalPolicy.RISKY
+        val DEFAULT_SANDBOX_LEVEL = SandboxLevel.FULL
+        val DEFAULT_LONG_PRESS_ACTION = GestureAction.NONE
+        val DEFAULT_DOUBLE_TAP_ACTION = GestureAction.NONE
+        val DEFAULT_SIDE_KEY_SHORT_ACTION = GestureAction.NONE
+        val DEFAULT_SIDE_KEY_LONG_ACTION = GestureAction.NONE
 
         const val KEY_ASR_ENABLED = "asr_enabled"
         const val KEY_ASR_PROVIDER = "asr_provider"
@@ -394,26 +436,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val MaxRememberedShellCommands = 20
 
         const val KEY_ANIMATIONS_ENABLED = "animationsEnabled"
-        const val KEY_VISION_BETA_ENABLED = "vision_beta_enabled"
         const val KEY_PROVIDER_PROFILES = "provider_profiles"
         const val KEY_SUB_AGENT_ENABLED = "subAgentEnabled"
 
         const val DEFAULT_ANIMATIONS_ENABLED = true
-        const val DEFAULT_VISION_BETA_ENABLED = false
         const val DEFAULT_SUB_AGENT_ENABLED = false
-    }
-}
-
-/** 主题模式三档：跟随系统 / 深色 / 浅色。存储值即枚举名，未知值一律回退深色。 */
-enum class ThemeMode(val storageKey: String) {
-    SYSTEM("SYSTEM"),
-    DARK("DARK"),
-    LIGHT("LIGHT");
-
-    companion object {
-        /** 未知 / 空 / 大小写不符一律回退 [DARK]：宁可停在确定可用的深色，也不猜。 */
-        fun fromStorage(raw: String?): ThemeMode =
-            values().firstOrNull { it.storageKey == raw } ?: DARK
     }
 }
 

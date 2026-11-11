@@ -1,5 +1,7 @@
 package com.example.myapplication.agent.privilege
 
+import com.example.myapplication.agent.ShellPolicy
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.ServiceConnection
@@ -140,7 +142,7 @@ class ShizukuShell(
             .version(SERVICE_VERSION)
 
     companion object {
-        const val DEFAULT_TIMEOUT_MS = 15_000L
+        const val DEFAULT_TIMEOUT_MS = ShellPolicy.DEFAULT_TIMEOUT_MS
         const val BIND_TIMEOUT_MS = 5_000L
         const val PROCESS_NAME_SUFFIX = "privilege"
         const val SERVICE_VERSION = 1

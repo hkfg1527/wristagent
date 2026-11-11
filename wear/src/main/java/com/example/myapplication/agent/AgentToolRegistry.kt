@@ -8,7 +8,10 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.example.myapplication.agent.contract.AgentMemory
+import com.example.myapplication.agent.contract.MemoryFactBook
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.agent.mcp.McpToolBinding
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -39,6 +42,16 @@ class AgentToolRegistry(
     }
 
     /**
+     * 长期记忆仓储由调度器注入：写入方与系统提示词的重建必须落在**同一个**仓储上，
+     * 否则 remember_fact 写进去的内容要等冷启动才会进上下文。
+     */
+    private var memory: AgentMemory? = null
+
+    fun bindMemory(value: AgentMemory) {
+        memory = value
+    }
+
+    /**
      * run_subagent 的执行体由调度器注入：嵌套循环需要网络层与工具执行层，注册表自己不具备。
      * 参数 parentDepth 由调用方给（顶层循环恒为 0），子代理能否再下钻由 SubAgentPolicy 判定。
      */
@@ -46,6 +59,18 @@ class AgentToolRegistry(
 
     fun bindSubAgentRunner(runner: suspend (task: String, focus: String?, parentDepth: Int) -> JSONObject) {
         subAgentRunner = runner
+    }
+
+    /**
+     * MCP 远端工具：开关关闭时清单里一个都没有，也不会发起任何连接；
+     * 开关打开时后台做一次 initialize + tools/list，远端工具以 mcp_ 前缀进本地清单。
+     * 懒建：绑定前 preferences 还是空，构造顺序不影响这里的判定。
+     */
+    internal val mcpTools: McpToolBinding by lazy {
+        McpToolBinding(
+            endpointSource = { preferences?.mcpEndpoint ?: "" },
+            enabledSource = { preferences?.isMcpEnabled ?: false }
+        )
     }
 
     // 观察外部配置或 UI 变化的回调
@@ -202,10 +227,18 @@ class AgentToolRegistry(
             )
         }
 
+        // 长期记忆写入方：总开关关掉时连入口都不给（关掉的开关不能指望模型自觉），
+        // 真被旧清单里残留的调用打到，executeRememberFact 还会再拒一次
+        if (preferences?.memoryEnabled ?: AgentPreferences.DEFAULT_MEMORY_ENABLED) {
+            all.add(memoryToolDefinition())
+        }
+
         // 特权工具常驻：能力面不靠设置开关裁剪，靠执行前的审批闸门约束
         all.addAll(privilegedToolDefinitions())
         // 自写工具每次现读账本：define_tool 落盘后下一轮请求立刻出现在清单里
         selfDefinedTools().forEach { all.add(it.toToolDefinition()) }
+        // MCP 远端工具：只读缓存，后台刷新；与内置工具重名的一律让位（前缀 mcp_ 兜住来源区分）
+        all.addAll(mcpTools.toolDefinitions(all.map { it.name }.toSet()))
 
         // 子代理：只有专家模式 + 开关打开才整条出现；其余模式下不是灰显，而是根本不在清单里
         all.addAll(
@@ -222,6 +255,11 @@ class AgentToolRegistry(
      * 执行指定工具
      */
     suspend fun executeTool(call: ToolCall): ToolResult {
+        // MCP 远端工具走独立分支：失败已经被翻译成结构化回执，不经过内置工具这条链路。
+        // 同名的自写工具优先：define_tool 允许 mcp_ 开头的名字，注册表里已有它就按已有处理。
+        if (mcpTools.isMcpToolName(call.name) && selfDefinedTool(call.name) == null) {
+            return mcpTools.toolResult(call.id, call.name, call.arguments)
+        }
         return try {
             val args = call.parseArgs()
             val resultJson = when (call.name) {
@@ -234,6 +272,7 @@ class AgentToolRegistry(
                 "query_time_weather" -> executeQueryTimeWeather(args.optString("location", "本地"))
                 "web_search" -> executeWebSearch(args.optString("query", ""))
                 SearchToolGate.TOOL_PROVIDER_SEARCH -> executeProviderWebSearch(args.optString("query", ""))
+                ShellPolicy.TOOL_REMEMBER_FACT -> executeRememberFact(args)
                 ShellPolicy.TOOL_RUN_SHELL -> executeRunShell(args)
                 ShellPolicy.TOOL_DEFINE_TOOL -> executeDefineTool(args)
                 ShellPolicy.TOOL_LIST_TOOLS -> executeListTools()
@@ -255,13 +294,19 @@ class AgentToolRegistry(
                 isError = false
             )
         } catch (e: Exception) {
+            // 错误回执自己不许再炸：宿主 org.json 退化（单测桩 / 极端裁剪）时 toString() 会返回 null，
+            // 那会把"工具执行失败"升级成"调度器抛异常"。兜底成一行纯文本，语义与结构化回执一致。
+            val detail = runCatching {
+                JSONObject().apply {
+                    put("status", "error")
+                    put("message", e.localizedMessage ?: "执行异常")
+                }.toString()
+            }.getOrNull()
             ToolResult(
                 toolCallId = call.id,
                 toolName = call.name,
-                output = JSONObject().apply {
-                    put("status", "error")
-                    put("message", e.localizedMessage ?: "执行异常")
-                }.toString(),
+                output = detail?.takeIf { it.isNotBlank() }
+                    ?: ("tool_failed: " + e.javaClass.simpleName + " " + (e.localizedMessage ?: "执行异常")),
                 isError = true
             )
         }
@@ -588,6 +633,81 @@ class AgentToolRegistry(
             }
         )
     )
+
+    // ==================== 长期记忆写入方 ====================
+
+    /**
+     * remember_fact 的工具声明：显式记住一条长期偏好。
+     *
+     * 做成显式工具而不是后台隐式抽取，理由是模型记了什么必须**可解释、可撤销**：
+     * 每一次写入都过审批页（[ShellPolicy.requiresApprovalAlways] 的强制档），
+     * 主人当场就能看见要记住的原文并拒绝；记住的内容也能在设置里一键清空。
+     */
+    private fun memoryToolDefinition(): ToolDefinition = ToolDefinition(
+        name = ShellPolicy.TOOL_REMEMBER_FACT,
+        description = "把一条长期偏好/固定设定写进长期记忆库：写进去的内容之后每一轮请求都会" +
+            "出现在系统提示词里，不需要主人重复交代。单条不超过 " + MemoryFactBook.MAX_FACT_LENGTH +
+            " 字，重复的条目会被去重，清单上限 " + AgentPreferences.MAX_MEMORY_FACTS +
+            " 条。每次写入都会弹审批页，要记住的原文给主人过目并可由主人当场拒绝",
+        parametersSchema = JSONObject().apply {
+            put("type", "object")
+            val props = JSONObject()
+            props.put(
+                "fact",
+                JSONObject().apply {
+                    put("type", "string")
+                    put("description", "要记住的一条事实，写成陈述句，例如「主人偏好中文回复，讨厌客套话」")
+                }
+            )
+            put("properties", props)
+            put("required", JSONArray(listOf("fact")))
+        }
+    )
+
+    /** remember_fact 要落盘的那条内容：审批页与工具小胶囊都读它，避免两处各解析一遍入参。 */
+    fun memoryFactOf(call: ToolCall): String {
+        if (call.name != ShellPolicy.TOOL_REMEMBER_FACT) return ""
+        return MemoryFactBook.normalize(call.parseArgs().optString("fact", ""))
+    }
+
+    /**
+     * 真正落盘：去重与上限都在 [MemoryFactBook] 里，这里只负责把结局翻成结构化回执。
+     * 失败形状与其它工具一致（status=error + error_type + message），isError 恒为 false。
+     */
+    private fun executeRememberFact(args: JSONObject): JSONObject {
+        if (!(preferences?.memoryEnabled ?: AgentPreferences.DEFAULT_MEMORY_ENABLED)) {
+            return errorJson("memory_disabled", "长期记忆总开关已关闭，先打开再记")
+        }
+        val store = memory ?: return errorJson("memory_unavailable", "长期记忆仓储尚未接线")
+        val result = store.rememberFact(args.optString("fact", ""), AgentPreferences.MAX_MEMORY_FACTS)
+        return when (result.status) {
+            MemoryFactBook.Status.ADDED -> JSONObject().apply {
+                put("status", "success")
+                put("fact", result.fact)
+                put("count", result.count)
+                put("max", AgentPreferences.MAX_MEMORY_FACTS)
+                put("message", "已写入长期记忆，下一轮请求的系统提示词里就会带上它")
+            }
+
+            MemoryFactBook.Status.DUPLICATE -> JSONObject().apply {
+                put("status", "duplicate")
+                put("fact", result.fact)
+                put("count", result.count)
+                put("max", AgentPreferences.MAX_MEMORY_FACTS)
+                put("message", "这条已经在长期记忆里，未重复写入")
+            }
+
+            MemoryFactBook.Status.FULL -> errorJson(
+                "memory_full",
+                "长期记忆已达上限 " + AgentPreferences.MAX_MEMORY_FACTS + " 条，先清空或删旧条目再记"
+            )
+
+            MemoryFactBook.Status.INVALID -> errorJson(
+                "invalid_fact",
+                "记忆内容不可为空，且单条不超过 " + MemoryFactBook.MAX_FACT_LENGTH + " 字"
+            )
+        }
+    }
 
     private suspend fun executeRunShell(args: JSONObject): JSONObject {
         val command = args.optString("command", "")

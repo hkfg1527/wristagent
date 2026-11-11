@@ -2,7 +2,6 @@ package com.example.myapplication.agent
 
 import com.example.myapplication.presentation.ErrorMessage
 
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -51,8 +50,20 @@ class AgentDispatcher(
 ) {
     private val TAG = "AgentDispatcher"
     private val memory = AgentMemory(context)
+
+    /**
+     * 会话系统提示词的装配闸门：记忆集合变了才重装（见 [SessionSystemPrompt]）。
+     * 两个回调读的都是"现读"值，因此 remember_fact 一旦落盘，下一次 sync 就能看见新内容。
+     */
+    private val sessionPrompt = SessionSystemPrompt(
+        revision = { memoryPromptRevision(preferences.memoryEnabled, memory.longTermNotes) },
+        assemble = { composeSystemPrompt() }
+    )
+
     private val guardrail = SecurityGuardrail()
     private val conversationHistory = mutableListOf<ChatMessage>()
+    // 手势动作的执行点：按键层只入队，副作用统一在这里落地（见 GestureRuntime.applyDrained）
+    private val gestureRuntime = GestureRuntime(preferences)
 
     // 审批挂起函数：返回 true 为允许，false 为拒绝。参数包含工具名、动作说明、风险评估
     var onRequireConfirmation: (suspend (toolName: String, actionText: String, risk: RiskAssessment) -> Boolean)? = null
@@ -78,6 +89,8 @@ class AgentDispatcher(
         // 工具层要读自写工具账本与记住清单，也要能执行特权命令：在这里一次接好线
         toolRegistry.bindPreferences(preferences)
         toolRegistry.bindShellRunner(PrivilegeShellRunner(privilege))
+        // 记忆仓储同一个实例交给工具层：remember_fact 写的就是下面系统头读到的那份
+        toolRegistry.bindMemory(memory)
         // run_subagent 的执行体要用网络层 + 工具执行层，只有调度器具备：把嵌套循环接到工具层上
         toolRegistry.bindSubAgentRunner { task, focus, parentDepth ->
             subAgentRunner.run(
@@ -110,49 +123,59 @@ class AgentDispatcher(
             } else "未知"
         }.getOrDefault("未知")
 
-        val clipSnippet = runCatching {
-            val clipManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val item = clipManager?.primaryClip?.getItemAt(0)
-            item?.text?.toString()?.take(60) ?: "空"
-        }.getOrDefault("空")
-
+        // 剪贴板遥测已删除（ISSUES E6）：Android 10+ 只有在持有窗口焦点（或是默认输入法/助手）时
+        // 才拿得到 primaryClip，而这里只在系统提示词构建时（Activity 的 onCreate 阶段、
+        // 窗口尚未获得焦点）读一次，那一行的值结构上永远是「空」——留一段恒空的假遥测
+        // 只会让模型误以为它知道剪贴板。
         return """
         [宿主物理环境与实时感知 Telemetry]:
         - 当前精准系统时刻: $nowStr
         - 宿主设备物理形态: Wear OS 圆屏穿戴设备（圆形表盘；具体型号不写死，避免告知模型错误事实）
         - 电池遥测状态: $batteryLevel
-        - 剪贴板最新文字: "$clipSnippet"
-        在回答主人关于时间、日期、电量或刚才复制的内容时，直接引用上述客观事实，无需重复反问。
+        在回答主人关于时间、日期或电量时，直接引用上述客观事实，无需重复反问。
         """.trimIndent()
     }
 
+    /** 身份 / 能力 / 纪律 / 边界四段放在资源里（values 与 values-zh 各一份），长记忆头与遥测固定在最前面。 */
+    private fun composeSystemPrompt(): String = AgentSystemPrompt.compose(
+        sections = AgentSystemPrompt.SECTION_RES_IDS.map { resId ->
+            runCatching { context.getString(resId) }.getOrDefault("")
+        },
+        // memoryEnabled 关掉时连记忆头都不拼：长期笔记因此也不会进入上下文
+        memoryHeader = MemoryInjection.header(preferences.memoryEnabled, memory.buildSystemMemoryHeader()),
+        telemetryBlock = buildDynamicTelemetryBlock(),
+        customPrompt = preferences.customSystemPrompt
+    )
+
+    /**
+     * 新会话的系统头：资源段与自定义提示词都可能刚改过，因此强制重装一次。
+     * 同一会话内的轮间走 [syncSystemMessageWithMemory]，只在记忆集合变化时重装。
+     */
     private fun initSystemMessage() {
         conversationHistory.clear()
-        // 身份 / 能力 / 纪律 / 边界四段放在资源里（values 与 values-zh 各一份），
-        // 长记忆头与实时遥测固定在最前面；customSystemPrompt 非空时整体替换四段。
-        val sections = AgentSystemPrompt.SECTION_RES_IDS.map { resId ->
-            runCatching { context.getString(resId) }.getOrDefault("")
-        }
-        val systemPrompt = AgentSystemPrompt.compose(
-            sections = sections,
-            // memoryEnabled 关掉时连记忆头都不拼：长期笔记因此也不会进入上下文
-            memoryHeader = MemoryInjection.header(preferences.memoryEnabled, memory.buildSystemMemoryHeader()),
-            telemetryBlock = buildDynamicTelemetryBlock(),
-            customPrompt = preferences.customSystemPrompt
-        )
-        conversationHistory.add(ChatMessage(role = AgentRole.SYSTEM, content = systemPrompt))
+        sessionPrompt.sync(conversationHistory, force = true)
     }
 
+    /**
+     * 每轮请求前的记忆同步。
+     *
+     * 系统头原本只在 [initSystemMessage] 装配一次，于是同一会话里 remember_fact 新写进去的
+     * 记忆要等重开会话才进上下文 —— 这就是"记忆打开了却什么都没记住"。修订键没变时
+     * [SessionSystemPrompt.sync] 直接返回 false，不做任何字符串拼装。
+     */
+    private fun syncSystemMessageWithMemory() {
+        if (sessionPrompt.sync(conversationHistory)) {
+            Log.i(TAG, "长期记忆已变化，重建系统提示词")
+        }
+    }
+
+    /** 清空长期记忆并按新会话重建系统头（与既有"清空即重置"的语义保持一致）。 */
     fun clearLongTermMemory() {
         memory.longTermNotes = ""
         initSystemMessage()
     }
 
-    fun getMemoryFactCount(): Int {
-        val notes = memory.longTermNotes
-        if (notes.isBlank()) return 0
-        return notes.split("\n", ";", "；").count { it.isNotBlank() }
-    }
+    fun getMemoryFactCount(): Int = memory.facts().size
 
     fun getRegisteredTools(): List<ToolDefinition> = toolRegistry.getToolDefinitions()
 
@@ -204,6 +227,11 @@ class AgentDispatcher(
             onStateUpdate(state)
             return@withContext
         }
+
+        // 空闲时按下的手势只能在这里结算：整批 drain 清空队列，其中的终止被丢弃 ——
+        // 此刻还没有任务可终止，拿上一次按键去打断刚起来的任务就是误伤；
+        // 切模型 / 忘掉清单则在第一次请求之前生效，于是本任务的第一个请求就用新模型。
+        gestureRuntime.applyDrained(GestureRequestQueue.drain())
 
         executeInterleavedApiLoop(state, onStateUpdate)
     }
@@ -299,7 +327,12 @@ class AgentDispatcher(
 
                 // 遍历执行工具
                 for (call in currentCalls) {
-                    if (isCancelled) {
+                    // 手势 / 侧键绑定的整批动作在这里落地：drain 是取走语义，同一批每个动作只执行一次，
+                    // 于是长按停止不会连带把下一个任务在开头就打断；切模型 / 忘掉清单也在这里真正执行，
+                    // 否则按键只是把动作投进一个没人消费的队列（假开关）。先执行其余动作、再判终止，
+                    // 理由见 GestureRuntime.applyDrained。
+                    val gestures = gestureRuntime.applyDrained(GestureRequestQueue.drain())
+                    if (isCancelled || gestures.stopTurn) {
                         handleCancelledTools(currentCalls)
                         currentState = currentState.copy(
                             isThinking = false,
@@ -315,10 +348,13 @@ class AgentDispatcher(
                     // 特权工具（run_shell / 自写工具 / define_tool）绕开通用分级闸门，走下面的强制审批链
                     val forcedApproval = toolRegistry.requiresApprovalAlways(call.name)
                     val shellCommand = toolRegistry.shellCommandOf(call)
-                    val actionDesc = if (shellCommand.isNullOrBlank()) {
-                        "执行 [" + call.name + "]"
-                    } else {
-                        "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+                    val rememberedFact = toolRegistry.memoryFactOf(call)
+                    // 审批页要显示"到底要记住什么"：长期记忆写入的原文比工具名有用得多
+                    val actionDesc = when {
+                        !shellCommand.isNullOrBlank() ->
+                            "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+                        rememberedFact.isNotEmpty() -> "记住长期偏好：「" + rememberedFact + "」"
+                        else -> "执行 [" + call.name + "]"
                     }
 
                     // A. 致命黑名单硬拦截：只对普通工具生效。
@@ -345,7 +381,32 @@ class AgentDispatcher(
                     // B1 特权 shell 命令：命令原文进审批页，破坏性命令永远要人批；
                     // B2 define_tool（以及命令为空的 run_shell）：能力面变更与参数错误同样强制审批；
                     // B3 其余工具沿用原分级闸门（AI 风险等级 + 安全模式）。
-                    val heuristicGate = ApprovalGate.decide(risk, preferences.securityMode)
+                    // 沙箱等级先于审批：等级不允许的命令直接挡下，不进审批页（问人也无用）
+                    val sandboxBlock = shellCommand?.let { command ->
+                        SandboxGate.blockMessage(preferences.sandboxLevel, ShellPolicy.dangerOf(command))
+                    }
+                    if (sandboxBlock != null) {
+                        val blockBlock = ConversationBlock.ToolCall(
+                            id = UUID.randomUUID().toString(),
+                            toolName = call.name,
+                            argsJson = call.arguments,
+                            resultSummary = sandboxBlock,
+                            isExecuting = false
+                        )
+                        blocks.add(blockBlock)
+                        conversationHistory.add(
+                            ChatMessage(role = AgentRole.TOOL, content = sandboxBlock, toolCallId = call.id, name = call.name)
+                        )
+                        currentState = currentState.copy(conversationBlocks = blocks.toList())
+                        onStateUpdate(currentState)
+                        continue
+                    }
+
+                    val heuristicGate = ApprovalGate.decide(
+                        risk,
+                        preferences.securityMode,
+                        preferences.toolApprovalPolicy
+                    )
                     val gate: ApprovalGate.Decision
                     val evaluatedRisk: RiskAssessment
                     val autoAllowNote: String?
@@ -385,7 +446,11 @@ class AgentDispatcher(
 
                         heuristicGate == ApprovalGate.Decision.REQUIRE_APPROVAL -> {
                             evaluatedRisk = applyNarration(call.name, actionDesc, risk)
-                            gate = ApprovalGate.decide(evaluatedRisk, preferences.securityMode)
+                            gate = ApprovalGate.decide(
+                                evaluatedRisk,
+                                preferences.securityMode,
+                                preferences.toolApprovalPolicy
+                            )
                             autoAllowNote = if (gate == ApprovalGate.Decision.AUTO_ALLOW) {
                                 Log.i(
                                     TAG,
@@ -588,20 +653,25 @@ class AgentDispatcher(
      */
     private fun forcedApprovalRisk(toolName: String): RiskAssessment {
         val isDefineTool = toolName == ShellPolicy.TOOL_DEFINE_TOOL
+        val isMemoryTool = ShellPolicy.isMemoryTool(toolName)
         return RiskAssessment(
             isHardBlocked = false,
             isHighRisk = true,
-            riskSummary = if (isDefineTool) {
-                "定义新工具：Agent 会获得一个新的可执行入口"
-            } else {
-                "特权工具：执行前必须由人放行"
+            riskSummary = when {
+                isDefineTool -> "定义新工具：Agent 会获得一个新的可执行入口"
+                isMemoryTool -> "写入长期记忆：这条内容之后每一轮都会进系统提示词"
+                else -> "特权工具：执行前必须由人放行"
             },
             requireCooldownSeconds = 0,
-            whatItDoes = if (isDefineTool) "注册一个带命令模板的新工具" else "调用特权工具 " + toolName,
-            worstCase = if (isDefineTool) {
-                "新工具会留在工具清单里，之后每次调用都要单独审批"
-            } else {
-                "命令以最高可用权限执行，可能改动系统状态"
+            whatItDoes = when {
+                isDefineTool -> "注册一个带命令模板的新工具"
+                isMemoryTool -> "把一条偏好写进长期记忆库"
+                else -> "调用特权工具 " + toolName
+            },
+            worstCase = when {
+                isDefineTool -> "新工具会留在工具清单里，之后每次调用都要单独审批"
+                isMemoryTool -> "被写进去的内容之后一直生效，也会长期影响后续对话的判断"
+                else -> "命令以最高可用权限执行，可能改动系统状态"
             },
             aiRiskLevel = RiskLevel.MEDIUM,
             commandText = "",
@@ -624,6 +694,8 @@ class AgentDispatcher(
                 ShellPolicy.TOOL_DEFINE_TOOL -> "已注册工具 " + json.optString("name", "")
                 ShellPolicy.TOOL_LIST_TOOLS -> "自写工具 " + json.optInt("count", 0) + " 个"
                 ShellPolicy.TOOL_REMOVE_TOOL -> "已删除 " + json.optString("removed", "")
+                ShellPolicy.TOOL_REMEMBER_FACT ->
+                    "长期记忆 " + json.optInt("count", 0) + "/" + json.optInt("max", 0) + " 条"
                 else -> json.optString("summary", json.optString("message", "执行成功"))
             }
         } catch (_: Exception) {
@@ -650,10 +722,15 @@ class AgentDispatcher(
      */
     private fun applyAutoCompaction() {
         if (!preferences.autoCompressContext) return
-        val compacted = ContextCompactor.trim(
+        val maxTurns = preferences.maxContextTurns
+        // 阈值决定"多满才开始压"：同一个 autoCompressContext 开关下，0.3 会在历史刚到
+        // 预算三成时压缩，0.95 则拖到几乎满仓 —— 这是网页端可调、表端此前完全缺失的那一档。
+        if (!CompressPolicy.shouldCompress(conversationHistory.size, maxTurns, preferences.historyCompressThreshold)) {
+            return
+        }
+        val compacted = ContextCompactor.trimToMessages(
             history = conversationHistory,
-            maxTurns = preferences.maxContextTurns,
-            enabled = true
+            keepMessages = CompressPolicy.keepMessages(maxTurns)
         )
         if (compacted.size == conversationHistory.size) return
         Log.i(TAG, "自动压缩上下文：" + conversationHistory.size + " -> " + compacted.size + " 条")
@@ -749,7 +826,7 @@ class AgentDispatcher(
                 doOutput = true
             }
             val body = JSONObject().apply {
-                put("model", preferences.modelName)
+                put("model", requestModelName(preferences))
                 put("temperature", 0)
                 put("max_tokens", 200)
                 put("stream", false)
@@ -782,6 +859,8 @@ class AgentDispatcher(
     ): Result<ModelTurnResult> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
+            // 记忆同步先于压缩：remember_fact 落盘后系统头必须在本轮请求里就换上新的
+            syncSystemMessageWithMemory()
             applyAutoCompaction()
             sanitizeConversationHistory()
 
@@ -793,37 +872,15 @@ class AgentDispatcher(
             val url = URL(endpoint)
 
             // 推理努力只在推理模型上发出去，且受 defaultThinkingEnabled 总闸约束；
-            // 供应商不认这个字段时置空后重试一次
-            var reasoningEffortValue: String? = ThinkingPolicy.reasoningEffortBody(
-                enabled = preferences.defaultThinkingEnabled,
-                modelName = preferences.modelName,
-                effort = ReasoningEffort.fromStored(preferences.reasoningEffort)
+            // 供应商不认这个字段时置空后重试一次（取值唯一来源见 requestReasoningEffort）
+            var reasoningEffortValue: String? = requestReasoningEffort(preferences)
+
+            fun buildRequestBody(): JSONObject = buildMainRequestBody(
+                preferences = preferences,
+                history = conversationHistory,
+                toolDefinitions = toolRegistry.getToolDefinitions(),
+                reasoningEffort = reasoningEffortValue
             )
-
-            fun buildRequestBody(): JSONObject = JSONObject().apply {
-                put("model", preferences.modelName)
-                put("temperature", preferences.temperature)
-                put("max_tokens", preferences.maxOutputTokens)
-                if (preferences.streamMode) {
-                    put("stream", true)
-                }
-                reasoningEffortValue?.let { put("reasoning_effort", it) }
-                val msgs = JSONArray()
-                val turnsLimit = preferences.maxContextTurns
-                val systemMsg = conversationHistory.firstOrNull { it.role == AgentRole.SYSTEM }
-                val dialogMsgs = conversationHistory.filter { it.role != AgentRole.SYSTEM }.takeLast(turnsLimit * 2)
-                if (systemMsg != null) msgs.put(systemMsg.toJson())
-                dialogMsgs.forEach { msgs.put(it.toJson()) }
-                put("messages", msgs)
-
-                val toolDefs = toolRegistry.getToolDefinitions()
-                if (toolDefs.isNotEmpty()) {
-                    val tools = JSONArray()
-                    toolDefs.forEach { tools.put(it.toJson()) }
-                    put("tools", tools)
-                    put("tool_choice", "auto")
-                }
-            }
 
             fun openConnection(): HttpURLConnection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -1019,10 +1076,11 @@ class AgentDispatcher(
         val risk = guardrail.assessTool(call.name, call.arguments, preferences.securityMode)
         val forcedApproval = toolRegistry.requiresApprovalAlways(call.name)
         val shellCommand = toolRegistry.shellCommandOf(call)
-        val actionDesc = if (shellCommand.isNullOrBlank()) {
-            "执行 [" + call.name + "]"
-        } else {
-            "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+        val rememberedFact = toolRegistry.memoryFactOf(call)
+        val actionDesc = when {
+            !shellCommand.isNullOrBlank() -> "执行 [" + call.name + "] " + ShellPolicy.normalize(shellCommand)
+            rememberedFact.isNotEmpty() -> "记住长期偏好：「" + rememberedFact + "」"
+            else -> "执行 [" + call.name + "]"
         }
 
         // 致命黑名单硬拦截：与主循环同一条判定，特权工具的原文仍然走审批页
@@ -1036,7 +1094,7 @@ class AgentDispatcher(
                 ShellPolicy.isRemembered(shellCommand, preferences.rememberedShellCommandList())
             )
             forcedApproval -> ApprovalGate.Decision.REQUIRE_APPROVAL
-            else -> ApprovalGate.decide(risk, preferences.securityMode)
+            else -> ApprovalGate.decide(risk, preferences.securityMode, preferences.toolApprovalPolicy)
         }
 
         if (gate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
@@ -1086,17 +1144,7 @@ class AgentDispatcher(
                 readTimeout = SUB_AGENT_READ_TIMEOUT_MS
                 doOutput = true
             }
-            val body = JSONObject().apply {
-                put("model", preferences.modelName)
-                put("temperature", preferences.temperature)
-                put("max_tokens", preferences.maxOutputTokens)
-                put("stream", false)
-                put("messages", JSONArray().apply { history.forEach { put(it.toJson()) } })
-                if (tools.isNotEmpty()) {
-                    put("tools", JSONArray().apply { tools.forEach { put(it.toJson()) } })
-                    put("tool_choice", "auto")
-                }
-            }
+            val body = buildSubAgentRequestBody(preferences, history, tools)
             OutputStreamWriter(conn.outputStream, "UTF-8").use { it.write(body.toString()) }
 
             val responseCode = conn.responseCode
@@ -1195,6 +1243,85 @@ class AgentDispatcher(
 }
 
 /**
+ * 请求体 model 字段的唯一取值点。
+ *
+ * 手势切模型改的是 preferences.modelName，而每一轮请求都在发车前现读这里 ——
+ * 于是"按一下侧键"与"下一个请求用哪个模型"之间只有这一处取值，单测可以直接断言它跟着变
+ * （见 GestureDrainConsumptionTest）。
+ */
+internal fun requestModelName(preferences: AgentPreferences): String = preferences.modelName
+
+/**
+ * 请求体 reasoning_effort 的唯一取值点（主循环与子代理共用）。
+ *
+ * 两道约束：defaultThinkingEnabled 总闸 + 模型是否认识这个字段。
+ * 两个请求体都只从这里取值，任何一处漏掉都会让那条链路按供应商默认档跑。
+ */
+internal fun requestReasoningEffort(preferences: AgentPreferences): String? =
+    ThinkingPolicy.reasoningEffortBody(
+        enabled = preferences.defaultThinkingEnabled,
+        modelName = preferences.modelName,
+        effort = ReasoningEffort.fromStored(preferences.reasoningEffort)
+    )
+
+/**
+ * 主循环请求体：系统头排最前、对话按 maxContextTurns 在请求侧裁剪、工具清单每轮现读。
+ *
+ * [reasoningEffort] 由调用方持有：供应商明确拒收该字段时，主循环要把它置空后重建一次请求体。
+ */
+internal fun buildMainRequestBody(
+    preferences: AgentPreferences,
+    history: List<ChatMessage>,
+    toolDefinitions: List<ToolDefinition>,
+    reasoningEffort: String?
+): JSONObject = JSONObject().apply {
+    put("model", requestModelName(preferences))
+    put("temperature", preferences.temperature)
+    put("max_tokens", preferences.maxOutputTokens)
+    if (preferences.streamMode) {
+        put("stream", true)
+    }
+    reasoningEffort?.let { put("reasoning_effort", it) }
+    val msgs = JSONArray()
+    val turnsLimit = preferences.maxContextTurns
+    val systemMsg = history.firstOrNull { it.role == AgentRole.SYSTEM }
+    val dialogMsgs = history.filter { it.role != AgentRole.SYSTEM }.takeLast(turnsLimit * 2)
+    if (systemMsg != null) msgs.put(systemMsg.toJson())
+    dialogMsgs.forEach { msgs.put(it.toJson()) }
+    put("messages", msgs)
+
+    if (toolDefinitions.isNotEmpty()) {
+        val tools = JSONArray()
+        toolDefinitions.forEach { tools.put(it.toJson()) }
+        put("tools", tools)
+        put("tool_choice", "auto")
+    }
+}
+
+/**
+ * 子代理请求体：非流式、单次往返。
+ *
+ * 推理档与主循环读同一个 [requestReasoningEffort] —— 子代理此前完全不发 reasoning_effort，
+ * 于是主人选了推理努力档，主循环按它跑、子代理却永远按供应商默认档跑。
+ */
+internal fun buildSubAgentRequestBody(
+    preferences: AgentPreferences,
+    history: List<ChatMessage>,
+    toolDefinitions: List<ToolDefinition>
+): JSONObject = JSONObject().apply {
+    put("model", requestModelName(preferences))
+    put("temperature", preferences.temperature)
+    put("max_tokens", preferences.maxOutputTokens)
+    put("stream", false)
+    requestReasoningEffort(preferences)?.let { put("reasoning_effort", it) }
+    put("messages", JSONArray().apply { history.forEach { put(it.toJson()) } })
+    if (toolDefinitions.isNotEmpty()) {
+        put("tools", JSONArray().apply { toolDefinitions.forEach { put(it.toJson()) } })
+        put("tool_choice", "auto")
+    }
+}
+
+/**
  * 分级审批闸门：AI 风险等级决定要不要弹审批，安全模式决定无风险操作能否自动放行。
  * 判定顺序固定为 硬拦截 > 安全底线 > 风险等级，安全底线永远压过"低风险自动放行"。
  */
@@ -1205,9 +1332,20 @@ object ApprovalGate {
         REQUIRE_APPROVAL // 弹审批，由人滑动决定
     }
 
-    fun decide(risk: RiskAssessment, mode: SecurityMode): Decision {
-        // 1. 硬黑名单优先级最高：任何模式、任何等级一律拦截
+    fun decide(
+        risk: RiskAssessment,
+        mode: SecurityMode,
+        policy: ToolApprovalPolicy = ToolApprovalPolicy.RISKY
+    ): Decision {
+        // 1. 硬黑名单优先级最高：任何策略、任何模式、任何等级一律拦截
         if (risk.isHardBlocked) return Decision.HARD_BLOCK
+
+        // 2. 审批策略先于风险分级生效：ALWAYS 一律问人，NEVER 一律放行（硬拦截仍在上一步）
+        when (policy) {
+            ToolApprovalPolicy.ALWAYS -> return Decision.REQUIRE_APPROVAL
+            ToolApprovalPolicy.NEVER -> return Decision.AUTO_ALLOW
+            ToolApprovalPolicy.RISKY -> Unit
+        }
 
         // 2. 无风险操作：LOW 且护栏没判高危
         if (risk.aiRiskLevel == RiskLevel.LOW && !risk.isHighRisk) {

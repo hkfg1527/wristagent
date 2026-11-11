@@ -2,7 +2,6 @@ package com.example.myapplication.agent
 
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.presentation.ChatUiState
-import com.example.myapplication.presentation.ui.MainInputType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -145,13 +144,20 @@ class AgentSettingConsumptionTest {
         )
 
         val trimmed = ContextCompactor.trim(history, maxTurns = 2, enabled = true)
-        assertEquals("切点上的孤立 tool 回执必须丢掉", 4, trimmed.size)
+        // 旧实现只用 dropWhile 剥掉窗口开头的回执，窗口末尾的 t-new 会留在上下文里，
+        // 因此这里曾经以 4 条通过（= 留着一个没有发起方的回执）。修好之后两端都剔除，
+        // 并用更早的消息把预算补足，所以条数仍是"system 头 + maxTurns*2"。
+        assertEquals("剔除孤回执后预算不缩水：system 头 + 4 条对话", 5, trimmed.size)
         assertEquals(AgentRole.USER, trimmed[1].role)
+        assertTrue(
+            "上下文里不许留下任何没有发起方的 tool 回执",
+            trimmed.none { it.role == AgentRole.TOOL }
+        )
     }
 
     @Test
     fun compactModeSurfacesThroughUiState() {
-        assertTrue("设置打开时初始状态带紧凑标志", ChatUiState.initial(MainInputType.VOICE, compactMode = true).compactMode)
-        assertFalse("默认不紧凑", ChatUiState.initial(MainInputType.VOICE).compactMode)
+        assertTrue("设置打开时初始状态带紧凑标志", ChatUiState.initial(compactMode = true).compactMode)
+        assertFalse("默认不紧凑", ChatUiState.initial().compactMode)
     }
 }

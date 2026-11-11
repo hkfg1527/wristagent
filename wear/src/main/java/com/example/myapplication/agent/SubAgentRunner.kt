@@ -50,6 +50,8 @@ data class SubAgentReport(
  *
  * 上下文隔离：自己持有一份 history（system + task），全程不碰主对话的 conversationHistory，
  * 只把最终结论作为 [SubAgentReport] 交回去；工具集由调用方按"去掉 run_subagent"给出。
+ * 清单只是"告知"，执行侧另有一道硬拒：模型自造 run_subagent 时不许落到执行层，
+ * 否则 [SubAgentPolicy.MAX_DEPTH] 会被执行侧的 parentDepth 常量绕过。
  * 轮数：与主循环共用 [AgentLoopPolicy]，无上限，靠取消 / 能量提示 / 空转检测 / 超时退出。
  */
 class SubAgentRunner(
@@ -150,6 +152,20 @@ class SubAgentRunner(
 
             for (call in calls) {
                 if (isCancelled()) return cancelled(executed, startedAt)
+                // 深度契约的执行侧兜底：清单里没有 run_subagent 只是"不再告知模型"，
+                // 模型自造工具名（或工具回执里夹带的诱导）不会被提示词拦下，而 executeTool
+                // 那一侧的子代理没有深度概念 —— 不在这里拒，嵌套派发会以 parentDepth = 0 跑起来。
+                if (call.name == SubAgentPolicy.TOOL_NAME) {
+                    history.add(
+                        ChatMessage(
+                            role = AgentRole.TOOL,
+                            content = depthRefusalJson(),
+                            toolCallId = call.id,
+                            name = call.name
+                        )
+                    )
+                    continue
+                }
                 val result = try {
                     executeTool(call)
                 } catch (e: CancellationException) {
@@ -213,6 +229,26 @@ class SubAgentRunner(
             errorType = type,
             message = message
         )
+
+    /**
+     * 子代理企图再开子代理时的结构化回执：明确拒绝并说明原因，不是静默丢弃。
+     *
+     * 与 [toolFailureJson] 同一条纪律：回执必须是非空文本。序列化拿不到内容（宿主 org.json
+     * 退化时）就降级成一行纯文本，绝不把 null 塞进 ChatMessage。
+     */
+    private fun depthRefusalJson(): String {
+        val detail = runCatching {
+            JSONObject().apply {
+                put("status", "error")
+                put("error_type", SubAgentReport.ERROR_DEPTH)
+                put("message", "子代理里不能再开子代理（最大深度 " + SubAgentPolicy.MAX_DEPTH + "），本次调用未执行")
+                put("recovery_hint", "自己把这件事查清再给结论；确实需要再派一层时，把理由写进结论交回主对话")
+            }.toString()
+        }.getOrNull()
+        return detail?.takeIf { it.isNotBlank() }
+            ?: ("tool_refused: " + SubAgentReport.ERROR_DEPTH + " 子代理里不能再开子代理（最大深度 " +
+                SubAgentPolicy.MAX_DEPTH + "）")
+    }
 
     private fun taskPrompt(task: String, focus: String?): String {
         val trimmedFocus = focus?.trim().orEmpty()

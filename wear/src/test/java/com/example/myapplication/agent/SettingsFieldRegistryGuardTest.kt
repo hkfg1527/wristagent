@@ -1,6 +1,5 @@
 package com.example.myapplication.agent
 
-import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.readProjectFile
 import com.example.myapplication.voice.AsrLanguage
@@ -80,10 +79,12 @@ class SettingsFieldRegistryGuardTest {
         assertEquals("reasoningEffort 默认值必须是 ReasoningEffort 的真实档位", ReasoningEffort.DEFAULT_STORAGE, prefs.reasoningEffort)
         assertTrue("baseUrl 默认 " + prefs.baseUrl + " 必须是 http(s) 地址", prefs.baseUrl.startsWith("http"))
         assertTrue("mcpEndpoint 默认 " + prefs.mcpEndpoint + " 必须是 http(s) 地址", prefs.mcpEndpoint.startsWith("http"))
-        assertTrue("mainInputType 默认值必须落在 VOICE / KEYBOARD", prefs.mainInputType in setOf("VOICE", "KEYBOARD"))
-        assertEquals("themeMode 默认值", ThemeMode.DARK, prefs.themeMode)
         assertEquals("securityMode 默认值", SecurityMode.STANDARD, prefs.securityMode)
-        assertEquals("rightButtonAction 默认值", RightButtonAction.MODEL_SWITCH, prefs.rightButtonAction)
+        // 本轮新增的三档：默认值必须是"历史行为"，否则升级即静默改行为
+        assertEquals("toolApprovalPolicy 默认值", ToolApprovalPolicy.RISKY, prefs.toolApprovalPolicy)
+        assertEquals("sandboxLevel 默认值", SandboxLevel.FULL, prefs.sandboxLevel)
+        assertEquals("historyCompressThreshold 默认值", CompressPolicy.DefaultThreshold, prefs.historyCompressThreshold, 0.0001f)
+        assertEquals("手势绑定默认不接任何动作", GestureAction.NONE, prefs.longPressAction)
     }
 
     @Test
@@ -121,10 +122,12 @@ class SettingsFieldRegistryGuardTest {
         }
         assertEquals("这些布尔属性只有 setter 没有 getter，读不回来：", emptyList<String>(), unpaired)
 
+        // 审计删除的 VoiceWakeOnScreen / VoiceWakeOnLockScreen / UsePureBlack 已不在覆盖集里：
+        // 字段本身被删了，再要求它们可读写就是在要求一个没有执行路径的开关。
         val newFlags = listOf(
-            "AutoSpeakReplies", "AsrLiveTranscript", "VoiceWakeOnScreen", "VoiceWakeOnLockScreen",
+            "AutoSpeakReplies", "AsrLiveTranscript",
             "ProviderManagedSearchEnabled", "DefaultThinkingEnabled", "MemoryEnabled", "AutoCompressContext",
-            "UsePureBlack", "CompactMode", "AnimationsEnabled", "VisionBetaEnabled", "SubAgentEnabled", "McpEnabled"
+            "CompactMode", "AnimationsEnabled", "SubAgentEnabled", "McpEnabled"
         )
         assertEquals("这些新增开关必须可读写（不在覆盖集里说明被改名或退化成只读）：", emptyList<String>(), newFlags - covered)
     }

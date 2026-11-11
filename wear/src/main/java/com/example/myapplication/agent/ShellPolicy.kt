@@ -26,6 +26,9 @@ object ShellPolicy {
     const val TOOL_LIST_TOOLS = "list_tools"
     const val TOOL_REMOVE_TOOL = "remove_tool"
 
+    /** 长期记忆写入方：不执行任何命令，但会把内容持久化成之后每一轮都注入的上下文。 */
+    const val TOOL_REMEMBER_FACT = "remember_fact"
+
     const val DEFAULT_TIMEOUT_MS = 15_000L
     const val MIN_TIMEOUT_MS = 1_000L
     const val MAX_TIMEOUT_MS = 120_000L
@@ -242,9 +245,24 @@ object ShellPolicy {
     fun isPrivilegedTool(toolName: String, selfDefinedNames: Set<String>): Boolean =
         toolName == TOOL_RUN_SHELL || toolName in selfDefinedNames
 
-    /** define_tool 不执行命令，但它在扩大能力面，同样强制审批；元数据类工具走通用分级闸门。 */
+    /**
+     * 强制审批档（无视安全模式与审批策略，一律先问人）。
+     *
+     * 判据不是"这一下危险不危险"，而是"之后会不会一直生效"：
+     * - run_shell / 自写工具：以最高可用权限执行任意命令；
+     * - define_tool：扩大能力面，新工具会留在清单里；
+     * - remember_fact：**持久化数据**，写进去的条目之后每一轮都进系统提示词 ——
+     *   这是唯一一条能长期影响后续对话的隐式通道，因此与 define_tool 同档，
+     *   而不是退回按 AI 风险等级分的通用闸门（那条闸门会按低风险自动放行）。
+     * 元数据类工具（list_tools / remove_tool / 设备状态等）仍走通用分级闸门。
+     */
     fun requiresApprovalAlways(toolName: String, selfDefinedNames: Set<String>): Boolean =
-        isPrivilegedTool(toolName, selfDefinedNames) || toolName == TOOL_DEFINE_TOOL
+        isPrivilegedTool(toolName, selfDefinedNames) ||
+            toolName == TOOL_DEFINE_TOOL ||
+            toolName == TOOL_REMEMBER_FACT
+
+    /** 长期记忆写入不是 shell 命令：它持久化数据，但不进沙箱分档、也不执行任何命令。 */
+    fun isMemoryTool(toolName: String): Boolean = toolName == TOOL_REMEMBER_FACT
 
     private fun matchedRule(normalized: String): DangerRule? =
         DESTRUCTIVE_RULES.firstOrNull { it.pattern.containsMatchIn(normalized) }
