@@ -81,6 +81,9 @@ private class MatrixBatches(val dotCount: Int) {
     // 组内代表值 = 成员均值：桶只保证成员方差有界，均值让整组像素误差无偏（并让顶部半径档的吸收无损）
     val alphaSum = FloatArray(DOT_GROUP_COUNT)
     val radiusSum = FloatArray(DOT_GROUP_COUNT)
+    // 主键按压的逐点位移：只在幅度 > 0 的帧里被写入与读取，幅度 0 的帧一次都不碰
+    val pressDx = FloatArray(dotCount)
+    val pressDy = FloatArray(dotCount)
     val categoryRgb = IntArray(DOT_CATEGORY_COUNT)
     val paint = Paint().apply {
         isAntiAlias = true
@@ -324,14 +327,17 @@ internal object ThinkingWave {
  * 纯圆表盘高亮大微晶方形点阵渲染引擎 (浮于遮罩之上 · 加大高质感光点 · 强烈水波纹扩散 · 四态光相变)
  * 1. 方形阵列：严格基于直角坐标系 (x, y) 均匀栅格排布，以圆心为基准对称排布；
  * 2. 覆盖全圆：完全铺满圆形表盘的所有区域（包括四周圆弧月半弧），无任何方形裁剪框；
- * 3. 几何预缓存：所有点位与距离在组合期一次性算入 FloatArray，绘制期不再分配对象、不再求平方根；
+ * 3. 几何预缓存：所有点位与距离在组合期一次性算入 FloatArray，绘制期不分配对象；
+ *    只有主键被按住的那几帧才为每点求一次平方根（取精确的径向方向），幅度 0 的帧不执行；
  * 4. 批绘制：逐帧把点按 (颜色类别 × alpha 量化桶 × 半径档位) 归并成若干组，每组一次
  *    drawPoints(PointMode.Points, StrokeCap.Round, strokeWidth = 2 × 半径) 取代逐点 drawCircle；
  *    分组用 remember 的 IntArray/FloatArray 原地做计数排序，绘制的 alpha 与半径取组内成员均值，
  *    绘制期零分配、无 List；
  * 5. 空闲降频：纯呼吸待机时把呼吸相位量化到 1/24，量化值不变则不产生绘制失效，
  *    上一帧的绘制指令被整帧复用；思考波相位只在真有行波时才被读取，不污染空闲帧依赖；
- * 6. 审批进度着色：approvalProgress 让点阵自身从基色插值到放行绿，不额外叠加任何整屏色层。
+ * 6. 审批进度着色：approvalProgress 让点阵自身从基色插值到放行绿，不额外叠加任何整屏色层；
+ * 7. 主键按压：keyPressAmplitude > 0 时按 DotLattice 的 (1-t)² 衰减把原点附近的点径向推开并放大半径，
+ *    位移写进预分配的 FloatArray 供第二遍直接相加 —— 局部顶起，远处点严格不动（不是整盘平移）。
  */
 @Composable
 fun UnifiedMatrixCanvas(
@@ -342,7 +348,9 @@ fun UnifiedMatrixCanvas(
     isRecordingVoice: Boolean = false,       // 录音状态
     shockwaveProgress: Float = -1f,          // 底栏激荡冲击波 (0f ~ 1f)
     gridSpacingDp: Float = 16f,              // 网格物理间距 (dp)
-    approvalProgress: Float = 0f             // 审批滑块进度 (0f 拒绝 ~ 1f 放行)：点阵本身由基色渐变到放行绿
+    approvalProgress: Float = 0f,            // 审批滑块进度 (0f 拒绝 ~ 1f 放行)：点阵本身由基色渐变到放行绿
+    // 主键按压幅度 (0f ~ 1f)：0f 时整条按压路径被跳过，绘制结果与不传该参数时逐像素相同
+    keyPressAmplitude: Float = 0f
 ) {
     // 3.0s 沉稳深邃呼吸过渡 (加大呼吸振幅)。动效总开关关闭时连无限动画都不创建：
     // 相位钉在中位，量化档位随之恒定，点阵彻底静止
@@ -443,6 +451,10 @@ fun UnifiedMatrixCanvas(
         // 分桶缓冲同样只随网格点数分配一次
         val batches = remember(grid.count) { MatrixBatches(grid.count) }
 
+        // 按压幅度在组合期收敛一次：动效总开关关闭时钉成 0（关掉动效就不该留下位移残影），
+        // 0 时下面整条按压路径都不执行，绘制指令与不传该参数时逐像素相同。
+        val pressAmplitude = if (animationsEnabled) keyPressAmplitude.coerceIn(0f, 1f) else 0f
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val count = grid.count
             if (count == 0) return@Canvas
@@ -468,6 +480,16 @@ fun UnifiedMatrixCanvas(
             val dynamicUnit = 0.8.dp.toPx()
             // 半径量化档宽：一档 0.6dp，再取组内均值后残差 ≈ 0.17dp（基半径 2.3dp 的 7%，不可辨）
             val radiusQuantum = 0.6.dp.toPx()
+
+            // ---- 主键按压：常数只随 gridSpacingDp 变，不进逐点循环 ----
+            // 幅度 0 时 hasPress 为假，下面的逐点分支全部不进入，本帧不做任何额外计算
+            val hasPress = pressAmplitude > 0f
+            val pressFalloffPx = DotLattice.FALLOFF_GRID_STEPS * stepPx
+            val pressPeakPx = DotLattice.PEAK_DISPLACEMENT_GRID_STEPS * stepPx * pressAmplitude
+            val pressRadiusGain = DotLattice.PEAK_RADIUS_GAIN * pressAmplitude
+            // 原点与 buildMatrixGrid 传进去的 micOrigin 同源，再按画布缩放换算到绘制坐标系
+            val pressOriginX = grid.widthPx / 2f * scaleX
+            val pressOriginY = (grid.heightPx - micOriginOffsetPx) * scaleY
 
             // ---- 逐帧不变量的行波参数，一次性算好 ----
             val glintPosition = glintAnim.value * (w + h)
@@ -514,6 +536,8 @@ fun UnifiedMatrixCanvas(
             val alphaSum = batches.alphaSum
             val radiusSum = batches.radiusSum
             val categoryRgb = batches.categoryRgb
+            val pressDxArr = batches.pressDx
+            val pressDyArr = batches.pressDy
 
             categoryRgb[DOT_CAT_BASE] = baseDotColor.toArgb() and 0x00FFFFFF
             categoryRgb[DOT_CAT_GREEN] = RGB_DOT_GREEN
@@ -591,7 +615,19 @@ fun UnifiedMatrixCanvas(
                 }
 
                 // 7. 半径增生量：动态放大单独占档；无动态的帧里 0 档成员全是静态半径，组代表值即精确半径
-                val extraRadius = (rippleScale + glintScale * 1.2f + shockScale * 1.5f) * dynamicUnit
+                var extraRadius = (rippleScale + glintScale * 1.2f + shockScale * 1.5f) * dynamicUnit
+
+                // 8. 主键按压：沿原点径向推开 + 半径放大（幅度 0 的帧一次都不执行）。
+                //    位移只写进预分配数组，第二遍直接加在坐标上，避免为了两个浮点数逐点建对象。
+                if (hasPress) {
+                    val px = xs[i] * scaleX - pressOriginX
+                    val py = ys[i] * scaleY - pressOriginY
+                    val dist = sqrt(px * px + py * py)
+                    val invDist = if (dist > 0f) 1f / dist else 0f
+                    pressDxArr[i] = DotLattice.displacementX(px * invDist, dist, pressPeakPx, pressFalloffPx)
+                    pressDyArr[i] = DotLattice.displacementY(py * invDist, dist, pressPeakPx, pressFalloffPx)
+                    extraRadius += staticRadius * (DotLattice.scale(dist, pressRadiusGain, pressFalloffPx) - 1f)
+                }
 
                 val group = dotGroupIndex(category, alpha, extraRadius, radiusQuantum)
                 groupOfDot[i] = group
@@ -612,13 +648,26 @@ fun UnifiedMatrixCanvas(
             }
 
             // ---- pass 2：把坐标按组写进连续段（只做两次数组写入，不再重算任何三角函数）----
-            i = 0
-            while (i < count) {
-                val slot = groupCursor[groupOfDot[i]]
-                groupCursor[groupOfDot[i]] = slot + 1
-                points[slot * 2] = xs[i] * scaleX
-                points[slot * 2 + 1] = ys[i] * scaleY
-                i++
+            // 幅度 0 走下面第一支，与历史实现逐字节一致（同一个循环体、同样的两次写入），
+            // 因此空闲帧录制的绘制指令仍然可以被整帧复用。
+            if (hasPress) {
+                i = 0
+                while (i < count) {
+                    val slot = groupCursor[groupOfDot[i]]
+                    groupCursor[groupOfDot[i]] = slot + 1
+                    points[slot * 2] = xs[i] * scaleX + pressDxArr[i]
+                    points[slot * 2 + 1] = ys[i] * scaleY + pressDyArr[i]
+                    i++
+                }
+            } else {
+                i = 0
+                while (i < count) {
+                    val slot = groupCursor[groupOfDot[i]]
+                    groupCursor[groupOfDot[i]] = slot + 1
+                    points[slot * 2] = xs[i] * scaleX
+                    points[slot * 2 + 1] = ys[i] * scaleY
+                    i++
+                }
             }
 
             // ---- 批绘制：每满组一次 drawPoints(PointMode.Points, 圆头, strokeWidth = 2 × 半径) ----

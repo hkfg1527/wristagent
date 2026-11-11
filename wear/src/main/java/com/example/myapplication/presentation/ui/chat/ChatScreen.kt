@@ -94,6 +94,7 @@ import com.example.myapplication.presentation.ui.TopClockBar
 import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
+import com.example.myapplication.presentation.ui.settings.motionSpec
 import com.example.myapplication.presentation.ui.VoiceListeningOverlay
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
@@ -149,6 +150,19 @@ fun ChatScreen(
     // 底栏激荡波纹：每一轮被接受的新执行播一次 (纯白微晶光波)
     val shockwaveAnim = remember { Animatable(-1f) }
     val shockwaveProgress = if (animationsEnabled) shockwaveAnim.value else -1f
+
+    // 主键按压 → 点阵被顶开的幅度：底栏只上报布尔的按下/抬起，弹簧在这里把它驱动成 0..1。
+    // 按下瞬间是 0（点阵与静息逐像素相同），随后 ~150ms 弹到位；松开同一条弹簧回 0，不留残影。
+    var isOrbPressed by remember { mutableStateOf(false) }
+    val orbPressAnim = remember { Animatable(0f) }
+    LaunchedEffect(isOrbPressed) {
+        orbPressAnim.animateTo(
+            targetValue = if (isOrbPressed) 1f else 0f,
+            // 与主键自身的压下手感同一组弹簧参数：点阵和键是同一个动作的两个面
+            animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.62f, stiffness = 420f))
+        )
+    }
+    val keyPressAmplitude = if (animationsEnabled) orbPressAnim.value else 0f
 
     val thinkingIntensity by animateFloatAsState(
         targetValue = if (state.isThinkingActive) 1f else 0f,
@@ -722,7 +736,9 @@ fun ChatScreen(
                 shockwaveProgress = shockwaveProgress,
                 gridSpacingDp = liveSpacingDp,
                 // 审批滑块进度直接交给点阵：越往左推，点本身从冷白基色连续变绿变亮，不叠加任何整屏色层
-                approvalProgress = state.approvalProgress
+                approvalProgress = state.approvalProgress,
+                // 主键按下的幅度：让点阵在原点附近被径向顶开，远处点不动（不是整盘平移）
+                keyPressAmplitude = keyPressAmplitude
             )
         } else {
             // 关闭动效：呼吸、冲击波、审批红瀑、完工掠影全部随点阵一起消失，
@@ -847,6 +863,7 @@ fun ChatScreen(
             ),
             collapsed = bottomBarMode == BottomBarMode.Collapsed,
             collapseProgress = collapseProgress.value,
+            onOrbPressChange = { isOrbPressed = it },
             onCollapsedStripTap = { reportBottomBarEvent(BottomBarEvent.StripTap) }
         )
 

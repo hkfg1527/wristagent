@@ -161,7 +161,9 @@ fun BottomInteractiveBlock(
     // 收展进度 1=完整按钮 0=收起。由 ChatScreen 统一持有，保证"按钮缩小"与"弧条成形"是同一条时间线，
     // 不会出现"下面突然冒出、上面自己收、两边各弹一下"的割裂感。
     collapseProgress: Float = 1f,
-    onCollapsedStripTap: () -> Unit = {}
+    onCollapsedStripTap: () -> Unit = {},
+    // 主键按下/抬起：只上报布尔状态的变化（不逐帧回调），用于让点阵跟手被顶开
+    onOrbPressChange: (Boolean) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     // 动画开关：关掉后所有形变/弹射/滑块回弹都走 snap，直接落到目标值，不残留中间态
@@ -184,6 +186,10 @@ fun BottomInteractiveBlock(
 
     // 主键按压缩放：录音时微放大做呼吸，按下时收 0.94 给出"按进去了"的即时反馈
     var isOrbPressed by remember { mutableStateOf(false) }
+
+    // 按下/抬起只是一个布尔量的两次翻转，用 key 变化触发一次性外发：
+    // 不订阅每一帧的手势事件，也就不存在"每帧回调"这种浪费
+    LaunchedEffect(isOrbPressed) { onOrbPressChange(isOrbPressed) }
 
     // 发送闪亮：抬手把这一句发出去的那一帧点满，走 quick() 140ms 衰减回静息（见 OrbEdgeHighlight）
     val sendFlash = remember { Animatable(0f) }
