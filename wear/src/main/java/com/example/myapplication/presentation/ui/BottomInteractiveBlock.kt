@@ -1122,39 +1122,6 @@ fun MinimalistSoundwaveIcon(
 }
 
 /**
- * 极简调节滑块图标 (对应设置)
- */
-@Composable
-fun MinimalistSlidersIcon(
-    tint: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier.size(13.dp, 11.dp)) {
-        val strokeW = 1.2.dp.toPx()
-        val dotR = 1.3.dp.toPx()
-        // Line 1
-        drawLine(
-            color = tint,
-            start = Offset(0f, size.height * 0.28f),
-            end = Offset(size.width, size.height * 0.28f),
-            strokeWidth = strokeW,
-            cap = StrokeCap.Round
-        )
-        drawCircle(color = tint, radius = dotR, center = Offset(size.width * 0.35f, size.height * 0.28f))
-
-        // Line 2
-        drawLine(
-            color = tint,
-            start = Offset(0f, size.height * 0.72f),
-            end = Offset(size.width, size.height * 0.72f),
-            strokeWidth = strokeW,
-            cap = StrokeCap.Round
-        )
-        drawCircle(color = tint, radius = dotR, center = Offset(size.width * 0.68f, size.height * 0.72f))
-    }
-}
-
-/**
  * 极简模型分层图标 (对应模型切换)
  */
 @Composable

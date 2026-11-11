@@ -164,44 +164,6 @@ private fun WearChevron(modifier: Modifier = Modifier) {
     }
 }
 
-/** 可选中的筛选胶囊：选中态 Accent 实底配深色文字，未选中态 SurfaceAlt 描边。 */
-@Composable
-fun WearChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(Wear.Radius.Control)
-    val container = if (selected) Wear.Palette.Accent else Wear.Palette.SurfaceAlt
-    val labelColor = if (selected) Wear.Palette.Bg else Wear.Palette.TextPrimary
-
-    Box(
-        modifier = modifier
-            .heightIn(min = Wear.Size.Touch)
-            .widthIn(min = Wear.Size.Touch)
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .height(Wear.Size.ChipHeight)
-                .clip(shape)
-                .background(container)
-                .then(if (selected) Modifier else Modifier.border(1.dp, Wear.Palette.Border, shape))
-                .padding(horizontal = Wear.Space.Md),
-            contentAlignment = Alignment.Center,
-        ) {
-            BasicText(
-                text = label,
-                style = Wear.TextCaption.copy(color = labelColor),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
 /** 小徽标：固定高度的小圆角标签，色调由 [Tone] 决定；[horizontalPadding] 供窄徽章收紧内边距。 */
 @Composable
 fun WearBadge(
