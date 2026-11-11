@@ -1,7 +1,11 @@
 package com.example.myapplication.presentation.ui.chat
 
 import com.example.myapplication.presentation.ui.ApprovalBlockHeight
+import com.example.myapplication.presentation.ui.ApprovalRememberBandHeight
+import com.example.myapplication.presentation.ui.ApprovalTrackTouchHeight
 import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.presentation.ui.theme.WearTypography
+import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -9,9 +13,10 @@ import org.junit.Test
 /**
  * 审批浮层纵向分带的数值钉死。
  *
- * 真机 C101X35122973（466px @2.0 密度 = 233dp 圆屏、半径 116.5dp）与 240dp 设计稿两种屏高，
- * 都必须满足：文案带底边到滑轨顶边 ≥12dp，且「记住并放行」文字最远角点落在圆内。
- * 这些数一旦被谁"顺手调小"，文字就会重新压回滑轨上，所以全部钉在测试里。
+ * 真机 C101X35122973（466px @2.0 密度 = 233dp 圆屏、半径 116.5dp）与 240dp 设计稿两种屏高，都必须满足：
+ * 固定头 + 内容带 + 间隙 12 + 审批块 64 + 底距 12 正好等于屏高；内容带底边到滑轨顶边 ≥12dp；
+ * 「记住并放行」文字最远角点落在圆内。这些数一旦被谁"顺手调小"，文字就会重新压回滑轨上、
+ * 或者固定头又会把内容带挤掉，所以全部钉在测试里。
  */
 class ApprovalBandMetricsTest {
 
@@ -26,7 +31,7 @@ class ApprovalBandMetricsTest {
         )
     }
 
-    /** 文案带底边总预留 = 底距 12 + 块高 64 + 间隙 12 = 88dp，两组数值走同一条加法。 */
+    /** 内容带底边总预留 = 底距 12 + 块高 64 + 间隙 12 = 88dp，两组数值走同一条加法。 */
     @Test
     fun testContentBandReserve_addsInsetBlockAndGap() {
         assertEquals(
@@ -38,7 +43,7 @@ class ApprovalBandMetricsTest {
         assertEquals(30f, ApprovalBandMetrics.contentBandReserveDp(6f), 0f)
     }
 
-    /** 文案带底边必须正好比审批块顶边高 12dp：Reserve 减掉底距与块高之后剩下的就是这一条间隙。 */
+    /** 内容带底边必须正好比审批块顶边高 12dp：Reserve 减掉底距与块高之后剩下的就是这一条间隙。 */
     @Test
     fun testContentBandBottom_sitsExactlyTwelveDpAboveApprovalBlockTop() {
         val blockTopFromBottom =
@@ -56,26 +61,139 @@ class ApprovalBandMetricsTest {
         assertTrue(ApprovalBandMetrics.BAR_BOTTOM_INSET_DP >= 12f)
     }
 
-    /** 两种屏高的文案带高度：233dp 真表 145dp，240dp 设计 152dp。 */
+    /**
+     * 固定头高 = 圆屏留白 8 + 标题行 24 + 标题到条 8 + 条 8 + 段间距 10 = 58dp，五段都必须是令牌值。
+     *
+     * 标题行不是随手写的 24：它就是 titleMedium 的行高（WearMaterialTheme 显式覆写 18/24sp），
+     * 字号档一变这条断言就红，不会留下一份对不上的"头高"。
+     */
     @Test
-    fun testContentBandHeight_realDeviceAndDesignScreens() {
+    fun testHeaderHeight_isRoundPadPlusTitleLineAndBarsAndGap() {
+        assertEquals(24f, WearTypography.titleMedium.lineHeight.value, 0.001f)
         assertEquals(
-            145f,
-            ApprovalBandMetrics.contentBandHeightDp(233f, ApprovalBlockHeight.value),
-            0f
+            WearTypography.titleMedium.lineHeight.value,
+            ApprovalBandMetrics.HEADER_TITLE_LINE_DP,
+            0.001f
         )
+        assertEquals(Wear.Space.Sm.value, ApprovalBandMetrics.HEADER_TOP_PAD_DP, 0f)
+        assertEquals(Wear.Space.Sm.value, ApprovalBandMetrics.HEADER_TITLE_TO_BARS_DP, 0f)
+        assertEquals(8f, ApprovalBandMetrics.HEADER_BARS_DP, 0f)
+        assertEquals(10f, ApprovalBandMetrics.BLOCK_GAP_DP, 0f)
+        assertEquals(58f, ApprovalBandMetrics.HEADER_HEIGHT_DP, 0f)
         assertEquals(
-            152f,
-            ApprovalBandMetrics.contentBandHeightDp(240f, ApprovalBlockHeight.value),
+            ApprovalBandMetrics.HEADER_TOP_PAD_DP +
+                ApprovalBandMetrics.HEADER_TITLE_LINE_DP +
+                ApprovalBandMetrics.HEADER_TITLE_TO_BARS_DP +
+                ApprovalBandMetrics.HEADER_BARS_DP +
+                ApprovalBandMetrics.BLOCK_GAP_DP,
+            ApprovalBandMetrics.HEADER_HEIGHT_DP,
             0f
         )
     }
 
-    /** 屏高不足预留时夹到 0：负高度传给 padding 会直接抛异常。 */
+    /**
+     * 圆屏留白这 8dp 是"标题不被圆周切掉"的量化依据，不是审美：233dp 圆/半径 116.5dp 上，
+     * 标题字形顶边落在 y = 留白 + 行内上留白 ≈ 13dp，那里弦长 2√(116.5²−103.5²) ≈ 107dp，
+     * 而「高风险操作」18sp 五字宽 90dp —— 留白归零时顶边落在 y≈5dp，弦长只有 68dp，两个字上半截会被切掉。
+     */
     @Test
-    fun testContentBandHeight_shorterThanReserve_clampsToZero() {
+    fun testHeaderTopPad_keepsTitleInsideRoundScreenChord() {
+        val radius = 116.5f
+        val titleWidth = 90f
+        fun chordAt(yFromTopDp: Float): Float {
+            val dy = radius - yFromTopDp
+            return 2f * sqrt(radius * radius - dy * dy)
+        }
+        // 留白存在时：字形顶边在 y≈13dp，弦长容得下整个标题
+        assertTrue(chordAt(ApprovalBandMetrics.HEADER_TOP_PAD_DP + 5f) >= titleWidth)
+        // 反例：留白归零时同一行的弦长装不下标题 —— 这条检查有牙
+        assertTrue(chordAt(5f) < titleWidth)
+    }
+
+    /**
+     * 守恒：固定头 + 内容带 + 间隙 12 + 审批块 64 + 底距 12 = 屏高。
+     *
+     * 逐项相加（不用 [ApprovalBandMetrics.stackHeightDp]，那个函数自己就算得对），
+     * 233dp 与 240dp 两种屏都必须正好合上 —— 少一 dp 说明头叠在内容上挤掉了别的东西，
+     * 多一 dp 说明头没从内容带里扣干净。
+     */
+    @Test
+    fun testBandStack_headerPlusContentPlusGapPlusBlockPlusInset_equalsScreenHeight() {
+        val blockHeight = ApprovalBlockHeight.value
+        assertEquals(233f, screenStackDp(233f, blockHeight), 0.001f)
+        assertEquals(240f, screenStackDp(240f, blockHeight), 0.001f)
+        assertEquals(233f, ApprovalBandMetrics.stackHeightDp(233f, blockHeight), 0.001f)
+        assertEquals(240f, ApprovalBandMetrics.stackHeightDp(240f, blockHeight), 0.001f)
+    }
+
+    /** 两种屏高的可滚动内容带：233dp 真表 87dp（233−88−58），240dp 设计 94dp（240−88−58）。 */
+    @Test
+    fun testContentBandHeight_realDeviceAndDesignScreens() {
+        assertEquals(
+            87f,
+            ApprovalBandMetrics.contentBandHeightDp(233f, ApprovalBlockHeight.value),
+            0f
+        )
+        assertEquals(
+            94f,
+            ApprovalBandMetrics.contentBandHeightDp(240f, ApprovalBlockHeight.value),
+            0f
+        )
+        // 内容带 = 屏高 − 88 − 头高：头变高 1dp，内容带就少 1dp，不可能两边都满
+        assertEquals(
+            ApprovalBandMetrics.contentBandHeightDp(240f, ApprovalBlockHeight.value),
+            240f - 88f - ApprovalBandMetrics.HEADER_HEIGHT_DP,
+            0f
+        )
+    }
+
+    /** 屏高不足预留 + 固定头时夹到 0：负高度传给 padding 会直接抛异常。 */
+    @Test
+    fun testContentBandHeight_shorterThanReserveAndHeader_clampsToZero() {
+        // 预留 88 + 固定头 58 = 146dp 正好吃掉全部屏高
+        assertEquals(0f, ApprovalBandMetrics.contentBandHeightDp(146f, 64f), 0f)
+        assertEquals(1f, ApprovalBandMetrics.contentBandHeightDp(147f, 64f), 0f)
         assertEquals(0f, ApprovalBandMetrics.contentBandHeightDp(88f, 64f), 0f)
         assertEquals(0f, ApprovalBandMetrics.contentBandHeightDp(60f, 64f), 0f)
+    }
+
+    /**
+     * 固定头只吃文字：滑轨热区与「记住并放行」条带的 y 区间只由屏高与审批块高决定，与头高无关。
+     *
+     * 233dp 真表：滑轨 157..201、记住 201..221；240dp 设计稿：滑轨 164..208、记住 208..228。
+     * 两条带一起正好填满 64dp 的审批块，块底 = 屏幕底 − 12dp。
+     */
+    @Test
+    fun testTrackAndRememberBand_areNotMovedByHeader() {
+        assertEquals(44f, ApprovalTrackTouchHeight.value, 0f)
+        assertEquals(20f, ApprovalRememberBandHeight.value, 0f)
+
+        val screens = floatArrayOf(233f, 240f)
+        val trackTops = floatArrayOf(157f, 164f)
+        val trackBottoms = floatArrayOf(201f, 208f)
+        val rememberBottoms = floatArrayOf(221f, 228f)
+
+        for (index in screens.indices) {
+            val screenHeight = screens[index]
+            val blockTop =
+                screenHeight - ApprovalBandMetrics.BAR_BOTTOM_INSET_DP - ApprovalBlockHeight.value
+            val trackBottom = blockTop + ApprovalTrackTouchHeight.value
+            val rememberBottom = trackBottom + ApprovalRememberBandHeight.value
+
+            assertEquals(trackTops[index], blockTop, 0f)
+            assertEquals(trackBottoms[index], trackBottom, 0f)
+            assertEquals(rememberBottoms[index], rememberBottom, 0f)
+            assertEquals(screenHeight - 12f, rememberBottom, 0f)
+
+            // 头 + 内容带的底边正好落在滑轨顶边上方 12dp：头再高也只是让内容带变矮
+            val textBottom = ApprovalBandMetrics.HEADER_HEIGHT_DP +
+                ApprovalBandMetrics.contentBandHeightDp(screenHeight, ApprovalBlockHeight.value)
+            assertEquals(trackTops[index] - 12f, textBottom, 0f)
+
+            // 反例：若头被叠在内容上（而不是从内容带里扣），文字底边就会压进滑轨热区
+            val overlayInsteadOfDeduct = textBottom + ApprovalBandMetrics.HEADER_HEIGHT_DP
+            assertTrue(overlayInsteadOfDeduct > trackTops[index] - 12f)
+        }
     }
 
     /** 最远角点半径就是勾股距离：3-4-5 精确成立，宽高互换结果一致。 */
@@ -104,4 +222,12 @@ class ApprovalBandMetricsTest {
         val overflowing = ApprovalBandMetrics.farthestCornerRadiusDp(92f, 104.5f)
         assertTrue(overflowing > 116.5f)
     }
+
+    /** 守恒式的逐项展开：固定头 + 内容带 + 间隙 + 审批块 + 底距。 */
+    private fun screenStackDp(screenHeightDp: Float, blockHeightDp: Float): Float =
+        ApprovalBandMetrics.HEADER_HEIGHT_DP +
+            ApprovalBandMetrics.contentBandHeightDp(screenHeightDp, blockHeightDp) +
+            ApprovalBandMetrics.CONTENT_TO_TRACK_GAP_DP +
+            blockHeightDp +
+            ApprovalBandMetrics.BAR_BOTTOM_INSET_DP
 }

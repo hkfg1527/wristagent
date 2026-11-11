@@ -21,8 +21,8 @@
     <string name="ui_approval_slider_hint">Tap to reject · slide left to allow</string>
     <string name="ui_approval_release_to_allow">Release to allow</string>
     <string name="ui_approval_headline_low">Low risk</string>
-    <string name="ui_approval_headline_confirm">Needs confirmation</string>
-    <string name="ui_approval_headline_high">High-risk action</string>
+    <string name="ui_approval_headline_confirm">Confirm</string>
+    <string name="ui_approval_headline_high">High risk</string>
 
     <!-- Tool pill and reasoning pill. -->
     <string name="ui_thought_thinking">Thinking</string>
