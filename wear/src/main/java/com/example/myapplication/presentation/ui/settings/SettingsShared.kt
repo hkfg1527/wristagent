@@ -1628,7 +1628,8 @@ private fun SettingsSecondaryLabel(text: String, maxLines: Int = 1) {
 val PullDownDismissThreshold = 50.dp
 
 /** 临时诊断开关：真机确认手势路径后置 false 即彻底消音（release 包也带日志，便于直接装 release 验证）。 */
-private const val PullDownDismissDebug = true
+// 生产默认关闭：打开后每次下拉动作都会打坐标日志。留着是为了下次排查手势问题时能一行改回来。
+private const val PullDownDismissDebug = false
 
 private const val PullDownDismissLogTag = "PullDownDismiss"
 
@@ -1652,7 +1653,9 @@ internal fun ScalingLazyListState.isAtScrollTop(): Boolean {
 }
 
 /** 顶部对齐诊断开关：真机确认"滚到最顶不留空白"后置 false 消音（release 包也带日志，便于直接装 release 验证）。 */
-private const val SettingsTopAnchorDebug = true
+// 生产默认关闭：打开后 SettingsTopAnchorProbe 会在**每次布局变化**时 snapshotFlow 收集一次
+// 列表几何（含 isAtScrollTop()）并打日志——这是调试探针，不是常驻功能。
+private const val SettingsTopAnchorDebug = false
 
 private const val SettingsTopAnchorLogTag = "SettingsTopAnchor"
 

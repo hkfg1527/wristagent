@@ -62,6 +62,8 @@
 - 删除不再使用的 mobile 模块。
 - 代码卫生：清理 41 条未使用 import 与 2 个零引用声明（`RightButtonAction` 枚举、`ChevronMark` composable）。判定标准是「该符号在文件正文整词 0 命中」，KDoc 里的 `[Symbol]` 也算命中，所以文档锚点不会被误删；`by` 委托的隐式操作符白名单一律保留。
 - versionName 1.0 / versionCode 10。
+- **生产包不再带调试仪器**：`SettingsTopAnchorDebug` 与 `PullDownDismissDebug` 两个开关此前写死为 `true`，导致设置页每次布局变化都会 snapshotFlow 收集一次列表几何并打日志、每次下拉都打坐标——已改为 `false`（探针保留，排查时一行改回）。同时在 R8 规则里剥离 `Log.d`/`Log.v`，只保留 `Log.w`/`Log.e`（控制台端口绑定失败这类生产排障日志必须留）。
+- 仓库卫生：`docs/` 只跟踪 4 份面向使用者的文档，真机取证与工作草稿全部忽略；全仓跟踪文件里 0 个密钥串，git pack 1.45 MiB。
 
 ## [0.01] - 2026-11-07（内部测试版）
 
