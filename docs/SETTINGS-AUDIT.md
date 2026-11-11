@@ -9,6 +9,12 @@
 > - **(iii) 重复**：与另一项语义重复
 > - **真**：读取点位于真实执行路径，改值后行为可观测变化
 
+> **时点说明**：本表是 2026-11-10 审计时点的快照（47 个属性）。此后又发生了三件事，
+> 本表**未逐行回填**，以 `CHANGELOG.md` 的 1.0 条目为准：
+> 1. `mainInputType` 已整体删除（输入方式改由左翼直接打开输入框决定）；
+> 2. `visionBetaEnabled` 已删除（agent 侧零消费点，打开只多一个按钮且点击只提示服务未接入）；
+> 3. 新增 `toolApprovalPolicy` / `sandboxLevel` / `historyCompressThreshold` / `longTermMemory`（remember_fact 写入方）四项。
+
 ## 一、全字段表（47 个属性）
 
 "手表可改"= 手表端是否存在写入路径（开关 / 单选 / 滑杆 / 文本对话框）。
