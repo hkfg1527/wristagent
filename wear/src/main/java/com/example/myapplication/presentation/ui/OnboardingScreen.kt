@@ -398,6 +398,7 @@ private fun OnboardingFooter(page: Int, onSkip: () -> Unit, onAction: () -> Unit
  */
 @Composable
 private fun PageDots(page: Int) {
+    val accent = Wear.Accent
     Row(
         modifier = Modifier
             .width(OnboardingGeometry.DotsWidthDp.dp)
@@ -415,7 +416,7 @@ private fun PageDots(page: Int) {
                     .clip(CircleShape)
                     .background(
                         if (OnboardingPager.isDotActive(index, page)) {
-                            Wear.Palette.Accent
+                            accent
                         } else {
                             Wear.Palette.TextMuted
                         }
@@ -449,6 +450,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
         OnboardingGeometry.StaticPhase
     }
 
+    val accent = Wear.Accent
     Canvas(modifier = Modifier.size(OnboardingGeometry.IllustrationDp.dp)) {
         // 96dp 设计稿 → 像素的比例：所有长度都按设计稿数值写
         val unit = size.minDimension / 96f
@@ -461,13 +463,13 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
             0 -> {
                 val orbRadius = px(22f)
                 drawCircle(
-                    color = Wear.Palette.Accent.copy(alpha = 0.45f),
+                    color = accent.copy(alpha = 0.45f),
                     radius = orbRadius + px(8f),
                     center = Offset(cx, cy),
                     style = Stroke(width = px(2f), cap = StrokeCap.Round)
                 )
                 drawArc(
-                    color = Wear.Palette.Accent,
+                    color = accent,
                     startAngle = -90f,
                     sweepAngle = 360f * phase,
                     useCenter = false,
@@ -501,7 +503,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                 repeat(2) { index ->
                     val ripple = (phase + index * 0.5f) % 1f
                     drawCircle(
-                        color = Wear.Palette.Accent.copy(alpha = (1f - ripple) * 0.55f),
+                        color = accent.copy(alpha = (1f - ripple) * 0.55f),
                         radius = orbRadius + px(6f) + px(16f) * ripple,
                         center = Offset(cx, cy),
                         style = Stroke(width = px(1.5f))
@@ -516,7 +518,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                     cap = StrokeCap.Round
                 )
                 drawCircle(
-                    color = Wear.Palette.Accent,
+                    color = accent,
                     radius = px(4f),
                     center = Offset(cx + orbRadius * 0.62f, cy - orbRadius * 0.66f)
                 )
@@ -537,14 +539,14 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                 val arrowY = orbCenterY - orbRadius - px(4f) - px(30f) * phase
                 val arrowHalfWidth = px(9f)
                 drawLine(
-                    color = Wear.Palette.Accent,
+                    color = accent,
                     start = Offset(cx - arrowHalfWidth, arrowY + px(7f)),
                     end = Offset(cx, arrowY),
                     strokeWidth = px(3f),
                     cap = StrokeCap.Round
                 )
                 drawLine(
-                    color = Wear.Palette.Accent,
+                    color = accent,
                     start = Offset(cx + arrowHalfWidth, arrowY + px(7f)),
                     end = Offset(cx, arrowY),
                     strokeWidth = px(3f),
@@ -580,7 +582,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                 // 右翼：会话抽屉，强调色
                 drawCircle(color = Wear.Palette.AccentDim, radius = wingRadius, center = Offset(cx + spread, cy))
                 drawCircle(
-                    color = Wear.Palette.Accent,
+                    color = accent,
                     radius = wingRadius,
                     center = Offset(cx + spread, cy),
                     style = Stroke(width = px(1.5f))

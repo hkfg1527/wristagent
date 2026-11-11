@@ -169,7 +169,7 @@ fun ThoughtPill(
             BasicText(
                 text = "›",
                 modifier = Modifier.rotate(arrowRotation),
-                style = labelStyle.copy(color = Wear.Palette.Accent),
+                style = labelStyle.copy(color = Wear.Accent),
                 maxLines = 1
             )
         }
@@ -212,11 +212,11 @@ private fun primarySummary(summary: String?): String? {
     return first?.takeIf { it.isNotEmpty() } ?: summary?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-private fun toolStatusColor(toolCall: ConversationBlock.ToolCall): Color {
+private fun toolStatusColor(toolCall: ConversationBlock.ToolCall, accent: Color): Color {
     val summary = toolCall.resultSummary
     return when {
-        toolCall.isExecuting -> Wear.Palette.Accent
-        summary == null -> Wear.Palette.Accent
+        toolCall.isExecuting -> accent
+        summary == null -> accent
         toolFailureKeywords.any { summary.contains(it, ignoreCase = true) } -> Wear.Palette.Danger
         else -> Wear.Palette.Success
     }
@@ -234,7 +234,7 @@ fun SpringColoredToolPill(
 ) {
     val isExecuting = toolCall.isExecuting
     val meta = ToolVisualMeta.resolve(toolCall.toolName)
-    val statusColor = toolStatusColor(toolCall)
+    val statusColor = toolStatusColor(toolCall, Wear.Accent)
     // 工具专属染色：底色 14%、描边 60% 都由该工具的 tagColor 推导，和正文卡片的 Surface/Border 明确区分
     val tagColor = Color(meta.tagColorHex)
     val pillBackground = tagColor.copy(alpha = 0.14f)
@@ -345,7 +345,7 @@ fun SpringColoredToolPill(
                         // 执行中：胶囊里先给出进度，参数与返回在拿到之后补上
                         BasicText(
                             text = stringResource(R.string.ui_tool_running),
-                            style = Wear.TextMono.copy(color = Wear.Palette.Accent),
+                            style = Wear.TextMono.copy(color = Wear.Accent),
                             maxLines = 1
                         )
                     }
@@ -394,12 +394,13 @@ fun SpringStreamingText(
     // AnnotatedString（450ms 呼吸 ≈ 60 次/秒），这是流式期间最没意义的开销。
     // 而且流式时文字本身每 32ms 就换一次，闪烁根本看不出来 —— 改为静止实心光标后，
     // 重建次数从 60/秒降到「每次文本更新 1 次」。
-    val annotated = remember(cleanedText, isStreaming) {
+    val accent = Wear.Accent
+    val annotated = remember(cleanedText, isStreaming, accent) {
         buildAnnotatedString {
             // 渲染前做最小 Markdown 清洗：成对强调标记与反引号不外露，流式未闭合标记不闪烁
             append(cleanedText)
             if (isStreaming) {
-                withStyle(SpanStyle(color = Wear.Palette.Accent)) {
+                withStyle(SpanStyle(color = accent)) {
                     append(" ▌")
                 }
             }

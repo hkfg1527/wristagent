@@ -179,7 +179,7 @@ fun WearBadge(
         Tone.MUTED -> Wear.Palette.SurfaceAlt
     }
     val content = when (tone) {
-        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.ACCENT -> Wear.Accent
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.TextSecondary
     }
@@ -207,7 +207,7 @@ fun WearBanner(text: String, tone: Tone, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(Wear.Radius.Control)
     val container = if (tone == Tone.DANGER) Wear.Palette.DangerSurface else Wear.Palette.Surface
     val content = when (tone) {
-        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.ACCENT -> Wear.Accent
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.TextSecondary
     }

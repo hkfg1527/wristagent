@@ -385,7 +385,7 @@ fun BottomInteractiveBlock(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        MinimalistLayersIcon(tint = Wear.Palette.Accent)
+                        MinimalistLayersIcon(tint = Wear.Accent)
                     }
                 }
             }
@@ -691,6 +691,7 @@ private fun RememberAndAllowBand(
         },
         contentAlignment = Alignment.Center
     ) {
+        val accent = Wear.Accent
         // 进度细线：1dp、只占条带底缘，从中间向两侧长满 —— 与主键高光同一种"细而透"的语言
         Canvas(modifier = Modifier.matchParentSize()) {
             val progress = hold.value
@@ -698,7 +699,7 @@ private fun RememberAndAllowBand(
             val linePx = 1.dp.toPx()
             val lineWidth = size.width * progress
             drawRect(
-                color = Wear.Palette.Accent.copy(alpha = 0.85f),
+                color = accent.copy(alpha = 0.85f),
                 topLeft = Offset((size.width - lineWidth) / 2f, size.height - linePx),
                 size = Size(lineWidth, linePx)
             )
@@ -706,7 +707,7 @@ private fun RememberAndAllowBand(
         BasicText(
             text = RememberAndAllowLabel,
             style = Wear.TextCaption.copy(
-                color = lerp(Wear.Palette.TextSecondary, Wear.Palette.Accent, hold.value)
+                color = lerp(Wear.Palette.TextSecondary, accent, hold.value)
             ),
             maxLines = 1
         )

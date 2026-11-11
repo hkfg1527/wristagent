@@ -70,6 +70,7 @@ fun VoiceListeningOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Md)
         ) {
+            val accent = Wear.Accent
             Box(
                 modifier = Modifier.size(72.dp),
                 contentAlignment = Alignment.Center
@@ -77,7 +78,7 @@ fun VoiceListeningOverlay(
                 // 外层呼吸光环
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
-                        color = Wear.Palette.Accent.copy(alpha = ringAlpha),
+                        color = accent.copy(alpha = ringAlpha),
                         radius = (size.minDimension / 2f) * waveScale,
                         style = Stroke(width = 2.dp.toPx())
                     )
@@ -88,7 +89,7 @@ fun VoiceListeningOverlay(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(Wear.Palette.Accent)
+                        .background(accent)
                         .shadow(elevation = 6.dp, shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
