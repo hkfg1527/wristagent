@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,6 +73,28 @@ private val ApprovalContentBandReserve =
  * 固定头与内容带之间也走这同一条间距，所以它同时是 [ApprovalBandMetrics.HEADER_HEIGHT_DP] 的最后一段。
  */
 private val ApprovalTextBlockGap = ApprovalBandMetrics.BLOCK_GAP_DP.dp
+
+/**
+ * 内容带顶边的渐隐遮罩高度：12dp。
+ *
+ * 它不是装饰。内容带钉底后，顶边一定把最上面那一行从中间切开
+ * （真机 docs/device/v10/99f_approval.png：「调用 run_shell」只剩下半截），
+ * 一行字被横切一半会被读成渲染故障。顶上这一条 [Wear.Palette.Bg] 不透明 → 透明的渐隐
+ * 把被切开的半行压回背景里，于是「上面还有内容」被读成设计意图。
+ *
+ * 它不参与分带：不改变 [ApprovalBandMetrics] 的任何高度常量与守恒式，只画在内容带自己的绘制里。
+ */
+internal val ApprovalTopMaskHeight = 12.dp
+
+/**
+ * 顶边遮罩的不透明度：入参就是 ScrollState.value 的滚动量（px），滚动量 > 0 时 1，否则 0。
+ *
+ * 判据是滚动状态而不是常量：滚动量 0 表示上方已经没有内容（包括四块都放得下、整段根本不可滚），
+ * 这时画遮罩只会平白压暗第一行。钉底是即时的 —— 弹出那一帧滚动量就已经是 maxValue，
+ * 所以遮罩和滚动同帧到位，不会出现"先露半行、再淡入遮罩"的抖动，也就不需要入场动画。
+ */
+internal fun approvalTopMaskAlphaFor(scrollValue: Int): Float =
+    if (scrollValue > 0) 1f else 0f
 
 /** 审批态只做极轻压暗（0.22）：点阵必须仍然看得见，也没有任何整屏绿/红蒙色层。 */
 private const val ApprovalScrimAlpha = 0.22f
@@ -221,6 +244,8 @@ private fun approvalParagraph(
  * BottomInteractiveBlock）。固定头与内容带是兄弟节点，头**不在滚动子树里**，所以标题永远完整可见，
  * 与滚动位置无关；只有内容带会滚，滚动位置钉在底部（最坏情况始终可见），
  * 滚动容器同时把内容夹在内容带内，于是任何文字都不可能再画到滑轨上。
+ * 钉底必然在内容带顶边切开最上面那一行，所以顶边压一条 12dp 的 Bg 渐隐（见 [ApprovalTopMaskHeight]），
+ * 只在滚动量 > 0 时出现：被切开的半行淡回背景，读成"上面还有内容"而不是渲染故障。
  */
 @Composable
 internal fun ApprovalFloatingLayer(
@@ -371,6 +396,34 @@ internal fun ApprovalFloatingLayer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
+                            // 顶边渐隐遮罩（高见 [ApprovalTopMaskHeight]）：先 drawContent() 再覆盖，
+                            // 画在**这一带自己的坐标系**里 —— 必须排在 verticalScroll 之前，否则画刷会跟着内容滚走。
+                            // 只落在这 12dp 高的矩形里：盖不到固定头（兄弟节点，在带子上方），也够不到滑轨（带子底边还差 12dp）。
+                            // 刷子交给 drawWithCache：只在尺寸变化时重建，滚动时复用同一个 Brush；
+                            // 滚动量读在绘制相位里，所以滚动只让这一次 draw 失效，不会重组合也不会重布局。
+                            // 没有新增任何布局节点：这是同一个 Column 上的一条 draw modifier。
+                            .drawWithCache {
+                                val maskHeightPx = ApprovalTopMaskHeight.toPx()
+                                val mask = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Wear.Palette.Bg,
+                                        Wear.Palette.Bg.copy(alpha = 0f)
+                                    ),
+                                    startY = 0f,
+                                    endY = maskHeightPx
+                                )
+                                onDrawWithContent {
+                                    drawContent()
+                                    val maskAlpha = approvalTopMaskAlphaFor(contentScroll.value)
+                                    if (maskAlpha > 0f) {
+                                        drawRect(
+                                            brush = mask,
+                                            size = Size(size.width, maskHeightPx),
+                                            alpha = maskAlpha
+                                        )
+                                    }
+                                }
+                            }
                             // 放不下就滚动，不裁字：滚动容器把内容夹在内容带里，越过底边的东西也画不出来
                             .verticalScroll(contentScroll),
                         verticalArrangement = Arrangement.spacedBy(ApprovalTextBlockGap),

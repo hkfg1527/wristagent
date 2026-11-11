@@ -223,6 +223,30 @@ class ApprovalBandMetricsTest {
         assertTrue(overflowing > 116.5f)
     }
 
+    /**
+     * 顶边遮罩：高 12dp，出现条件读的是滚动状态而不是常量。
+     *
+     * 钉底必然在内容带顶边切开最上面那一行（真机 docs/device/v10/99f_approval.png：「调用 run_shell」只剩半截），
+     * 遮罩把这半行压回 [Wear.Palette.Bg]。但滚动量为 0 时整条都不许画 —— 四块都放得下、
+     * 整段根本不可滚的时候，画遮罩只会平白压暗第一行，把"没有内容"谎报成"上面还有内容"。
+     */
+    @Test
+    fun testTopMask_appearsOnlyWhenContentBandIsScrolled() {
+        assertEquals(12f, ApprovalTopMaskHeight.value, 0f)
+        // 遮罩不能比内容带还高：233dp 真表内容带只有 87dp
+        assertTrue(
+            ApprovalTopMaskHeight.value <
+                ApprovalBandMetrics.contentBandHeightDp(233f, ApprovalBlockHeight.value)
+        )
+        // 滚动量 0（含完全不可滚的短文案）：不画
+        assertEquals(0f, approvalTopMaskAlphaFor(0), 0f)
+        // 只要有滚动量就是满不透明度，被切开的半行不会留下半透明的残影
+        assertEquals(1f, approvalTopMaskAlphaFor(1), 0f)
+        assertEquals(1f, approvalTopMaskAlphaFor(96), 0f)
+        // 反例：判据一旦退化成常数，"滚动量为 0 不画"这条就红
+        assertTrue(approvalTopMaskAlphaFor(0) < approvalTopMaskAlphaFor(1))
+    }
+
     /** 守恒式的逐项展开：固定头 + 内容带 + 间隙 + 审批块 + 底距。 */
     private fun screenStackDp(screenHeightDp: Float, blockHeightDp: Float): Float =
         ApprovalBandMetrics.HEADER_HEIGHT_DP +
