@@ -59,11 +59,14 @@ fun VoiceListeningOverlay(
         label = "ringAlpha"
     )
 
+    // 整层没有归属自己的可读文字（子节点的"正在倾听/请对准手表说话"不会说明点了会发生什么），
+    // 动作名交给 onClickLabel：屏幕阅读器读作"双击取消录音"
+    val cancelLabel = stringResource(R.string.ui_listening_cancel)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Wear.Palette.Bg.copy(alpha = 0.94f))
-            .clickable(onClick = onCancel),
+            .clickable(onClickLabel = cancelLabel, onClick = onCancel),
         contentAlignment = Alignment.Center
     ) {
         Column(

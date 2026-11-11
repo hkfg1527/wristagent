@@ -128,6 +128,19 @@ object Wear {
 
     /** 尺寸令牌。 */
     object Size {
+        /**
+         * 图标按钮与 chip 的触摸基准尺寸：**刻意取 44dp，低于无障碍建议的 48dp，不是漏改**。
+         *
+         * Android 无障碍指引要求触摸目标 ≥48dp，但在 233dp 圆屏上 44dp 是有账可算的取舍：
+         * [com.example.myapplication.presentation.ui.OnboardingGeometry.FooterHeightDp] 与
+         * SkipWidthDp 直接由本令牌推导，页脚矩形（136×44dp，上沿 y=48dp）下沿最远角点半径
+         * 只有 114.40dp，到 116.5dp 的圆周只剩 **2.10dp** 余量；抬到 48dp 会同时把页脚变成
+         * 140×48dp，角点半径 118.81dp > 116.5dp，页脚撑出圆屏、最远那个角被裁掉。
+         * 而列表行本来就是 48dp（SettingsSpacingMath.MinRowHeightDp），44dp 只用在图标按钮与
+         * chip 这类自带圆形背景、视觉直径小于行高的小目标上。
+         *
+         * 所以改这个值不是"补上 4dp 的无障碍欠账"，而是重排引导页几何：先改圆屏预算，再改这里。
+         */
         val Touch = 44.dp
         val ChipHeight = 32.dp
         val BadgeHeight = 20.dp

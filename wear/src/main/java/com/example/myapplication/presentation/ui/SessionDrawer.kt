@@ -59,6 +59,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -441,14 +443,20 @@ private fun SessionRow(
     }
 }
 
-/** 44dp Canvas 叉号删除键：只进入确认态，不直接删数据。 */
+/**
+ * 44dp Canvas 叉号删除键：只进入确认态，不直接删数据。
+ *
+ * 叉号是纯图形，屏幕阅读器读不出"删除"，无障碍名称由 [contentDescription] 提供。
+ */
 @Composable
 private fun DeleteButton(onClick: () -> Unit) {
+    val deleteDescription = stringResource(R.string.ui_drawer_delete_session)
     Box(
         modifier = Modifier
             .size(Wear.Size.Touch)
             .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = deleteDescription },
         contentAlignment = Alignment.Center
     ) {
         CrossMark(color = Wear.Palette.Danger)
@@ -476,14 +484,16 @@ private fun ConfirmDeleteButton(label: String, color: Color, onClick: () -> Unit
     }
 }
 
-/** 44dp Canvas 叉号关闭键。 */
+/** 44dp Canvas 叉号关闭键：同样是纯图形，无障碍名称由 [contentDescription] 提供。 */
 @Composable
 private fun CloseButton(onClick: () -> Unit) {
+    val closeDescription = stringResource(R.string.ui_drawer_close)
     Box(
         modifier = Modifier
             .size(Wear.Size.Touch)
             .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = closeDescription },
         contentAlignment = Alignment.Center
     ) {
         CrossMark(color = Wear.Palette.TextSecondary)

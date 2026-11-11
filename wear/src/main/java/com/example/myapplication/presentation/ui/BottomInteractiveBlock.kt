@@ -70,6 +70,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -335,6 +338,8 @@ fun BottomInteractiveBlock(
                 // 左翼本身就是"改用键盘"那条路，不必先切模式再回主键上点第二下。
                 if (wingAlpha > 0.02f) {
                     val leftOffsetDp = (-50.dp * splitProgress.value)
+                    // 纯图标副键：没有可见文字，无障碍名称只能由 contentDescription 提供
+                    val leftWingDescription = stringResource(R.string.ui_bottom_open_keyboard)
                     Box(
                         modifier = Modifier
                             .offset(x = leftOffsetDp)
@@ -347,6 +352,7 @@ fun BottomInteractiveBlock(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
+                                role = Role.Button,
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
@@ -354,7 +360,8 @@ fun BottomInteractiveBlock(
                                     }
                                     onLeftKeyboardClick()
                                 }
-                            ),
+                            )
+                            .semantics { contentDescription = leftWingDescription },
                         contentAlignment = Alignment.Center
                     ) {
                         MinimalistKeyboardIcon(tint = Wear.Palette.TextSecondary)
@@ -364,6 +371,7 @@ fun BottomInteractiveBlock(
                 // 右副键：固定打开会话抽屉 (横向手势已被系统占用，不再按偏好渲染三种图标)
                 if (wingAlpha > 0.02f) {
                     val rightOffsetDp = (50.dp * splitProgress.value)
+                    val rightWingDescription = stringResource(R.string.ui_bottom_open_sessions)
                     Box(
                         modifier = Modifier
                             .offset(x = rightOffsetDp)
@@ -376,6 +384,7 @@ fun BottomInteractiveBlock(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
+                                role = Role.Button,
                                 onClick = {
                                     scope.launch {
                                         isSplitExpanded = false
@@ -383,7 +392,8 @@ fun BottomInteractiveBlock(
                                     }
                                     onRightActionClick()
                                 }
-                            ),
+                            )
+                            .semantics { contentDescription = rightWingDescription },
                         contentAlignment = Alignment.Center
                     ) {
                         MinimalistLayersIcon(tint = Wear.Accent)

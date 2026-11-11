@@ -10,9 +10,13 @@
     <string name="ui_drawer_new_chat">＋ 新开对话</string>
     <string name="ui_drawer_settings">系统设置</string>
     <string name="ui_drawer_delete_confirm">删除该会话？</string>
+    <string name="ui_drawer_delete_session">删除会话</string>
+    <string name="ui_drawer_close">关闭</string>
 
     <!-- 底栏交互块。 -->
     <string name="ui_bottom_stop">停止</string>
+    <string name="ui_bottom_open_keyboard">打开键盘</string>
+    <string name="ui_bottom_open_sessions">会话与模型</string>
 
     <!-- 审批滑块与等级标题。 -->
     <string name="ui_approval_reject_tap">点击拒绝</string>
@@ -37,4 +41,5 @@
     <!-- 语音监听浮层。 -->
     <string name="ui_listening">正在倾听...</string>
     <string name="ui_listening_hint">请对准手表说话</string>
+    <string name="ui_listening_cancel">取消录音</string>
 </resources>
