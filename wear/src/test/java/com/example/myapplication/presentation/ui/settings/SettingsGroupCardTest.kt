@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.presentation.ui.theme.Wear
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -144,7 +145,8 @@ class SettingsGroupCardTest {
 
     @Test
     fun cardConstantsArePinned() {
-        assertEquals(16f, SettingsDesignMath.GroupCardRadiusDp, 0.001f)
+        // 圆角统一进令牌：形状值只允许在 Wear.Radius 里定义一次，页面与数学层都从这里取
+        assertEquals(16f, Wear.Radius.Group.value, 0.001f)
         assertEquals(14f, SettingsDesignMath.RowSidePaddingDp, 0.001f)
         assertEquals(0f, SettingsSpacingMath.CardRowGapDp, 0.001f)
     }

@@ -478,9 +478,6 @@ object SettingsDesignMath {
     /** 组间留白：24dp，恒 >= 组内行距的 2 倍（实际 6 倍）。 */
     const val SectionGapDp = 24f
 
-    /** 组卡片圆角：固定 16dp。MaterialTheme.shapes.small 对 42~48dp 高的行来说太大，读起来像按钮。 */
-    const val GroupCardRadiusDp = 16f
-
     /** 组卡片内一行的左右内边距：取值右端因此距卡片右缘 14dp，不再贴死在圆角上。 */
     const val RowSidePaddingDp = 14f
 

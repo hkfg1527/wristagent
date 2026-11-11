@@ -625,7 +625,7 @@ private val RowVerticalPadding: Dp = 2.dp
 val SettingsRowSidePadding: Dp = SettingsDesignMath.RowSidePaddingDp.dp
 
 /** 组卡片圆角：固定 16dp，不吃 MaterialTheme.shapes.small（它对一行来说太大）。 */
-private val GroupCardRadius: Dp = SettingsDesignMath.GroupCardRadiusDp.dp
+private val GroupCardRadius: Dp = Wear.Radius.Group
 
 /**
  * 当前行在所属卡片里的位置，由列表构建侧（根页 / [SettingsSubPage]）按组提供。
