@@ -11,6 +11,8 @@ data class ConsoleRequest(
     val body: String? = null,
     val bodyBytes: Int = 0,
     val bodyTooLarge: Boolean = false,
+    /** 对端 IP：失败限流按它分桶，避免局域网内任一主机把合法用户锁在门外。 */
+    val client: String = "",
 ) {
     fun header(name: String): String? =
         headers[name.lowercase()] ?: headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
@@ -41,9 +43,6 @@ class ConsoleResponse(
  * 控制台接口的全部纯逻辑：路由匹配、token 校验、settings 读写与校验、action 分发、静态资源。
  * 不引用任何 Android 或传输层类型，因此可以完整地在 JVM 单测里驱动。
  */
-/** Secret fields masked in every console response. */
-private val CONSOLE_SECRET_KEYS = listOf("apiKey", "baiduApiKey", "baiduSecretKey")
-
 class ConsoleApi(
     private val settings: ConsoleSettingsPort,
     private val capabilities: () -> Map<String, Any?>,
@@ -65,15 +64,20 @@ class ConsoleApi(
     private fun route(request: ConsoleRequest): ConsoleResponse {
         val method = request.method.uppercase()
         val path = normalizePath(request.path)
+        if (path == HEALTHZ_PATH) {
+            if (method != "GET" && method != "HEAD") return errorJson(405, "method_not_allowed")
+            return healthz()
+        }
         if (path == "/api" || path.startsWith("/api/")) {
             // 鉴权先于一切：缺 token/错 token 一律 401，不泄露路径是否存在
             val nowMs = clock()
-            if (throttle.isLocked(nowMs)) return errorJson(429, "too_many_attempts")
+            val peer = request.client
+            if (throttle.isLocked(nowMs, peer)) return errorJson(429, "too_many_attempts")
             if (!authorized(request)) {
-                throttle.onFailure(nowMs)
+                throttle.onFailure(nowMs, peer)
                 return errorJson(401, "unauthorized")
             }
-            throttle.onSuccess()
+            throttle.onSuccess(peer)
             return when {
                 path == "/api/ping" ->
                     if (method == "GET") ping() else errorJson(405, "method_not_allowed")
@@ -114,6 +118,27 @@ class ConsoleApi(
         linkedMapOf<String, Any?>("ok" to true, "version" to API_VERSION, "app" to APP_NAME),
     )
 
+    /**
+     * 免鉴权存活探针：PC 排障时用它区分「没起 / 起在别的端口 / 401」。
+     * 只回运行参数，不含密钥、令牌与任何网络地址。
+     */
+    private fun healthz(): ConsoleResponse = jsonResponse(
+        200,
+        linkedMapOf<String, Any?>(
+            "ok" to true,
+            "app" to APP_NAME,
+            "version" to API_VERSION,
+            "port" to serverPort(),
+            "uptimeMs" to uptime(),
+            "model" to currentModelName(),
+        ),
+    )
+
+    private fun currentModelName(): String {
+        val live = runCatching { settings.snapshot() }.getOrNull().orEmpty()
+        return live["modelName"] as? String ?: ""
+    }
+
     private fun state(): ConsoleResponse = jsonResponse(
         200,
         linkedMapOf<String, Any?>(
@@ -131,7 +156,11 @@ class ConsoleApi(
         // anyone who guesses the 4-digit access code.
         val live = runCatching { settings.snapshot() }.getOrNull().orEmpty()
             .toMutableMap<String, Any?>()
-            .apply { for (secret in CONSOLE_SECRET_KEYS) this[secret] = ConsoleToken.mask(this[secret] as? String) }
+            .apply {
+                for (secret in ConsoleSecrets.KEYS) {
+                    if (containsKey(secret)) this[secret] = ConsoleSecrets.mask(this[secret] as? String)
+                }
+            }
         val out = LinkedHashMap<String, Any?>()
         for (field in ConsoleFields.ALL) out[field.key] = live[field.key]
         for ((alias, real) in ConsoleFields.ALIASES) {
@@ -161,6 +190,7 @@ class ConsoleApi(
 
         val ignored = ArrayList<String>()
         val pending = ArrayList<Pair<String, Any>>()
+        val live = runCatching { settings.snapshot() }.getOrNull().orEmpty()
         // 先全量校验再落库：任何一个字段类型不符都整单拒绝，避免半套设置生效
         for ((key, value) in parsed) {
             val field = ConsoleFields.field(key)
@@ -169,7 +199,18 @@ class ConsoleApi(
                 continue
             }
             when (val coerced = ConsoleFields.coerce(field, value)) {
-                is ConsoleValue.Valid -> pending += field.key to coerced.value
+                is ConsoleValue.Valid -> {
+                    val candidate = coerced.value
+                    // 网页把状态接口给的掩码原样回传时，那不是新密钥而是回写事故：保留旧值，绝不落库
+                    if (candidate is String &&
+                        ConsoleSecrets.isSecret(field.key) &&
+                        ConsoleSecrets.isMaskEcho(candidate, live[field.key] as? String)
+                    ) {
+                        continue
+                    }
+                    pending += field.key to candidate
+                }
+
                 ConsoleValue.BadType -> return errorJson(400, "bad_type", field.key)
                 is ConsoleValue.BadValue -> return jsonResponse(
                     400,
@@ -180,9 +221,22 @@ class ConsoleApi(
                         "allowed" to coerced.allowed,
                     ),
                 )
+                is ConsoleValue.OutOfRange -> return jsonResponse(
+                    400,
+                    linkedMapOf<String, Any?>(
+                        "ok" to false,
+                        "error" to "bad_value",
+                        "field" to field.key,
+                        "min" to coerced.min,
+                        "max" to coerced.max,
+                    ),
+                )
             }
         }
-        for ((key, value) in pending) settings.write(key, value)
+        for ((key, value) in pending) {
+            // 存储层拒绝必须回给网页：静默当成功就是「网页能改、手表没变」的老问题
+            if (settings.write(key, value) != ConsoleWriteResult.OK) ignored += key
+        }
 
         val payload = linkedMapOf<String, Any?>("ok" to true, "settings" to snapshotWithAliases())
         if (ignored.isNotEmpty()) payload["ignored"] = ignored
@@ -219,6 +273,7 @@ class ConsoleApi(
     companion object {
         const val APP_NAME = "wristagent"
         const val API_VERSION = 1
+        const val HEALTHZ_PATH = "/healthz"
         const val MAX_BODY_BYTES = 64 * 1024
 
         private val BACKENDS = setOf("ROOT", "SHIZUKU", "DIRECT")

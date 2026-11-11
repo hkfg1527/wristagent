@@ -1,13 +1,14 @@
 package com.example.myapplication.agent.remote
 
 import android.content.Context
+import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.Collections
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
@@ -40,7 +41,7 @@ class ConsoleServer(
     @Synchronized
     override fun start() {
         if (isRunning) return
-        val executor = newPool()
+        val executor = newRequestPool()
         var chosen = -1
         var bound: NanoHTTPD? = null
         for ((index, candidate) in ConsolePortPolicy.candidates(preferredPort, attempts).withIndex()) {
@@ -52,13 +53,16 @@ class ConsoleServer(
                 chosen = candidate
                 bound = httpd
                 break
-            } catch (_: IOException) {
+            } catch (error: IOException) {
+                Log.w(TAG, "端口 " + candidate + " 绑定失败，转下一个候选", error)
                 closeListener(httpd)
-            } catch (_: RuntimeException) {
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "端口 " + candidate + " 绑定异常，转下一个候选", error)
                 closeListener(httpd)
             }
         }
         if (bound == null) {
+            Log.w(TAG, "全部候选端口都不可用，控制台未启动：" + ConsolePortPolicy.candidates(preferredPort, attempts))
             runCatching { executor.shutdownNow() }
             return
         }
@@ -159,7 +163,9 @@ class ConsoleServer(
             }
         }
 
-        return api.handle(ConsoleRequest(method, uri, query, headers, body, bodyBytes, tooLarge))
+        // 对端 IP 只用于失败限流分桶，不写进任何响应
+        val client = runCatching { session.remoteIpAddress }.getOrNull().orEmpty()
+        return api.handle(ConsoleRequest(method, uri, query, headers, body, bodyBytes, tooLarge, client))
     }
 
     private fun errorResponse(status: Int, error: String): ConsoleResponse =
@@ -176,22 +182,31 @@ class ConsoleServer(
         return response
     }
 
-    private fun newPool(): ThreadPoolExecutor = ThreadPoolExecutor(
+    /** 请求执行池；可见是为了让单测断言队列上界，而不是把容量当成实现细节。 */
+    fun newRequestPool(): ThreadPoolExecutor = ThreadPoolExecutor(
         0,
         MAX_WORKERS,
         30L,
         TimeUnit.SECONDS,
-        LinkedBlockingQueue(),
+        ArrayBlockingQueue(QUEUE_CAPACITY),
     ).apply { allowCoreThreadTimeOut(true) }
 
+    /** 投递请求：队列满时返回 false，而不是让 RejectedExecutionException 打死 accept 循环。 */
+    fun submitRequest(executor: ThreadPoolExecutor, task: Runnable): Boolean =
+        runCatching { executor.execute(task) }.isSuccess
+
     /** 把 NanoHTTPD 的请求执行托管到自有线程池，并跟踪在途连接以便 stop() 一并关闭。 */
-    private class PooledRunner(private val executor: ThreadPoolExecutor) : NanoHTTPD.AsyncRunner {
+    private inner class PooledRunner(private val executor: ThreadPoolExecutor) : NanoHTTPD.AsyncRunner {
 
         private val open = Collections.synchronizedList(ArrayList<NanoHTTPD.ClientHandler>())
 
         override fun exec(code: NanoHTTPD.ClientHandler) {
+            // 队列满时丢弃这条连接：RejectedExecutionException 逃出 exec 会连带打死整个 accept 循环
+            if (!submitRequest(executor, code)) {
+                runCatching { code.close() }
+                return
+            }
             open.add(code)
-            executor.execute(code)
         }
 
         override fun closed(code: NanoHTTPD.ClientHandler) {
@@ -234,7 +249,11 @@ class ConsoleServer(
     }
 
     companion object {
+        private const val TAG = "ConsoleServer"
         private const val MAX_WORKERS = 8
+
+        /** 排队上界：8 个在跑 + 64 个排队，再多也只能证明有人在刷，不该进内存。 */
+        const val QUEUE_CAPACITY = 64
 
         @Volatile
         private var singleton: ConsoleServer? = null

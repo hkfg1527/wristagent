@@ -35,7 +35,11 @@ class ConsoleSettingsMappingTest {
         } else {
             "console-" + field.key
         }
-        ConsoleFieldType.FLOAT -> 0.25f
+        ConsoleFieldType.FLOAT -> {
+            val min = field.min ?: 0.0
+            val max = field.max ?: 1.0
+            (min + (max - min) / 2.0).toFloat()
+        }
         ConsoleFieldType.INT -> 7
         ConsoleFieldType.BOOLEAN -> !(current as? Boolean ?: false)
         ConsoleFieldType.ENUM -> field.allowed.last()
@@ -254,13 +258,19 @@ class ConsoleSettingsMappingTest {
         return ConsoleJson.parseObject(response.text())!!
     }
 
-    /** 反证：同一套请求通道对"白名单外的键"必须回 ignored，证明上面两条绿灯不是恒真。 */
+    /**
+     * 反证：同一套请求通道对"白名单外的键"必须回 ignored，证明上面两条绿灯不是恒真。
+     *
+     * 用作反证样本的键必须同时满足两件事：AgentPreferences 里有真实 getter（才能验证"没落库"），
+     * 且不在 ConsoleFields.ALL 里。reasoningEffort 两者都满足；
+     * 原先取的 voiceWakeOnScreen 已随设置审计删除（零消费点的假开关）。
+     */
     @Test
     fun unregisteredKeyStillLandsInIgnored() {
         val store = freshStore()
         val preferences = AgentPreferences(store)
-        val before = preferences.voiceWakeOnScreen
-        val body = "{\"voiceWakeOnScreen\":" + !before + "}"
+        val before = preferences.reasoningEffort
+        val body = "{\"reasoningEffort\":\"high\"}"
         val response = webApi(settings(store)).handle(
             ConsoleRequest(
                 "POST",
@@ -271,8 +281,8 @@ class ConsoleSettingsMappingTest {
             )
         )
         assertEquals(200, response.status)
-        assertEquals(listOf("voiceWakeOnScreen"), ConsoleJson.parseObject(response.text())!!["ignored"])
-        assertEquals("未注册的键不得落库", before, preferences.voiceWakeOnScreen)
+        assertEquals(listOf("reasoningEffort"), ConsoleJson.parseObject(response.text())!!["ignored"])
+        assertEquals("未注册的键不得落库", before, preferences.reasoningEffort)
     }
 
     private fun webApi(port: ConsoleSettingsPort): ConsoleApi = ConsoleApi(
@@ -292,7 +302,6 @@ class ConsoleSettingsMappingTest {
         val NEW_BOOLEAN_KEYS = listOf(
             "animationsEnabled",
             "subAgentEnabled",
-            "visionBetaEnabled",
             "compactMode",
             "providerManagedSearchEnabled",
             "autoSpeakReplies",

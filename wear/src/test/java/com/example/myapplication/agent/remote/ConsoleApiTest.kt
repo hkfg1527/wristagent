@@ -47,7 +47,6 @@ class ConsoleApiTest {
         "isMcpEnabled" to true,
         "mcpEndpoint" to "http://127.0.0.1:8000/sse",
         "matrixSpacingDp" to 16f,
-        "mainInputType" to "VOICE",
         "streamMode" to true,
         "hasCompletedOnboarding" to true,
     )
@@ -354,7 +353,7 @@ class ConsoleApiTest {
             "securityMode", "maxContextTurns", "asrProvider", "baiduApiKey", "baiduSecretKey", "asrEnabled",
             "toolDeviceStatusEnabled", "toolVibrateEnabled", "toolMatrixDensityEnabled", "toolPowerModeEnabled",
             "toolWeatherEnabled", "toolWebSearchEnabled", "isMcpEnabled", "mcpEndpoint", "matrixSpacingDp",
-            "mainInputType", "streamMode", "hasCompletedOnboarding",
+            "streamMode", "hasCompletedOnboarding",
         )
         for (key in expected) assertTrue("缺少字段 " + key, settings.containsKey(key))
         assertEquals(settings["baseUrl"], settings["apiBaseUrl"])

@@ -8,7 +8,9 @@ import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import com.example.myapplication.agent.AgentDispatcher
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.SettingsChangeBus
+import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.ProviderProfile
 import com.example.myapplication.agent.ProviderProfileBook
 import com.example.myapplication.agent.providerProfileId
@@ -76,11 +78,9 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "mcpEndpoint" to preferences.mcpEndpoint,
         "providerProfiles" to webProviderProfiles(preferences),
         "matrixSpacingDp" to preferences.matrixSpacingDp,
-        "mainInputType" to preferences.mainInputType,
         "streamMode" to preferences.streamMode,
         "animationsEnabled" to preferences.animationsEnabled,
         "subAgentEnabled" to preferences.subAgentEnabled,
-        "visionBetaEnabled" to preferences.visionBetaEnabled,
         "compactMode" to preferences.compactMode,
         "providerManagedSearchEnabled" to preferences.providerManagedSearchEnabled,
         "autoSpeakReplies" to preferences.autoSpeakReplies,
@@ -88,6 +88,9 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "defaultThinkingEnabled" to preferences.defaultThinkingEnabled,
         "memoryEnabled" to preferences.memoryEnabled,
         "autoCompressContext" to preferences.autoCompressContext,
+        "sandboxLevel" to preferences.sandboxLevel.storageKey,
+        "toolApprovalPolicy" to preferences.toolApprovalPolicy.storageKey,
+        "historyCompressThreshold" to preferences.historyCompressThreshold,
         "hasCompletedOnboarding" to preferences.hasCompletedOnboarding,
     )
 
@@ -123,13 +126,10 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
             }
             "matrixSpacingDp" -> preferences.matrixSpacingDp =
                 (value as? Number)?.toFloat() ?: return ConsoleWriteResult.READ_ONLY
-            "mainInputType" -> preferences.mainInputType = value as? String ?: return ConsoleWriteResult.READ_ONLY
             "streamMode" -> preferences.streamMode = value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "animationsEnabled" -> preferences.animationsEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "subAgentEnabled" -> preferences.subAgentEnabled =
-                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
-            "visionBetaEnabled" -> preferences.visionBetaEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "compactMode" -> preferences.compactMode =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
@@ -145,6 +145,20 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "autoCompressContext" -> preferences.autoCompressContext =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "sandboxLevel" -> {
+                val storage = value as? String ?: return ConsoleWriteResult.READ_ONLY
+                val level = SandboxLevel.values().firstOrNull { it.storageKey == storage }
+                    ?: return ConsoleWriteResult.READ_ONLY
+                preferences.sandboxLevel = level
+            }
+            "toolApprovalPolicy" -> {
+                val storage = value as? String ?: return ConsoleWriteResult.READ_ONLY
+                val policy = ToolApprovalPolicy.values().firstOrNull { it.storageKey == storage }
+                    ?: return ConsoleWriteResult.READ_ONLY
+                preferences.toolApprovalPolicy = policy
+            }
+            "historyCompressThreshold" -> preferences.historyCompressThreshold =
+                (value as? Number)?.toFloat() ?: return ConsoleWriteResult.READ_ONLY
             else -> return ConsoleWriteResult.READ_ONLY
         }
         // 写入成功后通知界面重读：否则运行中的界面要等重启才看到新值
@@ -282,9 +296,9 @@ internal object ConsoleBridge {
 
     private fun exportSettings(preferences: AgentPreferences): String {
         val snapshot = LinkedHashMap(AgentPreferencesSettingsPort(preferences).snapshot())
-        snapshot["apiKey"] = ConsoleToken.mask(snapshot["apiKey"] as? String)
-        snapshot["baiduApiKey"] = ConsoleToken.mask(snapshot["baiduApiKey"] as? String)
-        snapshot["baiduSecretKey"] = ConsoleToken.mask(snapshot["baiduSecretKey"] as? String)
+        for (secret in ConsoleSecrets.KEYS) {
+            snapshot[secret] = ConsoleSecrets.mask(snapshot[secret] as? String)
+        }
         return ConsoleJson.write(snapshot)
     }
 

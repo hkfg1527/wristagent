@@ -15,7 +15,21 @@
   var TOAST_MS = 1600;
   var CUSTOM_MODEL = '__custom__';
   var MODEL_FALLBACK = ['deepseek-chat', 'deepseek-reasoner'];
-  var MAX_TOKEN_STEPS = [150, 300, 600, 1200, 2048];
+  var MAX_TOKEN_STEPS = [64, 150, 300, 600, 1200, 2048, 4096, 8192];   /* 契约 16..8192，档位覆盖首尾 */
+  /* 服务端可写键：唯一权威来源是 ConsoleFields.ALL 的 35 个可写键 + ALIASES 的 6 个镜像键。
+     不在这份清单里的键服务端不认识，提交前一律剔除，值只留在本地草稿。改这里之前先核对 ConsoleFields.kt。 */
+  var SERVER_KEYS = [
+    'baseUrl', 'apiKey', 'modelName', 'temperature', 'maxOutputTokens', 'customSystemPrompt',
+    'securityMode', 'maxContextTurns', 'asrProvider', 'baiduApiKey', 'baiduSecretKey', 'asrEnabled',
+    'toolDeviceStatusEnabled', 'toolVibrateEnabled', 'toolMatrixDensityEnabled', 'toolPowerModeEnabled',
+    'toolWeatherEnabled', 'toolWebSearchEnabled', 'isMcpEnabled', 'mcpEndpoint', 'providerProfiles',
+    'matrixSpacingDp', 'streamMode', 'animationsEnabled', 'subAgentEnabled',
+    'compactMode', 'providerManagedSearchEnabled', 'autoSpeakReplies',
+    'asrLiveTranscript', 'defaultThinkingEnabled', 'memoryEnabled', 'autoCompressContext',
+    'sandboxLevel', 'toolApprovalPolicy', 'historyCompressThreshold',
+    'apiBaseUrl', 'maxTokens', 'systemPrompt', 'memoryRounds', 'longTermMemoryEnabled', 'asrEngine'
+  ];
+
   var SKIN_WATCH_MAX = 420;   /* <=420px：手表皮肤 */
   var SKIN_PHONE_MAX = 900;   /* 421~900px：手机皮肤；>900px：电脑皮肤 */
 
@@ -338,6 +352,8 @@
   /* ---------------- 字段读写 ---------------- */
   function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
+  function isServerKey(k) { return SERVER_KEYS.indexOf(k) >= 0; }
+
   /* 读值优先级：本地草稿（服务端 ignored 的键）> 服务端快照 > 页面默认值。
      任一层缺失都回落到下一层，所以后端没有这个字段时页面照常显示默认值。 */
   function readValue(row) {
@@ -376,13 +392,20 @@
     return changed;
   }
 
-  /* 草稿横幅：保存与刷新后都要能解释「为什么这个值没落库」 */
+  /* 草稿横幅：保存与刷新后都要能解释「为什么这个值没落库」。
+     只在草稿集合变化时重绘，滑杆连续 input 不该每帧重建 DOM。 */
+  var draftSig = '';
+
   function draftBanner(keys) {
-    if (!keys || !keys.length) { clearBanner('draft'); return; }
+    var list = keys || [];
+    if (!list.length) { draftSig = ''; clearBanner('draft'); return; }
+    var sig = list.join('|');
+    if (sig === draftSig && banners.has('draft')) return;
+    draftSig = sig;
     setBanner('draft', {
       tone: 'warn',
-      title: keys.length + ' 项设置后端暂未支持',
-      text: '服务端回执 ignored：' + keys.join('、') + '。这些输入已保留为本地草稿（刷新页面仍在），后端支持后自动回写落库。',
+      title: list.length + ' 项设置只保存在本地',
+      text: '这些键没有落在手表上：' + list.join('、') + '。输入已保留在本机浏览器（刷新页面仍在），不会写入手表设置。',
       dismissible: true
     });
   }
@@ -415,16 +438,30 @@
     return String(value);
   }
 
-  function payloadFor(row, value) {
-    var body = {};
-    for (var i = 0; i < row.keys.length; i++) body[row.keys[i]] = coerce(row, value);
-    return body;
+  /* 一行可能挂多个键（主键 + 契约别名）。只有服务端认识的键进 POST，
+     其余键不外发，值直接落本地草稿：服务端不认识它，发过去只会被 ignored 回来。 */
+  function splitBody(row, value) {
+    var v = coerce(row, value);
+    var server = {}, local = {};
+    for (var i = 0; i < row.keys.length; i++) {
+      if (isServerKey(row.keys[i])) server[row.keys[i]] = v;
+      else local[row.keys[i]] = v;
+    }
+    return { server: server, local: local };
   }
 
   /* ---------------- 保存流水线 ---------------- */
   function queueSave(row, value) {
-    var body = payloadFor(row, value);
-    Object.keys(body).forEach(function (k) { dirty[k] = body[k]; });
+    var parts = splitBody(row, value);
+    var localKeys = Object.keys(parts.local);
+    if (localKeys.length) {
+      localKeys.forEach(function (k) { drafts[k] = parts.local[k]; });
+      saveDrafts();
+      draftBanner(Object.keys(drafts));
+    }
+    var serverKeys = Object.keys(parts.server);
+    if (!serverKeys.length) return;
+    serverKeys.forEach(function (k) { dirty[k] = parts.server[k]; });
     clearTimeout(dirtyTimer);
     dirtyTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
@@ -969,10 +1006,9 @@
       }, {
         title: '请求', rows: [
           { id: 'streamMode', type: 'switch', label: '流式输出', hint: '边生成边回传，首字更快', keys: ['streamMode'], def: true, kw: 'stream 流式 sse' },
-          { id: 'defaultThinkingEnabled', type: 'switch', label: '默认深度思考', hint: '新会话默认开启思考链', keys: ['defaultThinkingEnabled'], def: false, kw: 'think 思考 推理 reasoning 默认' },
+          { id: 'defaultThinkingEnabled', type: 'switch', label: '默认深度思考', hint: '新会话默认开启思考链', keys: ['defaultThinkingEnabled'], def: true, kw: 'think 思考 推理 reasoning 默认' },
           { id: 'providerManagedSearchEnabled', type: 'switch', label: '供应商托管搜索', hint: '由服务商执行联网，本机不发搜索请求', keys: ['providerManagedSearchEnabled'], def: false, kw: 'search 搜索 联网 托管 供应商' },
-          { id: 'autoCompressContext', type: 'switch', label: '自动压缩上下文', hint: '超出轮数上限时摘要旧对话，不丢开头', keys: ['autoCompressContext'], def: true, kw: 'compress 压缩 上下文 摘要 context' },
-          { id: 'visionBetaEnabled', type: 'switch', label: '视觉输入', hint: '允许随消息附带图片（实验）', keys: ['visionBetaEnabled'], def: false, kw: 'vision 视觉 图片 图像 多模态 beta' }
+          { id: 'autoCompressContext', type: 'switch', label: '自动压缩上下文', hint: '占用超过压缩阈值后丢弃最旧的对话，系统头固定保留', keys: ['autoCompressContext'], def: true, kw: 'compress 压缩 上下文 摘要 context' },
         ]
       }, {
         title: '采样微调', rows: [
@@ -986,7 +1022,7 @@
       id: 'provider', title: '供应商与网络', sub: '五套供应商档案、自定义请求头与代理', icon: 'provider',
       sections: [{
         title: '供应商档案', rows: [
-          { id: 'providerProfiles', type: 'list', label: '档案列表', hint: '常用 5 套：名称 / 端点 / 模型，可增删改；下方按钮走 action connection-test', addLabel: '新增供应商', emptyText: '还没有供应商档案', fields: ['name', 'baseUrl', 'model'], fieldLabels: { name: '名称', baseUrl: '端点', model: '模型' }, actionName: 'connection-test', actionLabel: '测试连接', actionHint: 'connectionTest：按当前档案发起一次最小请求', keys: ['providerProfiles'], def: [{ name: 'DeepSeek 主用', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }, { name: 'DeepSeek 备用', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-reasoner' }, { name: '中转节点', baseUrl: 'https://relay.example.com/v1', model: 'deepseek-chat' }, { name: '本地 Ollama', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:7b' }, { name: '自建兼容端', baseUrl: 'http://192.168.1.10:8000/v1', model: 'custom' }], kw: 'provider 供应商 profile 档案 providerProfiles 端点 中转 测试连接 connectionTest 五套' }
+          { id: 'providerProfiles', type: 'list', label: '档案列表', hint: '常用 5 套：名称 / 端点 / 模型，可增删改；下方按钮走 action connection-test', addLabel: '新增供应商', emptyText: '还没有供应商档案', fields: ['name', 'baseUrl', 'model'], fieldLabels: { name: '名称', baseUrl: '端点', model: '模型' }, actionName: 'connection-test', actionLabel: '测试连接', actionHint: 'connectionTest：按当前档案发起一次最小请求', keys: ['providerProfiles'], def: [], kw: 'provider 供应商 profile 档案 providerProfiles 端点 中转 测试连接 connectionTest 五套' }
         ]
       }, {
         title: '请求头与代理', rows: [
@@ -1013,7 +1049,7 @@
       sections: [{
         title: '采样与长度', rows: [
           { id: 'temperature', type: 'slider', label: '温度', hint: '越高越发散，0 表示尽量确定', min: 0, max: 1.5, step: 0.1, int: false, fmt: function (v) { return Number(v).toFixed(1); }, keys: ['temperature'], def: 0.7, kw: 'temperature 温度 随机 发散' },
-          { id: 'maxTokens', type: 'slider', label: '最大输出 tokens', hint: '档位 150 / 300 / 600 / 1200 / 2048', steps: MAX_TOKEN_STEPS, keys: ['maxOutputTokens', 'maxTokens'], def: 2048, kw: 'tokens max 输出长度 maxOutputTokens 长度' }
+          { id: 'maxTokens', type: 'slider', label: '最大输出 tokens', hint: '档位 64 / 150 / 300 / 600 / 1200 / 2048 / 4096 / 8192', steps: MAX_TOKEN_STEPS, keys: ['maxOutputTokens', 'maxTokens'], def: 2048, kw: 'tokens max 输出长度 maxOutputTokens 长度' }
         ]
       }, {
         title: '提示词', rows: [
@@ -1021,8 +1057,9 @@
         ]
       }, {
         title: '上下文', rows: [
+          { id: 'maxContextTurns', type: 'slider', label: '上下文轮数上限', hint: '每次请求最多带入的历史对话轮数，上限 200 轮', min: 0, max: 200, step: 1, unit: '轮', keys: ['maxContextTurns', 'memoryRounds'], def: 30, kw: 'context 上下文 轮数 历史 memoryRounds maxContextTurns 记忆 轮次 上限' },
           { id: 'contextWindow', type: 'slider', label: '上下文窗口', hint: '单次请求最多带入的上下文长度', steps: [4096, 8192, 16384, 32768, 65536, 131072], fmt: function (v) { return Math.round(Number(v) / 1024) + 'k'; }, unit: 'tokens', keys: ['contextWindow', 'maxContextTokens'], def: 32768, kw: 'context 上下文 窗口 contextWindow tokens 长度' },
-          { id: 'historyCompressThreshold', type: 'slider', label: '历史压缩阈值', hint: '占用超过该比例后开始压缩历史', min: 0.3, max: 0.95, step: 0.05, int: false, round: 2, fmt: function (v) { return Math.round(Number(v) * 100) + '%'; }, keys: ['historyCompressThreshold', 'compressThreshold'], def: 0.8, kw: 'compress 压缩 阈值 历史 historyCompressThreshold' },
+          { id: 'historyCompressThreshold', type: 'slider', label: '历史压缩阈值', hint: '占用超过该比例后开始压缩历史', min: 0.3, max: 0.95, step: 0.05, int: false, round: 2, fmt: function (v) { return Math.round(Number(v) * 100) + '%'; }, keys: ['historyCompressThreshold'], def: 0.8, kw: 'compress 压缩 阈值 历史 historyCompressThreshold' },
           { id: 'truncationStrategy', type: 'segmented', label: '截断策略', hint: '超出窗口时优先丢弃哪一端', keys: ['truncationStrategy'], def: 'TRUNCATE_TAIL', options: [{ v: 'TRUNCATE_TAIL', t: '留近期' }, { v: 'TRUNCATE_HEAD', t: '留早期' }, { v: 'SUMMARY', t: '摘要代替' }], kw: 'truncation 截断 策略 truncationStrategy 丢弃 摘要' }
         ]
       }]
@@ -1031,20 +1068,19 @@
       id: 'dialog', title: '对话与安全', sub: '长期记忆、沙箱等级与命令黑名单', icon: 'dialog',
       sections: [{
         title: '记忆', rows: [
-          { id: 'longTermMemoryEnabled', type: 'switch', label: '长期记忆', hint: '把要点写入本地长期记忆库', keys: ['longTermMemoryEnabled', 'memoryEnabled'], def: false, kw: 'memory 长期记忆 longTermMemoryEnabled memoryEnabled 记忆库 总开关' },
-          { id: 'memoryNoteCount', type: 'slider', label: '记忆条数上限', hint: '长期记忆最多保留的条目数', min: 0, max: 50, step: 1, unit: '条', keys: ['memoryNoteCount'], def: 10, kw: 'memory 记忆 条数 memoryNoteCount 上限' },
+          { id: 'longTermMemoryEnabled', type: 'switch', label: '长期记忆', hint: '把要点写入本地长期记忆库', keys: ['longTermMemoryEnabled', 'memoryEnabled'], def: true, kw: 'memory 长期记忆 longTermMemoryEnabled memoryEnabled 记忆库 总开关' },
+          { id: 'memoryNoteCount', type: 'slider', label: '记忆条数上限', hint: '手表端固定上限 50 条：本档尚未接线，改它不会改变实际保留条数', min: 0, max: 50, step: 1, unit: '条', keys: ['memoryNoteCount'], def: 10, kw: 'memory 记忆 条数 memoryNoteCount 上限' },
           { id: 'actClearMemory', type: 'action', danger: true, label: '清空记忆', hint: 'memoryClear：清空会话上下文与本地记忆，不可撤销', actionName: 'clear-memory', actionLabel: '清空记忆', kw: 'clear memory 清空 记忆 重置 memoryClear 删除' }
         ]
       }, {
         title: '安全', rows: [
-          { id: 'sandboxLevel', type: 'segmented', label: '沙箱等级', hint: '限制工具调用能触碰的范围', keys: ['sandboxLevel'], def: 'WORKSPACE', kw: 'sandbox 沙箱 等级 sandboxLevel 权限 只读', options: [{ v: 'READ_ONLY', t: '只读' }, { v: 'WORKSPACE', t: '工作区' }, { v: 'FULL', t: '全权限' }] },
+          { id: 'sandboxLevel', type: 'segmented', label: '沙箱等级', hint: '限制工具调用能触碰的范围', keys: ['sandboxLevel'], def: 'FULL', kw: 'sandbox 沙箱 等级 sandboxLevel 权限 只读', options: [{ v: 'READ_ONLY', t: '只读' }, { v: 'WORKSPACE', t: '工作区' }, { v: 'FULL', t: '全权限' }] },
           { id: 'dangerousCommandBlacklist', type: 'list', label: '危险命令黑名单', hint: '命中即拦截，不进入确认流程', addLabel: '新增规则', emptyText: '没有规则时全部放行', keys: ['dangerousCommandBlacklist', 'commandBlacklist'], def: ['rm -rf /', 'mkfs', 'dd of=/dev/block', 'reboot -p', 'pm uninstall --user 0'], kw: 'blacklist 黑名单 危险命令 dangerousCommandBlacklist 拦截 规则' }
         ]
       }, {
         title: '行为', rows: [
-          { id: 'securityMode', type: 'segmented', label: '安全模式', hint: '严格：全部确认；标准：只读放行；专家：除黑名单直接执行', keys: ['securityMode'], def: 'STANDARD', kw: 'security 安全 novice standard expert 严格 标准 专家', options: [{ v: 'NOVICE', t: '严格' }, { v: 'STANDARD', t: '标准' }, { v: 'EXPERT', t: '专家' }] },
-          { id: 'mainInputType', type: 'segmented', label: '主输入方式', hint: '手表端默认唤起的输入控件', keys: ['mainInputType'], def: 'VOICE', kw: 'input 输入 语音 键盘', options: [{ v: 'VOICE', t: '语音' }, { v: 'KEYBOARD', t: '键盘' }] },
-          { id: 'subAgentEnabled', type: 'switch', label: '子代理', hint: '仅标准/专家模式生效，允许派发只读子任务', keys: ['subAgentEnabled'], def: false, kw: 'sub agent 子代理 子任务 并行 subAgentEnabled' }
+          { id: 'securityMode', type: 'segmented', label: '安全模式', hint: '严格：全部确认；标准：只读放行；专家：除黑名单与高危外直接执行', keys: ['securityMode'], def: 'STANDARD', kw: 'security 安全 novice standard expert 严格 标准 专家', options: [{ v: 'NOVICE', t: '严格' }, { v: 'STANDARD', t: '标准' }, { v: 'EXPERT', t: '专家' }] },
+          { id: 'subAgentEnabled', type: 'switch', label: '子代理', hint: '仅专家模式生效，允许派发子任务（子代理的工具调用同样要审批）', keys: ['subAgentEnabled'], def: false, kw: 'sub agent 子代理 子任务 并行 subAgentEnabled' }
         ]
       }]
     },
@@ -1075,7 +1111,7 @@
         ]
       }, {
         title: '外部工具', rows: [
-          { id: 'toolApprovalPolicy', type: 'segmented', label: '审批策略', hint: '哪些工具调用需要人工确认', keys: ['toolApprovalPolicy', 'approvalPolicy'], def: 'RISKY', kw: 'approval 审批 策略 确认 toolApprovalPolicy', options: [{ v: 'ALWAYS', t: '全部确认' }, { v: 'RISKY', t: '风险确认' }, { v: 'NEVER', t: '不确认' }] },
+          { id: 'toolApprovalPolicy', type: 'segmented', label: '审批策略', hint: '哪些工具调用需要人工确认', keys: ['toolApprovalPolicy'], def: 'RISKY', kw: 'approval 审批 策略 确认 toolApprovalPolicy', options: [{ v: 'ALWAYS', t: '全部确认' }, { v: 'RISKY', t: '风险确认' }, { v: 'NEVER', t: '不确认' }] },
           { id: 'mcpServers', type: 'list', label: 'MCP 服务列表', hint: '名称 / 端点，逐条连接', addLabel: '新增服务', emptyText: '还没有 MCP 服务', fields: ['name', 'url'], fieldLabels: { name: '名称', url: '端点' }, keys: ['mcpServers', 'mcpServerList'], def: [{ name: 'filesystem', url: 'http://127.0.0.1:8000/sse' }, { name: 'calendar', url: 'http://127.0.0.1:8010/sse' }], kw: 'mcp 服务 列表 mcpServers 端点 sse 工具' }
         ]
       }]
@@ -1089,11 +1125,11 @@
         ]
       }, {
         title: '界面', rows: [
-          { id: 'matrixSpacingDp', type: 'slider', label: '点阵间距', hint: '点阵信息密度，越大越疏', min: 4, max: 16, step: 1, unit: 'dp', keys: ['matrixSpacingDp'], def: 16, kw: 'matrix spacing 点阵 间距 dp 排版' },
+          { id: 'matrixSpacingDp', type: 'slider', label: '点阵间距', hint: '点阵信息密度，越大越疏', min: 0, max: 64, step: 1, unit: 'dp', keys: ['matrixSpacingDp'], def: 16, kw: 'matrix spacing 点阵 间距 dp 排版' },
           { id: 'animationsEnabled', type: 'switch', label: '动画效果', hint: '关闭后点阵呼吸、思考省略号与波形全部静止', keys: ['animationsEnabled'], def: true, kw: 'animation 动画 动效 省电 animationsEnabled' },
           { id: 'compactMode', type: 'switch', label: '紧凑排版', hint: '缩小正文字号，单屏放更多内容', keys: ['compactMode'], def: false, kw: 'compact 紧凑 排版 字号 密度' },
           { id: 'autoSpeakReplies', type: 'switch', label: '自动朗读', hint: '回复结束后自动播报', keys: ['autoSpeakReplies'], def: false, kw: 'speak 朗读 播报 tts 语音' },
-          { id: 'asrLiveTranscript', type: 'switch', label: '实时字幕', hint: '录音时边转写边显示', keys: ['asrLiveTranscript'], def: false, kw: 'asr 字幕 实时 转写 录音' }
+          { id: 'asrLiveTranscript', type: 'switch', label: '实时字幕', hint: '录音时边转写边显示', keys: ['asrLiveTranscript'], def: true, kw: 'asr 字幕 实时 转写 录音' }
         ]
       }]
     },

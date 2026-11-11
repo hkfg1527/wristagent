@@ -23,8 +23,8 @@ class ConsoleSettingsParityGuardTest {
     fun pagesParseMatchesTheDocumentedShape() {
         val rows = consoleRows()
         assertEquals("网页 PAGES 页数", 9, rows.map { it.pageId }.toSet().size)
-        assertEquals("网页 PAGES 行数", 57, rows.size)
-        assertEquals("带设置键的行数", 49, rows.count { it.keys.isNotEmpty() })
+        assertEquals("网页 PAGES 行数", 56, rows.size)
+        assertEquals("带设置键的行数", 48, rows.count { it.keys.isNotEmpty() })
         assertEquals(
             "无键的行必须是纯动作 / 只读回显：",
             expectedUnkeyedRows,
@@ -62,6 +62,11 @@ class ConsoleSettingsParityGuardTest {
                     }
                     is ConsoleValue.BadValue -> {
                         violations += rowKey + "：" + alias + " 的测试样值不在允许值内"
+                        continue
+                    }
+                    is ConsoleValue.OutOfRange -> {
+                        violations += rowKey + "：" + alias + " 的测试样值超出范围（" +
+                            result.min + ".." + result.max + "）"
                         continue
                     }
                 }
@@ -206,16 +211,31 @@ class ConsoleSettingsParityGuardTest {
      * structured 字段（providerProfiles 这类列表）必须造对象数组：它们用 STRING 承载，
      * 落库侧收的却是数组，只按标量类型造样值只会得到 "-guard" 这样的字符串，于是任何
      * **正确**的实现都会被判成 READ_ONLY。这是取样器的缺陷，不是给某个字段开豁免。
+     *
+     * 数值样值必须是 JSON 形状：小数用 Double、整数用 Int。HTTP 体的 JSON 解码只会产出
+     * Double/Int，[ConsoleFields.coerce] 的 FLOAT 分支也就只认这两种；造一个 Float 进去
+     * 会被判成 bad_type —— 那是取样器造错了形状，不是字段校验错了。
      */
     private fun sampleValue(field: ConsoleField, current: Any?): Any = when {
         field.structured -> listOf(
             mapOf("name" to "guard", "baseUrl" to "https://guard.example.com", "model" to "guard-model")
         )
         field.type == ConsoleFieldType.BOOLEAN -> !(current as? Boolean ?: false)
-        field.type == ConsoleFieldType.INT -> ((current as? Number)?.toInt() ?: 0) + 7
-        field.type == ConsoleFieldType.FLOAT -> ((current as? Number)?.toDouble() ?: 0.0) + 0.25
+        field.type == ConsoleFieldType.INT -> inRange(field, ((current as? Number)?.toInt() ?: 0) + 7.0).toInt()
+        field.type == ConsoleFieldType.FLOAT -> inRange(field, ((current as? Number)?.toDouble() ?: 0.0) + 0.25)
         field.type == ConsoleFieldType.STRING -> ((current as? String) ?: "") + "-guard"
         else -> field.allowed.firstOrNull { it != current } ?: field.allowed.first()
+    }
+
+    /**
+     * 把样值夹回字段声明的范围：越界样值会被 ConsoleFields 判成 OutOfRange，
+     * 于是一个**正确**的范围校验也会被记成违规。这是取样器的缺陷，不是给字段开豁免。
+     */
+    private fun inRange(field: ConsoleField, candidate: Double): Double {
+        val min = field.min ?: return candidate
+        val max = field.max ?: return candidate
+        if (candidate in min..max) return candidate
+        return min + (max - min) / 2.0
     }
 
     private data class ConsoleRow(val pageId: String, val id: String, val type: String, val keys: List<String>)
@@ -247,28 +267,24 @@ class ConsoleSettingsParityGuardTest {
         /**
          * 网页有设置键、但桥里没有映射的行（HEAD d4defe1 实测）。
          *
-         * 只允许收缩：桥补上一条就去掉一条。其中 provider.providerProfiles 与
-         * dialog.longTermMemoryEnabled 与 SettingsCoverage 的「表端可改」声明直接冲突，
-         * 由 [everyWatchWritableWebRowWritesThroughToTheWatch] 单独钉住。
+         * 只允许收缩：桥补上一条就去掉一条。以下五条已接通，故已从本表移除（留着就是永久豁免）：
+         * provider.providerProfiles（ConsoleFields 有 providerProfiles）、
+         * dialog.longTermMemoryEnabled（longTermMemoryEnabled → memoryEnabled 别名）、
+         * dialog.sandboxLevel、tools.toolApprovalPolicy、generate.historyCompressThreshold（本轮补齐）。
          */
         val knownDroppedWebRows = setOf(
             "model.topP",
             "model.topK",
             "model.frequencyPenalty",
-            "provider.providerProfiles",
             "provider.customHeaders",
             "provider.proxyUrl",
             "role.roleCards",
             "role.systemPromptLibrary",
             "role.openingLine",
             "generate.contextWindow",
-            "generate.historyCompressThreshold",
             "generate.truncationStrategy",
-            "dialog.longTermMemoryEnabled",
             "dialog.memoryNoteCount",
-            "dialog.sandboxLevel",
             "dialog.dangerousCommandBlacklist",
-            "tools.toolApprovalPolicy",
             "tools.mcpServers"
         )
 

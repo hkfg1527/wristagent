@@ -41,4 +41,30 @@ class ConsoleAuthThrottleTest {
         assertTrue(throttle.isLocked(69_999L))
         assertFalse(throttle.isLocked(70_000L))
     }
+
+    @Test
+    fun failuresFromOnePeerDoNotLockAnother() {
+        val throttle = ConsoleAuthThrottle()
+        repeat(5) { throttle.onFailure(1_000L, "10.0.0.9") }
+        assertTrue("攻击者自己必须被锁", throttle.isLocked(1_000L, "10.0.0.9"))
+        assertFalse("同一局域网里合法用户不得被邻居锁死", throttle.isLocked(1_000L, "192.168.1.20"))
+    }
+
+    @Test
+    fun successFromOnePeerDoesNotClearAnotherPeersFailures() {
+        val throttle = ConsoleAuthThrottle()
+        repeat(4) { throttle.onFailure(0L, "10.0.0.9") }
+        throttle.onSuccess("192.168.1.20")
+        throttle.onFailure(0L, "10.0.0.9")
+        assertTrue("别的来源成功一次不能给攻击者清零", throttle.isLocked(0L, "10.0.0.9"))
+    }
+
+    @Test
+    fun peerTableHasAnUpperBound() {
+        val throttle = ConsoleAuthThrottle()
+        for (index in 0 until 5_000) {
+            throttle.onFailure(1_000L, "peer-" + index)
+        }
+        assertTrue("限流桶表必须有上界，否则伪造大量来源就能撑爆内存", throttle.trackedPeers() <= 256)
+    }
 }
