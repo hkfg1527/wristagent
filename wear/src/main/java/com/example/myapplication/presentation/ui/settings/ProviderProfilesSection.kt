@@ -46,12 +46,19 @@ fun ProviderProfilesContent(
             row { SettingsCaptionRow(text = stringResource(R.string.settings_providers_empty)) }
         } else {
             book.profiles.forEach { profile ->
+                // 掩码在组合期取一次：空密钥时整段不出现，不留下一个只有空格的尾部槽位
+                val maskedKey = SettingsValueMath
+                    .maskSecret(profile.apiKey)
+                    .takeIf { it.isNotEmpty() }
                 row {
                     SettingsRadioRow(
                         label = profile.name,
-                        // 副标题只露模型名与掩码密钥：圆屏上不整串铺开 apiKey
-                        subtitle = profile.modelName + "  " +
-                            SettingsValueMath.maskSecret(profile.apiKey),
+                        // 副标题只露模型名与掩码密钥：圆屏上不整串铺开 apiKey。
+                        // 单行 + 尾部省略号 —— deepseek-reasoner 不许从词中间折成
+                        // "deepseek-reaso" + "ner"；掩码不参与截断，模型名超长时先截模型名。
+                        subtitle = profile.modelName,
+                        subtitleTail = maskedKey,
+                        subtitleMaxLines = 1,
                         selected = profile.id == book.activeProfileId,
                         onSelect = {
                             context.vibrateTick()

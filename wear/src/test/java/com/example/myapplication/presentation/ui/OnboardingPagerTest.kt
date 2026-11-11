@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui
 
+import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -135,25 +136,40 @@ class OnboardingGeometryTest {
         assertTrue(OnboardingGeometry.IllustrationDp <= 120f)
     }
 
+    /** 一块元素占的四个量：名字 + 宽 + 高 + 上沿相对圆心的 y。 */
+    private data class Row(
+        val name: String,
+        val widthDp: Float,
+        val heightDp: Float,
+        val topDp: Float
+    )
+
+    private val rows: List<Row> = listOf(
+        Row(
+            "示意图",
+            OnboardingGeometry.IllustrationDp,
+            OnboardingGeometry.IllustrationDp,
+            OnboardingGeometry.IllustrationTopDp
+        ),
+        Row("标题", OnboardingGeometry.ContentWidthDp, OnboardingGeometry.TitleLineDp, OnboardingGeometry.TitleTopDp),
+        Row(
+            "说明",
+            OnboardingGeometry.ContentWidthDp,
+            OnboardingGeometry.DescriptionLineDp,
+            OnboardingGeometry.DescriptionTopDp
+        ),
+        Row("页码点", OnboardingGeometry.DotsWidthDp, OnboardingGeometry.DotsRowHeightDp, OnboardingGeometry.DotsTopDp),
+        Row("页脚", OnboardingGeometry.FooterWidthDp, OnboardingGeometry.FooterHeightDp, OnboardingGeometry.FooterTopDp)
+    )
+
     @Test
     fun everyRowStaysInsideTheCircle() {
-        val rows = listOf(
-            Triple("示意图", OnboardingGeometry.IllustrationDp, OnboardingGeometry.IllustrationTopDp),
-            Triple("标题", OnboardingGeometry.ContentWidthDp, OnboardingGeometry.TitleTopDp),
-            Triple("说明", OnboardingGeometry.ContentWidthDp, OnboardingGeometry.DescriptionTopDp),
-            Triple("页脚", OnboardingGeometry.FooterWidthDp, OnboardingGeometry.FooterTopDp)
-        )
-        rows.forEach { (name, width, top) ->
-            val height = when (name) {
-                "示意图" -> OnboardingGeometry.IllustrationDp
-                "标题" -> OnboardingGeometry.TitleLineDp
-                "说明" -> OnboardingGeometry.DescriptionLineDp
-                else -> OnboardingGeometry.FooterHeightDp
-            }
+        rows.forEach { row ->
             assertTrue(
-                name + " 的最远角点半径 " + OnboardingGeometry.farthestCornerRadiusDp(width, height, top) +
+                row.name + " 的最远角点半径 " +
+                    OnboardingGeometry.farthestCornerRadiusDp(row.widthDp, row.heightDp, row.topDp) +
                     "dp 超过屏幕半径 " + (OnboardingGeometry.CircleDiameterDp / 2f) + "dp",
-                OnboardingGeometry.fitsInCircle(width, height, top)
+                OnboardingGeometry.fitsInCircle(row.widthDp, row.heightDp, row.topDp)
             )
         }
     }
@@ -175,15 +191,64 @@ class OnboardingGeometryTest {
     }
 
     @Test
-    fun footerBudgetAddsUpToTheFooterWidth() {
+    fun dotsWidthIsFiveDotsAndFourGaps() {
         val dots = OnboardingGeometry.DotSizeDp * OnboardingPager.PageCount +
             OnboardingGeometry.GapDp * (OnboardingPager.PageCount - 1)
         assertEquals(dots, OnboardingGeometry.DotsWidthDp, 0.001f)
+    }
+
+    @Test
+    fun footerKeepsTheChordBudgetItHadWithTheDotsInIt() {
+        // 页码点搬走后页脚总宽一个像素没变：跳过 + 中段留白 + 按钮，中段留白正是原点阵那一档
         assertEquals(
-            OnboardingGeometry.SkipWidthDp + OnboardingGeometry.GapDp + OnboardingGeometry.DotsWidthDp +
-                OnboardingGeometry.GapDp + OnboardingGeometry.ActionWidthDp,
+            OnboardingGeometry.GapDp * 2f + OnboardingGeometry.DotsWidthDp,
+            OnboardingGeometry.FooterMiddleGapDp,
+            0.001f
+        )
+        assertEquals(
+            OnboardingGeometry.SkipWidthDp + OnboardingGeometry.FooterMiddleGapDp +
+                OnboardingGeometry.ActionWidthDp,
             OnboardingGeometry.FooterWidthDp,
             0.001f
+        )
+        assertEquals("三件套时代的页脚总宽，搬位置不许改预算", 136f, OnboardingGeometry.FooterWidthDp, 0.001f)
+    }
+
+    @Test
+    fun dotsSitRightUnderTheDescriptionAndOutsideTheFooter() {
+        assertTrue(
+            "页码点必须落在说明文字下方：点行上沿 " + OnboardingGeometry.DotsTopDp +
+                "dp，说明行下沿 " + (OnboardingGeometry.DescriptionTopDp + OnboardingGeometry.DescriptionLineDp) + "dp",
+            OnboardingGeometry.DotsTopDp >=
+                OnboardingGeometry.DescriptionTopDp + OnboardingGeometry.DescriptionLineDp
+        )
+        assertEquals(
+            "页码点行的高度就是一排点，没有额外撑高",
+            OnboardingGeometry.DotSizeDp,
+            OnboardingGeometry.DotsRowHeightDp,
+            0.001f
+        )
+        assertEquals(
+            "页码点行与页脚之间不再隔空档：内容总高由这三段相加",
+            OnboardingGeometry.FooterTopDp,
+            OnboardingGeometry.DotsTopDp + OnboardingGeometry.DotsRowHeightDp,
+            0.001f
+        )
+        assertTrue(
+            "页码点不许再回到页脚那一行里",
+            OnboardingGeometry.DotsTopDp < OnboardingGeometry.FooterTopDp
+        )
+    }
+
+    @Test
+    fun aRowShiftedTwelveDpDownLeavesTheCircle() {
+        // 第二组反面样本：把页脚整体下移 12dp 就出圆 —— 判据跟着几何参数动，不是恒真
+        assertFalse(
+            OnboardingGeometry.fitsInCircle(
+                OnboardingGeometry.FooterWidthDp,
+                OnboardingGeometry.FooterHeightDp,
+                OnboardingGeometry.FooterTopDp + 12f
+            )
         )
     }
 
@@ -206,5 +271,40 @@ class OnboardingGeometryTest {
     fun touchTargetsMeetTheTokenMinimum() {
         assertTrue(OnboardingGeometry.FooterHeightDp >= 44f)
         assertTrue(OnboardingGeometry.SkipWidthDp >= 44f)
+    }
+}
+
+/**
+ * 引导页源码守护：页码点搬了位置，读屏描述与"页脚只剩两件"这两条约束不会由编译器检查。
+ * 只有扫真实源文件才能钉住 —— 否则下一次改版面会把「第 N 页，共 5 页」连同位置一起丢掉。
+ */
+class OnboardingSourceGuardTest {
+
+    private val source: String = readProjectFile(
+        "src/main/java/com/example/myapplication/presentation/ui/OnboardingScreen.kt"
+    )
+
+    @Test
+    fun pageDotsKeepTheirAccessibilityDescription() {
+        val dots = source
+            .substringAfter("private fun PageDots(")
+            .substringBefore("private fun GestureIllustration(")
+        assertTrue(
+            "页码点那一行必须保留「第 N 页，共 5 页」的读屏描述",
+            dots.contains("contentDescription")
+        )
+        assertTrue("页码点数量仍取页数常量，不许各自漂移", dots.contains("OnboardingPager.PageCount"))
+    }
+
+    @Test
+    fun theFooterOnlyKeepsSkipAndTheActionButton() {
+        val footer = source
+            .substringAfter("private fun OnboardingFooter(")
+            .substringBefore("private fun PageDots(")
+        assertFalse("页码点必须已经搬出页脚", footer.contains("PageDots("))
+        assertTrue(
+            "页脚两件左右分置：跳过贴左、按钮贴右，中段留空",
+            footer.contains("Arrangement.SpaceBetween")
+        )
     }
 }

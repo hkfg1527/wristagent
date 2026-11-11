@@ -125,7 +125,9 @@ internal object OnboardingPager {
  * 引导页几何：所有尺寸在这里算，UI 只引用结果。
  *
  * 圆屏 466px @2x = 233dp，半径 116.5dp。内容宽 184dp 时竖直方向只剩 ±71.5dp 可用，
- * 因此宽度必须和高度做交易：正文收窄到 148dp 换取上下空间，页脚三件套压到 136dp。
+ * 因此宽度必须和高度做交易：正文收窄到 148dp 换取上下空间，页脚压到 136dp。
+ * 页脚曾经是「跳过 + 五个页码点 + 按钮」三件套同排；页码点搬到说明文字下方之后，
+ * 页脚本体只剩左右两件，中段那 44dp（原点阵 36dp + 两道点距）留空，总宽一个像素没变。
  * "整块落在圆周内" = 矩形最远角点到圆心的距离不超过半径，判据见 [fitsInCircle]。
  */
 internal object OnboardingGeometry {
@@ -154,17 +156,28 @@ internal object OnboardingGeometry {
     val DotsWidthDp: Float =
         DotSizeDp * OnboardingPager.PageCount + GapDp * (OnboardingPager.PageCount - 1).coerceAtLeast(0)
 
-    /** 页脚三件套总宽：跳过 + 点 + 按钮 + 两道点距。 */
-    val FooterWidthDp: Float = SkipWidthDp + GapDp + DotsWidthDp + GapDp + ActionWidthDp
+    /** 页码点那一行的高度：一排点，没有别的元素。 */
+    val DotsRowHeightDp: Float = DotSizeDp
+
+    /** 页脚中段留白：页码点搬走之后空出来的那一档，宽度仍按原来「点阵 + 两道点距」的预算。 */
+    val FooterMiddleGapDp: Float = GapDp + DotsWidthDp + GapDp
+
+    /** 页脚总宽：跳过 + 中段留白 + 按钮 = 136dp，与三件套时代完全一致。 */
+    val FooterWidthDp: Float = SkipWidthDp + FooterMiddleGapDp + ActionWidthDp
 
     /** 示意图 + 标题 + 说明 的总高，也就是翻页动画盒子的高度。 */
     val BodyHeightDp: Float = IllustrationDp + GapDp + TitleLineDp + GapDp + DescriptionLineDp
 
-    /** 内容总高：正文 + 点距 + 页脚。 */
-    val ContentHeightDp: Float = BodyHeightDp + GapDp + FooterHeightDp
+    /** 内容总高：正文 + 点距 + 页码点行 + 页脚（页码点行与页脚之间不再隔空档）。 */
+    val ContentHeightDp: Float = BodyHeightDp + GapDp + DotsRowHeightDp + FooterHeightDp
 
-    /** 内容盒上沿相对圆心的 y（dp）：96dp 示意图与 136dp 页脚各自的最远角点都在半径内。 */
-    const val ContentTopDp = -100f
+    /**
+     * 内容盒上沿相对圆心的 y（dp）。
+     *
+     * 上沿与下沿两个最远角点必须同时落在半径 116.5dp 内，解得可用窗口 [-106.15, -101.4]，
+     * 取中点 -104：96dp 示意图的上沿角点 114.5dp、136dp 页脚的下沿角点 114.4dp，各留约 2dp。
+     */
+    const val ContentTopDp = -104f
 
     /** Column 相对屏幕中心的竖直偏移。 */
     val ContentCenterOffsetDp: Float = ContentTopDp + ContentHeightDp / 2f
@@ -172,7 +185,8 @@ internal object OnboardingGeometry {
     val IllustrationTopDp: Float = ContentTopDp
     val TitleTopDp: Float = IllustrationTopDp + IllustrationDp + GapDp
     val DescriptionTopDp: Float = TitleTopDp + TitleLineDp + GapDp
-    val FooterTopDp: Float = DescriptionTopDp + DescriptionLineDp + GapDp
+    val DotsTopDp: Float = DescriptionTopDp + DescriptionLineDp + GapDp
+    val FooterTopDp: Float = DotsTopDp + DotsRowHeightDp
 
     /** 示意图形循环动效周期（ms）。 */
     const val LoopDurationMs = 1700
@@ -257,6 +271,10 @@ fun OnboardingScreen(
 
             Spacer(Modifier.height(OnboardingGeometry.GapDp.dp))
 
+            // 页码点是「读到第几页」的辅助信息，跟着正文走：贴在说明文字正下方，
+            // 不再和跳过 / 继续挤在同一条页脚基线上
+            PageDots(page)
+
             OnboardingFooter(
                 page = page,
                 onSkip = finishOnboarding,
@@ -304,10 +322,13 @@ private fun PageBody(page: Int, animationsEnabled: Boolean) {
 }
 
 /**
- * 页脚：[跳过] · [五个页码点] · [继续/开始]。
+ * 页脚：[跳过] …… [继续/开始]，左右分置、中段留空。
  *
- * 圆屏底部弦长只剩约 143dp，三件套必须挤在同一行：拆成两行就必然把最后一行顶到圆周外。
- * 跳过槽位在最后一页留空占位，保证点与按钮不因文案切换而左右跳动。
+ * 页码点已经搬到说明文字下方（见 [PageDots]）：三类完全不同的元素挤在同一条基线上时，
+ * 第 5 页去掉「跳过」之后页码点会紧贴按钮，看起来像按钮属于点阵的一部分。
+ * 底部弦长预算没有变 —— 跳过 44 + 中段留白 44 + 按钮 48 = 136dp，仍塞进 143dp 弦长，
+ * 页脚盒与三件套时代同宽同位，最远角点半径 114.4dp。
+ * 跳过槽位在最后一页留空占位，保证按钮不因文案切换而左右跳动。
  */
 @Composable
 private fun OnboardingFooter(page: Int, onSkip: () -> Unit, onAction: () -> Unit) {
@@ -315,7 +336,8 @@ private fun OnboardingFooter(page: Int, onSkip: () -> Unit, onAction: () -> Unit
         modifier = Modifier
             .width(OnboardingGeometry.FooterWidthDp.dp)
             .height(OnboardingGeometry.FooterHeightDp.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         if (OnboardingPager.canSkip(page)) {
             val skipLabel = OnboardingPager.SkipLabel
@@ -337,12 +359,6 @@ private fun OnboardingFooter(page: Int, onSkip: () -> Unit, onAction: () -> Unit
         } else {
             Spacer(Modifier.width(OnboardingGeometry.SkipWidthDp.dp))
         }
-
-        Spacer(Modifier.width(OnboardingGeometry.GapDp.dp))
-
-        PageDots(page)
-
-        Spacer(Modifier.width(OnboardingGeometry.GapDp.dp))
 
         val actionLabel = OnboardingPager.actionLabel(page)
         Box(
@@ -373,12 +389,19 @@ private fun OnboardingFooter(page: Int, onSkip: () -> Unit, onAction: () -> Unit
     }
 }
 
-/** 五个页码点：只有当前页点亮，未点亮的一档仍取最暗可读色。 */
+/**
+ * 五个页码点：只有当前页点亮，未点亮的一档仍取最暗可读色。
+ *
+ * 位置在说明文字正下方、页脚之上（几何见 [OnboardingGeometry.DotsTopDp]）：
+ * 这一行只占一排点的宽高（36dp × 4dp），不参与页脚的两端分置。
+ * 整行带「第 N 页，共 5 页」的无障碍描述，换页时读屏仍能报出位置。
+ */
 @Composable
 private fun PageDots(page: Int) {
     Row(
         modifier = Modifier
             .width(OnboardingGeometry.DotsWidthDp.dp)
+            .height(OnboardingGeometry.DotsRowHeightDp.dp)
             .semantics {
                 contentDescription = "第 ${page + 1} 页，共 ${OnboardingPager.PageCount} 页"
             },
