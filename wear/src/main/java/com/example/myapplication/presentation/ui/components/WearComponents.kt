@@ -174,7 +174,7 @@ fun WearBadge(
 ) {
     val shape = RoundedCornerShape(Wear.Space.Xs)
     val container = when (tone) {
-        Tone.ACCENT -> Wear.Palette.AccentDim
+        Tone.ACCENT -> Wear.AccentSurface
         Tone.DANGER -> Wear.Palette.DangerSurface
         Tone.MUTED -> Wear.Palette.SurfaceAlt
     }

@@ -13,8 +13,9 @@ import org.junit.Test
  * `Wear.Palette.Accent` 编译期一样通过 —— 换色后那些元素静止在默认蓝上，
  * 只有真机截图才发现。所以在源码里钉死"还剩哪几处在读静态令牌、分别是谁"。
  *
- * 只数带词边界的 `Wear.Palette.Accent`：AccentDim / AccentTrack 是两枚没有运行时投影的
- * 配套令牌（强调色换成别的时它们该不该跟着算产品决定），不在这条防线的违规面里。
+ * 两类令牌各有一条防线：主色 `Wear.Palette.Accent` 由前两个用例钉住，
+ * 配套的 AccentDim / AccentTrack（现在也有投影 Wear.AccentSurface / Wear.AccentRail）由
+ * [companionTokensAreOnlyReadWhereTheChangeBoundaryEnds] 钉住。
  */
 class AccentRuntimeSourceGuardTest {
 
@@ -30,16 +31,38 @@ class AccentRuntimeSourceGuardTest {
     }
 
     @Test
-    fun theOnlyStaticReadLeftIsThePureOrbHighlightTone() {
+    fun theOrbHighlightToneTakesTheAccentAsAParameter() {
         val code = stripped(BottomInteractiveBlockPath)
         assertEquals(
-            "OrbEdgeHighlight.toneOf 是零 Compose 依赖的纯函数（JVM 单测直接覆盖），全文件只许它读令牌",
-            1,
+            "OrbEdgeHighlight.toneOf 是零 Compose 依赖的纯函数（JVM 单测直接覆盖），读不了 @Composable 的投影：强调色必须由调用方传入",
+            0,
             staticAccent.findAll(code).count()
         )
         assertTrue(
-            "这一处必须仍是 toneOf 里按 mode 取值的静态映射，不许搬到别的绘制路径上",
-            code.contains("mode == BottomBlockMode.RECORDING -> Wear.Palette.Accent")
+            "toneOf 必须收强调色参数，静息档复用页面那一份轨道位算法",
+            code.contains("fun toneOf(mode: BottomBlockMode, isPressed: Boolean, accent: Color)") &&
+                code.contains("else -> accentRailOf(accent)")
+        )
+    }
+
+    @Test
+    fun companionTokensAreOnlyReadWhereTheChangeBoundaryEnds() {
+        val actual = mainSources()
+            .mapNotNull { file ->
+                val reads = companionToken.findAll(stripComments(file.readText())).count()
+                if (reads == 0) null else moduleRelative(file) to reads
+            }
+            .toMap()
+        assertEquals(
+            "AccentDim / AccentTrack 已有运行时投影（Wear.AccentSurface / Wear.AccentRail），页面代码只许读投影：" +
+                "这里每多一处，那枚配套色换色时就静止在默认蓝上。剩下三处都在本次改动的文件边界之外" +
+                "（SessionDrawer 的选中胶囊、SettingsShared 的两个 Tone 映射），改完就该从这张表里消失。",
+            mapOf(
+                "theme/WearMaterialTheme.kt" to 2,
+                "settings/SettingsShared.kt" to 3,
+                SessionDrawerName to 1
+            ),
+            actual
         )
     }
 
@@ -52,11 +75,10 @@ class AccentRuntimeSourceGuardTest {
             }
             .toMap()
         assertEquals(
-            "静态令牌只允许留在这三处：默认档定义、M3 配色投影、toneOf 纯函数；新增一处就会在这里红",
+            "静态令牌只允许留在这两处：默认档定义、M3 配色投影（toneOf 已改成把强调色当参数收）；新增一处就会在这里红",
             mapOf(
                 "settings/AppearanceSettings.kt" to 1,
-                "theme/WearMaterialTheme.kt" to 2,
-                BottomInteractiveBlockName to 1
+                "theme/WearMaterialTheme.kt" to 2
             ),
             actual
         )
@@ -85,9 +107,13 @@ class AccentRuntimeSourceGuardTest {
     private companion object {
         val staticAccent = Regex("Wear\\.Palette\\.Accent\\b")
 
+        /** 配套令牌：词边界写法，配色投影里的 `Wear.Palette.AccentDim` 才会命中。 */
+        val companionToken = Regex("Palette\\.Accent(?:Dim|Track)\\b")
+
         const val MainJavaRoot = "src/main/java"
         const val ComponentRoot = "src/main/java/com/example/myapplication/presentation/ui/"
         const val BottomInteractiveBlockName = "BottomInteractiveBlock.kt"
+        const val SessionDrawerName = "SessionDrawer.kt"
 
         const val BottomInteractiveBlockPath = ComponentRoot + BottomInteractiveBlockName
         const val OnboardingPath = ComponentRoot + "OnboardingScreen.kt"
@@ -95,12 +121,13 @@ class AccentRuntimeSourceGuardTest {
         const val VoiceOverlayPath = ComponentRoot + "VoiceListeningOverlay.kt"
         const val WearComponentsPath = ComponentRoot + "components/WearComponents.kt"
 
-        /** 这次改造的 4 个文件已清零；第 5 个（BottomInteractiveBlock）的唯一残留由上面的用例单独钉住。 */
+        /** 这次改造的 5 个文件已全部清零：任何一处再读静态令牌，换色后它就静止在默认蓝上。 */
         val ConvertedPaths = listOf(
             OnboardingPath,
             FrostedGlassPath,
             VoiceOverlayPath,
-            WearComponentsPath
+            WearComponentsPath,
+            BottomInteractiveBlockPath
         )
     }
 }

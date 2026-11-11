@@ -2,6 +2,8 @@ package com.example.myapplication.presentation.ui
 
 import androidx.compose.ui.graphics.Color
 import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.presentation.ui.theme.accentRailOf
+import com.example.myapplication.presentation.ui.theme.contrastRatio
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,14 +75,67 @@ class OrbEdgeHighlightTest {
 
     @Test
     fun highlightOnlyUsesTheThreeAllowedTokens() {
-        assertEquals(Wear.Palette.AccentTrack, OrbEdgeHighlight.toneOf(BottomBlockMode.IDLE, isPressed = false))
-        assertEquals(Wear.Palette.Accent, OrbEdgeHighlight.toneOf(BottomBlockMode.RECORDING, isPressed = false))
-        assertEquals(Wear.Palette.TextPrimary, OrbEdgeHighlight.toneOf(BottomBlockMode.IDLE, isPressed = true))
+        // 运行时强调色在纯函数里读不到（投影是 @Composable 的），所以强调色由调用方传进来
+        assertEquals(
+            "静息档必须是强调色的轨道位投影，不是写死的默认蓝令牌",
+            accentRailOf(Wear.Palette.Accent),
+            OrbEdgeHighlight.toneOf(BottomBlockMode.IDLE, isPressed = false, accent = Wear.Palette.Accent)
+        )
+        assertEquals(
+            "录音档就是运行时强调色本身",
+            Wear.Palette.Accent,
+            OrbEdgeHighlight.toneOf(BottomBlockMode.RECORDING, isPressed = false, accent = Wear.Palette.Accent)
+        )
+        assertEquals(
+            Wear.Palette.TextPrimary,
+            OrbEdgeHighlight.toneOf(BottomBlockMode.IDLE, isPressed = true, accent = Wear.Palette.Accent)
+        )
+        // 默认蓝下的轨道位落在 #3588AD 附近（±3 吸收库内 Oklab 换算的末位差）。
+        // 这个数刻意与旧的 AccentTrack #3788AD 对齐 —— 换色要能跟随，但不能让默认配色面目全非。
+        val defaultRail = OrbEdgeHighlight.toneOf(
+            BottomBlockMode.IDLE,
+            isPressed = false,
+            accent = Wear.Palette.Accent
+        )
+        assertEquals("轨道位 R 不是 Bg 与强调色 0.765 的 Oklab 混合", 0x35 / 255f, defaultRail.red, 3f / 255f)
+        assertEquals("轨道位 G 不是 Bg 与强调色 0.765 的 Oklab 混合", 0x88 / 255f, defaultRail.green, 3f / 255f)
+        assertEquals("轨道位 B 不是 Bg 与强调色 0.765 的 Oklab 混合", 0xAD / 255f, defaultRail.blue, 3f / 255f)
+        for (mode in BottomBlockMode.values()) {
+            // 静止档只有两种：录音档是强调色本身（键上那圈要亮），其余一律是轨道位投影。
+            // 之前这里写死「所有静止档都等于轨道位」，与上面 RECORDING 的显式断言自相矛盾。
+            val expectedRest = if (mode == BottomBlockMode.RECORDING) {
+                Wear.Palette.Accent
+            } else {
+                accentRailOf(Wear.Palette.Accent)
+            }
+            assertEquals(
+                "静止档只有「轨道位投影」与「录音档强调色」两种",
+                expectedRest,
+                OrbEdgeHighlight.toneOf(mode, isPressed = false, accent = Wear.Palette.Accent)
+            )
+            assertEquals(
+                "按下档永远是 TextPrimary，与强调色无关",
+                Wear.Palette.TextPrimary,
+                OrbEdgeHighlight.toneOf(mode, isPressed = true, accent = Wear.Palette.Accent)
+            )
+        }
+        // 换一个强调色：静息/录音档必须跟着变，且静息档仍在 Bg 与强调色之间
+        val green = Color(0xFF4ADE80)
+        assertEquals(
+            green,
+            OrbEdgeHighlight.toneOf(BottomBlockMode.RECORDING, isPressed = false, accent = green)
+        )
+        val railContrast = contrastRatio(accentRailOf(green), Wear.Palette.Bg)
+        assertTrue("静息档暗到和背景分不出来", railContrast >= 3f)
+        assertTrue(
+            "静息档亮到和强调色同档了",
+            railContrast < contrastRatio(green, Wear.Palette.Bg)
+        )
         // 不能借审批的红黄：高光是"反光"，不是风险提示
         val tones = BottomBlockMode.values().flatMap { mode ->
             listOf(
-                OrbEdgeHighlight.toneOf(mode, isPressed = false),
-                OrbEdgeHighlight.toneOf(mode, isPressed = true)
+                OrbEdgeHighlight.toneOf(mode, isPressed = false, accent = Wear.Palette.Accent),
+                OrbEdgeHighlight.toneOf(mode, isPressed = true, accent = Wear.Palette.Accent)
             )
         }
         assertTrue("高光色落到了风险色上", tones.none { it == Wear.Palette.Danger || it == Wear.Palette.Warning })

@@ -89,9 +89,23 @@ val WearShapes: Shapes = Shapes(
  *
  * 官方 M3 组件（滑轨、开关、按钮、分段开关）拿到的 primary 因此跟随用户选择的强调色；
  * 外观设置只能换"一个"颜色，不能长出第二套配色体系。
+ *
+ * primaryDim / primaryContainer 也必须跟着重算：它们是强调色的**配套面**，用页面同一份投影
+ * （[accentSurfaceOf] 的系数），否则用这两个槽位的官方组件会停在默认档的 AccentDim 上不跟随。
  */
-fun ColorScheme.withAccent(accent: Color): ColorScheme =
-    if (primary == accent) this else copy(primary = accent, onPrimaryContainer = accent)
+fun ColorScheme.withAccent(accent: Color): ColorScheme {
+    val surface = accentSurfaceOf(accent)
+    return if (primary == accent && primaryDim == surface && primaryContainer == surface) {
+        this
+    } else {
+        copy(
+            primary = accent,
+            onPrimaryContainer = accent,
+            primaryDim = surface,
+            primaryContainer = surface
+        )
+    }
+}
 
 /**
  * 设置页的 M3 主题壳：把令牌配色、官方字号阶梯与两档圆角一并灌进 [MaterialTheme]，

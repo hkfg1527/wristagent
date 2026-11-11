@@ -79,6 +79,7 @@ import androidx.annotation.StringRes
 import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.presentation.ui.theme.accentRailOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -555,6 +556,8 @@ fun BottomInteractiveBlock(
                     } else {
                         null
                     }
+                    // 高光色要在组合里取一次：运行时投影是 @Composable 的，Canvas 的绘制 lambda 读不到。
+                    val edgeTone = OrbEdgeHighlight.toneOf(mode, isOrbPressed, Wear.Accent)
                     Canvas(modifier = Modifier.matchParentSize()) {
                         val level = OrbEdgeHighlight.intensityOf(
                             mode = mode,
@@ -564,11 +567,10 @@ fun BottomInteractiveBlock(
                         ) * collapseFraction
                         if (level <= 0.01f) return@Canvas
                         val strokePx = OrbEdgeHighlight.StrokeWidthDp.dp.toPx()
-                        val tone = OrbEdgeHighlight.toneOf(mode, isOrbPressed)
                         drawArc(
                             brush = Brush.sweepGradient(
                                 0f to Color.Transparent,
-                                0.10f to tone.copy(alpha = level),
+                                0.10f to edgeTone.copy(alpha = level),
                                 0.34f to Color.Transparent,
                                 1f to Color.Transparent,
                                 center = center
@@ -965,11 +967,17 @@ internal object OrbEdgeHighlight {
         return (base + (SendLevel - base) * flash).coerceIn(0f, 1f)
     }
 
-    /** 高光只允许这三种令牌色：静息取最暗的 AccentTrack，录音取 Accent，按下取 TextPrimary。 */
-    fun toneOf(mode: BottomBlockMode, isPressed: Boolean): Color = when {
+    /**
+     * 高光只允许这三种色：静息取强调色的轨道位，录音取强调色本身，按下取 TextPrimary。
+     *
+     * 强调色由调用方传入而不是在这里读 Wear.Accent：本对象是零 Compose 依赖的纯函数（JVM 单测
+     * 直接覆盖），而运行时投影是 @Composable 的。静息档复用页面同一份轨道位算法（[accentRailOf]），
+     * 不另记一个系数 —— 换色时边缘高光跟着变，而不是停在默认蓝上。
+     */
+    fun toneOf(mode: BottomBlockMode, isPressed: Boolean, accent: Color): Color = when {
         isPressed -> Wear.Palette.TextPrimary
-        mode == BottomBlockMode.RECORDING -> Wear.Palette.Accent
-        else -> Wear.Palette.AccentTrack
+        mode == BottomBlockMode.RECORDING -> accent
+        else -> accentRailOf(accent)
     }
 }
 

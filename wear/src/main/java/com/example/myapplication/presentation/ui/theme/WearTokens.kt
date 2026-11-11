@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -41,9 +42,11 @@ object Wear {
         /** 最暗一档可读文字：黑底 5.76:1，仍过 WCAG AA 4.5:1；再暗就不许承载文字。 */
         val TextMuted = Color(0xFF7C8798)
         val Accent = Color(0xFF4FC3F7)
+
+        /** 默认蓝下的配套面（手挑值）：页面读投影 [Wear.AccentSurface]，这枚只作默认档定义。 */
         val AccentDim = Color(0xFF0E3A4E)
 
-        /** 强调色的轨道位：等效主色压到 60% 不透明（黑底 5.29:1），用于开关轨道、状态点等静态指示。 */
+        /** 默认蓝下的轨道位（等效主色压到 60% 不透明，黑底 5.29:1）：页面读投影 [Wear.AccentRail]。 */
         val AccentTrack = Color(0xFF3788AD)
 
         /** 中度风险黄：审批页中风险等级的标题、危险条与滑轨强调色。 */
@@ -169,6 +172,26 @@ object Wear {
         get() = resolveAccent()
 
     /**
+     * 强调色的配套面：用户输入气泡底、徽标 ACCENT 底、引导页右翼、主题的 primaryDim / primaryContainer。
+     *
+     * 这是 [Accent] 这个 token 的**运行时投影**，不是第 16 个色值 —— [Palette] 里仍然恰好 15 个色值，
+     * PaletteAuditTest 数的常量一个没多；换色时它跟着 [Accent] 一起变，页面因此不再读
+     * [Palette.AccentDim]（那只是默认蓝下一次手挑的结果）。算法与系数见 [accentSurfaceOf]。
+     */
+    val AccentSurface: Color
+        @Composable @ReadOnlyComposable
+        get() = accentSurfaceOf(resolveAccent())
+
+    /**
+     * 强调色的轨道位：开关选中轨道、主键静息档高光、滑轨未选段。
+     *
+     * 同样是 [Accent] 的运行时投影（[Palette] 仍是 15 个色值），算法与系数见 [accentRailOf]。
+     */
+    val AccentRail: Color
+        @Composable @ReadOnlyComposable
+        get() = accentRailOf(resolveAccent())
+
+    /**
      * 大标题/数字档：官方 displayMedium。
      *
      * 这里的 TextStyle 只负责"官方字号 + 令牌色"的组合，字号本身来自 [MaterialTheme.typography]，
@@ -245,6 +268,26 @@ internal fun resolveAccent(): Color {
     AppearanceBootstrap.ensure(LocalContext.current)
     return LocalAccentColor.current ?: WearAppearance.accent
 }
+
+/**
+ * 强调色配套面（气泡 / 徽标 / 右翼 / primaryDim）的唯一算法：Bg 与强调色按 0.425 混合。
+ *
+ * **系数是按 Oklab 反推的，不是按 sRGB。** Compose 1.10.4 的 `lerp(Color, Color, Float)`
+ * 走 Oklab 插值（不是逐通道线性），所以「按 sRGB 算出来该是 0.28」在真机上会落到 #061D27 ——
+ * 比旧的 AccentDim #0E3A4E 暗一大截，气泡和纯黑页面的区分度会掉。
+ * 0.425 在 Oklab 下落回 #123A4C，与旧值只差几个色阶。
+ *
+ * 抽成纯函数是为了让没有组合运行时的调用点（主键边缘高光的 toneOf）复用同一份系数，
+ * 而不是各自记一个浮点数。
+ */
+internal fun accentSurfaceOf(accent: Color): Color = lerp(Wear.Palette.Bg, accent, 0.425f)
+
+/**
+ * 强调色轨道位的唯一算法：Bg 与强调色按 0.765 混合，理由同 [accentSurfaceOf]。
+ *
+ * 0.765 在 Oklab 下落回 #3588AD，与旧的 AccentTrack #3788AD 几乎一致。
+ */
+internal fun accentRailOf(accent: Color): Color = lerp(Wear.Palette.Bg, accent, 0.765f)
 
 /** 当前字号缩放，取法与 [resolveAccent] 一致。 */
 @Composable

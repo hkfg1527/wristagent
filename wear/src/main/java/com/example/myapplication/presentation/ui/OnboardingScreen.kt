@@ -451,6 +451,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
     }
 
     val accent = Wear.Accent
+    val accentSurface = Wear.AccentSurface
     Canvas(modifier = Modifier.size(OnboardingGeometry.IllustrationDp.dp)) {
         // 96dp 设计稿 → 像素的比例：所有长度都按设计稿数值写
         val unit = size.minDimension / 96f
@@ -580,7 +581,7 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                     style = Stroke(width = px(1.5f))
                 )
                 // 右翼：会话抽屉，强调色
-                drawCircle(color = Wear.Palette.AccentDim, radius = wingRadius, center = Offset(cx + spread, cy))
+                drawCircle(color = accentSurface, radius = wingRadius, center = Offset(cx + spread, cy))
                 drawCircle(
                     color = accent,
                     radius = wingRadius,

@@ -415,7 +415,7 @@ fun SpringStreamingText(
 }
 
 /**
- * 用户输入气泡（右对齐 · AccentDim 实底 + 1dp 描边 · 最宽 184dp · 内边距 14dp 对称）
+ * 用户输入气泡（右对齐 · 强调色配套面实底 + 1dp 描边 · 最宽 184dp · 内边距 14dp 对称）
  *
  * 1dp 描边是把"1.14:1 看不见的色块"变成真卡片的唯一手段：填充色本身不动，
  * 只加一条与行分隔线同档的边框，气泡边界于是可读。
@@ -432,7 +432,7 @@ fun UserChatBubble(
             .widthIn(max = ChatVisualMetrics.userBubbleWidthDp().dp)
             .clip(shape)
             // 去描边：边框是版面里最贵的装饰，吃掉 2dp 宽度还把气泡封成一个盒子
-            .background(Wear.Palette.AccentDim)
+            .background(Wear.AccentSurface)
             // 上下内边距由 16.5/14.5 改成对称 14/14：行距加到 20sp 后两行中文不再顶到边
             .padding(horizontal = padding, vertical = padding)
     ) {
