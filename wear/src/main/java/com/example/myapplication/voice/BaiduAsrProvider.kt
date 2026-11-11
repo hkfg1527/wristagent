@@ -129,9 +129,9 @@ object BaiduAsrRequest {
 /**
  * 百度短语音识别错误码到可读中文的映射。
  *
- * 已核实来源：https://cloud.baidu.com/doc/SPEECH/s/Jlbxdezuf（短语音识别标准版API）
- * TODO(待官方文档确认)：3308/3309/3310/3311/3312/3313/3314/3315/3316/3317 的具体语义未在可查文档中确认，
- * 因此统一落到「未知错误码」分支，保留原始错误码以便排查，不做语义臆测。
+ * 已核实来源：https://cloud.baidu.com/doc/SPEECH/s/Jlbxdezuf（短语音识别标准版API），其错误码表覆盖 3300–3307。
+ * 3308–3317 的语义无法在官方文档中核实，因此这些码只陈述可确认的事实——服务端回了该错误码、本次识别未完成——
+ * 不编造具体原因；[isKnown] 对它们保持 false，让调用方继续带上服务端原始 err_msg 供排查。
  */
 object BaiduErrorMessages {
     fun forCode(code: Int): String = when (code) {
@@ -142,9 +142,11 @@ object BaiduErrorMessages {
         3304 -> "请求过于频繁或额度已用尽，请稍后再试（错误码 3304）"
         3305 -> "百度语音服务暂时不可用，请稍后重试（错误码 3305）"
         3307 -> "录音过长，单次识别请控制在 60 秒以内（错误码 3307）"
+        in 3308..3317 -> "百度语音识别服务返回错误 " + code + "，本次识别未完成，请稍后重试"
         else -> "百度语音识别失败（错误码 " + code + "），请稍后重试"
     }
 
+    /** 语义已核实的码；3308–3317 语义未核实，故意返回 false 以便上层附带服务端 err_msg */
     fun isKnown(code: Int): Boolean = when (code) {
         3300, 3301, 3302, 3303, 3304, 3305, 3307 -> true
         else -> false
