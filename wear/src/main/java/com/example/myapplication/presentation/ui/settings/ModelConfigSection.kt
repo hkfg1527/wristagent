@@ -182,8 +182,10 @@ fun ModelConfigContent(
             }
             if (ModelCatalog.isCurrentModelMissing(entries, currentModel)) {
                 row {
+                    // 提示文案里带原始模型 id：折行会把这个 id 劈成两半
                     SettingsCaptionRow(
-                        text = stringResource(R.string.settings_model_not_in_list, currentModel)
+                        text = stringResource(R.string.settings_model_not_in_list, currentModel),
+                        maxLines = 1
                     )
                 }
             }

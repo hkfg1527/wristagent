@@ -46,18 +46,21 @@ fun ProviderProfilesContent(
             row { SettingsCaptionRow(text = stringResource(R.string.settings_providers_empty)) }
         } else {
             book.profiles.forEach { profile ->
-                // 掩码在组合期取一次：空密钥时整段不出现，不留下一个只有空格的尾部槽位
-                val maskedKey = SettingsValueMath
-                    .maskSecret(profile.apiKey)
-                    .takeIf { it.isNotEmpty() }
+                // 副标题的宽度全给模型名：它才是这一行里唯一能把两套配置区分开的信息。
+                // 密钥只在**缺失**时占位 —— 有密钥是默认预期，没密钥是异常，异常必须看得见；
+                // 语义色只落在 6dp 状态点上，不涂文字。文案复用既有资源：本轮可改边界不含 res/。
+                val keyMissing = profile.apiKey.isBlank()
                 row {
                     SettingsRadioRow(
                         label = profile.name,
-                        // 副标题只露模型名与掩码密钥：圆屏上不整串铺开 apiKey。
-                        // 单行 + 尾部省略号 —— deepseek-reasoner 不许从词中间折成
-                        // "deepseek-reaso" + "ner"；掩码不参与截断，模型名超长时先截模型名。
-                        subtitle = profile.modelName,
-                        subtitleTail = maskedKey,
+                        // 单行 + 尾部省略号：deepseek-reasoner 不许从词中间折成
+                        // "deepseek-reaso" + "ner"，右边也不再挂一段不参与截断的掩码跟它抢宽度。
+                        subtitle = if (keyMissing) {
+                            stringResource(R.string.settings_asr_key_missing)
+                        } else {
+                            profile.modelName
+                        },
+                        subtitleStatus = if (keyMissing) SettingsStatusTone.WARN else null,
                         subtitleMaxLines = 1,
                         selected = profile.id == book.activeProfileId,
                         onSelect = {

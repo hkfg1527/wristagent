@@ -565,8 +565,8 @@ private val SettingsValueMaxWidth: Dp = 92.dp
 /** 行内两行文字之间的墨距：body 行盒自带上下内边距，这里只补一档最小呼吸。 */
 private val SettingsRowLineGap: Dp = 2.dp
 
-/** 副标题与其尾部片段（密钥掩码）之间的呼吸：只占一档最小间距，宽度省给模型名。 */
-private val SettingsSubtitleTailGap: Dp = Wear.Space.Xs
+/** 副标题行上 6dp 语义色点与文字之间的呼吸：只占一档最小间距，宽度省给正文。 */
+private val SettingsSubtitleStatusGap: Dp = Wear.Space.Xs
 
 /** 行上下内边距：从 4dp 收到 2dp，把纵向预算还给内容。 */
 private val RowVerticalPadding: Dp = 2.dp
@@ -708,15 +708,16 @@ internal fun SettingsCardRow(
  * 副标题的折行规则按**内容**分：中文说明可以整段折行（[subtitleMaxLines] 默认 2），
  * 而模型名 / endpoint 这类机器标识符必须传 [subtitleMaxLines] = 1 —— 从词中间劈成
  * "deepseek-reaso" + "ner" 在列表里读起来像拼错，截断加省略号才像正常排版。
- * [subtitleTail] 是排在副标题右侧、**不参与截断**的固定片段（密钥掩码）：模型名超长时先截模型名。
+ * 副标题右侧不保留任何固定宽度的槽位：整行宽度都归这段文字，只有它自己会被截断。
+ * [subtitleStatus] 是副标题行上的 6dp 语义色点（如"密钥未填写"），颜色不落到文字上。
  */
 @Composable
 private fun SettingsSlotRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    subtitleTail: String? = null,
     subtitleMaxLines: Int = 2,
+    subtitleStatus: SettingsStatusTone? = null,
     value: String? = null,
     onClick: (() -> Unit)? = null,
     titleMaxLines: Int = 2,
@@ -744,35 +745,22 @@ private fun SettingsSlotRow(
                 )
                 if (subtitle != null) {
                     Spacer(Modifier.height(SettingsRowLineGap))
-                    if (subtitleTail == null) {
+                    // 副标题独占这一行的可用宽度：右边不摆固定槽位，超长时才在尾部省略。
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (subtitleStatus != null) {
+                            SettingsStatusDot(tone = subtitleStatus, description = subtitle)
+                            Spacer(Modifier.width(SettingsSubtitleStatusGap))
+                        }
                         BasicText(
                             text = subtitle,
+                            modifier = Modifier.weight(1f, fill = false),
                             style = SettingsRowValueStyle,
                             maxLines = subtitleMaxLines,
                             overflow = TextOverflow.Ellipsis
                         )
-                    } else {
-                        // 带尾部片段 = 单行：两段各自不折行，宽度不够时只截前一段（尾部省略号），
-                        // 尾部片段整串保留 —— 掩码被截成 "••…" 就等于没写。
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BasicText(
-                                text = subtitle,
-                                modifier = Modifier.weight(1f, fill = false),
-                                style = SettingsRowValueStyle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.width(SettingsSubtitleTailGap))
-                            BasicText(
-                                text = subtitleTail,
-                                style = SettingsRowValueStyle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Clip
-                            )
-                        }
                     }
                 }
             }
@@ -1098,7 +1086,7 @@ private fun SettingsThinSlider(
  * [dangerSelected] 只染**选中态那个圆点**：删数据 / 全权限 / 从不确认这类选项，
  * 危险语义落在控件本身上，不涂整行文字。
  *
- * 副标题带机器标识符（模型名 / endpoint）时传 [subtitleMaxLines] = 1 并加 [subtitleTail]：
+ * 副标题带机器标识符（模型名 / endpoint）时传 [subtitleMaxLines] = 1：
  * 单行 + 尾部省略号，绝不把标识符从词中间劈成两行。
  */
 @Composable
@@ -1108,16 +1096,16 @@ fun SettingsRadioRow(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    subtitleTail: String? = null,
     subtitleMaxLines: Int = 2,
+    subtitleStatus: SettingsStatusTone? = null,
     dangerSelected: Boolean = false,
     dotColor: Color? = null
 ) {
     SettingsSlotRow(
         title = label,
         subtitle = subtitle,
-        subtitleTail = subtitleTail,
         subtitleMaxLines = subtitleMaxLines,
+        subtitleStatus = subtitleStatus,
         modifier = modifier.widthIn(max = SettingsContentWidth),
         onClick = onSelect,
         trailing = {
@@ -1251,13 +1239,21 @@ fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier)
 }
 
 /**
- * 状态标签/说明文本：统一 2 行上限 + 省略号，长文本不会顶出圆屏。
+ * 状态标签/说明文本：默认 2 行上限 + 省略号，长文本不会顶出圆屏。
+ *
+ * 行数由内容定（[maxLines]）：URL 这类能在 "/" 处折行的是默认 2 行；
+ * 探针明细、含原始模型 id 的提示这类机器串传 1 —— 折行会把它们从词中间劈开。
  *
  * 它也是一个卡片行（minHeight = 0，不撑 48dp 触控高度）：夹在两张行之间时若没有背景，
  * 卡片正中就会破出一个黑洞 —— 说明行同样是这一组的一部分。
  */
 @Composable
-fun SettingsCaptionRow(text: String, modifier: Modifier = Modifier, mono: Boolean = false) {
+fun SettingsCaptionRow(
+    text: String,
+    modifier: Modifier = Modifier,
+    mono: Boolean = false,
+    maxLines: Int = 2
+) {
     SettingsCardRow(modifier = modifier, minHeight = 0.dp) {
         BasicText(
             text = text,
@@ -1265,7 +1261,7 @@ fun SettingsCaptionRow(text: String, modifier: Modifier = Modifier, mono: Boolea
                 .widthIn(max = SettingsContentWidth)
                 .fillMaxWidth(),
             style = if (mono) Wear.TextMono else Wear.TextCaption,
-            maxLines = 2,
+            maxLines = maxLines,
             overflow = TextOverflow.Ellipsis
         )
     }

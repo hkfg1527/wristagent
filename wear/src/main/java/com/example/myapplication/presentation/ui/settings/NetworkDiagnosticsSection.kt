@@ -171,7 +171,8 @@ fun NetworkDiagnosticsContent(
                     )
                 }
                 if (result.detail.isNotBlank()) {
-                    row { SettingsCaptionRow(text = result.detail, mono = true) }
+                    // 探针明细是机器串：折行会从词中间劈开，单行 + 尾部省略号更可读
+                    row { SettingsCaptionRow(text = result.detail, mono = true, maxLines = 1) }
                 }
             }
         }
