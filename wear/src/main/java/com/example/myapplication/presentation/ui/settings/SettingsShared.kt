@@ -6,6 +6,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -18,6 +19,8 @@ import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +57,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -67,8 +71,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
@@ -282,7 +288,7 @@ class SettingsRows internal constructor() {
  * 版面契约（与 [SettingsDesignMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
  * - 中部：ScalingLazyColumn，内容宽度固定 [SettingsContentWidth]（176dp），项间距 [SettingsRowGap]（0）；
- *   同组行拼成一张卡，卡内行与行之间一根 [SettingsGroupHairline]（子项组上沿左端另收 12dp）；
+ *   同组行拼成一张卡，卡内行与行之间一排 [SettingsGroupHairline] 点线（子项组上沿左端另收 12dp）；
  * - 组间距 24dp，只由 [SettingsSectionHeader] 的顶部留白提供；
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
@@ -534,23 +540,56 @@ fun SettingsBackButton(onClick: () -> Unit) {
  *   组的边界改由 24dp 留白承担（组内只隔一根 1px 线，比例因此一眼可辨）；
  * - 上方 24dp 是**组间距**的唯一来源，下方 8dp 是标题与本组首行之间；
  * - 左内边距 14dp 与行标签同一条槽线：标题与行标签逐像素对齐。
+ * - 左槽沟里那三颗 2dp 点是本页的点阵签名：它们画在**沟里**、不占布局宽度，
+ *   标题的起笔 x 因此一个像素都没动（右移 20dp 就会脱离行标签的左槽线）。
  */
 @Composable
 fun SettingsSectionHeader(text: String) {
     BasicText(
         text = text,
-        modifier = Modifier
-            .widthIn(max = SettingsContentWidth)
-            .fillMaxWidth()
-            .padding(
-                start = SettingsRowSidePadding,
-                top = SettingsSectionGap,
-                bottom = SettingsSectionHeaderBottomGap
-            ),
+        modifier = Modifier.settingsSectionHeaderLayout(),
         style = SettingsSectionStyle,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
+}
+
+/**
+ * 组标题的排版与点阵签名：上 24dp / 下 8dp 的组呼吸 + 左槽线 14dp，左槽沟里画三颗点。
+ *
+ * 先 padding 再 drawBehind，drawBehind 的坐标系就正好是「标题文字所在的那一条带」：
+ * 点的横向起笔在内容盒左缘、纵向中线与文字中线重合，而标题本身不参与这次绘制 ——
+ * 签名因此挂在沟里，标题仍起笔在 14dp 的左槽线上。
+ */
+private fun Modifier.settingsSectionHeaderLayout(): Modifier = this
+    .widthIn(max = SettingsContentWidth)
+    .fillMaxWidth()
+    .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap)
+    .drawBehind { headerDotSignature() }
+    .padding(start = SettingsRowSidePadding)
+
+/** 组标题签名点的直径：2dp —— 比行间点线的 3dp 再小一档，签名字符不抢标题。 */
+private val HeaderDotDiameter: Dp = 2.dp
+
+/** 组标题签名点的数量：三颗。 */
+private const val HeaderDotCount = 3
+
+/**
+ * 组标题左槽沟里的点阵签名：三颗 2dp 点、中心间距 6dp（= 2dp 点径 + 4dp 间隙），
+ * 三颗正好占满 14dp 槽沟（3 × 2 + 2 × 4 = 14）；垂直中线贴文字中线，颜色走 TextMuted，
+ * 既不引入新色，也不碰强调色。
+ */
+private fun DrawScope.headerDotSignature() {
+    val diameterPx = HeaderDotDiameter.toPx()
+    val stepPx = diameterPx + Wear.Space.Xs.toPx()
+    val centerY = size.height / 2f
+    repeat(HeaderDotCount) { index ->
+        drawCircle(
+            color = Wear.Palette.TextMuted,
+            radius = diameterPx / 2f,
+            center = Offset(diameterPx / 2f + index * stepPx, centerY)
+        )
+    }
 }
 
 /** 行内：左槽标签与右槽取值之间的最小呼吸。 */
@@ -618,10 +657,14 @@ private fun SettingsRowShape.toCornerShape(): Shape = RoundedCornerShape(
 )
 
 /**
- * 组内行与行之间的那根线：1dp / Border 色 / 右端从右槽线往左收 24dp，
- * 左端缩进由 [LocalSettingsGroupHairlineStart] 给（子项组上沿 12dp，普通行间 14dp）。
+ * 组内行与行之间的点线：沿格距 16dp 排 1.5dp 半径的小点（直径 3dp）/ Border 色，
+ * 右端收法与发丝线同一条（从右槽线往左 24dp），左端缩进由 [LocalSettingsGroupHairlineStart] 给
+ * （子项组上沿 12dp，普通行间 14dp）—— 首点圆心正落在该槽线上。
  *
  * 只画在卡片内部、只画在"行与行之间"：组内最后一行下面没有线，线数因此恒比行数少一。
+ *
+ * 带高仍是 1dp：行步进 49dp 由 [SettingsSpacingMath.RowStepDp] 钉死，不能为画点撑高。
+ * 3dp 的圆以这条带的中线为中心、上下各溢出 1dp 绘制 —— 行边界不在卡缘上，溢出不会被卡片圆角裁到。
  */
 @Composable
 private fun SettingsGroupHairline() {
@@ -631,10 +674,23 @@ private fun SettingsGroupHairline() {
             .height(SettingsDividerThickness)
             .padding(
                 start = LocalSettingsGroupHairlineStart.current,
-                end = SettingsRowSidePadding + SettingsDesignMath.DividerRightInsetDp.dp
+                end = SettingsRowSidePadding
             )
-            .background(Wear.Palette.Border)
-    )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // 轨道宽（dp）→ 点数：右端 24dp 与"末点不许被切"都由 SettingsDotRule 算
+            val dotCount = SettingsDotRule.dotCount(size.width / density)
+            val radiusPx = SettingsDotRule.dotRadiusDp().dp.toPx()
+            val centerY = size.height / 2f
+            repeat(dotCount) { index ->
+                drawCircle(
+                    color = Wear.Palette.Border,
+                    radius = radiusPx,
+                    center = Offset(SettingsDotRule.dotOffsetDp(index).dp.toPx(), centerY)
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -652,15 +708,32 @@ internal fun SettingsCardRow(
     minHeight: Dp = SettingsSpacingMath.MinRowHeightDp.dp,
     content: @Composable () -> Unit
 ) {
+    // 交互源只用来读"手指是否按住"：涟漪显式关掉，按下态由行底色承担（见 pressedRowBackground）
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     val clickModifier =
-        if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick)
+        if (onClick == null) {
+            Modifier
+        } else {
+            Modifier.clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick
+            )
+        }
     val shape = SettingsRowComposition.shapeOf(LocalSettingsRowSlot.current)
+    val rowBackground = pressedRowBackground(
+        pressed = onClick != null && pressed,
+        rest = if (shape == null) Color.Transparent else Wear.Palette.Surface
+    )
     if (shape == null) {
         // 不在卡片里（行被用在列表之外）：退回旧形态，不擅自加内边距
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
+                .background(rowBackground)
                 .then(clickModifier)
         ) { content() }
         return
@@ -675,6 +748,7 @@ internal fun SettingsCardRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = minHeight)
+                .background(rowBackground)
                 .then(clickModifier)
                 .padding(
                     start = SettingsRowSidePadding,
@@ -688,6 +762,21 @@ internal fun SettingsCardRow(
             SettingsGroupHairline()
         }
     }
+}
+
+/**
+ * 可点行的按下底色：按下立刻提到 SurfaceAlt，松开按 [Wear.Motion.quick]（140ms）回落。
+ *
+ * 只换底色 —— 不缩放整行（相邻行会跟着跳），不加涟漪、不加边框闪烁：这是交互反馈，不是装饰。
+ * [rest] 是静态底色：卡片里是 Surface，卡外行是透明，两者都回落到同一个 SurfaceAlt。
+ */
+@Composable
+private fun pressedRowBackground(pressed: Boolean, rest: Color): Color {
+    val lift = remember { Animatable(0f) }
+    LaunchedEffect(pressed) {
+        if (pressed) lift.snapTo(1f) else lift.animateTo(0f, Wear.Motion.quick())
+    }
+    return lerp(rest, Wear.Palette.SurfaceAlt, lift.value)
 }
 
 /**

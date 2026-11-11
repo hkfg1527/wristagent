@@ -296,6 +296,51 @@ object SettingsRowComposition {
 }
 
 /**
+ * 组内分隔线的点线几何：沿格距排点，右端留 24dp 不排。
+ *
+ * 法则 3 只允许两种分隔 —— 发丝线或**沿格距排列的小点**。换成点线之后，「格距是唯一度量单位」
+ * 这件事才由分隔本身读出来：点距 16dp 与背景点阵同源，而发丝线只能读出「这里有一条线」。
+ *
+ * 三条几何事实全在这一个纯对象里，不散进绘制代码：首点圆心落在左槽线上（偏移 0 即左槽线，
+ * 缩进由容器的 start padding 给）、点距 = 点阵格距、右端收法沿用发丝线的 24dp。
+ *
+ * 硬规则：**点必须整颗落在可用宽里**。末点被右端余量切到就整颗丢弃 —— 半个点比没有点更难看。
+ */
+object SettingsDotRule {
+    /** 点间距：16dp，与点阵格距同值。 */
+    const val SpacingDp = 16f
+
+    /** 右端不排点的余量：24dp，与发丝线的收法完全一致。 */
+    const val RightInsetDp = SettingsDesignMath.DividerRightInsetDp
+
+    /** 点半径：1.5dp。直径 3dp —— 圆得起来才读成「点」，再宽就是短横线。 */
+    const val RadiusDp = 1.5f
+
+    /**
+     * 一条宽 [trackWidthDp] 的轨道上能排几颗点。
+     *
+     * 可用宽 = 轨道宽 − [RightInsetDp]；第 i 颗的圆心在 i 倍 spacingDp 处，它的右缘
+     * 圆心 + [RadiusDp] 必须不越过可用宽。因此可用宽恰好是间距整数倍时，正好骑在
+     * 边界上的那颗会被丢掉：可用 128dp 仍是 8 颗，可用 129.5dp 才是 9 颗。
+     */
+    fun dotCount(trackWidthDp: Float, spacingDp: Float = SpacingDp): Int {
+        if (spacingDp <= 0f) return 0
+        val usableWidthDp = trackWidthDp - RightInsetDp
+        if (usableWidthDp <= 0f) return 0
+        val lastIndex = ((usableWidthDp - RadiusDp) / spacingDp).toInt()
+        return (lastIndex + 1).coerceAtLeast(0)
+    }
+
+    /** 第 [index] 颗点的圆心相对轨道左端的偏移：下标 0 就是左槽线本身，偏移 0。 */
+    fun dotOffsetDp(index: Int, spacingDp: Float = SpacingDp): Float =
+        if (index <= 0) 0f else index * spacingDp
+
+    /** 点半径：默认 1.5dp（直径 3dp）。[densityScale] 给将来的密度档位缩放，默认不缩放。 */
+    fun dotRadiusDp(densityScale: Float = 1f): Float =
+        if (densityScale <= 0f) 0f else RadiusDp * densityScale
+}
+
+/**
  * 设置页顶部对齐：滚到最顶时首项（标题）贴到内容区顶边，而不是停在视口垂直中心。
  *
  * 依据（wear compose foundation 1.7.1 `ScalingLazyListState.spaceNeeded` / `calculateTopAutoCenteringPaddingPx`）：
