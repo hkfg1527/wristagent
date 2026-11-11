@@ -324,7 +324,7 @@ private fun ModelChip(
                 .background(if (selected) Color.Transparent else Wear.Palette.SurfaceAlt)
                 .border(
                     width = 1.dp,
-                    color = if (selected) Wear.Palette.AccentTrack else Wear.Palette.Border,
+                    color = if (selected) Wear.AccentRail else Wear.Palette.Border,
                     shape = shape
                 )
                 .padding(horizontal = Wear.Space.Md),

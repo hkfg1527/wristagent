@@ -46,9 +46,6 @@ object Wear {
         /** 默认蓝下的配套面（手挑值）：页面读投影 [Wear.AccentSurface]，这枚只作默认档定义。 */
         val AccentDim = Color(0xFF0E3A4E)
 
-        /** 默认蓝下的轨道位（等效主色压到 60% 不透明，黑底 5.29:1）：页面读投影 [Wear.AccentRail]。 */
-        val AccentTrack = Color(0xFF3788AD)
-
         /** 中度风险黄：审批页中风险等级的标题、危险条与滑轨强调色。 */
         val Warning = Color(0xFFF5B942)
         val Danger = Color(0xFFFF6B6B)
@@ -164,7 +161,7 @@ object Wear {
     /**
      * 运行时强调色：默认是令牌 [Palette.Accent]，可由主题（[LocalAccentColor]）或外观设置覆盖。
      *
-     * 覆盖是"同一个 token 的运行时投影"，不是第 16 个色值：色板仍然只有 [Palette] 里那 15 个，
+     * 覆盖是"同一个 token 的运行时投影"，不是第 15 个色值：色板仍然只有 [Palette] 里那 14 个，
      * PaletteAuditTest 数的常量一个没多。
      */
     val Accent: Color
@@ -174,7 +171,7 @@ object Wear {
     /**
      * 强调色的配套面：用户输入气泡底、徽标 ACCENT 底、引导页右翼、主题的 primaryDim / primaryContainer。
      *
-     * 这是 [Accent] 这个 token 的**运行时投影**，不是第 16 个色值 —— [Palette] 里仍然恰好 15 个色值，
+     * 这是 [Accent] 这个 token 的**运行时投影**，不是第 15 个色值 —— [Palette] 里仍然恰好 14 个色值，
      * PaletteAuditTest 数的常量一个没多；换色时它跟着 [Accent] 一起变，页面因此不再读
      * [Palette.AccentDim]（那只是默认蓝下一次手挑的结果）。算法与系数见 [accentSurfaceOf]。
      */
@@ -185,7 +182,7 @@ object Wear {
     /**
      * 强调色的轨道位：开关选中轨道、主键静息档高光、滑轨未选段。
      *
-     * 同样是 [Accent] 的运行时投影（[Palette] 仍是 15 个色值），算法与系数见 [accentRailOf]。
+     * 同样是 [Accent] 的运行时投影（[Palette] 仍是 14 个色值），算法与系数见 [accentRailOf]。
      */
     val AccentRail: Color
         @Composable @ReadOnlyComposable

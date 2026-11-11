@@ -74,8 +74,8 @@ class SettingsVisualGuardTest {
 
         val shared = readSettings("SettingsShared.kt")
         assertEquals(
-            "全页强调色元素只允许两个：滑轨选中段 + 单选选中态",
-            2,
+            "全页强调色元素只允许三个：滑轨选中段 + 单选选中态 + 6dp 状态点（后者由纯映射取轨道位）",
+            3,
             Regex("Wear\\.Accent\\b").findAll(codeOnly(shared)).count()
         )
         assertTrue("滑轨选中段必须跟随运行时强调色", shared.contains("selectedBarColor = Wear.Accent"))

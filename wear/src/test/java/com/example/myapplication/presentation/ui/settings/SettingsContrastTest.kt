@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.ui.graphics.Color
 import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.presentation.ui.theme.accentRailOf
 import com.example.myapplication.presentation.ui.theme.contrastRatio
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -99,10 +100,11 @@ class SettingsContrastTest {
     }
 
     @Test
-    fun accentTrackKeepsStaticIndicatorsReadable() {
-        assertTrue(contrastRatio(Wear.Palette.AccentTrack, Wear.Palette.Bg) >= 4.5f)
+    fun accentRailKeepsStaticIndicatorsReadable() {
+        val rail = accentRailOf(Wear.Palette.Accent)
+        assertTrue(contrastRatio(rail, Wear.Palette.Bg) >= 4.5f)
         assertTrue(
-            contrastRatio(Wear.Palette.AccentTrack, Wear.Palette.Bg) <
+            contrastRatio(rail, Wear.Palette.Bg) <
                 contrastRatio(Wear.Palette.Accent, Wear.Palette.Bg)
         )
     }

@@ -30,7 +30,10 @@ class SessionDrawerVisualGuardTest {
             "强调色不许再当容器底色",
             Regex("containerColor = Wear\\.(Palette\\.)?Accent\\b").containsMatchIn(code)
         )
-        assertTrue("选中胶囊只留 1dp 的 AccentTrack 描边", code.contains("Wear.Palette.AccentTrack"))
+        assertTrue(
+            "选中胶囊只留 1dp 的强调色轨道位描边",
+            code.contains("if (selected) Wear.AccentRail else Wear.Palette.Border")
+        )
         assertTrue(
             "选中胶囊必须透明填充",
             code.contains("if (selected) Color.Transparent else Wear.Palette.SurfaceAlt")

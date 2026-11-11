@@ -14,7 +14,7 @@ import org.junit.Test
  * 只有真机截图才发现。所以在源码里钉死"还剩哪几处在读静态令牌、分别是谁"。
  *
  * 两类令牌各有一条防线：主色 `Wear.Palette.Accent` 由前两个用例钉住，
- * 配套的 AccentDim / AccentTrack（现在也有投影 Wear.AccentSurface / Wear.AccentRail）由
+ * 配套的 AccentDim（页面读它的投影 Wear.AccentSurface / Wear.AccentRail）由
  * [companionTokensAreOnlyReadWhereTheChangeBoundaryEnds] 钉住。
  */
 class AccentRuntimeSourceGuardTest {
@@ -54,14 +54,10 @@ class AccentRuntimeSourceGuardTest {
             }
             .toMap()
         assertEquals(
-            "AccentDim / AccentTrack 已有运行时投影（Wear.AccentSurface / Wear.AccentRail），页面代码只许读投影：" +
-                "这里每多一处，那枚配套色换色时就静止在默认蓝上。剩下三处都在本次改动的文件边界之外" +
-                "（SessionDrawer 的选中胶囊、SettingsShared 的两个 Tone 映射），改完就该从这张表里消失。",
-            mapOf(
-                "theme/WearMaterialTheme.kt" to 2,
-                "settings/SettingsShared.kt" to 3,
-                SessionDrawerName to 1
-            ),
+            "配套派生色已有运行时投影（Wear.AccentSurface / Wear.AccentRail），页面代码只许读投影：" +
+                "这里每多一处，那枚配套色换色时就静止在默认蓝上。只允许保留默认档定义本身 ——" +
+                "WearMaterialTheme 的两个槽位，它同时是 AccentDim「有人在读」的证据。",
+            mapOf("theme/WearMaterialTheme.kt" to 2),
             actual
         )
     }
@@ -113,7 +109,6 @@ class AccentRuntimeSourceGuardTest {
         const val MainJavaRoot = "src/main/java"
         const val ComponentRoot = "src/main/java/com/example/myapplication/presentation/ui/"
         const val BottomInteractiveBlockName = "BottomInteractiveBlock.kt"
-        const val SessionDrawerName = "SessionDrawer.kt"
 
         const val BottomInteractiveBlockPath = ComponentRoot + BottomInteractiveBlockName
         const val OnboardingPath = ComponentRoot + "OnboardingScreen.kt"

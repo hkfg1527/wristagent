@@ -20,9 +20,9 @@ import kotlin.math.sqrt
 class PaletteAuditTest {
 
     @Test
-    fun paletteStaysWithinFifteenTokens() {
+    fun paletteStaysWithinFourteenTokens() {
         assertTrue(
-            "调色板膨胀到 " + palette.size + " 个色值（上限 15）。新颜色必须合并进已有 token，不能新增。当前：" + palette.keys,
+            "调色板膨胀到 " + palette.size + " 个色值（上限 " + MAX_TOKENS + "）。新颜色必须合并进已有 token，不能新增。当前：" + palette.keys,
             palette.size <= MAX_TOKENS
         )
     }
@@ -92,7 +92,7 @@ class PaletteAuditTest {
     }
 
     private companion object {
-        const val MAX_TOKENS = 15
+        const val MAX_TOKENS = 14
         const val MIN_DISTANCE = 20.0
 
         val palette: Map<String, Long> = run {

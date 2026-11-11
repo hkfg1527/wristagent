@@ -106,6 +106,7 @@ import androidx.wear.compose.material3.TextToggleButton
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
+import com.example.myapplication.presentation.ui.theme.accentRailOf
 import kotlinx.coroutines.launch
 
 /**
@@ -984,15 +985,20 @@ private fun SettingsStatusBlock(description: String, tone: Tone) {
         modifier = Modifier
             .size(Wear.Size.StatusBlock)
             .clip(CircleShape)
-            .background(tone.statusBlockColor())
+            .background(tone.statusBlockColor(Wear.Accent))
             .semantics { contentDescription = description }
     )
 }
 
-/** [Tone] 到令牌色的唯一映射，避免状态色散落在各处。 */
-private fun Tone.statusBlockColor(): Color = when (this) {
-    // 静态属性不该是焦点：主色压到 60%（= AccentTrack，黑底 5.29:1），不再满饱和抢页面标题
-    Tone.ACCENT -> Wear.Palette.AccentTrack
+/**
+ * [Tone] 到令牌色的唯一映射，避免状态色散落在各处。
+ *
+ * 强调色那一档读不了投影 —— [Wear.AccentRail] 是 @Composable 的，这里是零 Compose 依赖的纯映射，
+ * 所以由调用方在组合作用域把当前强调色传进来，轨道位系数仍只由 [accentRailOf] 定义。
+ */
+private fun Tone.statusBlockColor(accent: Color): Color = when (this) {
+    // 静态属性不该是焦点：主色压到 60% 的轨道位（黑底 5.28:1），不再满饱和抢页面标题
+    Tone.ACCENT -> accentRailOf(accent)
     Tone.DANGER -> Wear.Palette.Danger
     Tone.MUTED -> Wear.Palette.TextMuted
 }
@@ -1416,19 +1422,19 @@ fun SettingsActionButton(
     tone: Tone = Tone.MUTED
 ) {
     val container = when (tone) {
-        Tone.ACCENT -> Wear.Palette.AccentDim
+        Tone.ACCENT -> Wear.AccentSurface
         Tone.DANGER -> Wear.Palette.DangerSurface
         Tone.MUTED -> Wear.Palette.Surface
     }
     // 强调色按钮不再染文字与描边：全页强调色只留给"选中态"（圆点 / 滑轨）。
-    // 主键身份由 AccentDim 实底 + AccentTrack 发丝线承担，仍是同一套令牌色。
+    // 主键身份由强调色的配套面实底（AccentSurface）+ 轨道位发丝线（AccentRail）承担，换色时一起跟随。
     val content = when (tone) {
         Tone.ACCENT -> Wear.Palette.TextPrimary
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.TextPrimary
     }
     val stroke = when (tone) {
-        Tone.ACCENT -> Wear.Palette.AccentTrack
+        Tone.ACCENT -> Wear.AccentRail
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.Border
     }
