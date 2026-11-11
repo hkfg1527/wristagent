@@ -140,10 +140,8 @@ fun AppearanceContent(
         title = stringResource(R.string.settings_sub_appearance),
         onBack = onBack
     ) {
-        section(stringResource(R.string.settings_appearance_header))
-
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_appearance_web_only)) }
-
+        // 「主题」组整组删除：网页端 ConsoleFields 里已经没有 themeMode，表端的主题枚举也随偏好一起删了，
+        // 留着「请在手机网页修改」就是把人指到一个不存在的选项上。
         row {
             SettingsSwitchRow(
                 label = stringResource(R.string.settings_appearance_compact),

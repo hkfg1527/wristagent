@@ -64,7 +64,7 @@ fun SettingsTransferContent(
     ) {
         section(stringResource(R.string.settings_transfer_header))
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_transfer_export),
                 tone = Tone.ACCENT,
@@ -82,7 +82,7 @@ fun SettingsTransferContent(
         }
 
         // 从剪贴板直接读：真实路径是"先复制、再点这一行"，不是让用户手打一段 JSON
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_transfer_import),
                 tone = Tone.MUTED,

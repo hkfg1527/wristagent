@@ -119,7 +119,7 @@ fun NetworkDiagnosticsContent(
             }
         }
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_netdiag_recheck),
                 // 不禁用：进页会自动体检一次，禁用会把这几秒里的点击静默吞掉
@@ -131,7 +131,7 @@ fun NetworkDiagnosticsContent(
                 }
             )
         }
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_netdiag_repair),
                 enabled = !running && plans.any { it.autoFixable },
@@ -175,7 +175,7 @@ fun NetworkDiagnosticsContent(
                 }
             }
         }
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_netdiag_copy),
                 enabled = !running && checks.isNotEmpty(),

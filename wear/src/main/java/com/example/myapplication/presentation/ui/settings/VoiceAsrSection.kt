@@ -167,7 +167,7 @@ fun VoiceAsrContent(
 
         section(stringResource(R.string.settings_asr_selftest_header))
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = if (isTesting) {
                     stringResource(R.string.settings_asr_testing)

@@ -115,11 +115,12 @@ fun PromptViewerContent(
             }
         }
     ) {
-        row {
+        // 页首两块是整块内容（可点头部 + 可滚动正文），不并进组卡
+        standaloneRow {
             PromptHeaderRow(onEdit = { editorOpen = true })
         }
 
-        row {
+        standaloneRow {
             PromptBody(text = bodyText)
         }
 

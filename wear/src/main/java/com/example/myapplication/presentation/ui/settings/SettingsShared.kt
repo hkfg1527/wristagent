@@ -16,6 +16,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,10 +35,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,11 +57,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -87,8 +94,6 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.Slider
-import androidx.wear.compose.material3.SliderDefaults
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
@@ -119,17 +124,22 @@ fun settingsSideInset(): Dp {
 
 /** 单行 44dp 触控热区之间的最小留白。 */
 
-/** 行与行之间的唯一分隔物：1dp 细线，取代原来的"每行一张卡片"。 */
+/** 全页唯一一种线的厚度：1dp。组内行与行之间的分隔线也是它。 */
 private val SettingsDividerThickness = SettingsSpacingMath.HairlineDp.dp
 
-/** 相邻两行之间的垂直留白：把每行切成独立的一块，而不是连成一堵墙。 */
-val SettingsItemGap: Dp = SettingsSpacingMath.ItemGapDp.dp
+/**
+ * 列表项之间的垂直留白：**0**。
+ *
+ * 同一组内的行必须严丝合缝拼成一张卡，列表因此不在项之间插空；分组的呼吸全部落在
+ * 组标题上方的 24dp（[SettingsSectionGap]）里 —— "组间 24dp / 组内一根 1px 线"才读得出来。
+ */
+val SettingsRowGap: Dp = SettingsSpacingMath.CardRowGapDp.dp
 
 /** 组标题下方到本组首行之间的留白，也是"每组第一行上方"的那一段空气。 */
 private val SettingsSectionHeaderBottomGap: Dp = SettingsSpacingMath.SectionHeaderBottomDp.dp
 
-/** 组间留白：24dp，恒为组内行距（4dp）的 6 倍 —— 亲密性比例必须 >= 2。 */
-private val SettingsSectionGap = SettingsDesignMath.SectionGapDp.dp
+/** 组间留白：24dp。组内只隔一根 1px 线，比例因此一眼可辨（旧的 4dp 行距已被卡片取代）。 */
+val SettingsSectionGap: Dp = SettingsDesignMath.SectionGapDp.dp
 
 /**
  * 根页列表顶部内边距：等于顶部渐变遮罩高度。
@@ -148,14 +158,14 @@ val RootContentTopPadding: Dp = SettingsLayoutMath.TopScrimDp.dp
 val RootTitleTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
     topInsetDp = SettingsLayoutMath.TopScrimDp,
     contentPaddingTopDp = RootContentTopPadding.value,
-    itemGapDp = SettingsSpacingMath.ItemGapDp
+    itemGapDp = SettingsSpacingMath.CardRowGapDp
 ).dp
 
-/** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp，行内补齐到 24dp 遮罩下沿。 */
+/** 子页头部行内的顶部留白：子页列表顶部内边距是 4dp（项间距已归 0），行内补齐到 24dp 遮罩下沿。 */
 val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
     topInsetDp = SettingsLayoutMath.TopScrimDp,
     contentPaddingTopDp = Wear.Space.Xs.value,
-    itemGapDp = SettingsSpacingMath.ItemGapDp
+    itemGapDp = SettingsSpacingMath.CardRowGapDp
 ).dp
 
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
@@ -222,7 +232,8 @@ enum class SettingsSubDialog {
 internal class SettingsRowEntry(
     val isSection: Boolean,
     val content: @Composable () -> Unit,
-    val isSubItem: Boolean = false
+    val isSubItem: Boolean = false,
+    val kind: SettingsRowEntryKind = SettingsRowEntryKind.CARD_ROW
 )
 
 /**
@@ -235,7 +246,28 @@ class SettingsRows internal constructor() {
 
     /** 登记一行内容；[subItem] = true 表示它是某个组下的子项，用更短的分隔线。 */
     fun row(subItem: Boolean = false, content: @Composable () -> Unit) {
-        items.add(SettingsRowEntry(isSection = false, content = content, isSubItem = subItem))
+        items.add(
+            SettingsRowEntry(
+                isSection = false,
+                content = content,
+                isSubItem = subItem,
+                kind = SettingsRowEntryKind.CARD_ROW
+            )
+        )
+    }
+
+    /**
+     * 登记一块卡外内容（动作按钮、正文块这类不并卡的整块）：它把所在卡截断，
+     * 前后各行各自成组 —— 「完成返回」「清空记忆」不会粘到上一张卡上。
+     */
+    fun standaloneRow(content: @Composable () -> Unit) {
+        items.add(
+            SettingsRowEntry(
+                isSection = false,
+                content = content,
+                kind = SettingsRowEntryKind.STANDALONE
+            )
+        )
     }
 
     /** 登记一行分组标题。 */
@@ -249,8 +281,8 @@ class SettingsRows internal constructor() {
  *
  * 版面契约（与 [SettingsDesignMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
- * - 中部：ScalingLazyColumn，内容宽度固定 [SettingsContentWidth]（176dp），行间距 [SettingsItemGap]，
- *   行之间**不画线**；只有子项组上沿一根 [SettingsSubItemDivider]；
+ * - 中部：ScalingLazyColumn，内容宽度固定 [SettingsContentWidth]（176dp），项间距 [SettingsRowGap]（0）；
+ *   同组行拼成一张卡，卡内行与行之间一根 [SettingsGroupHairline]（子项组上沿左端另收 12dp）；
  * - 组间距 24dp，只由 [SettingsSectionHeader] 的顶部留白提供；
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
@@ -268,6 +300,9 @@ fun SettingsSubPage(
     val registry = SettingsRows()
     registry.rows()
     val content = registry.items
+    // 组 = 一张卡：每行落在组里的哪个位置（组首 / 组中 / 组尾 / 单行）由行序列本身算出；
+    // 组标题与卡外行（动作按钮）把卡截断。组内分隔线的左端缩进按"下一行是不是子项组首"算。
+    val rowSlots = SettingsRowComposition.rowSlots(content.map { it.kind })
 
     val listState = rememberScalingLazyListState()
     val listFocusRequester = remember { FocusRequester() }
@@ -314,7 +349,8 @@ fun SettingsSubPage(
                 top = Wear.Space.Xs,
                 bottom = Wear.Size.SettingsBottomInset
             ),
-            verticalArrangement = Arrangement.spacedBy(SettingsItemGap),
+            // 项间距 0：同组的行必须严丝合缝拼成一张卡，分组的呼吸只由组标题上方的 24dp 承担
+            verticalArrangement = Arrangement.spacedBy(SettingsRowGap),
             // 关掉 autoCentering：它会在首项之上插入
             // (viewportCenter − Σ前序高度) 的 spacer。头部行现在只有 32dp（不再为凑 spacer=0 而撑到
             // 86dp），算出来的 spacer 会是 26dp 级的空白 —— 那正是"顶部一大片黑再出现内容"的老问题。
@@ -335,16 +371,33 @@ fun SettingsSubPage(
             ) { index ->
                 val entry = content[index]
                 val previous = content.getOrNull(index - 1)
-                // 全页只有一种线，且每个子项组只有一根：画在子项组的上沿。
-                // 同级行之间不画线，组的分界由组标题上方 24dp 留白承担（线数 == 子项组数）。
-                val isSubItemGroupStart = SettingsRowComposition.isSubItemGroupStart(
-                    previousIsSubItem = previous?.isSubItem,
-                    isSubItem = entry.isSubItem
+                // 组内分隔线由卡（SettingsCardRow）在行尾画：左端缩进取决于"下一行"是不是子项组首 ——
+                // 子项组上沿从子项槽线（12dp）起笔，普通行间从卡片左内边距（14dp）起笔，仍是全页一种线。
+                val next = content.getOrNull(index + 1)
+                val hairlineStart = SettingsRowComposition.groupHairlineStartIndentDp(
+                    isSubItem = next?.isSubItem ?: false,
+                    previousIsSubItem = entry.isSubItem
                 )
+                // 卡外行（动作按钮）紧跟一张卡时补一档组间距：列表项间距已归 0，不补就贴死卡尾。
+                // 页首第一个卡外行（如提示词正文）与另一个卡外行之间不补：它们本是一体的整块内容。
+                val standaloneTopGap =
+                    if (entry.kind == SettingsRowEntryKind.STANDALONE &&
+                        previous != null && previous.kind == SettingsRowEntryKind.CARD_ROW
+                    ) {
+                        SettingsSectionGap
+                    } else {
+                        0.dp
+                    }
                 SettingsStaggeredRow(index = index + 1, rowCount = rowCount, stagger = stagger, exit = exit) {
                     Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
-                        if (isSubItemGroupStart) SettingsSubItemDivider()
-                        entry.content()
+                        CompositionLocalProvider(
+                            LocalSettingsRowSlot provides rowSlots[index],
+                            LocalSettingsGroupHairlineStart provides hairlineStart.dp
+                        ) {
+                            Box(modifier = Modifier.padding(top = standaloneTopGap)) {
+                                entry.content()
+                            }
+                        }
                     }
                 }
             }
@@ -354,7 +407,10 @@ fun SettingsSubPage(
                     SettingsActionButton(
                         label = stringResource(R.string.settings_done_back),
                         tone = Tone.MUTED,
-                        modifier = Modifier.widthIn(max = SettingsContentWidth),
+                        // 「完成返回」是动作按钮、不是卡片行：与上面那张卡之间留一整档组间距
+                        modifier = Modifier
+                            .widthIn(max = SettingsContentWidth)
+                            .padding(top = SettingsSectionGap),
                         onClick = { exit.begin(onBack) }
                     )
                 }
@@ -406,13 +462,6 @@ fun SettingsEdgeScrim(modifier: Modifier = Modifier) {
             }
     )
 }
-
-/**
- * 行与行之间**不画线**：组内靠 4dp 行距与 48dp 行高留白分开。
- *
- * 旧的整行 1dp 分隔线已删除 —— 十几行各挂一根线，页面读起来是一张表格而不是一组设置。
- * 全页只保留一种线：子项组的 [SettingsSubItemDivider]，且每个子项组只有一根。
- */
 
 /**
  * 子页头部：44dp 返回键 + 页面标题，整块压在曲面时钟带以下。
@@ -482,8 +531,9 @@ fun SettingsBackButton(onClick: () -> Unit) {
  *
  * - 中性色：强调色全页只留给"选中值 / 当前状态"这一处语义，组标题不属于它；
  * - 没有下方那条强调色细线，也没有下划线：一屏三根装饰线正是"AI 拼的"来源，
- *   组的边界改由 24dp 留白承担（组内行距 4dp，比例 6:1）；
- * - 上方 24dp 是**组间距**的唯一来源，下方 8dp 是标题与本组首行之间。
+ *   组的边界改由 24dp 留白承担（组内只隔一根 1px 线，比例因此一眼可辨）；
+ * - 上方 24dp 是**组间距**的唯一来源，下方 8dp 是标题与本组首行之间；
+ * - 左内边距 14dp 与行标签同一条槽线：标题与行标签逐像素对齐。
  */
 @Composable
 fun SettingsSectionHeader(text: String) {
@@ -492,7 +542,11 @@ fun SettingsSectionHeader(text: String) {
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
+            .padding(
+                start = SettingsRowSidePadding,
+                top = SettingsSectionGap,
+                bottom = SettingsSectionHeaderBottomGap
+            ),
         style = SettingsSectionStyle,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
@@ -515,6 +569,32 @@ private val SettingsRowLineGap: Dp = 2.dp
 private val RowVerticalPadding: Dp = 2.dp
 
 /**
+ * 行内左右内边距：14dp。
+ *
+ * 左端让标签起笔与组标题同一条槽线；右端把取值 / 圆点 / 状态点从卡片圆角上推回 14dp，
+ * 旧版没有 end padding，取值是直接顶在圆角上的。
+ */
+val SettingsRowSidePadding: Dp = SettingsDesignMath.RowSidePaddingDp.dp
+
+/** 组卡片圆角：固定 16dp，不吃 MaterialTheme.shapes.small（它对一行来说太大）。 */
+private val GroupCardRadius: Dp = SettingsDesignMath.GroupCardRadiusDp.dp
+
+/**
+ * 当前行在所属卡片里的位置，由列表构建侧（根页 / [SettingsSubPage]）按组提供。
+ *
+ * 放在 CompositionLocal 里而不是逐层传参：行的组合函数只关心"我是不是组首 / 组尾"，
+ * 十几个调用点（子页各 section 文件）因此一行都不用改。null 表示这一行不在卡片里，
+ * 行为退回旧形态（无卡片、无内边距、无线）。
+ */
+internal val LocalSettingsRowSlot = compositionLocalOf<SettingsRowSlot?> { null }
+
+/**
+ * 当前行卡尾那根组内分隔线的左端缩进，由列表构建侧按"下一行是不是子项组首"算好放入。
+ * 默认取卡片左内边距（14dp）：行被用在列表之外时，卡与线都不存在，读不到它。
+ */
+internal val LocalSettingsGroupHairlineStart = compositionLocalOf { SettingsRowSidePadding }
+
+/**
  * 行取值的可见门槛（屏宽 dp）：更窄的屏上不显示取值。
  *
  * 根页与所有子页共用 [SettingsNavRow]，这条规则因此只有一处实现。抽成纯函数是为了把
@@ -526,6 +606,87 @@ internal const val SettingsRowValueMinScreenWidthDp = 200
 internal fun settingsRowShowsValue(screenWidthDp: Int): Boolean =
     screenWidthDp > SettingsRowValueMinScreenWidthDp
 
+/** 位置 -> 圆角：组首只圆上两角，组尾只圆下两角，中间四角皆方 —— 整组拼起来才是一张圆角矩形。 */
+private fun SettingsRowShape.toCornerShape(): Shape = RoundedCornerShape(
+    topStart = if (roundedTop) GroupCardRadius else 0.dp,
+    topEnd = if (roundedTop) GroupCardRadius else 0.dp,
+    bottomStart = if (roundedBottom) GroupCardRadius else 0.dp,
+    bottomEnd = if (roundedBottom) GroupCardRadius else 0.dp
+)
+
+/**
+ * 组内行与行之间的那根线：1dp / Border 色 / 右端从右槽线往左收 24dp，
+ * 左端缩进由 [LocalSettingsGroupHairlineStart] 给（子项组上沿 12dp，普通行间 14dp）。
+ *
+ * 只画在卡片内部、只画在"行与行之间"：组内最后一行下面没有线，线数因此恒比行数少一。
+ */
+@Composable
+private fun SettingsGroupHairline() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SettingsDividerThickness)
+            .padding(
+                start = LocalSettingsGroupHairlineStart.current,
+                end = SettingsRowSidePadding + SettingsDesignMath.DividerRightInsetDp.dp
+            )
+            .background(Wear.Palette.Border)
+    )
+}
+
+/**
+ * 组卡片里的一行：圆角只由 [LocalSettingsRowSlot] 决定，背景恒为 [Wear.Palette.Surface]。
+ *
+ * 三个问题在这一处一次解决：
+ * 1. 每行一张卡 → 组首只圆上两角、组尾只圆下两角，组内拼成一张圆角矩形；
+ * 2. 取值贴死在圆角上 → 行内左右各 [SettingsRowSidePadding]（14dp），取值右端因此离卡片右缘 14dp；
+ * 3. 不可点的纯展示行没有背景 → 背景不再与 onClick 绑定，展示行也是同一张卡的一部分，不留白洞。
+ */
+@Composable
+internal fun SettingsCardRow(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    minHeight: Dp = SettingsSpacingMath.MinRowHeightDp.dp,
+    content: @Composable () -> Unit
+) {
+    val clickModifier =
+        if (onClick == null) Modifier else Modifier.clickable(role = Role.Button, onClick = onClick)
+    val shape = SettingsRowComposition.shapeOf(LocalSettingsRowSlot.current)
+    if (shape == null) {
+        // 不在卡片里（行被用在列表之外）：退回旧形态，不擅自加内边距
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight)
+                .then(clickModifier)
+        ) { content() }
+        return
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape.toCornerShape())
+            .background(Wear.Palette.Surface)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight)
+                .then(clickModifier)
+                .padding(
+                    start = SettingsRowSidePadding,
+                    end = SettingsRowSidePadding,
+                    top = RowVerticalPadding,
+                    bottom = RowVerticalPadding
+                ),
+            contentAlignment = Alignment.CenterStart
+        ) { content() }
+        if (SettingsRowComposition.drawsGroupHairline(LocalSettingsRowSlot.current)) {
+            SettingsGroupHairline()
+        }
+    }
+}
+
 /**
  * 行骨架：块居中、行内左右两槽。
  *
@@ -535,6 +696,8 @@ internal fun settingsRowShowsValue(screenWidthDp: Int): Boolean =
  * 为什么不是"每行都居中"：列表里每一行都居中时没有左边缘可循，取值也对不齐，
  * 用户无法竖向扫读和比较 —— 这是"看起来像 AI 拼的"的第一号成因。
  * 为什么也不是"全部左对齐"：圆屏上的重心会掉到左边。整块居中 + 行内两槽是唯一解。
+ *
+ * 左右各 [SettingsRowSidePadding]（14dp）：左端让标签起笔与组标题同一条槽线，右端把取值从卡片圆角上推回 14dp。
  *
  * [subtitle] 属于左槽（标签的从属信息，另起一行），[value] 属于右槽（当前取值）。
  * [subItem] 只把左槽线右移 [SettingsSubItemIndent]：从属关系靠位置表达，**字号不变**。
@@ -551,60 +714,49 @@ private fun SettingsSlotRow(
     subItem: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .then(
-                if (onClick == null) {
-                    Modifier
-                } else {
-                    // 可点的行给一块极浅底：纯黑页上没有分隔线之后，行本身得是一块可点的区域
-                    Modifier
-                        .background(Wear.Palette.Surface)
-                        .clickable(role = Role.Button, onClick = onClick)
-                }
-            )
-            .heightIn(min = SettingsSpacingMath.MinRowHeightDp.dp)
-            // 左右不给内边距：标签起笔就是左槽线，与组标题逐像素对齐
-            .padding(
-                start = if (subItem) SettingsSubItemIndent else 0.dp,
-                top = RowVerticalPadding,
-                bottom = RowVerticalPadding
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            BasicText(
-                text = title,
-                style = SettingsRowLabelStyle,
-                maxLines = titleMaxLines,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (subtitle != null) {
-                Spacer(Modifier.height(SettingsRowLineGap))
+    SettingsCardRow(modifier = modifier, onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (subItem) Modifier.padding(start = SettingsSubItemIndent) else Modifier
+                    )
+            ) {
                 BasicText(
-                    text = subtitle,
+                    text = title,
+                    style = SettingsRowLabelStyle,
+                    maxLines = titleMaxLines,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (subtitle != null) {
+                    Spacer(Modifier.height(SettingsRowLineGap))
+                    BasicText(
+                        text = subtitle,
+                        style = SettingsRowValueStyle,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            // 右槽：取值靠右，右端落在行内边距以内；有行尾控件时控件才是最后一个元素
+            if (value != null) {
+                Spacer(Modifier.width(SettingsLabelValueGap))
+                BasicText(
+                    text = value,
+                    modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
                     style = SettingsRowValueStyle,
-                    maxLines = 2,
+                    maxLines = valueMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-        // 右槽：取值靠右，右端落到行右边界；有行尾控件时控件才是最后一个元素
-        if (value != null) {
-            Spacer(Modifier.width(SettingsLabelValueGap))
-            BasicText(
-                text = value,
-                modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
-                style = SettingsRowValueStyle,
-                maxLines = valueMaxLines,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(SettingsValueTailGap))
-            trailing()
+            if (trailing != null) {
+                Spacer(Modifier.width(SettingsValueTailGap))
+                trailing()
+            }
         }
     }
 }
@@ -698,39 +850,41 @@ fun SettingsSwitchRow(
     modifier: Modifier = Modifier,
     secondary: String? = null
 ) {
-    SwitchButton(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        // 容器一律透明：行本身就是"裸行 + 发丝线"，控件再自带一块实底就成了第二层卡片。
-        // 旧值：ON 态 #0E3A4E 整块实色（质量 ≈3–4 条 30dp 胶囊）、OFF 态 #10141A 边界 1.14:1 看不见。
-        colors = SwitchButtonDefaults.switchButtonColors(
-            checkedContainerColor = Color.Transparent,
-            checkedContentColor = Wear.Palette.TextPrimary,
-            checkedSecondaryContentColor = Wear.Palette.TextSecondary,
-            checkedThumbColor = Wear.Palette.Orb,
-            checkedTrackColor = Wear.Palette.AccentTrack,
-            checkedTrackBorderColor = Wear.Palette.AccentTrack,
-            uncheckedContainerColor = Color.Transparent,
-            uncheckedContentColor = Wear.Palette.TextPrimary,
-            uncheckedSecondaryContentColor = Wear.Palette.TextSecondary,
-            uncheckedThumbColor = Wear.Palette.TextSecondary,
-            uncheckedTrackColor = Wear.Palette.SurfaceAlt,
-            uncheckedTrackBorderColor = Wear.Palette.Border
-        ),
-        // 左右内边距归零：开关标签必须和所有行的标签落在同一条左槽线上
-        contentPadding = PaddingValues(
-            horizontal = 0.dp,
-            vertical = Wear.Space.Sm
-        ),
-        secondaryLabel = if (secondary == null) {
-            null
-        } else {
-            { SettingsSecondaryLabel(text = secondary) }
-        },
-        label = { SettingsPrimaryLabel(text = label) }
-    )
+    SettingsCardRow(modifier = modifier) {
+        SwitchButton(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            // 容器一律透明：行本身就是"裸行 + 发丝线"，控件再自带一块实底就成了第二层卡片。
+            // 旧值：ON 态 #0E3A4E 整块实色（质量 ≈3–4 条 30dp 胶囊）、OFF 态 #10141A 边界 1.14:1 看不见。
+            colors = SwitchButtonDefaults.switchButtonColors(
+                checkedContainerColor = Color.Transparent,
+                checkedContentColor = Wear.Palette.TextPrimary,
+                checkedSecondaryContentColor = Wear.Palette.TextSecondary,
+                checkedThumbColor = Wear.Palette.Orb,
+                checkedTrackColor = Wear.Palette.AccentTrack,
+                checkedTrackBorderColor = Wear.Palette.AccentTrack,
+                uncheckedContainerColor = Color.Transparent,
+                uncheckedContentColor = Wear.Palette.TextPrimary,
+                uncheckedSecondaryContentColor = Wear.Palette.TextSecondary,
+                uncheckedThumbColor = Wear.Palette.TextSecondary,
+                uncheckedTrackColor = Wear.Palette.SurfaceAlt,
+                uncheckedTrackBorderColor = Wear.Palette.Border
+            ),
+            // 左右内边距归零：开关标签靠卡片行自己的 14dp 内边距落到左槽线上
+            contentPadding = PaddingValues(
+                horizontal = 0.dp,
+                vertical = Wear.Space.Sm
+            ),
+            secondaryLabel = if (secondary == null) {
+                null
+            } else {
+                { SettingsSecondaryLabel(text = secondary) }
+            },
+            label = { SettingsPrimaryLabel(text = label) }
+        )
+    }
 }
 
 /**
@@ -746,17 +900,30 @@ fun SettingsSplitToggleRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    TextToggleButton(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier.fillMaxWidth(),
-        content = { SettingsPrimaryLabel(text = label) }
-    )
+    SettingsCardRow(modifier = modifier) {
+        TextToggleButton(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.fillMaxWidth(),
+            content = { SettingsPrimaryLabel(text = label) }
+        )
+    }
 }
 
+/** 细滑轨的几何常量（轨道 / 滑块 / 外圈）钉在 [SettingsSliderMath]，测试直接钉死防回漂。 */
+private val SliderTrackHeight: Dp = SettingsSliderMath.TrackHeightDp.dp
+
+private val SliderThumbSize: Dp = SettingsSliderMath.ThumbSizeDp.dp
+
+private val SliderThumbRing: Dp = SettingsSliderMath.ThumbRingDp.dp
+
+/** 滑轨的触控带高度：轨道只有 6dp，手指需要更高的一块命中区。 */
+private val SliderTouchHeight: Dp = 24.dp
+
 /**
- * 数值行：官方 Slider（带两端图标的多台阶滑轨），细粒度取值由 [SettingsValueMath] 量化，
- * 不再用 ± 按钮拼装。标签 / 数值 / 滑轨三件，不再额外套一层卡片。
+ * 数值行：一条 6dp 细轨 + 18dp 圆形滑块，细粒度取值由 [SettingsValueMath] 量化。
+ *
+ * 标签 / 数值 / 滑轨三件，整体是组卡片里的一行：圆角与 14dp 内边距由 [SettingsCardRow] 统一给。
  */
 @Composable
 fun SettingsSliderRow(
@@ -768,48 +935,126 @@ fun SettingsSliderRow(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
-    ) {
-        Row(
+    SettingsCardRow(modifier = modifier) {
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
         ) {
-            BasicText(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = SettingsRowLabelStyle,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.width(SettingsLabelValueGap))
-            // 数值进右槽：与所有行的取值落在同一条右槽线上，不再用 titleMedium 抢焦点
-            BasicText(
-                text = valueText,
-                modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
-                style = SettingsRowValueStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BasicText(
+                    text = label,
+                    modifier = Modifier.weight(1f),
+                    style = SettingsRowLabelStyle,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.width(SettingsLabelValueGap))
+                // 数值进右槽：与所有行的取值落在同一条右槽线上，不再用 titleMedium 抢焦点
+                BasicText(
+                    text = valueText,
+                    modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
+                    style = SettingsRowValueStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            SettingsThinSlider(
+                value = value,
+                valueRange = valueRange,
+                steps = steps,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth()
             )
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            steps = steps,
-            modifier = Modifier.fillMaxWidth(),
-            valueRange = valueRange,
-            shape = MaterialTheme.shapes.medium,
-            // 容器透明：滑轨自己就是控件，不需要再垫一块 Surface
-            colors = SliderDefaults.sliderColors(
-                containerColor = Color.Transparent,
-                buttonIconColor = Wear.Palette.TextPrimary,
-                selectedBarColor = Wear.Accent,
-                unselectedBarColor = Wear.Palette.SurfaceAlt,
-                selectedBarSeparatorColor = Wear.Palette.Bg,
-                unselectedBarSeparatorColor = Wear.Palette.Bg
+    }
+}
+
+/**
+ * 细滑轨 + 圆形滑块：已选段走运行时强调色，未选段走 SurfaceAlt；
+ * 滑块 18dp 填充 TextPrimary，外圈 2dp 用轨道色，视觉上"压在轨道上"而不是融进去。
+ *
+ * 为什么不用官方 Slider：Wear M3 的 Slider 是"52dp 分段胶囊 + 两端 ± 图标"，整块铺满强调色，
+ * 眯眼看是页面上最大的一块实色 —— 强调色在这里是重音，不该铺面积。轨道因此自己画、拖拽自己接。
+ */
+@Composable
+private fun SettingsThinSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedBarColor = Wear.Accent
+    val unselectedBarColor = Wear.Palette.SurfaceAlt
+    val thumbColor = Wear.Palette.TextPrimary
+    val span = (valueRange.endInclusive - valueRange.start).takeIf { it > 0f } ?: 1f
+    val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(SliderTouchHeight)
+            .pointerInput(valueRange, steps) {
+                detectTapGestures { offset ->
+                    onValueChange(
+                        settingsSliderValueAt(
+                            xPx = offset.x,
+                            widthPx = size.width.toFloat(),
+                            thumbRadiusPx = SliderThumbSize.toPx() / 2f,
+                            valueRange = valueRange,
+                            steps = steps
+                        )
+                    )
+                }
+            }
+            .pointerInput(valueRange, steps) {
+                detectHorizontalDragGestures { change, _ ->
+                    change.consume()
+                    onValueChange(
+                        settingsSliderValueAt(
+                            xPx = change.position.x,
+                            widthPx = size.width.toFloat(),
+                            thumbRadiusPx = SliderThumbSize.toPx() / 2f,
+                            valueRange = valueRange,
+                            steps = steps
+                        )
+                    )
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val trackHeightPx = SliderTrackHeight.toPx()
+            val thumbRadiusPx = SliderThumbSize.toPx() / 2f
+            val centerY = size.height / 2f
+            val usableWidth = (size.width - thumbRadiusPx * 2f).coerceAtLeast(1f)
+            val thumbCenterX = thumbRadiusPx + usableWidth * fraction
+            val trackTop = centerY - trackHeightPx / 2f
+            drawRoundRect(
+                color = unselectedBarColor,
+                topLeft = Offset(0f, trackTop),
+                size = Size(size.width, trackHeightPx),
+                cornerRadius = CornerRadius(trackHeightPx / 2f)
             )
-        )
+            drawRoundRect(
+                color = selectedBarColor,
+                topLeft = Offset(0f, trackTop),
+                size = Size(thumbCenterX, trackHeightPx),
+                cornerRadius = CornerRadius(trackHeightPx / 2f)
+            )
+            drawCircle(
+                color = thumbColor,
+                radius = thumbRadiusPx,
+                center = Offset(thumbCenterX, centerY)
+            )
+            drawCircle(
+                color = unselectedBarColor,
+                radius = thumbRadiusPx - SliderThumbRing.toPx() / 2f,
+                center = Offset(thumbCenterX, centerY),
+                style = Stroke(width = SliderThumbRing.toPx())
+            )
+        }
     }
 }
 
@@ -907,26 +1152,6 @@ fun SettingsSubRadioRow(
 }
 
 /**
- * 子项组上沿的那一根短线：1px / Border 色 / 从右槽线往左收 24dp。
- *
- * 全页只有这一种线，每个子项组一根。左端与子项标签的左槽线对齐（右移 12dp），
- * 右端比行宽短 24dp —— 读起来是"这组选项"的起点，而不是一张表格的横线。
- */
-@Composable
-fun SettingsSubItemDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(SettingsDividerThickness)
-            .padding(
-                start = SettingsSubItemIndent,
-                end = SettingsDesignMath.DividerRightInsetDp.dp
-            )
-            .background(Wear.Palette.Border)
-    )
-}
-
-/**
  * 状态点的语义：设置页正文里唯一允许出现语义色的地方。
  *
  * 60-30-10 里的那 10 就是它：一页最多一个状态点。
@@ -984,18 +1209,25 @@ fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier)
     )
 }
 
-/** 状态标签/说明文本：统一 2 行上限 + 省略号，长文本不会顶出圆屏。 */
+/**
+ * 状态标签/说明文本：统一 2 行上限 + 省略号，长文本不会顶出圆屏。
+ *
+ * 它也是一个卡片行（minHeight = 0，不撑 48dp 触控高度）：夹在两张行之间时若没有背景，
+ * 卡片正中就会破出一个黑洞 —— 说明行同样是这一组的一部分。
+ */
 @Composable
 fun SettingsCaptionRow(text: String, modifier: Modifier = Modifier, mono: Boolean = false) {
-    BasicText(
-        text = text,
-        modifier = modifier
-            .widthIn(max = SettingsContentWidth)
-            .fillMaxWidth(),
-        style = if (mono) Wear.TextMono else Wear.TextCaption,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis
-    )
+    SettingsCardRow(modifier = modifier, minHeight = 0.dp) {
+        BasicText(
+            text = text,
+            modifier = Modifier
+                .widthIn(max = SettingsContentWidth)
+                .fillMaxWidth(),
+            style = if (mono) Wear.TextMono else Wear.TextCaption,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 /** 44dp 实底动作按钮：官方 Button 承载，色调取自 [Tone]；DANGER 即错误配色。 */

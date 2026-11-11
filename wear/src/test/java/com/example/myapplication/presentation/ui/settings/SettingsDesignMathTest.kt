@@ -42,7 +42,7 @@ class SettingsDesignMathTest {
         assertEquals(24f, SettingsDesignMath.SectionGapDp, 0.001f)
         assertEquals(SettingsSpacingMath.ItemGapDp, SettingsDesignMath.RowGapDp, 0.001f)
         assertTrue("组间必须 >= 组内两倍", SettingsDesignMath.isSectionRhythmReadable())
-        // 实际比值：24 / 4 = 6
+        // 实际比值：24 / 4 = 6（并卡后卡内行距为 0，组内分界只是一根 1px 线，比例只会更悬殊）
         assertEquals(6f, SettingsDesignMath.sectionToRowRatio(), 0.001f)
     }
 

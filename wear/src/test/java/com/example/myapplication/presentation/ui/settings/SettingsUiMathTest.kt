@@ -202,11 +202,11 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun itemGapStaysOnTheMinimumStep() {
-        // 纵向预算全部让给内容：行间距压到最小呼吸 4dp
+    fun cardRowGapIsZeroAndLegacyItemGapStaysOnTheGrid() {
+        // 并卡后卡内行距为 0（行与行相接，分界交给 1px 发丝线）；ItemGapDp 仍是网格单位，供块级留白清单用
+        assertEquals(0f, SettingsSpacingMath.CardRowGapDp, 0.001f)
         assertEquals(4f, SettingsSpacingMath.ItemGapDp, 0.001f)
         assertTrue(SettingsSpacingMath.isOnGrid(SettingsSpacingMath.ItemGapDp))
-        assertTrue(SettingsSpacingMath.ItemGapDp < Wear.Space.Sm.value)
     }
 
     @Test
@@ -241,12 +241,12 @@ class SettingsSpacingMathTest {
     }
 
     @Test
-    fun rowStepGrowsForBiggerRows() {
-        // 48 行高 + 1 发丝 + 4 间距 = 53dp
-        assertEquals(53f, SettingsSpacingMath.RowStepDp, 0.001f)
+    fun rowStepFollowsTheCardRowGap() {
+        // 并卡后行与行相接：48 行高 + 1 发丝 + 0 卡内行距 = 49dp
+        assertEquals(49f, SettingsSpacingMath.RowStepDp, 0.001f)
         assertEquals(
             SettingsSpacingMath.MinRowHeightDp + SettingsSpacingMath.HairlineDp +
-                SettingsSpacingMath.ItemGapDp,
+                SettingsSpacingMath.CardRowGapDp,
             SettingsSpacingMath.RowStepDp,
             0.001f
         )
@@ -254,12 +254,15 @@ class SettingsSpacingMathTest {
 
     @Test
     fun biggerRowsTradeRowCountForLegibility() {
-        // 233dp 真机：233 / 53 = 4.4 行
+        // 233dp 真机：233 / 49 = 4.75 行
         assertTrue(SettingsSpacingMath.rowsPerScreen(233f) >= 4f)
-        assertEquals(4.4f, SettingsSpacingMath.rowsPerScreen(233f), 0.05f)
+        assertEquals(4.75f, SettingsSpacingMath.rowsPerScreen(233f), 0.05f)
+        // 这条测的是 rowsPerScreen 的单调性本身：步进越大，每屏行数越少。
+        // 必须用两个显式步进比较，不能拿当前常量去和一个写死的旧值比 ——
+        // 否则一旦 RowStepDp 变了，断言的方向就会跟着变，测试变成在测常量而不是在测函数。
         assertTrue(
             "步进变大后每屏行数应减少",
-            SettingsSpacingMath.rowsPerScreen(233f) < SettingsSpacingMath.rowsPerScreen(233f, 49f)
+            SettingsSpacingMath.rowsPerScreen(233f, 56f) < SettingsSpacingMath.rowsPerScreen(233f, 49f)
         )
     }
 
@@ -307,9 +310,9 @@ class SettingsSpacingMathTest {
     @Test
     fun rootTitleStartsBelowTheTopScrim() {
         assertTrue(
-            "标题顶边 " + (SettingsLayoutMath.TopScrimDp + SettingsSpacingMath.ItemGapDp +
+            "标题顶边 " + (SettingsLayoutMath.TopScrimDp + SettingsSpacingMath.CardRowGapDp +
                 RootTitleTopPadding.value) + "dp 落在遮罩内",
-            SettingsLayoutMath.TopScrimDp + SettingsSpacingMath.ItemGapDp + RootTitleTopPadding.value >=
+            SettingsLayoutMath.TopScrimDp + SettingsSpacingMath.CardRowGapDp + RootTitleTopPadding.value >=
                 SettingsLayoutMath.TopScrimDp
         )
     }

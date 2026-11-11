@@ -226,7 +226,7 @@ fun ModelConfigContent(
         }
 
         // 按钮 + 状态行是同一个列表项：状态行永远紧贴按钮下方，点了必然在视线内
-        row {
+        standaloneRow {
             Column(
                 modifier = Modifier
                     .widthIn(max = SettingsContentWidth)

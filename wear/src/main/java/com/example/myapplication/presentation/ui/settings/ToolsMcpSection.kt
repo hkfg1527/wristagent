@@ -221,7 +221,7 @@ fun ToolsMcpContent(
             row { SettingsCaptionRow(text = stringResource(R.string.settings_remembered_full)) }
         }
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = if (forgetArmed) {
                     stringResource(R.string.settings_remembered_forget_confirm)

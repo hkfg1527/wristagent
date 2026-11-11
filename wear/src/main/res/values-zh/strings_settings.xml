@@ -322,7 +322,6 @@
 
     <string name="settings_appearance">外观与点阵</string>
     <string name="settings_sub_appearance">外观与点阵</string>
-    <string name="settings_appearance_header">主题</string>
     <string name="settings_appearance_compact">简洁模式</string>
     <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
     <string name="settings_appearance_matrix_header">点阵</string>

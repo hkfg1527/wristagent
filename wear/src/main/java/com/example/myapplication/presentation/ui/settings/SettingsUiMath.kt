@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
 import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -200,20 +201,97 @@ object SettingsValueMath {
 }
 
 /**
- * 子项组的分段规则：整页只有一种线，且画在每组的上沿 —— 于是"线数 == 子项组数"。
+ * 一行在所属卡片里的位置：组首只圆上两角，组尾只圆下两角，中间四角皆方。
+ *
+ * 卡片不是"每行一张"而是"每组一张"：位置由 [SettingsRowComposition.rowSlots] 从行序列里推出来，
+ * 行自己不做判定 —— 组内因此拼成一整块，组间仍是 24dp 留白，"组间 / 组内"的差别才读得出来。
+ */
+enum class SettingsRowSlot {
+    /** 组里唯一的一行：四角全圆。 */
+    SINGLE,
+
+    /** 组首：只有上两角是圆的。 */
+    FIRST,
+
+    /** 组中：四角皆方。 */
+    MIDDLE,
+
+    /** 组尾：只有下两角是圆的。 */
+    LAST
+}
+
+/** 组卡片里一行的形状：只由位置决定，因此可以脱离 Compose 直接单测。 */
+data class SettingsRowShape(val roundedTop: Boolean, val roundedBottom: Boolean)
+
+/** 列表里一行的种类：组标题、卡片行、卡外行（动作按钮 / 焦点块这类不并卡的整块）。 */
+enum class SettingsRowEntryKind { SECTION, CARD_ROW, STANDALONE }
+
+/**
+ * 组卡片的分段规则：位置由行序列本身推出（组标题 / 卡外行断卡），线只画在"行与行之间"。
  *
  * 抽成纯函数是为了让这条视觉契约能被单测数出来，而不是靠人眼扫源码。
  */
 object SettingsRowComposition {
 
-    /** 当前行是否是某个子项组的第一行；[previousIsSubItem] = null 表示它是整页第一行。 */
-    fun isSubItemGroupStart(previousIsSubItem: Boolean?, isSubItem: Boolean): Boolean =
-        isSubItem && previousIsSubItem != true
+    /**
+     * 每一行在它所属卡片里的位置；null 表示这一行不在卡片里（组标题 / 卡外行）。
+     *
+     * [kinds] 与渲染顺序一一对应：连续的 [SettingsRowEntryKind.CARD_ROW] 段就是一组，
+     * 组内每行按位置拿到 [SettingsRowSlot]；组标题与卡外行（动作按钮等）把卡截断，
+     * 前后各起新组 —— "完成返回不并进上一张卡"由这一条直接成立。
+     */
+    fun rowSlots(kinds: List<SettingsRowEntryKind>): List<SettingsRowSlot?> {
+        val slots = MutableList<SettingsRowSlot?>(kinds.size) { null }
+        var start = 0
+        while (start < kinds.size) {
+            if (kinds[start] != SettingsRowEntryKind.CARD_ROW) {
+                start++
+                continue
+            }
+            var end = start
+            while (end + 1 < kinds.size && kinds[end + 1] == SettingsRowEntryKind.CARD_ROW) end++
+            val count = end - start + 1
+            for (index in start..end) {
+                slots[index] = when {
+                    count == 1 -> SettingsRowSlot.SINGLE
+                    index == start -> SettingsRowSlot.FIRST
+                    index == end -> SettingsRowSlot.LAST
+                    else -> SettingsRowSlot.MIDDLE
+                }
+            }
+            start = end + 1
+        }
+        return slots
+    }
 
-    /** 一整页里有多少个连续的 subItem 段：每段恰好对应一根 SettingsSubItemDivider。 */
-    fun subItemGroupCount(isSubItem: List<Boolean>): Int =
-        isSubItem.indices.count { index ->
-            isSubItemGroupStart(isSubItem.getOrNull(index - 1), isSubItem[index])
+    /** 位置 -> 形状：null 位置（组标题 / 卡外行）没有卡片，也不画线。 */
+    fun shapeOf(slot: SettingsRowSlot?): SettingsRowShape? = when (slot) {
+        null -> null
+        SettingsRowSlot.SINGLE -> SettingsRowShape(roundedTop = true, roundedBottom = true)
+        SettingsRowSlot.FIRST -> SettingsRowShape(roundedTop = true, roundedBottom = false)
+        SettingsRowSlot.MIDDLE -> SettingsRowShape(roundedTop = false, roundedBottom = false)
+        SettingsRowSlot.LAST -> SettingsRowShape(roundedTop = false, roundedBottom = true)
+    }
+
+    /**
+     * 这一行下面要不要画组内分隔线：只画在"行与行之间"，组内最后一行（含单行组）下面不画。
+     * null 位置（组标题 / 卡外行）永远不画 —— 线是卡的内部结构，卡外没有线。
+     */
+    fun drawsGroupHairline(slot: SettingsRowSlot?): Boolean = when (slot) {
+        null -> false
+        SettingsRowSlot.SINGLE, SettingsRowSlot.LAST -> false
+        SettingsRowSlot.FIRST, SettingsRowSlot.MIDDLE -> true
+    }
+
+    /**
+     * 组内分隔线的左端缩进：子项组的上沿从子项槽线（12dp）起笔，普通行间从卡片左内边距（14dp）起笔。
+     * 并卡前它是一根独立的子项短线；并卡后由卡内的同一根线承担，只有左端不同。
+     */
+    fun groupHairlineStartIndentDp(isSubItem: Boolean, previousIsSubItem: Boolean): Float =
+        if (isSubItem && !previousIsSubItem) {
+            SettingsDesignMath.SubItemIndentDp
+        } else {
+            SettingsDesignMath.RowSidePaddingDp
         }
 }
 
@@ -295,6 +373,14 @@ object SettingsSpacingMath {
      */
     const val ItemGapDp = 4f
 
+    /**
+     * 卡片内相邻两行之间的垂直留白：0。
+     *
+     * 行与行直接相接，分界交给 1dp 的 Border 线（只在组内画，组尾不画）；
+     * 分组的呼吸全部由组标题上方的 24dp 承担 —— "组间 24 / 组内一根线"才立得住。
+     */
+    const val CardRowGapDp = 0f
+
     /** 正文 CJK 行高（sp）：14sp × 1.43，旧值 1.18 倍让中文行间墨距只剩 3.5dp。 */
     const val BodyLineHeightSp = 22f
 
@@ -310,10 +396,13 @@ object SettingsSpacingMath {
     /** 行高下限：低于这个值就不再是可靠触控热区。 */
     const val MinRowHeightDp = 48f
 
-    /** 一行的实际步进：行高 + 发丝线 + 行间距 = 44 + 1 + 4 = 49dp。 */
-    const val RowStepDp = MinRowHeightDp + HairlineDp + ItemGapDp
+    /**
+     * 一行的实际步进：行高下限 + 卡内发丝线 + 卡内行距（0）= 49dp。
+     * 列表项间距并卡后归 0（[CardRowGapDp]），不再参与步进。
+     */
+    const val RowStepDp = MinRowHeightDp + HairlineDp + CardRowGapDp
 
-    /** 必须落在 [GridDp] 网格上的块级留白清单。 */
+    /** 必须落在 [GridDp] 网格上的块级留白清单（卡内行距为 0，不进网格清单）。 */
     val BlockGapsDp: List<Float> = listOf(ItemGapDp, SectionHeaderBottomDp)
 
     /** 块级留白是否落在 [GridDp] 网格上：0 与负数不算合法留白。 */
@@ -343,6 +432,12 @@ object SettingsDesignMath {
 
     /** 组间留白：24dp，恒 >= 组内行距的 2 倍（实际 6 倍）。 */
     const val SectionGapDp = 24f
+
+    /** 组卡片圆角：固定 16dp。MaterialTheme.shapes.small 对 42~48dp 高的行来说太大，读起来像按钮。 */
+    const val GroupCardRadiusDp = 16f
+
+    /** 组卡片内一行的左右内边距：取值右端因此距卡片右缘 14dp，不再贴死在圆角上。 */
+    const val RowSidePaddingDp = 14f
 
     /** 子项左槽线右移量：从属关系靠位置表达，不靠降字号。 */
     const val SubItemIndentDp = 12f
@@ -391,5 +486,46 @@ object SettingsDesignMath {
 
     /** 一页允许的语义色状态点数：只许一处。 */
     const val StatusDotsPerPage = 1
+}
+
+/**
+ * 细滑轨的几何常量：轨道 6dp、滑块 18dp、外圈 2dp —— 纯数字，测试直接钉死防回漂。
+ */
+object SettingsSliderMath {
+    /** 轨道高度：6dp。旧版官方 Slider 是一根 52dp 的分段胶囊，整块铺满强调色。 */
+    const val TrackHeightDp = 6f
+
+    /** 圆形滑块直径：18dp。 */
+    const val ThumbSizeDp = 18f
+
+    /** 滑块外圈厚度：2dp，颜色取轨道色。 */
+    const val ThumbRingDp = 2f
+}
+
+/**
+ * 细滑轨的取值换算：指针 x（px）→ 取值。
+ *
+ * 滑块中心只在 [thumbRadiusPx]..[widthPx - thumbRadiusPx] 之间移动，所以轨道两端各留半个滑块，
+ * 拖到边缘仍拿得到区间端点；[steps] > 0 时吸附到台阶（与官方 Slider 的 step 语义一致）。
+ * 纯函数：不碰 Compose，边界（越界拖动 / 零宽 / 反向区间）可以直接单测。
+ */
+internal fun settingsSliderValueAt(
+    xPx: Float,
+    widthPx: Float,
+    thumbRadiusPx: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int
+): Float {
+    val span = valueRange.endInclusive - valueRange.start
+    if (span <= 0f || widthPx <= 0f) return valueRange.start
+    val usableWidth = (widthPx - thumbRadiusPx * 2f).coerceAtLeast(1f)
+    val fraction = ((xPx - thumbRadiusPx) / usableWidth).coerceIn(0f, 1f)
+    val snapped = if (steps <= 0) {
+        fraction
+    } else {
+        val intervals = steps + 1
+        (round(fraction * intervals) / intervals).coerceIn(0f, 1f)
+    }
+    return valueRange.start + span * snapped
 }
 

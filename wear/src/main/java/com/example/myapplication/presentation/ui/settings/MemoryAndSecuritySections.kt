@@ -149,7 +149,7 @@ fun MemoryManagerContent(
 
         section(stringResource(R.string.settings_memory_clear_header))
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = if (memoryCleared) {
                     stringResource(R.string.settings_memory_cleared)

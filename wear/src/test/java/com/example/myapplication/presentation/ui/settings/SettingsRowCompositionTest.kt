@@ -6,51 +6,94 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 线的数量契约：整页只有一种线，每个子项组一根 —— "线数 == 子项组数"。
+ * 行序列 -> 组卡位置的可执行契约：卡外行 / 组标题断卡，连续卡片行成组。
  *
- * 判据直接用渲染路径里的 [SettingsRowComposition.isSubItemGroupStart]，
- * 实现改坏这里就会红，而不是测试里另写一份 if 自说自话。
+ * 判据直接用渲染路径里的 [SettingsRowComposition.rowSlots]，实现改坏这里就会红，
+ * 而不是测试里另写一份 if 自说自话。
  */
 class SettingsRowCompositionTest {
 
     @Test
-    fun groupStartsAreExactlyTheFirstSubItemOfEachRun() {
-        assertTrue(SettingsRowComposition.isSubItemGroupStart(previousIsSubItem = null, isSubItem = true))
-        assertTrue(SettingsRowComposition.isSubItemGroupStart(previousIsSubItem = false, isSubItem = true))
-        // 组内第二行起不再画线
-        assertFalse(SettingsRowComposition.isSubItemGroupStart(previousIsSubItem = true, isSubItem = true))
-        // 普通行永远不是组起点
-        assertFalse(SettingsRowComposition.isSubItemGroupStart(previousIsSubItem = null, isSubItem = false))
-        assertFalse(SettingsRowComposition.isSubItemGroupStart(previousIsSubItem = true, isSubItem = false))
-    }
-
-    @Test
-    fun dividerCountEqualsGroupCountForEveryShapeAPageCanHave() {
-        assertEquals(0, SettingsRowComposition.subItemGroupCount(emptyList()))
-        assertEquals(0, SettingsRowComposition.subItemGroupCount(listOf(false, false, false)))
-        assertEquals(1, SettingsRowComposition.subItemGroupCount(listOf(true)))
-        // 一个组：组内三行只画一根
-        assertEquals(1, SettingsRowComposition.subItemGroupCount(listOf(false, true, true, true, false)))
-        // 两个被普通行隔开的组：两根
-        assertEquals(2, SettingsRowComposition.subItemGroupCount(listOf(false, true, true, false, true)))
-        assertEquals(2, SettingsRowComposition.subItemGroupCount(listOf(true, false, true)))
-        assertEquals(3, SettingsRowComposition.subItemGroupCount(listOf(true, true, false, true, false, true, true)))
-    }
-
-    @Test
-    fun theRenderingLoopDrawsOneDividerPerGroup() {
-        val shapes = listOf(
-            listOf(false, true, true, false, true),
-            listOf(true),
-            listOf(false, false),
-            listOf(true, false, true, true)
+    fun consecutiveCardRowsFormOneGroup() {
+        assertEquals(
+            listOf(
+                SettingsRowSlot.FIRST,
+                SettingsRowSlot.MIDDLE,
+                SettingsRowSlot.LAST
+            ),
+            SettingsRowComposition.rowSlots(List(3) { SettingsRowEntryKind.CARD_ROW })
         )
-        shapes.forEach { shape ->
-            var drawn = 0
-            shape.forEachIndexed { index, isSubItem ->
-                if (SettingsRowComposition.isSubItemGroupStart(shape.getOrNull(index - 1), isSubItem)) drawn++
-            }
-            assertEquals("线数必须等于子项组数：$shape", SettingsRowComposition.subItemGroupCount(shape), drawn)
-        }
+    }
+
+    @Test
+    fun sectionHeadersAndStandaloneRowsBreakTheCard() {
+        // 组标题（section）与卡外行（动作按钮）前后各起新组：完成返回不粘到上一张卡
+        assertEquals(
+            listOf(
+                SettingsRowSlot.SINGLE,
+                null,
+                SettingsRowSlot.SINGLE,
+                null,
+                SettingsRowSlot.SINGLE
+            ),
+            SettingsRowComposition.rowSlots(
+                listOf(
+                    SettingsRowEntryKind.CARD_ROW,
+                    SettingsRowEntryKind.SECTION,
+                    SettingsRowEntryKind.CARD_ROW,
+                    SettingsRowEntryKind.STANDALONE,
+                    SettingsRowEntryKind.CARD_ROW
+                )
+            )
+        )
+    }
+
+    @Test
+    fun emptyPageYieldsNoSlots() {
+        assertEquals(emptyList<SettingsRowSlot?>(), SettingsRowComposition.rowSlots(emptyList()))
+    }
+
+    @Test
+    fun standalonePageYieldsNoSlots() {
+        // 纯动作页（整页只有按钮）没有卡片行，全部 slot 为 null
+        assertEquals(
+            listOf(null, null),
+            SettingsRowComposition.rowSlots(List(2) { SettingsRowEntryKind.STANDALONE })
+        )
+    }
+
+    @Test
+    fun hairlineOnlyBetweenRowsNeverUnderTheLastOne() {
+        val slots = SettingsRowComposition.rowSlots(
+            listOf(
+                SettingsRowEntryKind.CARD_ROW,
+                SettingsRowEntryKind.CARD_ROW,
+                SettingsRowEntryKind.CARD_ROW,
+                SettingsRowEntryKind.STANDALONE
+            )
+        )
+        assertTrue(SettingsRowComposition.drawsGroupHairline(slots[0]))
+        assertTrue(SettingsRowComposition.drawsGroupHairline(slots[1]))
+        assertFalse("组尾下面不画线", SettingsRowComposition.drawsGroupHairline(slots[2]))
+        assertFalse("卡外行永远不画线", SettingsRowComposition.drawsGroupHairline(slots[3]))
+        assertFalse(SettingsRowComposition.drawsGroupHairline(null))
+    }
+
+    @Test
+    fun theRenderingLoopDerivesSlotsFromTheRegistryKinds() {
+        // 三角验证：模拟一个真实页面的登记顺序（标题 / 行 / 标题 / 行 / 行 / 按钮），
+        // 渲染循环按 kind 列表算出的 slot 必须给到每一行
+        val kinds = listOf(
+            SettingsRowEntryKind.SECTION,
+            SettingsRowEntryKind.CARD_ROW,
+            SettingsRowEntryKind.SECTION,
+            SettingsRowEntryKind.CARD_ROW,
+            SettingsRowEntryKind.CARD_ROW,
+            SettingsRowEntryKind.STANDALONE
+        )
+        assertEquals(
+            listOf(null, SettingsRowSlot.SINGLE, null, SettingsRowSlot.FIRST, SettingsRowSlot.LAST, null),
+            SettingsRowComposition.rowSlots(kinds)
+        )
     }
 }

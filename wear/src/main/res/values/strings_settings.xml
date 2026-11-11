@@ -332,7 +332,6 @@
 
     <string name="settings_appearance">Appearance &amp; Matrix</string>
     <string name="settings_sub_appearance">Appearance &amp; Dot Matrix</string>
-    <string name="settings_appearance_header">Theme</string>
     <string name="settings_appearance_compact">Compact mode</string>
     <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
     <string name="settings_appearance_matrix_header">Dot matrix</string>

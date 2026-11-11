@@ -83,7 +83,7 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
             SettingsCaptionRow(text = stringResource(R.string.settings_remote_console_hint))
         }
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = if (running) "重新读取端口" else "启动控制台",
                 onClick = {

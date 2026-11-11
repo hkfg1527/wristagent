@@ -71,7 +71,7 @@ fun AdvancedPermissionContent(
             )
         }
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_privilege_request_shizuku),
                 enabled = status.shizukuInstalled,
@@ -82,7 +82,7 @@ fun AdvancedPermissionContent(
             )
         }
 
-        row {
+        standaloneRow {
             SettingsActionButton(
                 label = stringResource(
                     if (probing) R.string.settings_privilege_probe_running else R.string.settings_privilege_probe

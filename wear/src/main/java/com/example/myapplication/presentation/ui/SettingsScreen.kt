@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,7 +51,11 @@ import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.ui.settings.AppearanceContent
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
-import com.example.myapplication.presentation.ui.settings.SettingsItemGap
+import com.example.myapplication.presentation.ui.settings.SettingsRowGap
+import com.example.myapplication.presentation.ui.settings.SettingsRowSlot
+import com.example.myapplication.presentation.ui.settings.LocalSettingsRowSlot
+import com.example.myapplication.presentation.ui.settings.SettingsRowSidePadding
+import com.example.myapplication.presentation.ui.settings.SettingsSectionGap
 import com.example.myapplication.presentation.ui.settings.AdvancedPermissionContent
 import com.example.myapplication.presentation.ui.settings.HyperParamsContent
 import com.example.myapplication.presentation.ui.settings.MemoryManagerContent
@@ -266,7 +271,8 @@ fun SettingsScreen(
                         // 设置页没有主键：底部预留取 44dp 而不是聊天页的 76dp
                         bottom = Wear.Size.SettingsBottomInset
                     ),
-                    verticalArrangement = Arrangement.spacedBy(SettingsItemGap),
+                    // 项间距 0：同组的行拼成一张卡，分组呼吸只由组标题上方的 24dp 承担
+                    verticalArrangement = Arrangement.spacedBy(SettingsRowGap),
                     // 关掉 autoCentering：标题行不再撑 44dp 触摸高度后，itemIndex = 1 会让库
                     // 在首项之上插入约 60dp 的 spacer（233dp 屏），整列被推下半个屏幕。
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
@@ -295,7 +301,7 @@ fun SettingsScreen(
                     // 1. 模型与服务：取值改状态词（模型名进子页），行尾不再挂状态点 ——
                     //    旧版取值是裸模型名，把标题压到折行、自己又被截成 "deepseek-…"
                     item {
-                        RootContentRow(index = 2, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 2, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_and_service),
                                 value = if (apiKeyConfigured) {
@@ -313,7 +319,7 @@ fun SettingsScreen(
 
                     // 2. 供应商：多套 baseUrl / apiKey / 模型的一键套用，套用即写回单值偏好
                     item {
-                        RootContentRow(index = 3, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 3, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_provider_profiles),
                                 value = providerBook.active()?.name
@@ -328,7 +334,7 @@ fun SettingsScreen(
 
                     // 3. 模型参数：温度文案走资源，en/zh 同步
                     item {
-                        RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 4, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_params),
                                 value = stringResource(R.string.settings_temperature_value, currentTemp),
@@ -349,7 +355,7 @@ fun SettingsScreen(
 
                     // 4. 语音：语音转写与"语音与唤醒"合并成一行，转写状态做取值，唤醒入口在子页里
                     item {
-                        RootContentRow(index = 6, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 6, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
                             val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_voice_entry),
@@ -370,7 +376,7 @@ fun SettingsScreen(
 
                     // 5. 内置工具与 MCP：取值改"全部启用"，不再暴露 6/6 这种内部计数
                     item {
-                        RootContentRow(index = 7, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 7, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
                             val enabledCount = listOf(
                                 preferences.toolDeviceStatusEnabled,
                                 preferences.toolVibrateEnabled,
@@ -403,7 +409,7 @@ fun SettingsScreen(
 
                     // 6. 提示词：系统提示词与会话上下文合并成一行，两者都是同一层的"模型行为"配置
                     item {
-                        RootContentRow(index = 9, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 9, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_prompt_context),
                                 value = if (customPrompt.isBlank()) {
@@ -421,7 +427,7 @@ fun SettingsScreen(
 
                     // 8. 操作安全防线
                     item {
-                        RootContentRow(index = 10, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 10, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_remote_console_title),
                                 value = if (consoleServer.isRunning) ":" + consoleServer.port else null,
@@ -434,7 +440,7 @@ fun SettingsScreen(
                     }
 
                     item {
-                        RootContentRow(index = 11, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 11, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_security_policy),
                                 value = when (currentSecurityMode) {
@@ -452,7 +458,7 @@ fun SettingsScreen(
 
                     // 7. 外观与点阵：取值原先是"matrixSpacingDp"这种内部实现量，已删除
                     item {
-                        RootContentRow(index = 12, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 12, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_appearance),
                                 onClick = {
@@ -465,7 +471,7 @@ fun SettingsScreen(
 
                     // 8. 关于：快捷操作、重看引导、特权执行、网络体检四条低频项收进一层
                     item {
-                        RootContentRow(index = 13, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 13, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_about),
                                 onClick = {
@@ -478,7 +484,7 @@ fun SettingsScreen(
 
                     // 配置导入导出：整份可移植设置的 JSON 快照，能复制出来也能粘贴回去
                     item {
-                        RootContentRow(index = 14, stagger = rowStagger, exit = exit) {
+                        RootContentRow(index = 14, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_sub_transfer),
                                 onClick = {
@@ -495,7 +501,10 @@ fun SettingsScreen(
                             SettingsActionButton(
                                 label = stringResource(R.string.settings_done_back),
                                 tone = Tone.MUTED,
-                                modifier = Modifier.widthIn(max = SettingsContentWidth),
+                                // 动作按钮不并进卡片：与上面那张卡之间留一整档组间距
+                                modifier = Modifier
+                                    .widthIn(max = SettingsContentWidth)
+                                    .padding(top = SettingsSectionGap),
                                 onClick = { requestExit(onBack) }
                             )
                         }
@@ -712,20 +721,25 @@ private fun RootSectionRow(
 }
 
 /**
- * 根页的内容行：**没有分隔线**，只有一块 176dp 宽的行内容，整行参与逐行浮动。
+ * 根页的内容行：一块 176dp 宽的行内容，整行参与逐行浮动。
  *
- * 组与组之间靠组标题上方那 24dp 留白分界；同级行之间只靠 4dp 行距与 48dp 行高。
- * 线留给子项组（见 [SettingsSubItemDivider]），根页一条线都没有。
+ * [slot] 是这一行在所属卡片里的位置（组首 / 组中 / 组尾 / 单行），由调用点按字面顺序写死：
+ * 根页的 item 是逐条手写的，没有可推导的注册表，明写比另存一份"哪一行是组首"的布尔表更不容易漂。
+ * 圆角、14dp 内边距与组内那根 1px 线都由 [SettingsRowSlot] 一路传下去。
  */
 @Composable
 private fun RootContentRow(
     index: Int,
     stagger: SettingsRowStaggerState,
     exit: SettingsExitController,
+    slot: SettingsRowSlot? = null,
     content: @Composable () -> Unit
 ) {
     SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
-        Box(modifier = Modifier.widthIn(max = SettingsContentWidth)) { content() }
+        // slot = null 的两种是焦点块与「完成返回」：它们不是卡片行，保持独立
+        CompositionLocalProvider(LocalSettingsRowSlot provides slot) {
+            Box(modifier = Modifier.widthIn(max = SettingsContentWidth)) { content() }
+        }
     }
 }
 
@@ -754,7 +768,8 @@ private fun SettingsFocusBlock(modelName: String, baseUrl: String, configured: B
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
-            .padding(top = Wear.Space.Sm, bottom = Wear.Space.Xs)
+            // 起始内边距与行标签同一条左槽线：卡片行内的标签离卡片左缘 14dp，焦点块因此也内缩 14dp
+            .padding(start = SettingsRowSidePadding, top = Wear.Space.Sm, bottom = Wear.Space.Xs)
     ) {
         BasicText(
             text = title,

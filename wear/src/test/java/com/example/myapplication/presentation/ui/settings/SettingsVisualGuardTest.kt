@@ -86,18 +86,21 @@ class SettingsVisualGuardTest {
     }
 
     @Test
-    fun onlyOneKindOfHairlineExistsAndItIsDrawnOncePerSubItemGroup() {
+    fun onlyOneKindOfHairlineExistsAndItIsDrawnInsideGroupCardsOnly() {
         val shared = readSettings("SettingsShared.kt")
         assertFalse("整行分隔线必须已删除", shared.contains("fun SettingsRowDivider"))
-        assertTrue("子项组短线必须存在", shared.contains("fun SettingsSubItemDivider"))
-        // 全目录只有"声明 + 一处调用点"：线数 == 子项组数
+        // 并卡后子项短线并入组内发丝线（只有左端缩进不同），独立的 SettingsSubItemDivider 必须已删除
+        assertFalse("子项短线必须已并入组内发丝线", shared.contains("fun SettingsSubItemDivider"))
+        assertFalse("子项短线调用点必须已删除", shared.contains("SettingsSubItemDivider()"))
+        // 全目录只有一种线的声明：组内发丝线
         val occurrences = settingsSources().values.sumOf {
-            Regex("SettingsSubItemDivider\\(\\)").findAll(it).count()
+            Regex("fun SettingsGroupHairline").findAll(it).count()
         }
-        assertEquals("分隔线只允许一处调用点：", 2, occurrences)
+        assertEquals("组内发丝线只允许一处声明：", 1, occurrences)
+        // 线只画在"行与行之间"：纯函数钉住，组尾 / 单行组 / 卡外行不画
         assertTrue(
-            "调用点必须按子项组上沿判定",
-            shared.contains("if (isSubItemGroupStart) SettingsSubItemDivider()")
+            "线的绘制必须走 drawsGroupHairline 判定",
+            shared.contains("SettingsRowComposition.drawsGroupHairline(LocalSettingsRowSlot.current)")
         )
     }
 
