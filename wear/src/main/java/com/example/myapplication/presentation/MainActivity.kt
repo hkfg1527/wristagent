@@ -25,7 +25,6 @@ import com.example.myapplication.agent.GestureBindingGate
 import com.example.myapplication.agent.GestureBindings
 import com.example.myapplication.agent.GestureEvent
 import com.example.myapplication.agent.GestureRequestQueue
-import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.agent.remote.ConsoleService
 import com.example.myapplication.presentation.theme.MyApplicationTheme

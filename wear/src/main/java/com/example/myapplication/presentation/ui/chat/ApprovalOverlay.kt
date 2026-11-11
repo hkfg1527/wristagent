@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
@@ -35,26 +37,31 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.presentation.ApprovalTone
+import com.example.myapplication.presentation.ui.ApprovalBlockHeight
 import com.example.myapplication.presentation.ui.ApprovalTextRes
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import com.example.myapplication.presentation.ui.theme.Wear
+import kotlin.math.sqrt
 import kotlinx.coroutines.delay
 
 /** 审批文案宽度：240dp 圆屏上固定 190dp，两侧各留 25dp，正文不会碰到圆周。 */
 private val ApprovalTextWidth = 190.dp
 
 /**
- * 文案块垂直抬升：屏幕高 240dp，取 48dp 抬升后文案中心落在 (240−48)/2 = 96dp，
- * 整列文案因此压在圆心上方，底边不会挤进 164dp 起的滑轨区。
+ * 文案带底边距屏幕底的总预留：底距 12 + 审批底栏块 64 + 间隙 12 = 88dp（见 [ApprovalBandMetrics]）。
+ *
+ * 旧实现只有一个 48dp 的"抬升"把文案整列居中，文案比文案带高时就直接画到滑轨上
+ * （真机 docs/device/v10/71_approval2.png：最坏情况第二行整行压在粉色胶囊下面）。
+ * 现在改成从屏幕底部倒推出来的固定带：超出的内容只能在这一带里滚动，不可能再压到滑轨。
  */
-private val ApprovalTextCenterLift = 48.dp
+private val ApprovalContentBandReserve =
+    ApprovalBandMetrics.contentBandReserveDp(ApprovalBlockHeight.value).dp
 
 /** 文案块间距：靠 10dp 间距分段，不用任何线框。 */
 private val ApprovalTextBlockGap = 10.dp
@@ -86,8 +93,47 @@ private fun riskBarsLit(level: RiskLevel): Int = when (level) {
 }
 
 /**
+ * 审批浮层的纵向分带（不依赖 Compose 运行时，数值由 JVM 单测钉住）。
+ *
+ * 圆屏屏高 H 上只存在两条带：
+ * - 文案带 [0, H − Reserve)：命令原文与最坏情况住在这里，放不下就滚动；
+ * - 底栏带 [H − Reserve + Gap, H)：滑轨与「记住并放行」由 BottomInteractiveBlock 独占。
+ * 两带之间隔着 [CONTENT_TO_TRACK_GAP_DP]，所以"文字被滑轨压住"在结构上不可能发生。
+ *
+ * [BAR_BOTTOM_INSET_DP] 与 ChatScreen 的 private BottomBarBottomInset 取同一数值；
+ * 审批块高不写死，由调用点传入 [ApprovalBlockHeight]（= BottomBarReserve 76 − Space.Md 12）。
+ */
+internal object ApprovalBandMetrics {
+    /** 底栏底距。ChatScreen.BottomBarBottomInset 是 private，只能在这里取同值。 */
+    const val BAR_BOTTOM_INSET_DP = 12f
+
+    /**
+     * 文案带与滑轨带之间的硬间隙，也是文案带底边到审批块顶边的距离。
+     *
+     * 底栏块顶边同时就是滑轨 44dp 触控热区的顶边，32dp 的粉色胶囊在热区里上下各缩 6dp，
+     * 所以文字最后一个可绘制像素到胶囊的真实间距是 12 + 6 = 18dp。
+     */
+    const val CONTENT_TO_TRACK_GAP_DP = 12f
+
+    /** 文案带底边距屏幕底的总预留 = 底距 + 审批块高 + 间隙。 */
+    fun contentBandReserveDp(blockHeightDp: Float): Float =
+        BAR_BOTTOM_INSET_DP + blockHeightDp + CONTENT_TO_TRACK_GAP_DP
+
+    /** 文案带可用高度：屏高不够时夹到 0，绝不返回负数去撑爆布局。 */
+    fun contentBandHeightDp(screenHeightDp: Float, blockHeightDp: Float): Float =
+        (screenHeightDp - contentBandReserveDp(blockHeightDp)).coerceAtLeast(0f)
+
+    /**
+     * 矩形元素最远角点到圆屏圆心的距离：半宽 [halfWidthDp] + 纵向偏移 [dyFromCenterDp]。
+     * 圆屏半径 116.5dp（466px @2.0 密度），超过它的角点会被圆周切掉。
+     */
+    fun farthestCornerRadiusDp(halfWidthDp: Float, dyFromCenterDp: Float): Float =
+        sqrt(halfWidthDp * halfWidthDp + dyFromCenterDp * dyFromCenterDp)
+}
+
+/**
  * 审批文案的行内排版：12sp [Wear.Palette.TextMuted] 标签做引子，正文接在同一段落里。
- * 竖排标签每块要多占一行（四块合计 64dp），而滑轨上方只有 164dp，
+ * 竖排标签每块要多占一行（四块合计 64dp），而文案带只有 145dp（233dp 真表），
  * 行内引子把这行高度让给正文，四块信息一条不少。
  */
 private fun approvalParagraph(
@@ -119,6 +165,10 @@ private fun approvalParagraph(
  * 于是文字是从背景里浮出来的，而不是被框住；暗晕之外的点阵依旧清晰可见。
  * 内容自上而下：等级标题 + 3 段危险条 / 调用 / 改动 / 最坏情况（空文案整块不占位），
  * 每块从 +48dp 浮上来并错开 60ms 启动；放行时整层按 [collapse] 塌缩成工具胶囊尺度。
+ *
+ * 纵向只分两条带：文案带 [审批块顶边 − 12dp] 往上，滑轨与「记住并放行」归 BottomInteractiveBlock。
+ * 文案带内的内容超过带高时**滚动**而不是截断（钉在底部，最坏情况始终可见），
+ * 滚动容器同时把内容夹在带内，于是任何文字都不可能再画到滑轨上。
  */
 @Composable
 internal fun ApprovalFloatingLayer(
@@ -144,7 +194,7 @@ internal fun ApprovalFloatingLayer(
     val toolDisplayName = toolMeta.displayNameRes?.let { stringResource(it) } ?: toolMeta.toolName
     val whatItDoes = risk?.whatItDoes.orEmpty()
     val worstCase = risk?.worstCase.orEmpty()
-    // 12sp / 16sp 行高：两行正文只占 32dp，四块文案加标题也压得住 190dp 宽
+    // 12sp 字号 + 说明档行高：190dp 宽下正文一行 14dp，四块文案的总高交给文案带滚动兜底
     val bodyStyle = Wear.TextBody.copy(
         fontSize = Wear.TextCaption.fontSize,
         lineHeight = Wear.TextCaption.lineHeight
@@ -163,6 +213,13 @@ internal fun ApprovalFloatingLayer(
         label = "approvalLayerAlpha"
     )
 
+    // 文案带的滚动位置：内容比带子高时钉在底部 —— 「最坏情况」永远紧贴滑轨上方那 12dp 间隙可见，
+    // 用户不必先猜"要不要滚一下才能看到最坏后果"。内容变短（maxValue 变化）时自动重新钉一次。
+    val contentScroll = rememberScrollState()
+    LaunchedEffect(contentScroll.maxValue) {
+        contentScroll.scrollTo(contentScroll.maxValue)
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -179,11 +236,11 @@ internal fun ApprovalFloatingLayer(
                     .fillMaxSize()
                     .background(Wear.Palette.Bg.copy(alpha = scrimAlpha))
             )
-            // 文案居中偏上：底部留出 [ApprovalTextCenterLift]，文案中心才落在 96dp 而不是屏心
+            // 文案带：底边钉在滑轨上方 [ApprovalBandMetrics.CONTENT_TO_TRACK_GAP_DP]，文案只在这一带里布局与滚动
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = ApprovalTextCenterLift),
+                    .padding(bottom = ApprovalContentBandReserve),
                 contentAlignment = Alignment.Center
             ) {
                 // 径向暗晕：中心浓、150dp 处已透明，没有边界没有轮廓，文字像从背景里浮出来。
@@ -211,7 +268,9 @@ internal fun ApprovalFloatingLayer(
                             scaleX = 1f - (1f - ApprovalCollapseScale) * collapse
                             scaleY = 1f - (1f - ApprovalCollapseScale) * collapse
                             translationY = ApprovalCollapseDrop.toPx() * collapse
-                        },
+                        }
+                        // 放不下就滚动，不裁字：滚动容器把内容夹在文案带里，越过底边的东西也画不出来
+                        .verticalScroll(contentScroll),
                     verticalArrangement = Arrangement.spacedBy(ApprovalTextBlockGap),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -251,9 +310,7 @@ internal fun ApprovalFloatingLayer(
                                 centeredBody,
                                 Wear.TextCaption
                             ),
-                            style = centeredBody,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            style = centeredBody
                         )
                     }
 
@@ -274,9 +331,7 @@ internal fun ApprovalFloatingLayer(
                                     centeredBody,
                                     Wear.TextCaption
                                 ),
-                                style = centeredBody,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
+                                style = centeredBody
                             )
                         }
                     }
@@ -291,9 +346,7 @@ internal fun ApprovalFloatingLayer(
                                     centeredWorstCase,
                                     Wear.TextCaption
                                 ),
-                                style = centeredWorstCase,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                                style = centeredWorstCase
                             )
                         }
                     }

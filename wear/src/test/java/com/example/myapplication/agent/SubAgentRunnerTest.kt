@@ -1,6 +1,5 @@
 package com.example.myapplication.agent
 
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

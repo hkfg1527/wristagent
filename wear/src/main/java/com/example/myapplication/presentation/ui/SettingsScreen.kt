@@ -26,9 +26,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -80,7 +78,6 @@ import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
 import com.example.myapplication.presentation.ui.settings.GestureBindingsContent
 import com.example.myapplication.presentation.ui.settings.ProviderProfilesContent
 import com.example.myapplication.presentation.ui.settings.RootContentTopPadding
-import com.example.myapplication.presentation.ui.settings.RootTitleTopPadding
 import com.example.myapplication.presentation.ui.settings.AboutContent
 import com.example.myapplication.presentation.ui.settings.PromptContextContent
 import com.example.myapplication.presentation.ui.settings.SettingsTransferContent

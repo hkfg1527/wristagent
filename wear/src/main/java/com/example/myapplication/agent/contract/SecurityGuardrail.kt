@@ -1,7 +1,5 @@
 package com.example.myapplication.agent.contract
 
-import java.util.regex.Pattern
-
 /**
  * AI 三级安全护栏审查引擎
  * 1. 致命指令硬黑名单绝对拦截 (rm -rf, 格式化, 擦除数据等)

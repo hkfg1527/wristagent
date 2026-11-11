@@ -2,7 +2,6 @@ package com.example.myapplication.presentation.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.wear.compose.material3.Shapes
-import androidx.wear.compose.material3.Typography
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue

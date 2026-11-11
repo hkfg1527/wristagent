@@ -1,8 +1,5 @@
 package com.example.myapplication.agent.contract
 
-import org.json.JSONArray
-import org.json.JSONObject
-
 /**
  * 交错流内容块：文本与小胶囊在时间线上自然交错排列
  */
@@ -47,15 +44,6 @@ enum class SecurityMode {
     NOVICE,     // 严格确认 (默认)：全部命令审批 + 危险操作锁定 3 秒 + 详细说明
     STANDARD,   // 标准模式：智能预审，只读放行，高风险操作需滑动确认
     EXPERT      // 自动执行：除硬黑名单外全部直接执行
-}
-
-/**
- * 右侧副键自定义配置
- */
-enum class RightButtonAction {
-    MODEL_SWITCH,   // 快捷切换 deepseek-chat / deepseek-reasoner (默认)
-    CLEAR_MEMORY,   // 一键复位清空会话记忆
-    OPEN_SETTINGS   // 打开系统设置
 }
 
 /**

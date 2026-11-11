@@ -1612,36 +1612,6 @@ private fun SettingsSecondaryLabel(text: String, maxLines: Int = 1) {
     )
 }
 
-/**
- * 右向折线箭头，与列表行一致。
- *
- * 几何：10dp 图形盒 + 1.5dp 描边（12dp/2dp 在 12sp 取值旁边偏重），
- * 并整体下移 1dp 补齐"墨心比同行文字高 1.0dp"的光学偏差。
- */
-@Composable
-fun ChevronMark() {
-    Canvas(
-        modifier = Modifier
-            .offset(y = 1.dp)
-            .size(Wear.Size.ChevronGlyph)
-    ) {
-        val path = Path().apply {
-            moveTo(size.width * 0.3f, size.height * 0.2f)
-            lineTo(size.width * 0.7f, size.height * 0.5f)
-            lineTo(size.width * 0.3f, size.height * 0.8f)
-        }
-        drawPath(
-            path = path,
-            color = Wear.Palette.TextMuted,
-            style = Stroke(
-                width = 1.5.dp.toPx(),
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-    }
-}
-
 /** 下滑退出手势阈值：松手时位移超过该值即退场，否则回弹复位。 */
 val PullDownDismissThreshold = 50.dp
 

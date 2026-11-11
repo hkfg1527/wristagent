@@ -6,7 +6,6 @@ import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.RenderableConversationItem
 import com.example.myapplication.presentation.ui.ToolVisualMeta
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test

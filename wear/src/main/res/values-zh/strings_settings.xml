@@ -152,8 +152,9 @@
     <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
     <string name="settings_remote_console_not_running">未运行</string>
-    <!-- 报告的是 ConsoleServer 真实监听的端口，不是配置里的首选端口。 -->
-    <string name="settings_remote_console_port_value">端口 %1$d</string>
+    <!-- 根页取值只放端口号本身：「端口」两字会把 15sp 的「网页控制台」挤成两行；
+         报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
+    <string name="settings_remote_console_port_value">%1$d</string>
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
     <string name="settings_remote_console_port_drifted">首选 %1$d 被占用 · 已改到 %2$d</string>
     <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>

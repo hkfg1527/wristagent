@@ -21,7 +21,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,7 +89,6 @@ import com.example.myapplication.presentation.ui.ReadingAnchor
 import com.example.myapplication.presentation.ui.ConversationGrouping
 import com.example.myapplication.presentation.ui.SessionDrawer
 import com.example.myapplication.presentation.ui.TopClockBar
-import com.example.myapplication.agent.ApprovalVisualState
 import com.example.myapplication.presentation.ui.UnifiedMatrixCanvas
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.settings.motionSpec
@@ -108,9 +105,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 
 /** 用户主动滚动（拖拽/表冠）后，镜头暂停这么久再继续跟随，避免和手指抢。 */
