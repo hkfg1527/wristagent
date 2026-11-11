@@ -16,7 +16,6 @@ import com.example.myapplication.agent.VoiceDraftGate
 import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.agent.session.SessionStore
 import java.io.File
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -24,7 +23,6 @@ import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBlockMode
-import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.StreamingThrottleState
 import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
 import com.example.myapplication.presentation.ui.chat.StreamingTail
@@ -51,7 +49,9 @@ import kotlin.coroutines.resume
 class ChatViewModel(
     application: Application,
     private val gateway: AgentGateway,
-    initialMainInputType: MainInputType = MainInputType.VOICE,
+    /** 会话落盘出口：生产取 filesDir，单测注入临时目录或注定失败的路径。 */
+    private val sessionStore: SessionStore? =
+        application.filesDir?.let { SessionStore(File(it, "sessions.txt")) },
     /** 测试注入用：默认走 viewModelScope。 */
     scope: CoroutineScope? = null,
     /** 流式节流的时间基准：默认 uptimeMillis，单测注入假时钟。 */
@@ -61,13 +61,10 @@ class ChatViewModel(
 ) : AndroidViewModel(application) {
 
     private val workScope: CoroutineScope = scope ?: viewModelScope
-    // 没有真实 filesDir 就不碰磁盘：单测里 filesDir 为空，写相对路径会让用例之间互相污染
-    private val sessionStore: SessionStore? =
-        application.filesDir?.let { SessionStore(File(it, "sessions.txt")) }
 
     private val throttle = StreamingThrottleState()
     private val _uiState = MutableStateFlow(
-        ChatUiState.initial(initialMainInputType, gateway.displayPreferences().compactMode)
+        ChatUiState.initial(gateway.displayPreferences().compactMode)
     )
 
     /** 自动播报的 Android 出口：只在真有内容要播时报建，播报失败只记日志。 */
@@ -168,8 +165,30 @@ class ChatViewModel(
                 .distinctUntilChanged()
                 .collectLatest { (sessions, activeId) ->
                     delay(SESSION_SAVE_DEBOUNCE_MS)
-                    store.save(sessions, activeId)
+                    saveSessions(store, sessions, activeId)
                 }
+        }
+    }
+
+    /**
+     * 写盘结果必须变成可观测状态：把 [SessionStore.save] 的返回值丢掉就等于回到空 catch。
+     * 先隔 [SESSION_SAVE_RETRY_MS] 重试一次（瞬时失败不该立刻惊动用户），
+     * 重试仍失败才置 [ChatUiState.sessionSaveFailed]；下一次写成功立刻清掉它。
+     * 手表上不弹窗、不 Toast，这个标记由聊天页渲染成一行说明。
+     */
+    private suspend fun saveSessions(store: SessionStore, sessions: List<ChatSession>, activeId: String) {
+        if (store.save(sessions, activeId).isSuccess) {
+            markSessionSaveFailed(false)
+            return
+        }
+        delay(SESSION_SAVE_RETRY_MS)
+        markSessionSaveFailed(store.save(sessions, activeId).isFailure)
+    }
+
+    /** 只在值真的翻转时发新快照：写盘是高频路径，别为每一份相同的状态再推一次。 */
+    private fun markSessionSaveFailed(failed: Boolean) {
+        _uiState.update { state ->
+            if (state.sessionSaveFailed == failed) state else state.copy(sessionSaveFailed = failed)
         }
     }
 
@@ -321,8 +340,7 @@ class ChatViewModel(
                 pendingApproval = PendingApproval(
                     toolName = toolName,
                     risk = risk,
-                    command = risk.commandText,
-                    rememberable = risk.rememberable && risk.commandText.isNotBlank()
+                    command = risk.commandText
                 ),
                 bottomBlockMode = BottomBlockMode.ACTION_ALLOW,
                 // 新一轮审批从完整态开始：上一轮放行留下的塌缩进度必须归零
@@ -363,11 +381,14 @@ class ChatViewModel(
     fun approvePendingAndRemember() {
         val pending = _uiState.value.pendingApproval
         if (pendingContinuation == null || _uiState.value.isApprovalCollapsing) return
-        if (pending == null || !pending.rememberable || pending.command.isBlank()) {
+        // 键就取 [ApprovalRememberPolicy] 的那一个：写进 allowlist 的字符串与 AgentDispatcher
+        // 下次命中判定读的字符串同源，中间不再有第二套归一化。
+        val key = ApprovalRememberPolicy.keyOf(pending?.risk)
+        if (pending == null || key == null) {
             approvePending()
             return
         }
-        gateway.updatePreferences { it.rememberShellCommand(pending.command) }
+        gateway.updatePreferences { it.rememberShellCommand(key) }
         approvePending()
     }
 
@@ -458,7 +479,7 @@ class ChatViewModel(
         gateway.updatePreferences { it.modelName = modelName }
     }
 
-    // ======================== 草稿与输入方式 ========================
+    // ======================== 草稿与文字输入 ========================
 
     fun openTextInput() = reduceDraft(TextInputEvent.Open)
 
@@ -475,19 +496,6 @@ class ChatViewModel(
 
     private fun reduceDraft(event: TextInputEvent) {
         _uiState.update { it.copy(draft = it.draft.reduce(event)) }
-    }
-
-    /** 主键输入方式切换：先落状态、再持久化、最后播提示（文案与启动播报同一套）。 */
-    fun changeMainInputType(type: MainInputType) {
-        _uiState.update { it.copy(mainInputType = type) }
-        gateway.updatePreferences { it.mainInputType = type.name }
-        showNotice(
-            textRes = when (type) {
-                MainInputType.KEYBOARD -> R.string.wearchat_notice_input_keyboard
-                MainInputType.VOICE -> R.string.wearchat_notice_input_voice
-            },
-            isError = false
-        )
     }
 
     // ======================== 语音 ========================
@@ -565,21 +573,22 @@ class ChatViewModel(
         /** 流式回答期间会话高频变化，合并成一次写盘，避免每条增量都碰磁盘。 */
         private const val SESSION_SAVE_DEBOUNCE_MS = 800L
 
+        /** 写盘失败后的重试间隔：一次瞬时失败不必惊动用户，但也不该拖到下一次变更才重试。 */
+        private const val SESSION_SAVE_RETRY_MS = 1200L
+
         /**
          * 生产装配：把 Android 侧协作者（引擎 / 偏好）一次性接进 ViewModel。
          * 上下文取 Application —— 引擎内部只用注册广播、剪贴板与系统服务，与 Activity 上下文等价且不泄漏。
          */
         fun factory(
             application: Application,
-            gateway: AgentGateway,
-            initialMainInputType: MainInputType
+            gateway: AgentGateway
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 ChatViewModel(
                     application = application,
-                    gateway = gateway,
-                    initialMainInputType = initialMainInputType
+                    gateway = gateway
                 ) as T
         }
     }

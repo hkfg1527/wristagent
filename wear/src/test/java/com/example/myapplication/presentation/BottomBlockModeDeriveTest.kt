@@ -1,7 +1,6 @@
 package com.example.myapplication.presentation
 
 import com.example.myapplication.presentation.ui.BottomBlockMode
-import com.example.myapplication.presentation.ui.MainInputType
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -14,7 +13,7 @@ import org.junit.Test
  */
 class BottomBlockModeDeriveTest {
 
-    private fun idle() = ChatUiState.initial(MainInputType.VOICE)
+    private fun idle() = ChatUiState.initial()
 
     @Test
     fun `全空闲时是闲置主键`() {

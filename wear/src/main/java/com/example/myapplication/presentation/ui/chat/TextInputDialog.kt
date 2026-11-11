@@ -25,10 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +37,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.R
 import com.example.myapplication.presentation.TextInputState
@@ -55,9 +50,7 @@ private val TextDialogFloatDistance = 36.dp
 /**
  * 自定义文本输入弹窗 (避让输入法 / 返回键只关弹窗)。
  *
- * 常规内容只有三样东西：输入框、取消、发送；
- * 图片识别内测开关打开时，输入框与按钮之间多一个「图片（内测）」入口 —— 只留入口，
- * 点它只给一句"识别服务尚未接入"的说明，不上传任何东西。开关关掉时这个入口完全不出现。
+ * 常规内容只有三样东西：输入框、取消、发送。
  */
 @Composable
 internal fun TextInputDialog(
@@ -66,7 +59,6 @@ internal fun TextInputDialog(
     onCancel: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
-    visionBetaEnabled: Boolean = false,
     /**
      * 语音入口：唯一保留的显式起麦方式之一（另一处是底栏主键按住说话）。
      *
@@ -77,7 +69,6 @@ internal fun TextInputDialog(
 ) {
     val dialogFocusRequester = remember { FocusRequester() }
     val animationsEnabled = LocalAnimationsEnabled.current
-    var visionBetaHintShown by remember { mutableStateOf(false) }
 
     // 返回键只关闭弹窗，绝不退出 Activity；未发送文本保留在状态机中
     BackHandler { onCancel() }
@@ -145,39 +136,6 @@ internal fun TextInputDialog(
                     .background(Wear.Palette.SurfaceAlt)
                     .padding(Wear.Space.Md)
             )
-
-            if (visionBetaEnabled) {
-                // 内测入口：只有开关打开时才存在，关掉后整块不参与组合
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(Wear.Size.Touch)
-                        .clip(RoundedCornerShape(Wear.Radius.Control))
-                        .border(1.dp, Wear.Palette.Border, RoundedCornerShape(Wear.Radius.Control))
-                        .clickable {
-                            visionBetaHintShown = true
-                        }
-                        .padding(horizontal = Wear.Space.Sm),
-                    contentAlignment = Alignment.Center
-                ) {
-                    BasicText(
-                        text = stringResource(R.string.wearchat_dialog_image),
-                        style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary),
-                        maxLines = 1
-                    )
-                }
-                if (visionBetaHintShown) {
-                    BasicText(
-                        text = stringResource(R.string.wearchat_vision_beta_hint),
-                        style = Wear.TextCaption.copy(
-                            color = Wear.Palette.TextMuted,
-                            textAlign = TextAlign.Center
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
 
             if (onVoiceInput != null) {
                 // 只有用户手指落到这颗按钮上才起麦：弹窗打开本身不触发录音

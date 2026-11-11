@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -97,14 +98,6 @@ enum class BottomBlockMode {
     ACTION_ALLOW        // 审批拦截：拉长为滑块横条，向左滑动放行
 }
 
-/**
- * 主按键模式：语音优先 vs 键盘优先
- */
-enum class MainInputType {
-    VOICE,
-    KEYBOARD
-}
-
 /** 审批扁胶囊的视觉高度：44dp 主键收成 32dp 的扁横条，可点热区仍取 [ApprovalTrackTouchHeight]。 */
 internal val ApprovalCapsuleHeight = 32.dp
 
@@ -136,14 +129,19 @@ internal val IdleBlockHeight = 58.dp
 internal val ApprovalBlockHeight = Wear.Size.BottomBarReserve - Wear.Space.Md
 
 /**
+ * 「记住并放行」条带高度：正好吃掉审批块里滑轨热区之下那段空档（64 − 44 = 20dp）。
+ *
+ * 不新增高度、不向上借位：审批文案底边与滑轨热区都不动，184dp 宽的圆屏上也不需要第二列按钮。
+ */
+internal val ApprovalRememberBandHeight = ApprovalBlockHeight - ApprovalTrackTouchHeight
+
+/**
  * 单体形态演变底栏控制器 (左右滑动弹性弹射两翼 · 点击弹性收回 · 绝无 Emoji)
  */
 @Composable
 fun BottomInteractiveBlock(
     mode: BottomBlockMode,
     modifier: Modifier = Modifier,
-    mainInputType: MainInputType = MainInputType.VOICE,
-    onMainInputTypeChange: (MainInputType) -> Unit = {},
     cooldownSeconds: Int = 0,               // 严格确认模式下的风险锁定倒计时
     riskExplanation: String = "",           // 最坏后果说明：审批改为滑块形态后不再单独成行，保留参数以兼容调用方
     onVoiceStartRecord: () -> Unit,
@@ -156,6 +154,9 @@ fun BottomInteractiveBlock(
     onSwipeUpSettings: () -> Unit,           // 阻尼跟手上滑进设置
     onApprovalProgress: (Float) -> Unit = {}, // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
     approvalTone: Color = Wear.Palette.Danger, // 审批强调色：随 AI 风险等级变化（调用方传入等级色）
+    // 记住并放行：只有风险声明"可记住"（非破坏性 + 有命令原文）时才出现，见 ApprovalRememberPolicy
+    rememberable: Boolean = false,
+    onRememberAndAllow: () -> Unit = {},
     collapsed: Boolean = false,              // 用户已经滚动过：主键收起成小白条，点它才恢复
     // 收展进度 1=完整按钮 0=收起。由 ChatScreen 统一持有，保证"按钮缩小"与"弧条成形"是同一条时间线，
     // 不会出现"下面突然冒出、上面自己收、两边各弹一下"的割裂感。
@@ -181,14 +182,33 @@ fun BottomInteractiveBlock(
         }
     }
 
-    // 录音按压缩放
+    // 主键按压缩放：录音时微放大做呼吸，按下时收 0.94 给出"按进去了"的即时反馈
+    var isOrbPressed by remember { mutableStateOf(false) }
+
+    // 发送闪亮：抬手把这一句发出去的那一帧点满，走 quick() 140ms 衰减回静息（见 OrbEdgeHighlight）
+    val sendFlash = remember { Animatable(0f) }
+
     val orbScaleAnim by animateFloatAsState(
-        targetValue = if (mode == BottomBlockMode.RECORDING) 1.08f else 1.0f,
+        targetValue = when {
+            isOrbPressed -> OrbEdgeHighlight.PressedScale
+            mode == BottomBlockMode.RECORDING -> 1.08f
+            else -> 1.0f
+        },
         // 弹性手感：阻尼 0.62 保留一次轻微过冲，抬手时是"弹回来"而不是生硬复位；
         // 旧值 1.25 倍在 52dp 键上等于放大 13dp，视觉上像整颗键"炸开"，改成 1.08 只做呼吸式起伏。
         animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.62f, stiffness = 420f)),
         label = "orbRecordScale"
     )
+
+    // 发送时刻闪亮一次：抬手把这一句发出去的那一帧开始衰减，不给静息留残光
+    val flashOnSend: () -> Unit = {
+        if (animationsEnabled) {
+            scope.launch {
+                sendFlash.snapTo(1f)
+                sendFlash.animateTo(0f, Wear.Motion.quick())
+            }
+        }
+    }
 
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
@@ -304,7 +324,8 @@ fun BottomInteractiveBlock(
                 val wingScale = (0.4f + 0.6f * splitProgress.value).coerceIn(0f, 1f)
                 val wingAlpha = splitProgress.value.coerceIn(0f, 1f)
 
-                // 左副键：键盘文字录入 (TXT) 或切回语音 (MIC)
+                // 左副键：打开文字输入对话框。输入方式的二选一状态已删除 ——
+                // 左翼本身就是"改用键盘"那条路，不必先切模式再回主键上点第二下。
                 if (wingAlpha > 0.02f) {
                     val leftOffsetDp = (-50.dp * splitProgress.value)
                     Box(
@@ -324,21 +345,12 @@ fun BottomInteractiveBlock(
                                         isSplitExpanded = false
                                         splitProgress.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.micro()))
                                     }
-                                    // 左副键只负责切换输入方式；"打开输入框"统一归主键，避免一按就被 IME 盖住提示
-                                    if (mainInputType == MainInputType.VOICE) {
-                                        onMainInputTypeChange(MainInputType.KEYBOARD)
-                                    } else {
-                                        onMainInputTypeChange(MainInputType.VOICE)
-                                    }
+                                    onLeftKeyboardClick()
                                 }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (mainInputType == MainInputType.VOICE) {
-                            MinimalistKeyboardIcon(tint = Wear.Palette.TextSecondary)
-                        } else {
-                            MinimalistSoundwaveIcon(tint = Wear.Palette.TextSecondary, isRecording = false)
-                        }
+                        MinimalistKeyboardIcon(tint = Wear.Palette.TextSecondary)
                     }
                 }
 
@@ -399,6 +411,7 @@ fun BottomInteractiveBlock(
                     .pointerInput(isSplitExpanded, isCollapsed) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            isOrbPressed = true
                             val startX = down.position.x
                             val startY = down.position.y
                             var isLongPressActive = false
@@ -421,9 +434,11 @@ fun BottomInteractiveBlock(
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
 
                                 if (!change.pressed) {
+                                    isOrbPressed = false
                                     longPressJob.cancel()
                                     if (isLongPressActive) {
                                         // 释放长按：松手回弹 + 发射水波纹 + 开始思考
+                                        flashOnSend()
                                         onVoiceStopAndTrigger()
                                     } else if (isDraggingY) {
                                         val totalDeltaY = change.position.y - startY
@@ -460,12 +475,11 @@ fun BottomInteractiveBlock(
                                             // 收起态的轻触交给贴底白条，主键不抢
                                         } else if (mode == BottomBlockMode.RECORDING) {
                                             // 正在录音时单触：结束录音并触发
+                                            flashOnSend()
                                             onVoiceStopAndTrigger()
-                                        } else if (mainInputType == MainInputType.KEYBOARD) {
-                                            // 键盘主键模式下单触：直接弹出文字输入对话框
-                                            onLeftKeyboardClick()
                                         } else {
-                                            // 语音模式下单触：启动录音 (设备若无录音引擎则弹出快捷输入)
+                                            // 单触固定走语音起录 (设备若无录音引擎则弹出快捷输入)：
+                                            // 文字输入由左翼直接打开，主键不再随某个持久化模式换行为
                                             onVoiceStartRecord()
                                         }
                                     }
@@ -504,13 +518,7 @@ fun BottomInteractiveBlock(
                         .alpha(collapseFraction)
                         .scale(0.6f + 0.4f * collapseFraction)
                 ) {
-                    if (mainInputType == MainInputType.KEYBOARD && mode != BottomBlockMode.RECORDING) {
-                        // 键盘主键：输入框轮廓按同一比例放大到 20×14dp（旧值 16×12dp）
-                        MinimalistKeyboardIcon(
-                            tint = Wear.Palette.Bg,
-                            modifier = Modifier.size(20.dp, 14.dp)
-                        )
-                    } else if (mode == BottomBlockMode.RECORDING) {
+                    if (mode == BottomBlockMode.RECORDING) {
                         // 录音中保留起伏波形：动态反馈比静态图标更能说明"正在收音"
                         MinimalistSoundwaveIcon(
                             tint = Wear.Palette.Danger,
@@ -522,23 +530,85 @@ fun BottomInteractiveBlock(
                         MinimalistMicIcon(tint = Wear.Palette.Bg)
                     }
                 }
+
+                // 边缘高光：1dp 细光贴着圆周走，只在右侧那一段亮、其余收成透明 ——
+                // 是"薄薄一层反光"，不是描边也不是一圈粗边框。强度唯一来源是 [OrbEdgeHighlight]：
+                // 静息 0.22 / 录音随呼吸脉动 / 按下 1.0 / 发送后 140ms 内衰减回静息。
+                if (collapseFraction > 0.01f) {
+                    // 呼吸只在录音时挂无限时间线：静息态不为"可能发生的动效"常开一条动画
+                    val pulseState: State<Float>? = if (mode == BottomBlockMode.RECORDING) {
+                        rememberInfiniteTransition(label = "orbEdgePulse").animateFloat(
+                            initialValue = 0.72f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(durationMillis = 900),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "orbEdgePulseValue"
+                        )
+                    } else {
+                        null
+                    }
+                    Canvas(modifier = Modifier.matchParentSize()) {
+                        val level = OrbEdgeHighlight.intensityOf(
+                            mode = mode,
+                            isPressed = isOrbPressed,
+                            sendFlash = sendFlash.value,
+                            pulse = pulseState?.value ?: 1f
+                        ) * collapseFraction
+                        if (level <= 0.01f) return@Canvas
+                        val strokePx = OrbEdgeHighlight.StrokeWidthDp.dp.toPx()
+                        val tone = OrbEdgeHighlight.toneOf(mode, isOrbPressed)
+                        drawArc(
+                            brush = Brush.sweepGradient(
+                                0f to Color.Transparent,
+                                0.10f to tone.copy(alpha = level),
+                                0.34f to Color.Transparent,
+                                1f to Color.Transparent,
+                                center = center
+                            ),
+                            startAngle = 0f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = Offset(strokePx / 2f, strokePx / 2f),
+                            size = Size(size.width - strokePx, size.height - strokePx),
+                            style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                        )
+                    }
+                }
             }
 
             // 注意：收起态的可点热区**不在这里**。
             // 收起后视觉已经是贴在底缘的弧条，热区必须跟着弧条走（由 ChatScreen 的贴底弧条承担）：
             // 之前热区留在按钮原位，用户点看得见的弧条没反应，等于把入口藏了起来。
         } else if (isApproval) {
-            // ================= 审批拦截：整行只剩一条滑块，单击=拒绝 / 左滑=放行 =================
-            ApprovalTrack(
-                modifier = Modifier.align(Alignment.TopCenter),
-                trackWidth = capsuleWidth,
-                trackHeight = capsuleHeight,
-                cooldownSeconds = cooldownSeconds,
-                approvalTone = approvalTone,
-                onAllow = onAllow,
-                onReject = onReject,
-                onApprovalProgress = onApprovalProgress
-            )
+            // ================= 审批拦截：主机一行滑块，单击=拒绝 / 左滑=放行 =================
+            // 记住入口排在滑轨正下方那 20dp 空档：不抬高底栏、不压缩滑轨，也不碰上方审批文案。
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .width(capsuleWidth),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ApprovalTrack(
+                    modifier = Modifier.fillMaxWidth(),
+                    trackWidth = capsuleWidth,
+                    trackHeight = capsuleHeight,
+                    cooldownSeconds = cooldownSeconds,
+                    approvalTone = approvalTone,
+                    onAllow = onAllow,
+                    onReject = onReject,
+                    onApprovalProgress = onApprovalProgress
+                )
+                if (rememberable) {
+                    RememberAndAllowBand(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(ApprovalRememberBandHeight),
+                        onRememberAndAllow = onRememberAndAllow
+                    )
+                }
+            }
         } else {
             // ================= 思考中：白色停止按钮 =================
             // 与主键同色（Orb 冷银白），文字用 Bg 深色保证对比；不再加边框，白底在深色点阵上已经足够分离。
@@ -564,6 +634,76 @@ fun BottomInteractiveBlock(
                 }
             }
         }
+    }
+}
+
+/** 长按完成时间：500ms。"记住"是一次永久的放行决定，单击不够，按住不放才生效。 */
+private const val RememberHoldMs = 500
+
+/** 「记住并放行」标签：与该命令一起进 allowlist，下次同一条命令不再弹这一页。 */
+private const val RememberAndAllowLabel = "记住并放行"
+
+/**
+ * 「记住并放行」条带：滑轨之下 20dp 空档里的一条细字，长按 [RememberHoldMs] 才生效。
+ *
+ * 单击不生效的理由是安全而非手感：记忆一旦落盘就没有第二次确认，误触等于永久放行一条特权命令；
+ * 按住期间底部那条 1dp 细线从中间长到满宽，进度可见，松手早于完成就撤回、什么也不发生。
+ */
+@Composable
+private fun RememberAndAllowBand(
+    modifier: Modifier = Modifier,
+    onRememberAndAllow: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val animationsEnabled = LocalAnimationsEnabled.current
+    val hold = remember { Animatable(0f) }
+
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val holdJob = scope.launch {
+                    hold.snapTo(0f)
+                    hold.animateTo(1f, tween(durationMillis = RememberHoldMs, easing = LinearEasing))
+                    onRememberAndAllow()
+                }
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) break
+                }
+                // 抬手早于完成：撤回到 0，这一次触摸什么也不发生。
+                // awaitEachGesture 的 lambda 是 AwaitPointerEventScope（受限挂起作用域），
+                // 不能就地 await 动画，必须丢回组合作用域里跑。
+                if (holdJob.isActive) {
+                    holdJob.cancel()
+                    scope.launch {
+                        hold.animateTo(0f, motionSpec(animationsEnabled, Wear.Motion.quick()))
+                    }
+                }
+            }
+        },
+        contentAlignment = Alignment.Center
+    ) {
+        // 进度细线：1dp、只占条带底缘，从中间向两侧长满 —— 与主键高光同一种"细而透"的语言
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val progress = hold.value
+            if (progress <= 0.01f) return@Canvas
+            val linePx = 1.dp.toPx()
+            val lineWidth = size.width * progress
+            drawRect(
+                color = Wear.Palette.Accent.copy(alpha = 0.85f),
+                topLeft = Offset((size.width - lineWidth) / 2f, size.height - linePx),
+                size = Size(lineWidth, linePx)
+            )
+        }
+        BasicText(
+            text = RememberAndAllowLabel,
+            style = Wear.TextCaption.copy(
+                color = lerp(Wear.Palette.TextSecondary, Wear.Palette.Accent, hold.value)
+            ),
+            maxLines = 1
+        )
     }
 }
 
@@ -772,6 +912,58 @@ private const val ApprovalTrackSwipedAlpha = 0.72f
 internal object ApprovalTrackTone {
     fun colorOf(tone: Color, progress: Float): Color =
         lerp(tone, Wear.Palette.Success, progress.coerceIn(0f, 1f))
+}
+
+/**
+ * 主键边缘高光的唯一强度/色调来源（纯函数，无 Compose 运行时依赖，JVM 单测直接覆盖）。
+ *
+ * 主键底色永远是 [Wear.Palette.Orb]（冷银白 #CDD3DC）—— 高光只叠在**边缘那 1dp** 上，
+ * 绝不拿底色去换明暗：用户明确要求过"按钮要亮的，不要灰色"。
+ * 四个时刻各一档：静息最淡、录音随呼吸脉动、按下最亮、发送后点满再衰减回静息。
+ */
+internal object OrbEdgeHighlight {
+    /** 细光宽度：1dp。再粗就是一圈边框，那不是高光。 */
+    const val StrokeWidthDp = 1f
+
+    /** 按下时主键缩放：收 0.94，给出"按进去了"的即时反馈。 */
+    const val PressedScale = 0.94f
+
+    /** 静息档：只是让边缘有一层反光，不参与注意力竞争。 */
+    const val IdleLevel = 0.22f
+
+    /** 录音档：一眼能看出"正在听"，但不抢中间的波形图标。 */
+    const val RecordingLevel = 0.62f
+
+    /** 发送档：抬手发出去那一刻点到这里，随后衰减回静息。 */
+    const val SendLevel = 0.86f
+
+    /** 按下档：细光最亮的一档。 */
+    const val PressedLevel = 1f
+
+    /** 录音呼吸的下限：再低就会和静息档分不出来。 */
+    const val PulseFloor = 0.6f
+
+    fun intensityOf(
+        mode: BottomBlockMode,
+        isPressed: Boolean,
+        sendFlash: Float = 0f,
+        pulse: Float = 1f
+    ): Float {
+        if (isPressed) return PressedLevel
+        val base = when (mode) {
+            BottomBlockMode.RECORDING -> RecordingLevel * pulse.coerceIn(PulseFloor, 1f)
+            else -> IdleLevel
+        }
+        val flash = sendFlash.coerceIn(0f, 1f)
+        return (base + (SendLevel - base) * flash).coerceIn(0f, 1f)
+    }
+
+    /** 高光只允许这三种令牌色：静息取最暗的 AccentTrack，录音取 Accent，按下取 TextPrimary。 */
+    fun toneOf(mode: BottomBlockMode, isPressed: Boolean): Color = when {
+        isPressed -> Wear.Palette.TextPrimary
+        mode == BottomBlockMode.RECORDING -> Wear.Palette.Accent
+        else -> Wear.Palette.AccentTrack
+    }
 }
 
 /**

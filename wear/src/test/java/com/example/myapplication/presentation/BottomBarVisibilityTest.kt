@@ -4,7 +4,6 @@ import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBarEvent
 import com.example.myapplication.presentation.ui.BottomBarMode
 import com.example.myapplication.presentation.ui.BottomBarVisibility
-import com.example.myapplication.presentation.ui.MainInputType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -94,7 +93,7 @@ class BottomBarVisibilityTest {
 /** 哪些状态必须强制底栏展开：执行中、审批、录音、输入弹窗、抽屉。 */
 class ChatUiStateBottomBarForceTest {
 
-    private fun idle() = ChatUiState.initial(MainInputType.VOICE)
+    private fun idle() = ChatUiState.initial()
 
     @Test
     fun `空闲态不强制展开`() {

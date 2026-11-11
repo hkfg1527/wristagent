@@ -1,13 +1,9 @@
 package com.example.myapplication.presentation.ui.chat
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -155,11 +153,20 @@ internal fun ApprovalFloatingLayer(
     val worstCaseStyle = bodyStyle.copy(color = Wear.Palette.Danger)
     val centeredWorstCase = worstCaseStyle.copy(textAlign = TextAlign.Center)
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(motionSpec(animationsEnabled, Wear.Motion.quick())),
-        exit = fadeOut(motionSpec(animationsEnabled, Wear.Motion.quick())),
-        modifier = modifier.fillMaxSize()
+    // 整层不透明度：与压暗层同一条曲线，常驻组合（= 提前预合成）靠它显隐。
+    // 原来用 AnimatedVisibility：visible 变 true 的那一帧才开始建这棵子树，
+    // "组合 + 布局 + 建径向渐变画刷"三笔成本全压在首帧上，真表上就是一次轻微闪切。
+    // 现在整层一直挂在这棵树里，切换那一帧不再有组合与布局开销；不可见时 alpha 为 0，绘制整体跳过。
+    val layerAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = motionSpec(animationsEnabled, Wear.Motion.quick()),
+        label = "approvalLayerAlpha"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = layerAlpha }
     ) {
         Box(
             modifier = Modifier
@@ -179,19 +186,23 @@ internal fun ApprovalFloatingLayer(
                     .padding(bottom = ApprovalTextCenterLift),
                 contentAlignment = Alignment.Center
             ) {
-                // 径向暗晕：中心浓、150dp 处已透明，没有边界没有轮廓，文字像从背景里浮出来
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Wear.Palette.Bg.copy(alpha = ApprovalHaloCenterAlpha),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = ApprovalHaloRadius.toPx()
-                        )
-                    )
-                }
+                // 径向暗晕：中心浓、150dp 处已透明，没有边界没有轮廓，文字像从背景里浮出来。
+                // 画刷交给 drawWithCache：只在尺寸变化时重建，渐显那几帧不再每帧新建一个 Brush。
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawWithCache {
+                            val halo = Brush.radialGradient(
+                                colors = listOf(
+                                    Wear.Palette.Bg.copy(alpha = ApprovalHaloCenterAlpha),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width / 2f, size.height / 2f),
+                                radius = ApprovalHaloRadius.toPx()
+                            )
+                            onDrawBehind { drawRect(brush = halo) }
+                        }
+                )
                 Column(
                     modifier = Modifier
                         .width(ApprovalTextWidth)
@@ -205,7 +216,7 @@ internal fun ApprovalFloatingLayer(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // 块一：等级标题 + 3 段危险条（标题定调，危险条按等级点亮几段）
-                    FloatingApprovalText(slot = 0) {
+                    FloatingApprovalText(slot = 0, visible = visible) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
@@ -232,7 +243,7 @@ internal fun ApprovalFloatingLayer(
                     }
 
                     // 块二：调用了什么（工具显示名，无 emoji）
-                    FloatingApprovalText(slot = 1) {
+                    FloatingApprovalText(slot = 1, visible = visible) {
                         BasicText(
                             text = approvalParagraph(
                                 stringResource(R.string.wearchat_approval_label_call),
@@ -255,7 +266,7 @@ internal fun ApprovalFloatingLayer(
                     }
                     val blockThreeText = if (commandText.isNotBlank()) commandText else whatItDoes
                     if (blockThreeText.isNotBlank()) {
-                        FloatingApprovalText(slot = 2) {
+                        FloatingApprovalText(slot = 2, visible = visible) {
                             BasicText(
                                 text = approvalParagraph(
                                     stringResource(blockThreeLabelRes),
@@ -272,7 +283,7 @@ internal fun ApprovalFloatingLayer(
 
                     // 块四：最坏情况（空文案整块不占位）
                     if (worstCase.isNotBlank()) {
-                        FloatingApprovalText(slot = 3) {
+                        FloatingApprovalText(slot = 3, visible = visible) {
                             BasicText(
                                 text = approvalParagraph(
                                     stringResource(R.string.wearchat_approval_label_worst_case),
@@ -294,22 +305,28 @@ internal fun ApprovalFloatingLayer(
 
 /**
  * 一块审批文案的入场：同一个 [Animatable] 同时驱动 translationY（+48dp → 0）与 alpha（0 → 1），
- * 走 spring(阻尼 0.82 / 刚度 260)；第 [slot] 块再延后 slot×60ms 启动，于是文字依次从底下浮上来排到上面。
+ * 走 [Wear.Motion.micro]；第 [slot] 块再延后 slot×60ms 启动，于是文字依次从底下浮上来排到上面。
+ * 浮层常驻组合后，入场必须由 [visible] 重新起跑，否则这套错峰只在页面首帧隐身着跑一次。
  */
 @Composable
 private fun FloatingApprovalText(
     slot: Int,
+    visible: Boolean,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val animationsEnabled = LocalAnimationsEnabled.current
     val enter = remember { Animatable(0f) }
-    LaunchedEffect(enter, animationsEnabled) {
+    LaunchedEffect(enter, animationsEnabled, visible) {
+        // 浮层现在常驻组合（见 ApprovalFloatingLayer 的预合成说明），入场动画必须靠 visible 重新起跑，
+        // 否则四块文案只在页面首帧隐身着跑完一次，真审批弹出时是"啪"地直接出现。
+        if (!visible) return@LaunchedEffect
         // 关闭动画时既不排队也不弹簧：四块文案一次性、无位移地出现
         if (!animationsEnabled) {
             enter.snapTo(1f)
             return@LaunchedEffect
         }
+        enter.snapTo(0f)
         delay(ApprovalTextStaggerMs * slot)
         enter.animateTo(1f, Wear.Motion.micro())
     }

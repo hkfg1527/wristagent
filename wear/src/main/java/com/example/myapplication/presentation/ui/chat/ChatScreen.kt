@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -71,6 +73,7 @@ import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.deriveBottomBlockMode
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ModelCycle
+import com.example.myapplication.presentation.SESSION_SAVE_FAILED_HINT
 import com.example.myapplication.presentation.ui.AUTO_COLLAPSE_DELAY_MS
 import com.example.myapplication.presentation.ui.WAKE_LATCH_MS
 import com.example.myapplication.presentation.ui.BottomBarEvent
@@ -81,7 +84,6 @@ import com.example.myapplication.presentation.ui.CameraCurve
 import com.example.myapplication.presentation.ui.CameraIdle
 import com.example.myapplication.presentation.ui.CollapsedStripHeight
 import com.example.myapplication.presentation.ui.IdleBlockHeight
-import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.BottomInteractiveBlock
 import com.example.myapplication.presentation.ui.ReadingCamera
 import com.example.myapplication.presentation.ui.ReadingCameraEvent
@@ -133,8 +135,6 @@ fun ChatScreen(
     voiceInputManager: VoiceInputManager,
     liveSpacingDp: Float,
     onOpenSettings: () -> Unit,
-    announceInputMode: Boolean = false,
-    onInputModeAnnounced: () -> Unit = {},
     externalPrompt: ExternalPrompt? = null,
     onClearExternalPrompt: () -> Unit = {}
 ) {
@@ -172,7 +172,9 @@ fun ChatScreen(
         label = "conversationListAlpha"
     )
 
-    // 模糊效果只建一次：图形层每帧都会跑 lambda，不能在里面反复 new RenderEffect
+    // 模糊效果只建一次：图形层每帧都会跑 lambda，不能在里面反复 new RenderEffect。
+    // 这里在建 ChatScreen 首帧就把 BlurEffect 值对象建好；真正挂到列表图层上仍是审批那一帧，
+    // 因此页面里另有一个 1×1 的预热节点（见下方"模糊层预热"）把同参数的效果也先建一遍。
     val listBlurEffect = remember {
         BlurEffect(ApprovalListBlurRadiusPx, ApprovalListBlurRadiusPx, TileMode.Clamp)
     }
@@ -215,16 +217,6 @@ fun ChatScreen(
         if (state.isSessionDrawerOpen || state.draft.isOpen || isApprovalFocus) return@LaunchedEffect
         withFrameNanos { }
         runCatching { mainFocusRequester.requestFocus() }
-    }
-
-    // 持久化的模式若是键盘，启动时主动说明主键当前会做文本输入（切换是静默保留的）
-    LaunchedEffect(Unit) {
-        if (announceInputMode) {
-            if (state.mainInputType == MainInputType.KEYBOARD) {
-                viewModel.showNotice(R.string.wearchat_notice_input_keyboard, isError = false)
-            }
-            onInputModeAnnounced()
-        }
     }
 
     var launchVoiceInputAction by remember { mutableStateOf<() -> Unit>({}) }
@@ -315,40 +307,58 @@ fun ChatScreen(
         )
     }
 
-    // ================= 阅读镜头：唯一的滚动所有者 =================
+    // ================= 阅读镜头：唯一的滚动所有者（单一驱动，永不重启）=================
     // 每帧只做一件事：把「正在读的那一行」保持在阅读带里。
     //   · 阅读锚点 = 本回合（最后一个紧跟提问的助手回合）正文最后一条的底边，取自 layoutInfo；
     //   · 阅读带   = 42dp … （视口高 − 底栏实际占用 − 8dp）；
     //   · 锚点低于带下沿 → 正文上移；高于带上沿 → 正文下移；带内（含 8dp 死区）→ 不滚；
     //   · 位移一律走 CameraCurve 的限速器（远快近慢 + 加速度上限 + 单帧不越过目标 + 亚像素残余）。
-    // 判定输入只有 layoutInfo 与底栏占用，所以「工具胶囊插入 / 思考胶囊折叠 / 底栏形变 / 逐字吐字」
-    // 这四类布局变化走的是同一条路径：下一帧按锚点重新判定。旧实现"对齐一次 → 恒速下滚"
-    // 只有一次纠错机会，任何一次插入/形变都会让锚点永久离开可读区，这就是"相机不跟随"。
+    // 三条纪律，缺一条就退回用户嘴里的"卡来卡去"：
+    //  1. **只有一个循环写列表位置，而且它挂在 listState 上**：回合切换、逐 token 追加、底栏形变
+    //     都不许打断它。旧实现把整个循环挂在 LaunchedEffect(readingTurnKey) 上，key 一变
+    //     速度与亚像素残余就一起归零重起，同一段视觉运动被拆成几次独立起跑。
+    //  2. **目标只在收缩方向限速**（ScrollFollow.limitTarget）：锚点取的是回合卡片的底边，
+    //     而这条边正是流式正文每 32ms 提交一次就生长、离开中线后又被缩放收回去的那条边 ——
+    //     逐帧"剩余距离"在 ±20px 内来回跳（真机一步 40.5px → 19.5px，远超限速器每帧 1.7px 的上限），
+    //     而单帧位移被 stepPx 夹到剩余距离，夹取量就是肉眼看到的硬跳。
+    //  3. **用户手势优先**：拖拽/表冠期间一帧都不抢，且只在"用户原本就在底部"时跟随。
     val density = LocalDensity.current
+    // 密度要逐帧现取：循环不再随重组重启，捕获一份首帧值就等于把它焊死
+    val liveDensity = rememberUpdatedState(density)
     // 表冠/拖拽之后的一小段"镜头让路"窗口
     var cameraPauseUntil by remember { mutableLongStateOf(0L) }
 
     // 只有"紧跟用户提问、且已经有可读内容（正文/思考/工具胶囊）"的助手回合才接管镜头；
-    // null 表示本轮没有接管（欢迎语、翻历史会话）。
+    // null 表示本轮没有接管（欢迎语、翻历史会话）。正文块 id 全程复用，所以它逐 token 不变。
     val readingTurnKey = remember(conversationItems) { CameraCurve.readingTurnKey(conversationItems) }
     // 条目索引每帧现取：错误提示条会追加在会话条目之后，回合内新增胶囊则不会。
     val liveConversationItems = rememberUpdatedState(conversationItems)
+    val liveTurnKey = rememberUpdatedState(readingTurnKey)
+    // 追加的唯一登记处：连续追加只留一格，镜头每帧最多取一条（见 ScrollFollow.FollowRequests）
+    val followRequests = remember { ScrollFollow.FollowRequests() }
 
-    LaunchedEffect(readingTurnKey) {
-        if (readingTurnKey == null) return@LaunchedEffect
+    // 所有"目标可能变了"的来源都只登记一格请求，绝不在这里发起滚动：
+    //   · 逐 token 的追加（内容又长了）；
+    //   · 布局本身的变化（工具胶囊插入/展开、思考胶囊折叠、底栏形变 —— 它们都会挪走可读区或锚点）。
+    // 同一帧内任意多次追加都被合并成一条，写列表位置的出口因此只有下面的镜头循环一个。
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            Triple(liveTurnKey.value, liveConversationItems.value.size, listState.layoutInfo)
+        }.collect { (key, size, _) -> if (key != null && size > 0) followRequests.request() }
+    }
+
+    LaunchedEffect(listState) {
         // 本轮是否已经被用户叫停的唯一判据（isStoppedForTurn）：用户滚过之后不再自动拉回。
         // 对齐/匀速这两个旧阶段已被"锚点 vs 阅读带"取代，因此这里只用到两个事件。
         val camera = ReadingCamera()
-        camera.onEvent(ReadingCameraEvent.TurnBodyAppeared)
-
-        val bandTopPx = with(density) {
-            ReadingAnchor.bandTopPx(
-                topInsetPx = Wear.Size.TopContentInset.toPx(),
-                marginPx = CameraCurve.FOCUS_TOP_MARGIN_DP.dp.toPx()
-            )
-        }
-        val bandGapPx = with(density) { ReadingAnchor.BAND_BOTTOM_GAP_DP.dp.toPx() }
-        val deadZonePx = CameraCurve.deadZonePx(density.density)
+        var cameraTurnKey: String? = null
+        // 本轮是否获准跟随：只在"用户原本就在底部"时置真，翻历史时为假
+        var followArmed = false
+        // 上一帧用户是否看着内容结尾：回合切换那一帧用它判断"原本在不在底部"
+        var userAtEnd = true
+        // 有没有活干：一次追加开启一段跟随，追进阅读带才停（合并器只决定"要不要开始"）
+        var following = false
+        // 限速器的连续状态：跨回合、跨让路窗口都不清零 —— 这就是"同一驱动继续跑"
         var speedPxPerSec = 0f
         var lastFrameMillis = 0L
         // 亚像素残余：速度小到每帧不足 1px 时直接 dispatchRawDelta 会被取整丢弃，必须攒够再滚
@@ -357,17 +367,37 @@ fun ChatScreen(
         // 镜头是逐帧控制器，但"每帧都要判断"不等于"每帧都要唤醒"：静置时若一直排帧回调，
         // 一个回合在屏上就等于永久 60 次/秒的空转。
         var idleStreak = 0
+        // 目标（剩余距离）的上一帧值：收缩限速的基准
+        var aimPx = 0f
+        var hasAim = false
 
         while (isActive) {
+            val turnKey = liveTurnKey.value
+            if (turnKey != cameraTurnKey) {
+                // 回合切换：只换目标，不重起驱动 —— 速度与亚像素残余继续沿用
+                cameraTurnKey = turnKey
+                hasAim = false
+                aimPx = 0f
+                followRequests.clear()
+                if (turnKey != null) {
+                    camera.onEvent(ReadingCameraEvent.TurnBodyAppeared)
+                    // "原本就在底部"用上一帧的状态判定：本回合卡片刚出现时必然还在屏外
+                    followArmed = userAtEnd
+                    following = true
+                } else {
+                    followArmed = false
+                }
+            }
+
             if (CameraIdle.shouldSleep(idleStreak)) {
                 // ---- 静止休眠：一个帧回调都不排，只等真正的状态变化 ----
                 // 唤醒源全部是 snapshot 状态（不是轮询）：布局变化（胶囊插入/展开、条目尺寸）、
-                // 底栏形变、会话条目变化（新 token / 新回合）、用户开始或结束滚动、沉浸态开关。
+                // 底栏形变、会话条目或回合切换（新 token / 新回合）、用户开始或结束滚动、沉浸态开关。
                 // drop(1) 丢掉 combine 起播时的"当前快照"，否则会立刻醒来变成空转。
                 combine(
                     snapshotFlow { listState.layoutInfo },
                     snapshotFlow { collapseProgress.value },
-                    snapshotFlow { liveConversationItems.value },
+                    snapshotFlow { liveTurnKey.value to liveConversationItems.value },
                     snapshotFlow { listState.isScrollInProgress },
                     snapshotFlow {
                         listOf(
@@ -378,11 +408,13 @@ fun ChatScreen(
                         )
                     }
                 ) { _, _, _, _, _ -> }.drop(1).first()
-                // 醒来第一帧必须重新判定：计数、限速器、dt 全部重起算
+                // 醒来第一帧必须重新判定：计数、限速器、dt、目标全部重起算
                 idleStreak = 0
                 speedPxPerSec = 0f
                 residualPx = 0f
                 lastFrameMillis = 0L
+                aimPx = 0f
+                hasAim = false
                 continue
             }
             // withFrameMillis 给的是**毫秒**（当纳秒用会把 dt 恒夹成下限，速度掉到设计的 1/4）
@@ -394,35 +426,49 @@ fun ChatScreen(
             }
             lastFrameMillis = frameMillis
 
-            // ---- 让路：用户手指/表冠在动，或刚滚完还在暂停窗口内 ----
-            if (ReadingAnchor.shouldYield(listState.isScrollInProgress, SystemClock.uptimeMillis(), cameraPauseUntil)) {
+            // ---- 用户是否仍看着内容结尾：必须每帧更新（它决定下一回合要不要跟随），
+            // 所以不能藏在"允许跟随"的分支里面，否则用户翻历史时这一位永远是上一帧的旧值 ----
+            val itemCount = liveConversationItems.value.size
+            userAtEnd = isContentEndVisible(listState, itemCount)
+
+            // ---- 该不该跟随：四个条件同时成立才动列表（用户手势与沉浸态优先）----
+            // 让路与沉浸态走同一条判据，区别只在"能不能计入静止帧"：
+            // 用户手势/让路窗口是时间与手势条件（休眠后没有状态变化能叫醒它），沉浸态是状态条件。
+            val nowMs = SystemClock.uptimeMillis()
+            val immersive = state.isApprovalFocus || state.isRecordingVoice ||
+                state.draft.isOpen || state.isSessionDrawerOpen
+            // 追加请求只在这里取：一条请求开启一段跟随，跟随中再来多少条都合并进同一段
+            if (followRequests.take()) following = true
+            if (!ScrollFollow.shouldFollow(
+                    followEnabled = followArmed && following && !camera.isStoppedForTurn,
+                    userScrolling = listState.isScrollInProgress,
+                    nowMs = nowMs,
+                    yieldUntilMs = cameraPauseUntil,
+                    immersive = immersive
+                )
+            ) {
                 if (listState.isScrollInProgress) {
                     // 用户主动接管滚动：本轮作废，绝不把人推回去
                     camera.onEvent(ReadingCameraEvent.UserScrolled)
-                    return@LaunchedEffect
+                    followArmed = false
                 }
-                // 暂停窗口内只是"这一帧不抢"，窗口一过镜头自己接回来。
-                // 这里绝不能计入静止帧：窗口到期是"时间"条件，休眠后没有任何状态变化能叫醒它。
-                idleStreak = 0
-                continue
-            }
-            if (camera.isStoppedForTurn) return@LaunchedEffect
-
-            // ---- 沉浸态（审批/录音/输入弹窗/抽屉）：这一帧不抢，但**不作废本轮** ----
-            // 审批放行后正文继续吐字、录音结束后回答继续流式，镜头必须能接回来；
-            // 旧实现这里直接 return，镜头从此死到下一轮 —— 用户看到的是"好像也坏了"。
-            if (state.isApprovalFocus || state.isRecordingVoice || state.draft.isOpen || state.isSessionDrawerOpen) {
-                speedPxPerSec = 0f
+                // 收速走同一条限速曲线，不硬清 0：硬清之后内容一出现就是"重新起跑"
+                speedPxPerSec = CameraCurve.nextSpeed(speedPxPerSec, 0f, dt)
                 residualPx = 0f
-                // 沉浸态本来就不动列表；这些标志的变化本身就是唤醒源，所以这里可以计入静止帧
-                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
+                aimPx = 0f
+                hasAim = false
+                idleStreak = if (listState.isScrollInProgress || nowMs < cameraPauseUntil) {
+                    0
+                } else {
+                    CameraIdle.nextStreak(idleStreak, isIdle = true)
+                }
                 continue
             }
 
             val info = listState.layoutInfo
             val viewportHeightPx = info.viewportSize.height.toFloat()
             if (viewportHeightPx <= 0f) continue
-            val turnIndex = liveConversationItems.value.lastIndex
+            val turnIndex = itemCount - 1
             val focusItem = info.visibleItemsInfo.firstOrNull { it.index == turnIndex }
             // 回合还没进可视区时按"贴着下沿"给距离：它永远排在列表末尾，只可能在下方，
             // 交给同一个限速器逐帧找过去，绝不瞬移。
@@ -435,7 +481,16 @@ fun ChatScreen(
             } ?: viewportHeightPx
 
             // 底栏实际占用：与按钮视觉共用同一条 collapseProgress 时间线，不另算第二条曲线
-            val barFootprintPx = with(density) {
+            val d = liveDensity.value
+            val bandTopPx = with(d) {
+                ReadingAnchor.bandTopPx(
+                    topInsetPx = Wear.Size.TopContentInset.toPx(),
+                    marginPx = CameraCurve.FOCUS_TOP_MARGIN_DP.dp.toPx()
+                )
+            }
+            val bandGapPx = with(d) { ReadingAnchor.BAND_BOTTOM_GAP_DP.dp.toPx() }
+            val deadZonePx = CameraCurve.deadZonePx(d.density)
+            val barFootprintPx = with(d) {
                 CameraCurve.barFootprintDp(
                     expandedBlockHeightDp = (if (state.isApprovalFocus) ApprovalBlockHeight else IdleBlockHeight).value,
                     bottomInsetDp = BottomBarBottomInset.value,
@@ -452,27 +507,41 @@ fun ChatScreen(
                 canScrollBackward = listState.canScrollBackward
             )
             if (plan.isHold) {
-                speedPxPerSec = 0f
+                // 追进阅读带了：这一段跟随结束，速度按同一条曲线落回（硬清会让下一帧重新起跑）
+                speedPxPerSec = CameraCurve.nextSpeed(speedPxPerSec, 0f, dt)
                 residualPx = 0f
-                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
+                following = false
+                aimPx = 0f
+                hasAim = false
+                idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = abs(speedPxPerSec) < 1f)
                 continue
             }
 
+            // 目标只在收缩方向限速：卡底边被流式正文顶下去又收回来的高频抖动被抹成一条斜坡，
+            // 单帧位移因此单调收敛，不会再被一个跳变的目标直接夹断。
+            val aim = if (hasAim) {
+                ScrollFollow.limitTarget(aimPx, plan.deltaPx, ScrollFollow.maxShrinkPx(dt))
+            } else {
+                plan.deltaPx
+            }
+            aimPx = aim
+            hasAim = true
+
             speedPxPerSec = CameraCurve.nextSpeed(
                 speedPxPerSec,
-                CameraCurve.targetSpeed(plan.deltaPx, deadZonePx),
+                CameraCurve.targetSpeed(aim, deadZonePx),
                 dt
             )
-            // 单帧位移绝不越过剩余距离，连亚像素残余一起夹住（否则会越过目标再回弹）
-            val wantPx = (CameraCurve.stepPx(speedPxPerSec, dt, plan.deltaPx) + residualPx)
-                .let { if (plan.deltaPx >= 0f) it.coerceIn(0f, plan.deltaPx) else it.coerceIn(plan.deltaPx, 0f) }
+            // 单帧位移绝不越过目标，连亚像素残余一起夹住（否则会越过目标再回弹）
+            val wantPx = (CameraCurve.stepPx(speedPxPerSec, dt, aim) + residualPx)
+                .let { if (aim >= 0f) it.coerceIn(0f, aim) else it.coerceIn(aim, 0f) }
             val appliedPx = if (abs(wantPx) < 0.01f) 0f else listState.dispatchRawDelta(wantPx)
             residualPx = wantPx - appliedPx
             if (abs(appliedPx) < 0.5f && abs(wantPx) >= 0.5f) {
                 // 已经顶到列表边界：这段位移物理上走不了，丢掉本帧残余，不卡死也不来回蹭；
-                // 同时按"无事可做"计数，免得在边界上空转一整晚
+                // 速度按同一条曲线落回，同时按"无事可做"计数，免得在边界上空转一整晚
                 residualPx = 0f
-                speedPxPerSec = 0f
+                speedPxPerSec = CameraCurve.nextSpeed(speedPxPerSec, 0f, dt)
                 idleStreak = CameraIdle.nextStreak(idleStreak, isIdle = true)
             } else {
                 idleStreak = 0
@@ -665,6 +734,18 @@ fun ChatScreen(
             )
         }
 
+        // ================= 1.5 模糊层预热 =================
+        // 审批那一帧如果要同时建 RenderEffect，成本会叠在"遮罩组合 + 文案浮起"上，真表上就是一次闪切。
+        // 用一个 1×1 的透明节点在页面首帧就把同参数效果建一次，审批时只剩"挂到列表图层"这一步。
+        Box(
+            modifier = Modifier
+                .size(1.dp)
+                .graphicsLayer {
+                    renderEffect = listBlurEffect
+                    alpha = 0.01f
+                }
+        )
+
         // ================= 2. 文字与卡片一体联动滚动流 (M3 圆屏标准：边缘缩小淡出，不做整块抹除) =================
         ConversationList(
             items = conversationItems,
@@ -718,8 +799,6 @@ fun ChatScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = BottomBarBottomInset),
-            mainInputType = state.mainInputType,
-            onMainInputTypeChange = { newType -> viewModel.changeMainInputType(newType) },
             cooldownSeconds = state.pendingApproval?.risk?.requireCooldownSeconds ?: 0,
             riskExplanation = state.pendingApproval?.risk?.riskSummary ?: "",
             onVoiceStartRecord = {
@@ -752,6 +831,9 @@ fun ChatScreen(
                 // 放行不立刻退出：先让整页塌缩成工具胶囊尺度，动画走完再交回结论
                 viewModel.approvePending()
             },
+            // 记住并放行：先把归一化命令写进 allowlist，再走同一条放行路径 —— 下一条相同命令不再弹这一页
+            rememberable = state.pendingApproval?.rememberable == true,
+            onRememberAndAllow = { viewModel.approvePendingAndRemember() },
             onReject = {
                 viewModel.rejectPending()
             },
@@ -818,14 +900,30 @@ fun ChatScreen(
             }
         }
 
+        // ================= 5.1 会话落盘失败：一行常驻说明，不会自己消失 =================
+        // 与瞬时提示共用底部同一个槽位：同时在场会叠成两层，而提示条本身是"刚刚发生"的最高优先级，
+        // 落盘失败等它消失后再露出来。手表上不弹窗、不 Toast，这一行就是全部反馈。
+        if (inlineNotice == null && state.sessionSaveFailed) {
+            WearBanner(
+                text = SESSION_SAVE_FAILED_HINT,
+                tone = Tone.DANGER,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        start = Wear.Space.Lg,
+                        end = Wear.Space.Lg,
+                        bottom = Wear.Size.BottomBarReserve
+                    )
+            )
+        }
+
         // ================= 6. 自定义文本输入弹窗 (避让输入法 / 返回键只关弹窗) =================
         if (state.draft.isOpen) {
             TextInputDialog(
                 draft = state.draft,
                 onChange = { viewModel.changeDraft(it) },
                 onCancel = { viewModel.cancelTextInput() },
-                onSubmit = { viewModel.submitDraft() },
-                visionBetaEnabled = preferences.visionBetaEnabled
+                onSubmit = { viewModel.submitDraft() }
             )
         }
 

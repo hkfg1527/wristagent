@@ -1,7 +1,6 @@
 package com.example.myapplication.presentation
 
 import com.example.myapplication.presentation.ui.BottomBlockMode
-import com.example.myapplication.presentation.ui.MainInputType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,7 +14,7 @@ import org.junit.Test
  */
 class BottomBarForceExpandFlagTest {
 
-    private fun idle() = ChatUiState.initial(MainInputType.VOICE)
+    private fun idle() = ChatUiState.initial()
 
     /** 语音收尾后残留在字段里的形态：所有标志都已归零，底栏必须允许收起。 */
     @Test

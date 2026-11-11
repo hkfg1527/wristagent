@@ -3,15 +3,22 @@ package com.example.myapplication.presentation
 import androidx.annotation.StringRes
 import com.example.myapplication.agent.AgentExecutionState
 import com.example.myapplication.agent.ChatSession
+import com.example.myapplication.agent.ShellDanger
+import com.example.myapplication.agent.ShellPolicy
 import com.example.myapplication.agent.contract.ConversationBlock
 import com.example.myapplication.agent.contract.RiskAssessment
 import com.example.myapplication.presentation.ui.BottomBlockMode
-import com.example.myapplication.presentation.ui.MainInputType
 import com.example.myapplication.presentation.ui.chat.CapsuleExpansion
 import com.example.myapplication.presentation.ui.settings.SettingsSpacingMath
 
 /** 默认会话首条欢迎语：新建会话与首个会话共用同一条文案。 */
 const val DEFAULT_SESSION_PROMPT = "主人，今天有什么需要解决的技术或生活问题？"
+
+/**
+ * 会话落盘失败提示：聊天页用它替代瞬时提示条 —— 写盘失败不会自己消失，
+ * 用户重启前看到的最后一条线索就是它。
+ */
+const val SESSION_SAVE_FAILED_HINT = "会话没能写入本机，重启后可能回到更早的一份"
 
 /** 瞬时提示可见时长。 */
 const val NOTICE_VISIBLE_MS = 2600L
@@ -24,10 +31,11 @@ data class PendingApproval(
     val toolName: String,
     val risk: RiskAssessment,
     /** 待执行命令原文：run_shell 与自写工具才有值，浮层用它替掉"改动"那一块。 */
-    val command: String = "",
-    /** 是否允许"记住此命令"：破坏性命令恒为 false，记住也永不生效。 */
-    val rememberable: Boolean = false
-)
+    val command: String = ""
+) {
+    /** 是否允许"记住此命令"：破坏性命令恒为 false，记住也永不生效。判定唯一来源是 [ApprovalRememberPolicy]。 */
+    val rememberable: Boolean get() = ApprovalRememberPolicy.keyOf(risk) != null
+}
 
 /**
  * 瞬时提示条内容：语音错误与主键模式反馈共用一条通道。
@@ -52,7 +60,6 @@ data class ChatUiState(
     val isStreamingBurst: Boolean,
     val isTaskCompleted: Boolean,
     val bottomBlockMode: BottomBlockMode,
-    val mainInputType: MainInputType,
     val pendingApproval: PendingApproval?,
     val approvalProgress: Float,
     val isApprovalCollapsing: Boolean,
@@ -69,7 +76,12 @@ data class ChatUiState(
      * 简洁模式：只收紧正文行高与块间距（几何映射见 [ChatBodyGeometry.of]）。值来自设置项 compactMode，
      * 本层只保证这个事实只有一个来源，换算交给纯函数、渲染交给列表读取。
      */
-    val compactMode: Boolean = false
+    val compactMode: Boolean = false,
+    /**
+     * 会话落盘失败（重试过一次仍失败）：由 [ChatViewModel] 写、聊天页只读。
+     * 没有它，写盘失败的唯一症状是"重启后对话回到更早的一份"，没有任何人事先知道。
+     */
+    val sessionSaveFailed: Boolean = false
 ) {
     /** 时间线交错块：列表分组与镜头跟随的唯一数据源。 */
     val blocks: List<ConversationBlock> get() = agentState.conversationBlocks
@@ -100,7 +112,7 @@ data class ChatUiState(
 
     companion object {
         /** 启动态：单会话、就绪、空闲底栏；[compactMode] 取设置里的简洁模式。 */
-        fun initial(mainInputType: MainInputType, compactMode: Boolean = false): ChatUiState {
+        fun initial(compactMode: Boolean = false): ChatUiState {
             val firstSession = ChatSession(
                 id = "session_default",
                 title = "当前对话",
@@ -125,7 +137,6 @@ data class ChatUiState(
                 isStreamingBurst = false,
                 isTaskCompleted = false,
                 bottomBlockMode = BottomBlockMode.IDLE,
-                mainInputType = mainInputType,
                 pendingApproval = null,
                 approvalProgress = 0f,
                 isApprovalCollapsing = false,
@@ -191,6 +202,21 @@ fun ChatUiState.deriveBottomBlockMode(): BottomBlockMode = when {
     else -> BottomBlockMode.IDLE
 }
 
-/** 持久化的主键输入方式 -> 枚举：只认 "KEYBOARD"，其余一律语音优先。 */
-fun mainInputTypeFromStored(stored: String?): MainInputType =
-    if (stored == "KEYBOARD") MainInputType.KEYBOARD else MainInputType.VOICE
+/**
+ * 「记住并放行」的唯一判定（纯函数）：审批页要不要给出记住入口、给出后往 allowlist 写什么键。
+ *
+ * 键就用 [ShellPolicy.normalize] 归一化后的命令原文 —— 与 AgentDispatcher 命中判定取的键同一套归一化，
+ * 于是"记住"和"下次命中"永远是同一个字符串，不会因为空格差异静默失效。
+ *
+ * 除 [RiskAssessment.rememberable] 外再本地复核一次破坏性档：记忆是一次性的永久决定，
+ * 不能只看上游某个布尔字段（AI 叙述链路曾把 rememberable 原样透传）。
+ */
+object ApprovalRememberPolicy {
+    fun keyOf(risk: RiskAssessment?): String? {
+        if (risk == null) return null
+        if (!risk.rememberable) return null
+        if (risk.commandText.isBlank()) return null
+        if (ShellPolicy.dangerOf(risk.commandText) == ShellDanger.DESTRUCTIVE) return null
+        return ShellPolicy.normalize(risk.commandText)
+    }
+}

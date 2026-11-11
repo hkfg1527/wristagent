@@ -80,9 +80,6 @@ fun WearAgentApp(
         }
     }
 
-    // 主键输入方式提示只在本次启动播报一次：从设置页返回主界面不重复打扰
-    var announceInputMode by remember { mutableStateOf(true) }
-
     DisposableEffect(Unit) {
         toolRegistry.onMatrixDensityChange = { spacing ->
             liveSpacingDp = spacing
@@ -171,8 +168,6 @@ fun WearAgentApp(
                             voiceInputManager = voiceInputManager,
                             liveSpacingDp = liveSpacingDp,
                             onOpenSettings = { currentScreen = AppScreen.SETTINGS },
-                            announceInputMode = announceInputMode,
-                            onInputModeAnnounced = { announceInputMode = false },
                             externalPrompt = externalPrompt,
                             onClearExternalPrompt = onClearExternalPrompt
                         )
