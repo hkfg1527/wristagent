@@ -46,24 +46,14 @@ class SessionDrawerVisualGuardTest {
     }
 
     @Test
-    fun drawerTitleReusesTheSettingsDotSignatureInsteadOfACopy() {
+    fun drawerDoesNotDependOnSettingsInternalsForDecoration() {
+        // 抽屉标题在 ScalingLazyColumn 的 item 里，会被裁到节点边界。曾试过用它画设置页那套
+        // 三点点阵签名，真机像素扫描确认标题左侧 x<35 区域一个非背景像素都没有 —— 一个点都没渲染出来。
+        // 与其为了装饰去动列表内边距，不如这一页不放签名。所以这里钉住"不许再引进来"。
         val code = drawerCode()
-        assertTrue("抽屉必须调用共用签名", code.contains("headerDotSignature()"))
-        assertTrue("摆位必须取共用整宽常量", code.contains("HeaderDotSignatureWidth"))
-        assertFalse("不许在抽屉里另写一份点阵", code.contains("private fun DrawScope.headerDotSignature"))
-        assertFalse("不许重复点径常量", code.contains("HeaderDotDiameter"))
-        assertFalse("不许重复点数常量", code.contains("HeaderDotCount"))
-
-        val shared = readProjectFile(SettingsPath)
-        assertTrue(
-            "签名实现必须是两页共用的 internal 函数",
-            shared.contains("internal fun DrawScope.headerDotSignature()")
-        )
-        assertEquals(
-            "点阵签名只允许一处声明",
-            1,
-            Regex("fun DrawScope\\.headerDotSignature").findAll(shared).count()
-        )
+        assertFalse("抽屉不许再依赖设置页的签名实现", code.contains("headerDotSignature"))
+        assertFalse("抽屉不许再依赖设置页的签名整宽常量", code.contains("HeaderDotSignatureWidth"))
+        assertFalse("不许在抽屉里另写一份点阵", code.contains("HeaderDotDiameter"))
     }
 
     private fun drawerCode(): String =

@@ -48,13 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,8 +73,6 @@ import com.example.myapplication.agent.ChatSession
 import com.example.myapplication.presentation.ui.components.WearDivider
 import com.example.myapplication.presentation.ui.components.WearRow
 import com.example.myapplication.presentation.ui.components.WearSectionHeader
-import com.example.myapplication.presentation.ui.settings.HeaderDotSignatureWidth
-import com.example.myapplication.presentation.ui.settings.headerDotSignature
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -203,15 +199,7 @@ fun SessionDrawer(
                         ) {
                             BasicText(
                                 text = stringResource(R.string.ui_drawer_title),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    // 点阵签名：与设置页组标题同一份实现，画在标题左侧的沟里。
-                                    // 负向平移不参与布局，标题的起始 x 一个像素都没动。
-                                    .drawBehind {
-                                        translate(left = -HeaderDotSignatureWidth.toPx()) {
-                                            headerDotSignature()
-                                        }
-                                    },
+                                modifier = Modifier.weight(1f),
                                 style = Wear.TextTitle,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis

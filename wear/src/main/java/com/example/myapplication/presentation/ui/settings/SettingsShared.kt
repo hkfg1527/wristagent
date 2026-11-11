@@ -579,9 +579,13 @@ private const val HeaderDotCount = 3
  * 三颗正好占满 14dp 槽沟（3 × 2 + 2 × 4 = 14）；垂直中线贴文字中线，颜色走 TextMuted，
  * 既不引入新色，也不碰强调色。
  *
- * 只此一份实现：设置页组标题与会话抽屉标题共用它，抽屉不再另写一段点阵。
+ * 只此一份实现，只给设置页组标题用。
+ *
+ * 会话抽屉曾想复用它，但抽屉标题在 ScalingLazyColumn 的 item 内、会被裁到节点边界，
+ * drawBehind 画到节点左侧的点根本没渲染出来（真机像素扫描 x<35 区域 0 个非背景像素）。
+ * 与其为了装饰去动列表内边距，不如这一页不放签名——抽屉不加它也协调。
  */
-internal fun DrawScope.headerDotSignature() {
+private fun DrawScope.headerDotSignature() {
     val diameterPx = HeaderDotDiameter.toPx()
     val stepPx = diameterPx + Wear.Space.Xs.toPx()
     val centerY = size.height / 2f
@@ -593,15 +597,6 @@ internal fun DrawScope.headerDotSignature() {
         )
     }
 }
-
-/**
- * 签名整宽：14dp（3 × 2 + 2 × 4），给"沟比签名宽"的调用方摆位用。
- *
- * 会话抽屉的标题沟来自列表 16dp 内边距，比签名宽 2dp：把签名整体左移这一整宽，
- * 末点的右缘才与标题起笔对齐 —— 与设置页组标题是同一种关系，标题的 x 因此一个像素都没动。
- */
-internal val HeaderDotSignatureWidth: Dp =
-    HeaderDotDiameter * HeaderDotCount + Wear.Space.Xs * (HeaderDotCount - 1)
 
 /** 行内：左槽标签与右槽取值之间的最小呼吸。 */
 private val SettingsLabelValueGap: Dp = SettingsSpacingMath.TitleToValueDp.dp
