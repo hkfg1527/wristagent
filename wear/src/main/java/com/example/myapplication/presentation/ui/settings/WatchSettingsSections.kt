@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
-import com.example.myapplication.agent.ThemeMode
 import com.example.myapplication.voice.AsrProviderId
 import kotlin.math.roundToInt
 
@@ -123,8 +122,10 @@ private fun wakeLabelResOf(source: VoiceEntrySource): Int? = when (source) {
 /**
  * 外观与点阵。
  *
- * 纯黑与主题模式在表端是只读回显：当前令牌集只有一套深色值（Bg 恒为 0xFF000000），
- * 给出可写开关只会得到"拨了没反应"的假开关，因此真正的切换落在网页控制台。
+ * 审计结论（docs/SETTINGS-AUDIT.md 第 45、46 行）：纯黑与主题模式在表端**没有任何消费点** ——
+ * `Wear.Palette.Bg` 是编译期常量，主题枚举也只被取来渲染文案。拨它们不改变任何像素，
+ * 属于用户点名的"没有什么用的选项"，因此连同偏好字段一起删除，只留一句静态说明：
+ * 底色恒为纯黑是令牌集事实，不是设置项。
  */
 @Composable
 fun AppearanceContent(
@@ -134,27 +135,12 @@ fun AppearanceContent(
     val context = LocalContext.current
     var compactMode by remember { mutableStateOf(preferences.compactMode) }
     var spacing by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
-    val themeMode = remember { preferences.themeMode }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_appearance),
         onBack = onBack
     ) {
         section(stringResource(R.string.settings_appearance_header))
-
-        row {
-            SettingsInfoRow(
-                title = stringResource(R.string.settings_appearance_pure_black),
-                value = stringResource(R.string.settings_appearance_pure_black_value)
-            )
-        }
-
-        row {
-            SettingsInfoRow(
-                title = stringResource(R.string.settings_appearance_theme),
-                value = stringResource(themeModeLabelRes(themeMode))
-            )
-        }
 
         row { SettingsCaptionRow(text = stringResource(R.string.settings_appearance_web_only)) }
 
@@ -168,6 +154,40 @@ fun AppearanceContent(
                     preferences.compactMode = enabled
                 }
             )
+        }
+
+        // 字号档：整体缩放现有 5 级字阶，改完立刻整站生效（读的是 WearAppearance 的快照状态）
+        section(FontScaleSectionLabel)
+
+        FontScaleTier.values().forEach { tier ->
+            row(subItem = true) {
+                SettingsSubRadioRow(
+                    label = tier.label,
+                    subtitle = tier.percent,
+                    selected = FontScaleTier.nearest(WearAppearance.fontScale) == tier,
+                    onSelect = {
+                        applyFontScaleTier(context, tier)
+                        context.vibrateTick()
+                    }
+                )
+            }
+        }
+
+        // 强调色档：运行时覆盖，不是新令牌；未选中的档也用小色点把颜色先给出来
+        section(AccentSectionLabel)
+
+        AccentPreset.values().forEach { preset ->
+            row(subItem = true) {
+                SettingsSubRadioRow(
+                    label = preset.label,
+                    selected = AccentPreset.of(WearAppearance.accent) == preset,
+                    dotColor = preset.color,
+                    onSelect = {
+                        applyAccentPreset(context, preset)
+                        context.vibrateTick()
+                    }
+                )
+            }
         }
 
         section(stringResource(R.string.settings_appearance_matrix_header))
@@ -191,9 +211,4 @@ fun AppearanceContent(
     }
 }
 
-/** 主题模式三档的展示文案。 */
-private fun themeModeLabelRes(mode: ThemeMode): Int = when (mode) {
-    ThemeMode.SYSTEM -> R.string.settings_theme_system
-    ThemeMode.DARK -> R.string.settings_theme_dark
-    ThemeMode.LIGHT -> R.string.settings_theme_light
-}
+

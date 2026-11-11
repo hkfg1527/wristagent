@@ -174,11 +174,9 @@
     <string name="settings_providers_capacity">%1$d/%2$d</string>
     <string name="settings_providers_rename_title">Profile name</string>
     <string name="settings_providers_rename_placeholder">Name this profile</string>
-    <string name="settings_ui_and_beta_header">Interface &amp; beta</string>
+    <string name="settings_ui_and_beta_header">Interface &amp; motion</string>
     <string name="settings_animations">Animation effects</string>
     <string name="settings_animations_secondary">Off stops matrix breathing, shockwave and button springs</string>
-    <string name="settings_vision_beta">Image recognition (beta)</string>
-    <string name="settings_vision_beta_secondary">Entry only: the recognition service is not wired up yet</string>
 <!-- 网络体检：九项检查 + 修复预案 -->
     <string name="settings_netdiag_title">Network Check</string>
     <string name="settings_netdiag_subtitle">Diagnose school or complex networks and try to fix them</string>
@@ -335,12 +333,6 @@
     <string name="settings_appearance">Appearance &amp; Matrix</string>
     <string name="settings_sub_appearance">Appearance &amp; Dot Matrix</string>
     <string name="settings_appearance_header">Theme</string>
-    <string name="settings_appearance_pure_black">Pure black background</string>
-    <string name="settings_appearance_pure_black_value">Always on · tokens fixed</string>
-    <string name="settings_appearance_theme">Theme mode</string>
-    <string name="settings_theme_system">Follow system</string>
-    <string name="settings_theme_dark">Dark</string>
-    <string name="settings_theme_light">Light</string>
     <string name="settings_appearance_compact">Compact mode</string>
     <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
     <string name="settings_appearance_matrix_header">Dot matrix</string>
@@ -375,4 +367,50 @@
     <string name="settings_sub_agent">Sub-agent mode</string>
     <string name="settings_sub_agent_secondary">Effective in expert mode only</string>
     <string name="settings_sub_agent_requires_expert">Expert mode only</string>
+    <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
+    <string name="settings_context_turns">Context turns</string>
+    <string name="settings_compress_threshold">Compress threshold</string>
+    <string name="settings_context_budget">Context budget</string>
+    <string name="settings_context_budget_value">Compress after %1$d of %2$d messages</string>
+
+    <string name="settings_approval_policy">Tool approval</string>
+    <string name="settings_approval_always">Confirm every call</string>
+    <string name="settings_approval_risky">Confirm risky calls only</string>
+    <string name="settings_approval_never">Never confirm</string>
+
+    <string name="settings_sandbox_level">Sandbox level</string>
+    <string name="settings_sandbox_read_only">Read only</string>
+    <string name="settings_sandbox_workspace">Workspace</string>
+    <string name="settings_sandbox_full">Full access</string>
+
+    <string name="settings_sub_gesture">Gestures &amp; side key</string>
+    <string name="settings_gesture_long_press">Long press</string>
+    <string name="settings_gesture_double_tap">Double tap</string>
+    <string name="settings_gesture_side_short">Side key short</string>
+    <string name="settings_gesture_side_long">Side key long</string>
+    <string name="settings_gesture_none">Unbound</string>
+    <string name="settings_gesture_stop_turn">Stop current turn</string>
+    <string name="settings_gesture_switch_model">Switch model</string>
+    <string name="settings_gesture_forget_remembered">Forget remembered commands</string>
+    <string name="settings_gesture_bound_count">%1$d bound</string>
+    <string name="settings_gesture_hint">Each binding maps to one real action; unbound stays a grey dot</string>
+
+    <string name="settings_sub_transfer">Config export / import</string>
+    <string name="settings_transfer_header">Settings snapshot</string>
+    <string name="settings_transfer_export">Copy snapshot to clipboard</string>
+    <string name="settings_transfer_import">Paste snapshot</string>
+    <string name="settings_transfer_dialog_title">Paste snapshot JSON</string>
+    <string name="settings_transfer_placeholder">version 1 · settings { ... }</string>
+    <string name="settings_transfer_exported">Snapshot copied</string>
+    <string name="settings_transfer_imported">Imported %1$d settings</string>
+    <string name="settings_transfer_invalid">Malformed snapshot, nothing written</string>
+    <string name="settings_transfer_hint">Portable settings only; API keys never leave the device</string>
+
+    <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
+    <string name="settings_remembered_header">Approval allow-list</string>
+    <string name="settings_remembered_title">Remembered commands</string>
+    <string name="settings_remembered_count">%1$d of %2$d</string>
+    <string name="settings_remembered_full">List is full: new "remember" calls are refused until you forget some</string>
+    <string name="settings_remembered_forget">Forget all remembered commands</string>
+    <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
 </resources>

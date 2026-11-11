@@ -7,11 +7,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
+import com.example.myapplication.presentation.ui.settings.AppearanceBootstrap
+import com.example.myapplication.presentation.ui.settings.WearAppearance
 
 /**
  * Wear 设计令牌：颜色、圆角、间距、尺寸的唯一来源。
@@ -145,51 +149,116 @@ object Wear {
     }
 
     /**
+     * 运行时强调色：默认是令牌 [Palette.Accent]，可由主题（[LocalAccentColor]）或外观设置覆盖。
+     *
+     * 覆盖是"同一个 token 的运行时投影"，不是第 16 个色值：色板仍然只有 [Palette] 里那 15 个，
+     * PaletteAuditTest 数的常量一个没多。
+     */
+    val Accent: Color
+        @Composable @ReadOnlyComposable
+        get() = resolveAccent()
+
+    /**
      * 大标题/数字档：官方 displayMedium。
      *
-     * 这里的 TextStyle 只负责"官方字号 + 令牌色"的组合，字号本身来自 [MaterialTheme.typography]。
+     * 这里的 TextStyle 只负责"官方字号 + 令牌色"的组合，字号本身来自 [MaterialTheme.typography]，
+     * 再乘以当前字号档（[LocalFontScale] -> [WearAppearance.fontScale]）。
      */
     val TextDisplay: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.displayMedium.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.displayMedium.withWearFontScale()
+            .withTokenColor(Palette.TextPrimary)
 
     /** 页面标题档：官方 titleLarge。 */
     val TextDisplayTitle: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.titleLarge.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.titleLarge.withWearFontScale()
+            .withTokenColor(Palette.TextPrimary)
 
     /** 标题档：官方 titleMedium。 */
     val TextTitle: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.titleMedium.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.titleMedium.withWearFontScale()
+            .withTokenColor(Palette.TextPrimary)
 
     /** 正文档：官方 bodyMedium。 */
     val TextBody: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.bodyMedium.withWearFontScale()
+            .withTokenColor(Palette.TextPrimary)
 
     /** 说明档：官方 bodySmall。 */
     val TextCaption: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodySmall.withTokenColor(Palette.TextSecondary)
+        get() = MaterialTheme.typography.bodySmall.withWearFontScale()
+            .withTokenColor(Palette.TextSecondary)
 
     /** 设置行标题档：上一档正文 + 主色（黑底 19.57:1），层级由字号而非"整体压暗"承担。 */
     val TextRowTitle: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyLarge.withTokenColor(Palette.TextPrimary)
+        get() = MaterialTheme.typography.bodyLarge.withWearFontScale()
+            .withTokenColor(Palette.TextPrimary)
 
     /** 设置行取值档：正文档 + 次色（黑底 6.94:1），小字也必须过 AA。 */
     val TextRowValue: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodyMedium.withTokenColor(Palette.TextSecondary)
+        get() = MaterialTheme.typography.bodyMedium.withWearFontScale()
+            .withTokenColor(Palette.TextSecondary)
 
     /** 等宽档：官方 bodySmall 换等宽字族，用于端点、密钥掩码与探针输出。 */
     val TextMono: TextStyle
         @Composable @ReadOnlyComposable
-        get() = MaterialTheme.typography.bodySmall.copy(
-            fontFamily = FontFamily.Monospace,
-            color = Palette.TextSecondary
-        )
+        get() = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+            .withWearFontScale()
+            .withTokenColor(Palette.TextSecondary)
+}
+
+/**
+ * 主题内可覆盖的强调色；null = 没有主题覆盖，读 [WearAppearance] 的运行时值。
+ *
+ * 用 [compositionLocalOf]（动态）而不是 static：强调色换掉时，读过它的组合必须重跑，
+ * 静态 local 不做失效传播，换色会停在旧像素上。
+ */
+val LocalAccentColor = compositionLocalOf<Color?> { null }
+
+/** 主题内可覆盖的字号缩放；null = 读 [WearAppearance] 的运行时值。 */
+val LocalFontScale = compositionLocalOf<Float?> { null }
+
+/**
+ * 当前强调色：主题覆盖优先，其次是外观设置的运行时值（默认即令牌 [Wear.Palette.Accent]）。
+ *
+ * 首次读取时把持久化值灌进内存（进程内只做一次），因此冷启动的聊天页也拿得到上次的选择。
+ */
+@Composable
+@ReadOnlyComposable
+internal fun resolveAccent(): Color {
+    AppearanceBootstrap.ensure(LocalContext.current)
+    return LocalAccentColor.current ?: WearAppearance.accent
+}
+
+/** 当前字号缩放，取法与 [resolveAccent] 一致。 */
+@Composable
+@ReadOnlyComposable
+internal fun resolveFontScale(): Float {
+    AppearanceBootstrap.ensure(LocalContext.current)
+    return LocalFontScale.current ?: WearAppearance.fontScale
+}
+
+/**
+ * 按当前字号档整体缩放一档字号：只乘系数，不新增档位常量。
+ *
+ * 行高同步缩放，否则放大中文正文会被原行高裁掉；两处都只在"数值已定"时才乘
+ * （[androidx.compose.ui.unit.TextUnit.Unspecified] 的 value 是 NaN，参与算术会抛异常）。
+ */
+@Composable
+@ReadOnlyComposable
+private fun TextStyle.withWearFontScale(): TextStyle {
+    val scale = resolveFontScale()
+    if (scale == 1f) return this
+    return copy(
+        fontSize = if (fontSize.value.isFinite()) fontSize * scale else fontSize,
+        lineHeight = if (lineHeight.value.isFinite()) lineHeight * scale else lineHeight
+    )
 }
 
 /** 把令牌色贴到官方字号上：字号只从 typography 来，颜色只从 Palette 来。 */

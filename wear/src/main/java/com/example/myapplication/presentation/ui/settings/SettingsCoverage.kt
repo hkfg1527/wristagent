@@ -33,9 +33,9 @@ enum class WebSettingsForm {
 data class WatchCoverage(val pageId: String, val rowId: String, val form: WebSettingsForm)
 
 /**
- * 网页 9 页 / 57 行到手表入口的逐行映射。
+ * 网页 9 页 / 56 行到手表入口的逐行映射。
  *
- * 57 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
+ * 56 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
  * 于是 [missingInWatch] 在真实清单上必须恒为空表 —— 这就是超集关系的证明。
  */
 object SettingsCoverage {
@@ -50,11 +50,10 @@ object SettingsCoverage {
         WatchCoverage("model", "topP", WebSettingsForm.WEB_ONLY),
         WatchCoverage("model", "topK", WebSettingsForm.WEB_ONLY),
         WatchCoverage("model", "frequencyPenalty", WebSettingsForm.WEB_ONLY),
-        // 本轮网页补齐的四行：表端各有对应开关（深度思考 / 托管搜索 / 上下文压缩 / 视觉输入）
+        // 本轮网页补齐的三行：表端各有对应开关（深度思考 / 托管搜索 / 上下文压缩）
         WatchCoverage("model", "defaultThinkingEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("model", "providerManagedSearchEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("model", "autoCompressContext", WebSettingsForm.SWITCH),
-        WatchCoverage("model", "visionBetaEnabled", WebSettingsForm.SWITCH),
 
         // provider · 供应商与网络：套用档案在表端可做，请求头与代理要键盘输入
         WatchCoverage("provider", "providerProfiles", WebSettingsForm.SELECT),
@@ -71,7 +70,8 @@ object SettingsCoverage {
         WatchCoverage("generate", "maxTokens", WebSettingsForm.SLIDER),
         WatchCoverage("generate", "customSystemPrompt", WebSettingsForm.TEXT_ENTRY),
         WatchCoverage("generate", "contextWindow", WebSettingsForm.WEB_ONLY),
-        WatchCoverage("generate", "historyCompressThreshold", WebSettingsForm.WEB_ONLY),
+        WatchCoverage("generate", "historyCompressThreshold", WebSettingsForm.SLIDER),
+        WatchCoverage("generate", "maxContextTurns", WebSettingsForm.SLIDER),
         WatchCoverage("generate", "truncationStrategy", WebSettingsForm.WEB_ONLY),
 
         // dialog · 对话与安全：记忆开关与安全模式可改，黑名单是多行规则列表
@@ -79,10 +79,9 @@ object SettingsCoverage {
         WatchCoverage("dialog", "memoryNoteCount", WebSettingsForm.WEB_ONLY),
         WatchCoverage("dialog", "actClearMemory", WebSettingsForm.ACTION),
         WatchCoverage("dialog", "subAgentEnabled", WebSettingsForm.SWITCH),
-        WatchCoverage("dialog", "sandboxLevel", WebSettingsForm.WEB_ONLY),
+        WatchCoverage("dialog", "sandboxLevel", WebSettingsForm.TRI_STATE),
         WatchCoverage("dialog", "dangerousCommandBlacklist", WebSettingsForm.WEB_ONLY),
         WatchCoverage("dialog", "securityMode", WebSettingsForm.TRI_STATE),
-        WatchCoverage("dialog", "mainInputType", WebSettingsForm.SWITCH),
 
         // voice · 语音：开关与引擎单选在表端，两个密钥走既有文本输入行
         WatchCoverage("voice", "asrEnabled", WebSettingsForm.SWITCH),
@@ -97,7 +96,7 @@ object SettingsCoverage {
         WatchCoverage("tools", "toolPowerModeEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("tools", "toolWeatherEnabled", WebSettingsForm.SWITCH),
         WatchCoverage("tools", "toolWebSearchEnabled", WebSettingsForm.SWITCH),
-        WatchCoverage("tools", "toolApprovalPolicy", WebSettingsForm.WEB_ONLY),
+        WatchCoverage("tools", "toolApprovalPolicy", WebSettingsForm.TRI_STATE),
         WatchCoverage("tools", "mcpServers", WebSettingsForm.WEB_ONLY),
 
         // interface · MCP 与界面：MCP 开关与点阵间距可改，端点只回显

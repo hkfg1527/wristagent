@@ -82,10 +82,10 @@ class WebOnlyRowTest {
 
     @Test
     fun webOnlyAndReadOnlyRowsAreNeverInteractive() {
-        // 网页专属 18 行 + 只读回显 4 行：表端一律不可点
+        // 网页专属 15 行（本轮 3 行提升为表端可写）+ 只读回显 4 行：表端一律不可点
         val webOnly = SettingsCoverage.byForm(listOf(WebSettingsForm.WEB_ONLY))
         val readOnly = SettingsCoverage.byForm(listOf(WebSettingsForm.READ_ONLY))
-        assertEquals(18, webOnly.size)
+        assertEquals(15, webOnly.size)
         assertEquals(4, readOnly.size)
         (webOnly + readOnly).forEach { rowKey ->
             val form = SettingsCoverage.formOf(rowKey)!!
@@ -95,14 +95,14 @@ class WebOnlyRowTest {
 
     @Test
     fun everyWritableRowIsInteractive() {
-        // 补上另一半：35 行可写形态一个都不能落进只读行入口
+        // 补上另一半：37 行可写形态一个都不能落进只读行入口
         val writable = SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS)
-        assertEquals(35, writable.size)
+        assertEquals(37, writable.size)
         writable.forEach { rowKey ->
             val form = SettingsCoverage.formOf(rowKey)!!
             assertEquals(rowKey, RowInteractivity.INTERACTIVE, rowInteractivityOf(form))
         }
-        // 57 行全覆盖，没有既不可点也不可写的漏网形态
-        assertEquals(57, SettingsCoverage.entries.size)
+        // 56 行全覆盖，没有既不可点也不可写的漏网形态
+        assertEquals(56, SettingsCoverage.entries.size)
     }
 }

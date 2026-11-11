@@ -32,6 +32,8 @@ fun HyperParamsContent(
     var showReasoning by remember { mutableStateOf(preferences.showThoughtChain) }
     var defaultThinking by remember { mutableStateOf(preferences.defaultThinkingEnabled) }
     var effort by remember { mutableStateOf(ReasoningEffort.fromStored(preferences.reasoningEffort)) }
+    // 自定义 Token 输入框的开合：与阶梯滑轨并存，阶梯给常用值，输入框管任意值
+    var editingTokens by remember { mutableStateOf(false) }
 
     fun notifyChange() {
         onParamsChanged?.invoke(temp, maxTokens, isStream)
@@ -54,7 +56,21 @@ fun HyperParamsContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_hyper_params),
-        onBack = onBack
+        onBack = onBack,
+        overlay = {
+            if (editingTokens) {
+                SettingsTextDialog(
+                    title = stringResource(R.string.settings_max_tokens),
+                    initial = maxTokens.toString(),
+                    placeholder = TokensRangeHint,
+                    // 非数字 / 非正数：解析返回 null，原值一个字符都不动
+                    onValueChange = { raw ->
+                        SettingsValueMath.parseMaxTokens(raw)?.let { applyMaxTokens(it) }
+                    },
+                    onDismiss = { editingTokens = false }
+                )
+            }
+        }
     ) {
         row {
             SettingsSliderRow(
@@ -112,6 +128,15 @@ fun HyperParamsContent(
                 onValueChange = { raw ->
                     applyMaxTokens(SettingsValueMath.tokenAt(raw.roundToInt()))
                 }
+            )
+        }
+
+        // 阶梯之外必须还能落到任意值：否则用户被锁在 5 个档位上，属于"只能调到一半"的假开关
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_max_tokens) + CustomTokensSuffix,
+                value = maxTokens.toString(),
+                onClick = { editingTokens = true }
             )
         }
 
@@ -186,6 +211,13 @@ private fun reasoningEffortLabelRes(effort: ReasoningEffort): Int = when (effort
     ReasoningEffort.MEDIUM -> R.string.settings_reasoning_effort_medium
     ReasoningEffort.HIGH -> R.string.settings_reasoning_effort_high
 }
+
+/** 自定义入口的后缀：与阶梯滑轨并列，说明这一行是"自己填"。 */
+private const val CustomTokensSuffix = " · 自定义"
+
+/** 输入框提示只给合法区间：资源目录在本次禁止清单里，整句文案待补 strings_settings.xml。 */
+private val TokensRangeHint =
+    SettingsValueMath.MaxTokensMin.toString() + " – " + SettingsValueMath.MaxTokensMax
 
 /** 三档温度预设：与旧版 chip 完全相同的取值。 */
 private const val TempFast = 0.2f

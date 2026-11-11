@@ -2,6 +2,9 @@ package com.example.myapplication.presentation.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Shapes
@@ -81,13 +84,35 @@ val WearShapes: Shapes = Shapes(
     extraLarge = RoundedCornerShape(Wear.Radius.Card)
 )
 
-/** 设置页的 M3 主题壳：把令牌配色、官方字号阶梯与两档圆角一并灌进 [MaterialTheme]。 */
+/**
+ * 把运行时强调色换上主色槽位，其余槽位仍是令牌映射。
+ *
+ * 官方 M3 组件（滑轨、开关、按钮、分段开关）拿到的 primary 因此跟随用户选择的强调色；
+ * 外观设置只能换"一个"颜色，不能长出第二套配色体系。
+ */
+fun ColorScheme.withAccent(accent: Color): ColorScheme =
+    if (primary == accent) this else copy(primary = accent, onPrimaryContainer = accent)
+
+/**
+ * 设置页的 M3 主题壳：把令牌配色、官方字号阶梯与两档圆角一并灌进 [MaterialTheme]，
+ * 并把运行时强调色 / 字号档作为可覆盖点下发（[LocalAccentColor] / [LocalFontScale]）。
+ *
+ * 这两个 local 是"主题内的覆盖点"：没有主题包裹的地方（主界面、引导页）读到的仍是
+ * [WearAppearance] 的运行时值，所以外观设置在整台表上都生效，而不是只在设置页里生效。
+ */
 @Composable
 fun WearMaterialTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = WearMaterialColorScheme,
-        typography = WearTypography,
-        shapes = WearShapes,
-        content = content
-    )
+    val accent = resolveAccent()
+    val fontScale = resolveFontScale()
+    CompositionLocalProvider(
+        LocalAccentColor provides accent,
+        LocalFontScale provides fontScale
+    ) {
+        MaterialTheme(
+            colorScheme = remember(accent) { WearMaterialColorScheme.withAccent(accent) },
+            typography = WearTypography,
+            shapes = WearShapes,
+            content = content
+        )
+    }
 }

@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
@@ -37,8 +39,9 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.GestureBindings
+import com.example.myapplication.agent.GestureEvent
 import com.example.myapplication.agent.ProviderProfileBook
-import com.example.myapplication.agent.contract.RightButtonAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.net.NetworkDiagnosisStore
@@ -58,8 +61,8 @@ import com.example.myapplication.presentation.ui.settings.SecurityGuardrailConte
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
 import com.example.myapplication.presentation.ui.settings.SettingsExitController
+import com.example.myapplication.presentation.ui.settings.SettingsFocusStyle
 import com.example.myapplication.presentation.ui.settings.SettingsNavRow
-import com.example.myapplication.presentation.ui.settings.SettingsRowDivider
 import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.SettingsEdgeScrim
 import com.example.myapplication.presentation.ui.settings.SettingsSectionHeader
@@ -68,16 +71,17 @@ import com.example.myapplication.presentation.ui.settings.settingsSideInset
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
+import com.example.myapplication.presentation.ui.settings.GestureBindingsContent
 import com.example.myapplication.presentation.ui.settings.ProviderProfilesContent
 import com.example.myapplication.presentation.ui.settings.RootContentTopPadding
 import com.example.myapplication.presentation.ui.settings.RootTitleTopPadding
 import com.example.myapplication.presentation.ui.settings.AboutContent
 import com.example.myapplication.presentation.ui.settings.PromptContextContent
+import com.example.myapplication.presentation.ui.settings.SettingsTransferContent
 import com.example.myapplication.presentation.ui.settings.ToolsMcpContent
 import com.example.myapplication.presentation.ui.settings.VoiceAsrContent
 import com.example.myapplication.presentation.ui.settings.PullDownDismissContainer
 import com.example.myapplication.presentation.ui.settings.isAtScrollTop
-import com.example.myapplication.presentation.ui.settings.WingShortcutContent
 import com.example.myapplication.presentation.ui.settings.rememberSettingsExitController
 import com.example.myapplication.presentation.ui.settings.rememberSettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.vibrateTick
@@ -87,11 +91,18 @@ import com.example.myapplication.voice.AsrProviderId
 
 /**
  * Wear OS 端侧 AI 设置中心
- * - 扁平单行列表：每行只有标题 / 当前值 / 行尾标记三个元素，行间只有 1dp 分隔线，没有逐行卡片
- * - 全屏只有一个视觉重点：顶部的页面标题；其余行标题统一 secondary，值与箭头统一 muted
- * - 所有取值来自 Wear 设计令牌，字号全部落在官方 M3E 阶梯上，可点区域不小于 44dp，行间距 8dp
- * - ScalingLazyColumn 圆屏曲率自适应与物理表冠联动
- * - 进出场为逐行浮动：每行按自己的内容序号延迟浮起/沉下，容器只做极轻淡入淡出
+ *
+ * 版面契约（与 [SettingsDesignMath] 一一对应）：
+ * - **块居中、行内左/右两槽**：所有行共用 176dp 内容宽（小于 184dp 安全宽），整块在圆内居中；
+ *   行内部标签左对齐到左槽线、取值右对齐到右槽线，两条槽线全页误差 0 —— 既保留可扫读的左边缘，
+ *   重心又仍在圆的中心（既不"每行都居中"，也不"整页都左对齐"）；
+ * - **颜色只有三个用途**：组标题中性、选中态 Accent、危险选项的选中圆点 Danger；
+ *   Success / Warning 只允许出现在 6dp 状态点上，且一页最多一处；
+ * - **层级靠位置与字重**：组标题 12sp / Medium，行标签与取值为同一档 15sp，
+ *   子项只把左槽线右移 12dp，不降字号；
+ * - **唯一的焦点**：顶部当前模型名（18sp / Medium），其余一律普通行；
+ * - **线只有一种**：子项组上沿一根 1px、从右槽线左收 24dp 的短线，每页线数 == 子项组数；
+ * - 进出场为逐行浮动：每行按自己的内容序号延迟浮起/沉下，容器只做极轻淡入淡出。
  */
 @Composable
 fun SettingsScreen(
@@ -105,7 +116,7 @@ fun SettingsScreen(
     var currentModel by remember { mutableStateOf(preferences.modelName) }
     var currentBaseUrl by remember { mutableStateOf(preferences.baseUrl) }
     var currentSecurityMode by remember { mutableStateOf(preferences.securityMode) }
-    var currentRightAction by remember { mutableStateOf(preferences.rightButtonAction) }
+    var currentGestures by remember { mutableStateOf(preferences.gestureBindings()) }
     var mcpEndpoint by remember { mutableStateOf(preferences.mcpEndpoint) }
     var isMcpEnabled by remember { mutableStateOf(preferences.isMcpEnabled) }
     var customPrompt by remember { mutableStateOf(preferences.customSystemPrompt) }
@@ -113,9 +124,8 @@ fun SettingsScreen(
     var currentMaxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
     var currentStreamMode by remember { mutableStateOf(preferences.streamMode) }
 
-    // 动画特效与图片识别内测：本页持有唯一真值，改完立刻落盘并投进 LocalAnimationsEnabled
+    // 动画特效：本页持有唯一真值，改完立刻落盘并投进 LocalAnimationsEnabled
     var animationsEnabled by remember { mutableStateOf(preferences.animationsEnabled) }
-    var visionBetaEnabled by remember { mutableStateOf(preferences.visionBetaEnabled) }
 
     // 供应商 Profile：根页只显示当前选中的那套名字，列表本身在子页里
     var providerBook by remember { mutableStateOf(preferences.providerProfiles()) }
@@ -136,7 +146,7 @@ fun SettingsScreen(
         currentModel = snapshot.modelName
         currentBaseUrl = snapshot.baseUrl
         currentSecurityMode = snapshot.securityMode
-        currentRightAction = snapshot.rightButtonAction
+        currentGestures = snapshot.gestureBindings
         mcpEndpoint = snapshot.mcpEndpoint
         isMcpEnabled = snapshot.isMcpEnabled
         customPrompt = snapshot.customSystemPrompt
@@ -144,7 +154,6 @@ fun SettingsScreen(
         currentMaxTokens = snapshot.maxOutputTokens
         currentStreamMode = snapshot.streamMode
         animationsEnabled = snapshot.animationsEnabled
-        visionBetaEnabled = snapshot.visionBetaEnabled
         providerBook = snapshot.providerBook
         asrEnabled = snapshot.asrEnabled
         asrProviderKey = snapshot.asrProviderKey
@@ -263,8 +272,18 @@ fun SettingsScreen(
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
                     autoCentering = null
                 ) {
-                    // 页面标题已移除：它不承载信息（滑进来就知道在设置页），却占掉 25dp 高度
-                    // 并抢走视觉第一落点，属于层级倒置。返回靠手势与系统返回键。
+                    // ===== 全屏唯一的焦点：当前模型 =====
+                    // 页面标题不承载信息（滑进来就知道在设置页），焦点让给"现在用的是哪个模型"：
+                    // 18sp / Medium 比任何一行都重，眯眼看时页面因此有唯一落点。
+                    item {
+                        RootContentRow(index = 0, stagger = rowStagger, exit = exit) {
+                            SettingsFocusBlock(
+                                modelName = currentModel,
+                                baseUrl = currentBaseUrl,
+                                configured = apiKeyConfigured
+                            )
+                        }
+                    }
 
                     // ================= 模型 =================
                     item {
@@ -276,7 +295,7 @@ fun SettingsScreen(
                     // 1. 模型与服务：取值改状态词（模型名进子页），行尾不再挂状态点 ——
                     //    旧版取值是裸模型名，把标题压到折行、自己又被截成 "deepseek-…"
                     item {
-                        RootSettingRow(index = 2, stagger = rowStagger, exit = exit, dividerAbove = false) {
+                        RootContentRow(index = 2, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_and_service),
                                 value = if (apiKeyConfigured) {
@@ -294,7 +313,7 @@ fun SettingsScreen(
 
                     // 2. 供应商：多套 baseUrl / apiKey / 模型的一键套用，套用即写回单值偏好
                     item {
-                        RootSettingRow(index = 3, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 3, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_provider_profiles),
                                 value = providerBook.active()?.name
@@ -309,7 +328,7 @@ fun SettingsScreen(
 
                     // 3. 模型参数：温度文案走资源，en/zh 同步
                     item {
-                        RootSettingRow(index = 4, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_model_params),
                                 value = stringResource(R.string.settings_temperature_value, currentTemp),
@@ -330,7 +349,7 @@ fun SettingsScreen(
 
                     // 4. 语音：语音转写与"语音与唤醒"合并成一行，转写状态做取值，唤醒入口在子页里
                     item {
-                        RootSettingRow(index = 6, stagger = rowStagger, exit = exit, dividerAbove = false) {
+                        RootContentRow(index = 6, stagger = rowStagger, exit = exit) {
                             val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_voice_entry),
@@ -351,7 +370,7 @@ fun SettingsScreen(
 
                     // 5. 内置工具与 MCP：取值改"全部启用"，不再暴露 6/6 这种内部计数
                     item {
-                        RootSettingRow(index = 7, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 7, stagger = rowStagger, exit = exit) {
                             val enabledCount = listOf(
                                 preferences.toolDeviceStatusEnabled,
                                 preferences.toolVibrateEnabled,
@@ -384,7 +403,7 @@ fun SettingsScreen(
 
                     // 6. 提示词：系统提示词与会话上下文合并成一行，两者都是同一层的"模型行为"配置
                     item {
-                        RootSettingRow(index = 9, stagger = rowStagger, exit = exit, dividerAbove = false) {
+                        RootContentRow(index = 9, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_prompt_context),
                                 value = if (customPrompt.isBlank()) {
@@ -402,7 +421,7 @@ fun SettingsScreen(
 
                     // 8. 操作安全防线
                     item {
-                        RootSettingRow(index = 13, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 10, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_remote_console_title),
                                 value = if (consoleServer.isRunning) ":" + consoleServer.port else null,
@@ -415,7 +434,7 @@ fun SettingsScreen(
                     }
 
                     item {
-                        RootSettingRow(index = 10, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 11, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_security_policy),
                                 value = when (currentSecurityMode) {
@@ -433,7 +452,7 @@ fun SettingsScreen(
 
                     // 7. 外观与点阵：取值原先是"matrixSpacingDp"这种内部实现量，已删除
                     item {
-                        RootSettingRow(index = 11, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 12, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_appearance),
                                 onClick = {
@@ -446,7 +465,7 @@ fun SettingsScreen(
 
                     // 8. 关于：快捷操作、重看引导、特权执行、网络体检四条低频项收进一层
                     item {
-                        RootSettingRow(index = 12, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 13, stagger = rowStagger, exit = exit) {
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_about),
                                 onClick = {
@@ -457,9 +476,22 @@ fun SettingsScreen(
                         }
                     }
 
+                    // 配置导入导出：整份可移植设置的 JSON 快照，能复制出来也能粘贴回去
+                    item {
+                        RootContentRow(index = 14, stagger = rowStagger, exit = exit) {
+                            SettingsNavRow(
+                                title = stringResource(R.string.settings_sub_transfer),
+                                onClick = {
+                                    context.vibrateTick()
+                                    activeDialog = SettingsSubDialog.TRANSFER
+                                }
+                            )
+                        }
+                    }
+
                     // 第三条退出路径：不依赖手势与系统键的显式"完成返回"
                     item {
-                        RootSettingRow(index = 13, stagger = rowStagger, exit = exit, dividerAbove = true) {
+                        RootContentRow(index = 15, stagger = rowStagger, exit = exit) {
                             SettingsActionButton(
                                 label = stringResource(R.string.settings_done_back),
                                 tone = Tone.MUTED,
@@ -519,14 +551,9 @@ fun SettingsScreen(
                                 preferences.mcpEndpoint = ep
                             },
                             animationsEnabled = animationsEnabled,
-                            visionBetaEnabled = visionBetaEnabled,
                             onToggleAnimations = { enabled ->
                                 animationsEnabled = enabled
                                 preferences.animationsEnabled = enabled
-                            },
-                            onToggleVisionBeta = { enabled ->
-                                visionBetaEnabled = enabled
-                                preferences.visionBetaEnabled = enabled
                             }
                         )
                         SettingsSubDialog.REMOTE_CONSOLE -> RemoteConsoleContent(
@@ -578,13 +605,18 @@ fun SettingsScreen(
                                 )
                             }
                         )
+                        SettingsSubDialog.TRANSFER -> SettingsTransferContent(
+                            preferences = preferences,
+                            onApplied = { syncFromPreferences() },
+                            onBack = { activeDialog = null }
+                        )
                         SettingsSubDialog.ABOUT -> {
                             // 网络体检结论与根页同源：进来时读一次最近结果，子页里再重新体检
                             val netDiagSummary = remember(activeDialog) {
                                 NetworkDiagnosisStore(context.applicationContext).lastSummary()
                             }
                             AboutContent(
-                                sideKeyValue = stringResource(R.string.settings_side_key_value),
+                                sideKeyValue = gestureSummary(currentGestures),
                                 privilegeValue = privilegeStatus.activeBackend.name,
                                 netDiagValue = when {
                                     netDiagSummary == null ->
@@ -599,12 +631,11 @@ fun SettingsScreen(
                                 onBack = { activeDialog = null },
                                 onReplayOnboarding = { requestExit(onRestartOnboarding) },
                                 sideKeyPage = { dismiss ->
-                                    WingShortcutContent(
-                                        currentAction = currentRightAction,
-                                        onBack = dismiss,
-                                        onSelect = { action ->
-                                            currentRightAction = action
-                                            preferences.rightButtonAction = action
+                                    GestureBindingsContent(
+                                        preferences = preferences,
+                                        onBack = {
+                                            currentGestures = preferences.gestureBindings()
+                                            dismiss()
                                         }
                                     )
                                 },
@@ -648,10 +679,25 @@ fun SettingsScreen(
 }
 
 /**
- * 根页的组标题行：与子页 [SettingsSectionHeader] 同一档，整行参与逐行浮动。
+ * 关于页里「侧键」那一行的取值：直接由四条绑定算出来。
  *
- * 组标题居中由共享实现承担：用户要求设置主页面所有文字从中心排版，[SettingsSectionHeader]
- * 因此默认 center = true —— 根页三处调用都吃这个默认值，不再各自写一遍对齐方式。
+ * 绑定全空时显示"未绑定"，任何一条绑上就列出已绑数量 —— 这一行因此永远反映真实可执行的动作，
+ * 而不是一个历史上从没有任何消费点的装饰值（旧 rightButtonAction 就是那种装饰值）。
+ */
+@Composable
+private fun gestureSummary(bindings: GestureBindings): String {
+    val bound = GestureEvent.values().count {
+        bindings.bindingFor(it) != com.example.myapplication.agent.GestureAction.NONE
+    }
+    return if (bound == 0) {
+        stringResource(R.string.settings_gesture_none)
+    } else {
+        stringResource(R.string.settings_gesture_bound_count, bound)
+    }
+}
+
+/**
+ * 根页的组标题行：与子页 [SettingsSectionHeader] 完全同构（12sp / TextMuted / Medium，左对齐）。
  */
 @Composable
 private fun RootSectionRow(
@@ -660,32 +706,75 @@ private fun RootSectionRow(
     exit: SettingsExitController,
     content: @Composable () -> Unit
 ) {
-    SettingsStaggeredRow(index = index, stagger = stagger, exit = exit) {
+    SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
         content()
     }
 }
 
 /**
- * 根页的一行：与子页骨架同构 —— 可选的 1dp 分隔线 + 行内容，整体参与逐行浮动。
+ * 根页的内容行：**没有分隔线**，只有一块 176dp 宽的行内容，整行参与逐行浮动。
  *
- * 分隔线画在同一列里而不是单独的列表项：单独的列表项会打断 [SettingsStaggeredRow] 的序号，
- * 也会在圆屏上被自动居中单独缩放。
+ * 组与组之间靠组标题上方那 24dp 留白分界；同级行之间只靠 4dp 行距与 48dp 行高。
+ * 线留给子项组（见 [SettingsSubItemDivider]），根页一条线都没有。
  */
 @Composable
-private fun RootSettingRow(
+private fun RootContentRow(
     index: Int,
     stagger: SettingsRowStaggerState,
     exit: SettingsExitController,
-    dividerAbove: Boolean,
     content: @Composable () -> Unit
 ) {
-    SettingsStaggeredRow(index = index, stagger = stagger, exit = exit) {
-        Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
-            if (dividerAbove) SettingsRowDivider()
-            content()
-        }
+    SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
+        Box(modifier = Modifier.widthIn(max = SettingsContentWidth)) { content() }
     }
 }
+
+/**
+ * 根页唯一的视觉焦点：当前模型名 + 下面一行 baseUrl（无 baseUrl 时退回配置状态）。
+ *
+ * 18sp / Medium / TextPrimary 比页面上任何一行都重，且只此一处 ——
+ * 一屏一个焦点的做法替代了"每行等权、眯眼看是一整片灰块"。
+ * 焦点块不可点：它只是把"现在在用哪个模型"抬出来，改动路径仍是下面「模型与服务」那一行。
+ */
+@Composable
+private fun SettingsFocusBlock(modelName: String, baseUrl: String, configured: Boolean) {
+    val title = if (modelName.isBlank()) {
+        stringResource(R.string.settings_status_unconfigured)
+    } else {
+        modelName
+    }
+    val subtitle = if (baseUrl.isBlank()) {
+        stringResource(
+            if (configured) R.string.settings_status_configured else R.string.settings_status_unconfigured
+        )
+    } else {
+        baseUrl
+    }
+    Column(
+        modifier = Modifier
+            .widthIn(max = SettingsContentWidth)
+            .fillMaxWidth()
+            .padding(top = Wear.Space.Sm, bottom = Wear.Space.Xs)
+    ) {
+        BasicText(
+            text = title,
+            style = SettingsFocusStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(Wear.Space.Xs))
+        // 小字回到 12sp 那一档：焦点下面的一切都必须明显更轻
+        BasicText(
+            text = subtitle,
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** 根页参与逐行动画的行数：焦点块 1 + 组标题 3 + 分区入口 11 + 末尾「完成返回」1。 */
+private const val RootRowCount = 16
 
 /**
  * 根页 remember 缓存的全部偏好：初始化与「清空记忆后回读」共用同一份快照。
@@ -698,7 +787,7 @@ internal data class SettingsRootSnapshot(
     val modelName: String,
     val baseUrl: String,
     val securityMode: SecurityMode,
-    val rightButtonAction: RightButtonAction,
+    val gestureBindings: GestureBindings,
     val mcpEndpoint: String,
     val isMcpEnabled: Boolean,
     val customSystemPrompt: String,
@@ -706,7 +795,6 @@ internal data class SettingsRootSnapshot(
     val maxOutputTokens: Int,
     val streamMode: Boolean,
     val animationsEnabled: Boolean,
-    val visionBetaEnabled: Boolean,
     val asrEnabled: Boolean,
     val asrProviderKey: String,
     val asrKeyReady: Boolean,
@@ -726,7 +814,7 @@ internal fun AgentPreferences.rootSnapshot(): SettingsRootSnapshot {
         modelName = modelName,
         baseUrl = baseUrl,
         securityMode = securityMode,
-        rightButtonAction = rightButtonAction,
+        gestureBindings = gestureBindings(),
         mcpEndpoint = mcpEndpoint,
         isMcpEnabled = isMcpEnabled,
         customSystemPrompt = customSystemPrompt,
@@ -734,7 +822,6 @@ internal fun AgentPreferences.rootSnapshot(): SettingsRootSnapshot {
         maxOutputTokens = maxOutputTokens,
         streamMode = streamMode,
         animationsEnabled = animationsEnabled,
-        visionBetaEnabled = visionBetaEnabled,
         asrEnabled = asr.enabled,
         asrProviderKey = asrProvider,
         asrKeyReady = asr.hasBaiduCredentials,

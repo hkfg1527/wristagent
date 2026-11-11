@@ -7,7 +7,6 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -79,6 +78,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -87,8 +87,6 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.RadioButton
-import androidx.wear.compose.material3.RadioButtonDefaults
 import androidx.wear.compose.material3.Slider
 import androidx.wear.compose.material3.SliderDefaults
 import androidx.wear.compose.material3.SwitchButton
@@ -99,8 +97,14 @@ import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
-/** 所有设置页共用的内容宽度上限：按圆周弦长推导，硬上限 168dp。 */
-val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
+/**
+ * 所有设置页共用的固定内容宽度：176dp。
+ *
+ * 不再用"屏宽减边距"推出来的动态值：宽度固定 + 两侧等量内缩，整块在圆内居中，
+ * 而行内左右两条槽线（标签起笔 / 取值收笔）在全页任何一行都落在同一个 x 上，误差 0。
+ * 176dp 比 184dp 安全宽窄 8dp，圆边处留出呼吸。
+ */
+val SettingsContentWidth: Dp = SettingsDesignMath.ContentWidthDp.dp
 
 /**
  * 当前屏宽下的内容盒左右内缩（dp）：弦长推出来的值，真机 233dp 屏为 32.5dp。
@@ -110,7 +114,7 @@ val SettingsContentWidth: Dp = SettingsLayoutMath.ContentWidthDp.dp
 @Composable
 fun settingsSideInset(): Dp {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    return SettingsLayoutMath.sideInsetDp(screenWidthDp.toFloat()).dp
+    return SettingsDesignMath.sideInsetDp(screenWidthDp.toFloat()).dp
 }
 
 /** 单行 44dp 触控热区之间的最小留白。 */
@@ -124,11 +128,8 @@ val SettingsItemGap: Dp = SettingsSpacingMath.ItemGapDp.dp
 /** 组标题下方到本组首行之间的留白，也是"每组第一行上方"的那一段空气。 */
 private val SettingsSectionHeaderBottomGap: Dp = SettingsSpacingMath.SectionHeaderBottomDp.dp
 
-/** 行内：取值与行尾标记（箭头 / 状态色块）之间的留白。 */
-private val SettingsValueTailGap: Dp = SettingsSpacingMath.ValueToTailDp.dp
-
-/** 分区之间的间距：上一区末行与本区标题之间留 16dp。 */
-private val SettingsSectionGap = Wear.Space.Lg
+/** 组间留白：24dp，恒为组内行距（4dp）的 6 倍 —— 亲密性比例必须 >= 2。 */
+private val SettingsSectionGap = SettingsDesignMath.SectionGapDp.dp
 
 /**
  * 根页列表顶部内边距：等于顶部渐变遮罩高度。
@@ -205,14 +206,23 @@ enum class SettingsSubDialog {
     /** 提示词中转页：系统提示词 + 会话与上下文合并后的根页入口。 */
     PROMPT_CONTEXT,
 
-    /** 关于中转页：快捷操作 / 重看引导 / 特权执行 / 网络体检的根页入口。 */
-    ABOUT
+    /** 关于中转页：手势与侧键 / 重看引导 / 特权执行 / 网络体检的根页入口。 */
+    ABOUT,
+
+    /** 配置导入导出：整份可移植设置的 JSON 快照，可复制也可粘贴回来。 */
+    TRANSFER
 }
 
-/** 一条已登记的行：分区标题与内容行必须区分，因为只有内容行之间才画分隔线。 */
+/**
+ * 一条已登记的行：分区标题与内容行必须区分，因为只有内容行才会被排进间距节奏。
+ *
+ * [isSubItem] 表示它是某个组下的子项：整页唯一的线画在子项组的**上沿**，
+ * 于是"线数 == 子项组数"，而同级行之间一根线都没有。
+ */
 internal class SettingsRowEntry(
     val isSection: Boolean,
-    val content: @Composable () -> Unit
+    val content: @Composable () -> Unit,
+    val isSubItem: Boolean = false
 )
 
 /**
@@ -223,9 +233,9 @@ internal class SettingsRowEntry(
 class SettingsRows internal constructor() {
     internal val items = mutableListOf<SettingsRowEntry>()
 
-    /** 登记一行内容。 */
-    fun row(content: @Composable () -> Unit) {
-        items.add(SettingsRowEntry(isSection = false, content = content))
+    /** 登记一行内容；[subItem] = true 表示它是某个组下的子项，用更短的分隔线。 */
+    fun row(subItem: Boolean = false, content: @Composable () -> Unit) {
+        items.add(SettingsRowEntry(isSection = false, content = content, isSubItem = subItem))
     }
 
     /** 登记一行分组标题。 */
@@ -237,10 +247,11 @@ class SettingsRows internal constructor() {
 /**
  * 所有子页共用的页面骨架。
  *
- * 版面契约（与 [SettingsLayoutMath] 一一对应）：
+ * 版面契约（与 [SettingsDesignMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
- * - 中部：ScalingLazyColumn，内容宽度上限 168dp，行间距 [SettingsItemGap]，行与行之间只有一条 1dp 分隔线；
- * - 分区间距 16dp，只由 [SettingsSectionHeader] 的顶部留白提供；
+ * - 中部：ScalingLazyColumn，内容宽度固定 [SettingsContentWidth]（176dp），行间距 [SettingsItemGap]，
+ *   行之间**不画线**；只有子项组上沿一根 [SettingsSubItemDivider]；
+ * - 组间距 24dp，只由 [SettingsSectionHeader] 的顶部留白提供；
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
  */
@@ -324,11 +335,15 @@ fun SettingsSubPage(
             ) { index ->
                 val entry = content[index]
                 val previous = content.getOrNull(index - 1)
-                // 只有"上一条也是内容行"时才加分隔线：分区标题与紧随其后的首行之间不画。
-                val needsDivider = !entry.isSection && previous != null && !previous.isSection
+                // 全页只有一种线，且每个子项组只有一根：画在子项组的上沿。
+                // 同级行之间不画线，组的分界由组标题上方 24dp 留白承担（线数 == 子项组数）。
+                val isSubItemGroupStart = SettingsRowComposition.isSubItemGroupStart(
+                    previousIsSubItem = previous?.isSubItem,
+                    isSubItem = entry.isSubItem
+                )
                 SettingsStaggeredRow(index = index + 1, rowCount = rowCount, stagger = stagger, exit = exit) {
                     Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
-                        if (needsDivider) SettingsRowDivider()
+                        if (isSubItemGroupStart) SettingsSubItemDivider()
                         entry.content()
                     }
                 }
@@ -392,18 +407,12 @@ fun SettingsEdgeScrim(modifier: Modifier = Modifier) {
     )
 }
 
-/** 行间 1dp 分隔线：页面里唯一的"容器"，取代逐行卡片。 */
-@Composable
-fun SettingsRowDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(SettingsDividerThickness)
-            // 分隔线内缩与行文字同一条左边界，不再用独立的 HairlineInset
-            .padding(horizontal = SettingsRowInset)
-            .background(Wear.Palette.Border)
-    )
-}
+/**
+ * 行与行之间**不画线**：组内靠 4dp 行距与 48dp 行高留白分开。
+ *
+ * 旧的整行 1dp 分隔线已删除 —— 十几行各挂一根线，页面读起来是一张表格而不是一组设置。
+ * 全页只保留一种线：子项组的 [SettingsSubItemDivider]，且每个子项组只有一根。
+ */
 
 /**
  * 子页头部：44dp 返回键 + 页面标题，整块压在曲面时钟带以下。
@@ -426,7 +435,8 @@ private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
             modifier = Modifier
                 .widthIn(min = SettingsLayoutMath.SubtitleMinWidthDp.dp)
                 .weight(1f),
-            style = Wear.TextDisplayTitle,
+            // 子页标题是本屏唯一的焦点：18sp / Medium，与根页的当前模型名同一档
+            style = SettingsFocusStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -468,67 +478,35 @@ fun SettingsBackButton(onClick: () -> Unit) {
 }
 
 /**
- * 分组标题：Caption 级小标题，主色。
+ * 组标题：12sp / TextMuted / 字重 Medium / 字距 +0.5sp，左对齐到左槽线。
  *
- * 顶部 16dp 是**分区间距**的唯一来源；下方 12dp 是"每组第一行上方"的那段空气，
- * 比行内留白更硬，让标题明显属于它下面那一组，而不是悬在两组之间。
- * 用主色而不是正文色：标题本身是结构信息，行内容已经全部降为 secondary/muted。
- *
- * [center] 默认 true：整页的文字轴已经居中，组标题留在左边会成为唯一的例外。
- * 需要左对齐时显式传 false，既有调用点一个都不用改。
+ * - 中性色：强调色全页只留给"选中值 / 当前状态"这一处语义，组标题不属于它；
+ * - 没有下方那条强调色细线，也没有下划线：一屏三根装饰线正是"AI 拼的"来源，
+ *   组的边界改由 24dp 留白承担（组内行距 4dp，比例 6:1）；
+ * - 上方 24dp 是**组间距**的唯一来源，下方 8dp 是标题与本组首行之间。
  */
 @Composable
-fun SettingsSectionHeader(text: String, center: Boolean = false) {
-    if (center) {
-        BasicText(
-            text = text,
-            modifier = Modifier
-                .widthIn(max = SettingsContentWidth)
-                .fillMaxWidth()
-                .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        return
-    }
-    // 不再画前置短线：那 12dp 横线 + 8dp 空隙把标题文字推到 20dp，
-    // 而行文字在 8dp，同一屏就出现两条左轴（实测偏差 12dp，肉眼可见）。
-    // 分组现在只靠上方 16dp 留白区分（亲密性原则：组间 > 组内），标题与行共用同一条左边界。
-    // 分组锚点：标题 + 下方一条 20dp 的强调色细线。
-    // 纯黑页面上全是灰字会显得空，一条 2dp 的色线给出「这一组的名字」这个结构信息，
-    // 且不占用行宽、不破坏居中轴（不能加左竖条，那会把重心推回左边）。
-    Column(
+fun SettingsSectionHeader(text: String) {
+    BasicText(
+        text = text,
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        BasicText(
-            text = text,
-            style = Wear.TextCaption.copy(color = Wear.Palette.TextSecondary, textAlign = TextAlign.Center),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(Wear.Space.Xs))
-        Box(
-            modifier = Modifier
-                .size(width = SectionAccentWidth, height = SectionAccentThickness)
-                .background(Wear.Palette.Accent)
-        )
-    }
+        style = SettingsSectionStyle,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
-private val SectionAccentWidth = 20.dp
-private val SectionAccentThickness = 2.dp
+/** 行内：左槽标签与右槽取值之间的最小呼吸。 */
+private val SettingsLabelValueGap: Dp = SettingsSpacingMath.TitleToValueDp.dp
 
-/** 行的左右内缩：组标题、行文字、分隔线共用这一条左边界。 */
-private val SettingsRowInset = Wear.Space.Sm
+/** 行内：右槽取值与行尾控件之间的呼吸。 */
+private val SettingsValueTailGap: Dp = SettingsSpacingMath.ValueToTailDp.dp
 
-/** 行尾安全区：箭头图形盒 + 取值↔尾标的呼吸。行内文字左右各让出同样的宽度。 */
-private val SettingsRowTailZone: Dp =
-    (SettingsLayoutMath.ChevronGlyphDp + SettingsSpacingMath.ValueToTailDp).dp
+/** 右槽取值的宽度上限：再宽就把左槽标签压到折行。 */
+private val SettingsValueMaxWidth: Dp = 92.dp
 
 /** 行内两行文字之间的墨距：body 行盒自带上下内边距，这里只补一档最小呼吸。 */
 private val SettingsRowLineGap: Dp = 2.dp
@@ -549,29 +527,31 @@ internal fun settingsRowShowsValue(screenWidthDp: Int): Boolean =
     screenWidthDp > SettingsRowValueMinScreenWidthDp
 
 /**
- * 行骨架：标题 +（可选）取值 + 行尾标记，三段全部相对**整行**居中。
+ * 行骨架：块居中、行内左右两槽。
  *
- * 取值不和标题挤同一行，是几何上的硬约束：内容盒 168dp 扣掉行内左右各 8dp 只剩 152dp，
- * 行尾标记还要占掉右端 20dp。同行摆放时标题的盒子只有 87dp（见
- * [SettingsLayoutMath.titleBudgetDp]），它的中心离整行中心差 32.5dp —— 这正是"加了
- * textAlign = Center 仍然看着偏左"的成因：textAlign 只在**自己的盒子**里居中。
- * 取值另起一行后，两行文字落在同一个对称盒子里，视觉中心才与屏幕中心重合。
+ * 整块（所有行共用的 [SettingsContentWidth]）在圆内水平居中，行内部**不居中**：
+ * 标签左对齐到左槽线，取值 / 控件右对齐到右槽线。
  *
- * 行高：单行行 = 44dp（[Wear.Size.Touch] 兜底），双行行 ≈ 49dp（4+20+4+17+4），
- * 与 [SettingsSpacingMath.RowStepDp] 的 49dp 一档对得上，不额外吃掉每屏行数 ——
- * 纵向内边距因此收到 [Wear.Space.Xs]，多出来的一行由这一档消化。
+ * 为什么不是"每行都居中"：列表里每一行都居中时没有左边缘可循，取值也对不齐，
+ * 用户无法竖向扫读和比较 —— 这是"看起来像 AI 拼的"的第一号成因。
+ * 为什么也不是"全部左对齐"：圆屏上的重心会掉到左边。整块居中 + 行内两槽是唯一解。
+ *
+ * [subtitle] 属于左槽（标签的从属信息，另起一行），[value] 属于右槽（当前取值）。
+ * [subItem] 只把左槽线右移 [SettingsSubItemIndent]：从属关系靠位置表达，**字号不变**。
  */
 @Composable
-private fun SettingsCenteredRow(
+private fun SettingsSlotRow(
     title: String,
-    value: String?,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    value: String? = null,
     onClick: (() -> Unit)? = null,
     titleMaxLines: Int = 2,
-    valueMaxLines: Int = 2,
+    valueMaxLines: Int = 1,
+    subItem: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
@@ -579,57 +559,64 @@ private fun SettingsCenteredRow(
                 if (onClick == null) {
                     Modifier
                 } else {
-                    // 可点的行给一块极浅底：纯黑上只有文字时，行与行之间靠一条发丝线区分，
-                    // 用户反馈「每个选项和每个选项区分不够大」。底块让每一行成为一块可点的区域。
+                    // 可点的行给一块极浅底：纯黑页上没有分隔线之后，行本身得是一块可点的区域
                     Modifier
                         .background(Wear.Palette.Surface)
                         .clickable(role = Role.Button, onClick = onClick)
                 }
             )
             .heightIn(min = SettingsSpacingMath.MinRowHeightDp.dp)
-            // 字号不动，只收 chrome：上下各 2dp 已经够把两行文字包住
-            .padding(horizontal = Wear.Space.Sm, vertical = RowVerticalPadding)
+            // 左右不给内边距：标签起笔就是左槽线，与组标题逐像素对齐
+            .padding(
+                start = if (subItem) SettingsSubItemIndent else 0.dp,
+                top = RowVerticalPadding,
+                bottom = RowVerticalPadding
+            ),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 左对齐体系：只有右侧给行尾控件让位，左边界与组标题、分隔线共用同一条线
-                // 对称尾区：左右各让出同宽，文字视觉中心仍落在屏幕中线
-                .padding(horizontal = if (trailing == null) 0.dp else SettingsRowTailZone),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             BasicText(
                 text = title,
-                modifier = Modifier.fillMaxWidth(),
-                style = SettingsRowTitleStyle,
+                style = SettingsRowLabelStyle,
                 maxLines = titleMaxLines,
                 overflow = TextOverflow.Ellipsis
             )
-            if (value != null) {
+            if (subtitle != null) {
                 Spacer(Modifier.height(SettingsRowLineGap))
                 BasicText(
-                    text = value,
-                    modifier = Modifier.fillMaxWidth(),
+                    text = subtitle,
                     style = SettingsRowValueStyle,
-                    maxLines = valueMaxLines,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
+        // 右槽：取值靠右，右端落到行右边界；有行尾控件时控件才是最后一个元素
+        if (value != null) {
+            Spacer(Modifier.width(SettingsLabelValueGap))
+            BasicText(
+                text = value,
+                modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
+                style = SettingsRowValueStyle,
+                maxLines = valueMaxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         if (trailing != null) {
-            Box(modifier = Modifier.align(Alignment.CenterEnd)) { trailing() }
+            Spacer(Modifier.width(SettingsValueTailGap))
+            trailing()
         }
     }
 }
 
 /**
- * 可进入行：**没有容器**——只有标题 / 取值 / 行尾标记三个元素，行与行之间由 1dp 分隔线切分。
+ * 可进入行：标签左槽 + 取值右槽，没有容器也没有分隔线。
+ *
+ * 取值只在宽屏显示（见 [settingsRowShowsValue]），窄屏上整行只剩一行标签 ——
+ * 根页与子页是同一份实现，左右槽线因此全站一致。
  *
  * 行尾标记二选一：有状态时是一块 [Wear.Size.StatusBlock] 的色块（状态文案转成无障碍描述，
- * 不再和大段文字抢注意力），没有状态时是右向箭头。
- *
- * 版面走 [SettingsCenteredRow]：标题居中，取值居中于下一行；取值只在宽屏显示
- * （见 [settingsRowShowsValue]），窄屏上整行只剩一行标题 —— 根页与子页是同一份实现。
+ * 不再和大段文字抢注意力），没有状态时什么都不放。
  */
 @Composable
 fun SettingsNavRow(
@@ -640,12 +627,11 @@ fun SettingsNavRow(
     modifier: Modifier = Modifier
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    SettingsCenteredRow(
+    SettingsSlotRow(
         title = title,
         value = if (value != null && settingsRowShowsValue(screenWidthDp)) value else null,
         modifier = modifier,
         onClick = onClick,
-        // 居中的版式里，右侧箭头是孤立元素：没有状态块就什么都不放，文字也不必让出尾区
         trailing = if (badge == null) {
             null
         } else {
@@ -654,16 +640,34 @@ fun SettingsNavRow(
     )
 }
 
-/** 行标题档：官方 bodyMedium + 主色（19.57:1）。层级由字号与亮度双轴承担，不再靠"全体压暗"。 */
-private val SettingsRowTitleStyle: TextStyle
-    @Composable get() = Wear.TextRowTitle.copy(
-        textAlign = TextAlign.Center,
-        fontWeight = FontWeight.Medium
+/**
+ * 全页字号只许三档：组标题 12sp / 行文本 15sp / 唯一焦点 18sp。
+ *
+ * 层级靠**字重与位置**，不靠继续堆字号：行标签与行取值同为 15sp，
+ * 二者的差别是颜色（主色 vs 次色）与槽位（左 vs 右），不是大小。
+ */
+/** 组标题档：12sp / TextMuted / Medium / 字距 +0.5sp。 */
+internal val SettingsSectionStyle: TextStyle
+    @Composable get() = Wear.TextCaption.copy(
+        color = Wear.Palette.TextMuted,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.5.sp
     )
 
-/** 行取值档：官方 bodySmall + 次色（6.94:1）。旧 muted 色只有 3.87:1，12sp 小字读不清。 */
-private val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextRowValue.copy(textAlign = TextAlign.Center)
+/** 行标签档：15sp / TextPrimary / Normal。 */
+internal val SettingsRowLabelStyle: TextStyle
+    @Composable get() = Wear.TextBody.copy(fontWeight = FontWeight.Normal)
+
+/** 行取值档：15sp / TextSecondary / Normal，右槽对齐写在样式里（BasicText 没有 textAlign 参数）。 */
+internal val SettingsRowValueStyle: TextStyle
+    @Composable get() = Wear.TextRowValue.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.End)
+
+/** 焦点档：18sp / TextPrimary / Medium，全页只给当前模型名和子页标题。 */
+internal val SettingsFocusStyle: TextStyle
+    @Composable get() = Wear.TextRowTitle.copy(fontWeight = FontWeight.Medium)
+
+/** 子项行的左槽线右移量：字号不变，只把标签推后 12dp，值槽线不动。 */
+val SettingsSubItemIndent: Dp = SettingsDesignMath.SubItemIndentDp.dp
 
 /** 行尾状态色块：一块纯色就够表达状态，文案走无障碍描述。 */
 @Composable
@@ -715,8 +719,9 @@ fun SettingsSwitchRow(
             uncheckedTrackColor = Wear.Palette.SurfaceAlt,
             uncheckedTrackBorderColor = Wear.Palette.Border
         ),
+        // 左右内边距归零：开关标签必须和所有行的标签落在同一条左槽线上
         contentPadding = PaddingValues(
-            horizontal = Wear.Space.Md,
+            horizontal = 0.dp,
             vertical = Wear.Space.Sm
         ),
         secondaryLabel = if (secondary == null) {
@@ -769,19 +774,21 @@ fun SettingsSliderRow(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+            verticalAlignment = Alignment.CenterVertically
         ) {
             BasicText(
                 text = label,
                 modifier = Modifier.weight(1f),
-                style = SettingsRowTitleStyle,
+                style = SettingsRowLabelStyle,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            Spacer(Modifier.width(SettingsLabelValueGap))
+            // 数值进右槽：与所有行的取值落在同一条右槽线上，不再用 titleMedium 抢焦点
             BasicText(
                 text = valueText,
-                style = Wear.TextTitle,
+                modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
+                style = SettingsRowValueStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -797,7 +804,7 @@ fun SettingsSliderRow(
             colors = SliderDefaults.sliderColors(
                 containerColor = Color.Transparent,
                 buttonIconColor = Wear.Palette.TextPrimary,
-                selectedBarColor = Wear.Palette.Accent,
+                selectedBarColor = Wear.Accent,
                 unselectedBarColor = Wear.Palette.SurfaceAlt,
                 selectedBarSeparatorColor = Wear.Palette.Bg,
                 unselectedBarSeparatorColor = Wear.Palette.Bg
@@ -807,11 +814,10 @@ fun SettingsSliderRow(
 }
 
 /**
- * 单选行：并进居中版式，不再用官方 RadioButton。
+ * 单选行：标签左槽 + 行尾圆点，不用官方 RadioButton（它自带另一套内边距与左对齐）。
  *
- * 官方 RadioButton 自带 12dp/8dp 内边距与左对齐文字，和全站其余居中的文字行混在一起，
- * 同一屏出现两套对齐与两套行高。这里改成同一行组件 + 行尾圆点，
- * 行高、内边距、文字对齐全部跟随 [SettingsCenteredRow]。
+ * [dangerSelected] 只染**选中态那个圆点**：删数据 / 全权限 / 从不确认这类选项，
+ * 危险语义落在控件本身上，不涂整行文字。
  */
 @Composable
 fun SettingsRadioRow(
@@ -819,22 +825,32 @@ fun SettingsRadioRow(
     selected: Boolean,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
-    subtitle: String? = null
+    subtitle: String? = null,
+    dangerSelected: Boolean = false,
+    dotColor: Color? = null
 ) {
-    SettingsCenteredRow(
+    SettingsSlotRow(
         title = label,
-        value = subtitle,
+        subtitle = subtitle,
         modifier = modifier.widthIn(max = SettingsContentWidth),
         onClick = onSelect,
-        valueMaxLines = 2,
-        trailing = { SettingsRadioDot(selected) }
+        trailing = {
+            SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
+        }
     )
 }
 
-/** 单选圆点：空心环 + 选中实心点，只表达状态，不做容器。 */
+/**
+ * 单选圆点：空心环 + 选中实心点，只表达状态，不做容器。
+ *
+ * 全页强调色的唯一落点就在"选中"这一件事上：未选中是中性 TextMuted，选中是运行时强调色
+ * （危险选项为 Danger，且只染这一点）。[dotColor] 只给强调色档用：未选中时留一颗该档颜色
+ * 的小点做预览，环仍是中性色 —— "选中"和"这个颜色长什么样"因此不会互相冒充。
+ */
 @Composable
-private fun SettingsRadioDot(selected: Boolean) {
-    val ring = if (selected) Wear.Palette.Accent else Wear.Palette.TextMuted
+private fun SettingsRadioDot(selected: Boolean, danger: Boolean = false, dotColor: Color? = null) {
+    val selectedColor = dotColor ?: (if (danger) Wear.Palette.Danger else Wear.Accent)
+    val ring = if (selected) selectedColor else Wear.Palette.TextMuted
     Box(
         modifier = Modifier
             .size(SettingsRadioDotSize)
@@ -847,7 +863,15 @@ private fun SettingsRadioDot(selected: Boolean) {
                 modifier = Modifier
                     .size(SettingsRadioDotSize / 2)
                     .clip(CircleShape)
-                    .background(Wear.Palette.Accent)
+                    .background(selectedColor)
+            )
+        } else if (dotColor != null) {
+            // 未选中的预设色只留一颗小色点做预览：环仍是中性色，"选中"和"这个颜色长什么样"不互相冒充
+            Box(
+                modifier = Modifier
+                    .size(SettingsRadioDotSize / 3)
+                    .clip(CircleShape)
+                    .background(dotColor.copy(alpha = SettingsPreviewDotAlpha))
             )
         }
     }
@@ -856,14 +880,107 @@ private fun SettingsRadioDot(selected: Boolean) {
 private val SettingsRadioDotSize = 18.dp
 private val SettingsRadioStroke = 2.dp
 
-/** 只读说明行：同样没有容器，标题与取值各自居中成一行。 */
+/** 未选中预设色点的预览透明度：够看清颜色，又不至于被误读成"已选中"。 */
+private const val SettingsPreviewDotAlpha = 0.75f
+
+/** 子项单选行：与 [SettingsRadioRow] 同一套圆点，只把左槽线右移 12dp（字号与右槽线不变）。 */
 @Composable
-fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier) {
-    SettingsCenteredRow(
+fun SettingsSubRadioRow(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    dangerSelected: Boolean = false,
+    dotColor: Color? = null
+) {
+    SettingsSlotRow(
+        title = label,
+        subtitle = subtitle,
+        modifier = modifier.widthIn(max = SettingsContentWidth),
+        onClick = onSelect,
+        subItem = true,
+        trailing = {
+            SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
+        }
+    )
+}
+
+/**
+ * 子项组上沿的那一根短线：1px / Border 色 / 从右槽线往左收 24dp。
+ *
+ * 全页只有这一种线，每个子项组一根。左端与子项标签的左槽线对齐（右移 12dp），
+ * 右端比行宽短 24dp —— 读起来是"这组选项"的起点，而不是一张表格的横线。
+ */
+@Composable
+fun SettingsSubItemDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SettingsDividerThickness)
+            .padding(
+                start = SettingsSubItemIndent,
+                end = SettingsDesignMath.DividerRightInsetDp.dp
+            )
+            .background(Wear.Palette.Border)
+    )
+}
+
+/**
+ * 状态点的语义：设置页正文里唯一允许出现语义色的地方。
+ *
+ * 60-30-10 里的那 10 就是它：一页最多一个状态点。
+ * 把 Success / Warning 涂在取值文字上的用法（大面积高饱和）已经全部撤掉。
+ */
+enum class SettingsStatusTone { OK, WARN }
+
+/** 状态点：6dp 圆点，颜色只走语义色，文案走无障碍描述。 */
+@Composable
+fun SettingsStatusDot(tone: SettingsStatusTone, description: String) {
+    val color = when (tone) {
+        SettingsStatusTone.OK -> Wear.Palette.Success
+        SettingsStatusTone.WARN -> Wear.Palette.Warning
+    }
+    Box(
+        modifier = Modifier
+            .size(Wear.Size.StatusBlock)
+            .clip(CircleShape)
+            .background(color)
+            .semantics { contentDescription = description }
+    )
+}
+
+/**
+ * 状态行：标签左槽 + 取值右槽，状态的"好坏"只落在右端 6dp 状态点上。
+ *
+ * 取值回到中性的 TextSecondary：颜色退回点，文字回到灰阶，重点才立得住。
+ */
+@Composable
+fun SettingsStatusRow(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    statusTone: SettingsStatusTone? = null
+) {
+    SettingsSlotRow(
         title = title,
         value = value,
         modifier = modifier.widthIn(max = SettingsContentWidth),
-        valueMaxLines = 2
+        trailing = if (statusTone == null) {
+            null
+        } else {
+            { SettingsStatusDot(tone = statusTone, description = title) }
+        }
+    )
+}
+
+/** 只读说明行：标签左槽 + 取值右槽，与可点行共用同两条槽线。 */
+@Composable
+fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier) {
+    SettingsSlotRow(
+        title = title,
+        value = value,
+        modifier = modifier.widthIn(max = SettingsContentWidth)
     )
 }
 
@@ -895,13 +1012,15 @@ fun SettingsActionButton(
         Tone.DANGER -> Wear.Palette.DangerSurface
         Tone.MUTED -> Wear.Palette.Surface
     }
+    // 强调色按钮不再染文字与描边：全页强调色只留给"选中态"（圆点 / 滑轨）。
+    // 主键身份由 AccentDim 实底 + AccentTrack 发丝线承担，仍是同一套令牌色。
     val content = when (tone) {
-        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.ACCENT -> Wear.Palette.TextPrimary
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.TextPrimary
     }
     val stroke = when (tone) {
-        Tone.ACCENT -> Wear.Palette.Accent
+        Tone.ACCENT -> Wear.Palette.AccentTrack
         Tone.DANGER -> Wear.Palette.Danger
         Tone.MUTED -> Wear.Palette.Border
     }
@@ -947,7 +1066,7 @@ fun SettingsTextEntryRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    SettingsCenteredRow(
+    SettingsSlotRow(
         title = label,
         value = if (value.isEmpty()) stringResource(R.string.settings_value_empty) else value,
         modifier = modifier,
@@ -1012,7 +1131,8 @@ fun SettingsTextDialog(
         ) {
             BasicText(
                 text = title,
-                style = Wear.TextDisplayTitle,
+                // 对话框标题也落在焦点档（18sp / Medium）：全站字号只有三档
+                style = SettingsFocusStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1021,7 +1141,7 @@ fun SettingsTextDialog(
                 // 编辑只改草稿：确认之前一个字符都不外泄
                 onValueChange = { draft = draft.edit(it) },
                 textStyle = Wear.TextBody,
-                cursorBrush = SolidColor(Wear.Palette.Accent),
+                cursorBrush = SolidColor(Wear.Palette.TextPrimary),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Wear.Size.Touch, max = DialogFieldMaxHeight)

@@ -8,23 +8,23 @@ import org.junit.Test
 /**
  * 「网页 ⊇ 手表」超集关系的唯一断言处。
  *
- * 网页端 9 页 / 48 行的权威清单来自 wear/src/main/assets/console/app.js 的 PAGES 定义，
+ * 网页端 9 页 / 56 行的权威清单来自 wear/src/main/assets/console/app.js 的 PAGES 定义，
  * 这里逐行抄成测试夹具：一旦网页端增删行，本夹具必须先同步，否则下面的覆盖断言会直接失败。
  */
 class SettingsCoverageTest {
 
     @Test
     fun fixtureMatchesWebConsoleShape() {
-        // 9 页 / 57 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
+        // 9 页 / 56 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
         assertEquals(9, WebFixture.pages.size)
-        assertEquals(57, WebFixture.pages.sumOf { it.rows.size })
+        assertEquals(56, WebFixture.pages.sumOf { it.rows.size })
         assertEquals(
             listOf(
-                "model" to 12,
+                "model" to 11,
                 "provider" to 3,
                 "role" to 3,
-                "generate" to 6,
-                "dialog" to 8,
+                "generate" to 7,
+                "dialog" to 7,
                 "voice" to 4,
                 "tools" to 8,
                 "interface" to 7,
@@ -63,8 +63,10 @@ class SettingsCoverageTest {
         // 超集的第二半：手表可写的行严格少于网页可写的行
         val watchWritable = SettingsCoverage.watchWritable(WebFixture.pages)
         assertTrue(SettingsCoverage.isStrictSuperset(WebFixture.pages))
-        assertEquals(35, watchWritable.size)
-        assertEquals(57 - 35, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
+        // 本轮把 3 行从"仅网页"提升为表端可写（压缩阈值 / 审批策略 / 沙箱等级），
+        // 并把网页端新增的 generate.maxContextTurns 一起登记成 SLIDER
+        assertEquals(37, watchWritable.size)
+        assertEquals(56 - 37, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
             .count { it !in watchWritable })
         // 手表可写的每一行都必须真实存在于网页端（不能凭空造出手表独有的可写项）
         val webIds = WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }.toSet()
@@ -73,9 +75,10 @@ class SettingsCoverageTest {
 
     @Test
     fun watchSideSplitsIntoWritableReadOnlyAndWebOnly() {
-        assertEquals(35, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
+        assertEquals(37, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
         assertEquals(4, SettingsCoverage.byForm(listOf(WebSettingsForm.READ_ONLY)).size)
-        assertEquals(18, SettingsCoverage.byForm(listOf(WebSettingsForm.WEB_ONLY)).size)
+        assertEquals(15, SettingsCoverage.byForm(listOf(WebSettingsForm.WEB_ONLY)).size)
+        assertEquals(56, SettingsCoverage.entries.size)
     }
 
     @Test
@@ -86,6 +89,12 @@ class SettingsCoverageTest {
         assertEquals(WebSettingsForm.WEB_ONLY, SettingsCoverage.formOf("dialog.dangerousCommandBlacklist"))
         assertEquals(WebSettingsForm.WEB_ONLY, SettingsCoverage.formOf("tools.mcpServers"))
         assertEquals(WebSettingsForm.WEB_ONLY, SettingsCoverage.formOf("role.roleCards"))
+        // 本轮补全的三档：网页有、表端此前连存储都没有
+        assertEquals(WebSettingsForm.SLIDER, SettingsCoverage.formOf("generate.historyCompressThreshold"))
+        // 网页端新增的上下文轮数滑杆：表端登记表必须同步，键路径严格是 generate.maxContextTurns
+        assertEquals(WebSettingsForm.SLIDER, SettingsCoverage.formOf("generate.maxContextTurns"))
+        assertEquals(WebSettingsForm.TRI_STATE, SettingsCoverage.formOf("tools.toolApprovalPolicy"))
+        assertEquals(WebSettingsForm.TRI_STATE, SettingsCoverage.formOf("dialog.sandboxLevel"))
         assertEquals(WebSettingsForm.SWITCH, SettingsCoverage.formOf("tools.toolWebSearchEnabled"))
         assertEquals(WebSettingsForm.SWITCH, SettingsCoverage.formOf("dialog.longTermMemoryEnabled"))
         // 网页端一旦多出表端没落位的一页，超集立刻不成立
@@ -104,7 +113,7 @@ class SettingsCoverageTest {
                     row("actModels", "action"), row("streamMode", "switch"), row("topP", "slider"),
                     row("topK", "slider"), row("frequencyPenalty", "slider"),
                     row("defaultThinkingEnabled", "switch"), row("providerManagedSearchEnabled", "switch"),
-                    row("autoCompressContext", "switch"), row("visionBetaEnabled", "switch")
+                    row("autoCompressContext", "switch")
                 )
             ),
             WebSettingsPage(
@@ -120,7 +129,7 @@ class SettingsCoverageTest {
                 listOf(
                     row("temperature", "slider"), row("maxTokens", "slider"), row("customSystemPrompt", "textarea"),
                     row("contextWindow", "slider"), row("historyCompressThreshold", "slider"),
-                    row("truncationStrategy", "segmented")
+                    row("maxContextTurns", "slider"), row("truncationStrategy", "segmented")
                 )
             ),
             WebSettingsPage(
@@ -129,7 +138,7 @@ class SettingsCoverageTest {
                     row("longTermMemoryEnabled", "switch"), row("memoryNoteCount", "slider"),
                     row("actClearMemory", "action"), row("sandboxLevel", "segmented"),
                     row("dangerousCommandBlacklist", "list"), row("securityMode", "segmented"),
-                    row("mainInputType", "segmented"), row("subAgentEnabled", "switch")
+                    row("subAgentEnabled", "switch")
                 )
             ),
             WebSettingsPage(

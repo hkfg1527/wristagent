@@ -178,6 +178,43 @@ object SettingsValueMath {
     }
 
     private const val SecretMask = "\u2022\u2022\u2022\u2022"
+
+    /** 自定义最大输出 Token 的合法区间：下限再小必然截断，上限再大只是烧额度。 */
+    const val MaxTokensMin = 16
+    const val MaxTokensMax = 32768
+
+    /**
+     * 解析自定义最大输出 Token：空串 / 非数字 / 非正数一律返回 null（调用方据此保持原值不动），
+     * 超出区间则夹进 [MaxTokensMin]..[MaxTokensMax]。
+     *
+     * 这是"阶梯 + 自定义"里的自定义那半：档位之外的任意值都能落到存储里，
+     * 用户不会因为阶梯只有 5 档就被锁在档位上。
+     */
+    fun parseMaxTokens(raw: String): Int? {
+        val digits = raw.trim()
+        if (digits.isEmpty()) return null
+        val parsed = digits.toIntOrNull() ?: return null
+        if (parsed <= 0) return null
+        return parsed.coerceIn(MaxTokensMin, MaxTokensMax)
+    }
+}
+
+/**
+ * 子项组的分段规则：整页只有一种线，且画在每组的上沿 —— 于是"线数 == 子项组数"。
+ *
+ * 抽成纯函数是为了让这条视觉契约能被单测数出来，而不是靠人眼扫源码。
+ */
+object SettingsRowComposition {
+
+    /** 当前行是否是某个子项组的第一行；[previousIsSubItem] = null 表示它是整页第一行。 */
+    fun isSubItemGroupStart(previousIsSubItem: Boolean?, isSubItem: Boolean): Boolean =
+        isSubItem && previousIsSubItem != true
+
+    /** 一整页里有多少个连续的 subItem 段：每段恰好对应一根 SettingsSubItemDivider。 */
+    fun subItemGroupCount(isSubItem: List<Boolean>): Int =
+        isSubItem.indices.count { index ->
+            isSubItemGroupStart(isSubItem.getOrNull(index - 1), isSubItem[index])
+        }
 }
 
 /**
@@ -289,5 +326,70 @@ object SettingsSpacingMath {
     /** 一屏能放下多少行：商而不是取整结果，由调用方决定怎么用。 */
     fun rowsPerScreen(screenHeightDp: Float, rowStepDp: Float = RowStepDp): Float =
         if (rowStepDp <= 0f) 0f else screenHeightDp / rowStepDp
+}
+
+/**
+ * 设置页的版式法则：块居中、行内左右两槽。
+ *
+ * 与 [SettingsSpacingMath] 分工不同 —— 那边管"一块行占多高"，这边管"整页的槽线、
+ * 亲密性比例、字号阶梯与正文行高"，也就是"看起来像人排的版面"的判定量。
+ */
+object SettingsDesignMath {
+    /** 内容盒宽度：176dp。比 184dp 安全宽窄 8dp，给圆边留呼吸。 */
+    const val ContentWidthDp = 176f
+
+    /** 组内行距：与 [SettingsSpacingMath.ItemGapDp] 同源，写在这里是为了让"组间 / 组内"的比值自证。 */
+    const val RowGapDp = SettingsSpacingMath.ItemGapDp
+
+    /** 组间留白：24dp，恒 >= 组内行距的 2 倍（实际 6 倍）。 */
+    const val SectionGapDp = 24f
+
+    /** 子项左槽线右移量：从属关系靠位置表达，不靠降字号。 */
+    const val SubItemIndentDp = 12f
+
+    /** 子项组内的那根短线：从右槽线往左收 24dp，短于行宽。 */
+    const val DividerRightInsetDp = 24f
+
+    /** 提示词正文的段落间距。 */
+    const val ParagraphGapDp = 8f
+
+    /** 提示词正文顶 / 底渐隐遮罩高度。 */
+    const val FadeDp = 12f
+
+    /** 正文行高（sp）：15sp 正文配 22sp 行高，与 [SettingsSpacingMath.BodyLineHeightSp] 同值。 */
+    const val BodyLineHeightSp = SettingsSpacingMath.BodyLineHeightSp
+
+    /** 三档字号（sp）：组标题 / 行文本 / 全页唯一的焦点。 */
+    const val SectionLabelSp = 12f
+    const val RowTextSp = 15f
+    const val FocusSp = 18f
+
+    /** 一页允许出现的字号档数。 */
+    const val MaxFontTiers = 3
+
+    /** 组间 / 组内行距的比值。 */
+    fun sectionToRowRatio(sectionGapDp: Float = SectionGapDp, rowGapDp: Float = RowGapDp): Float =
+        if (rowGapDp <= 0f) 0f else sectionGapDp / rowGapDp
+
+    /** 亲密性判定：组间至少拉开组内两倍，否则八组行读成一整片。 */
+    fun isSectionRhythmReadable(sectionGapDp: Float = SectionGapDp, rowGapDp: Float = RowGapDp): Boolean =
+        sectionToRowRatio(sectionGapDp, rowGapDp) >= 2f
+
+    /**
+     * 内容盒的左右内缩：整块居中，左右两条槽线因此全页一致。
+     *
+     * 真机 233dp 屏 = (233 − 176) / 2 = 28.5dp；窄屏按 [SettingsLayoutMath.SideInsetDp] 兜底，
+     * 不把内容推到圆周外。
+     */
+    fun sideInsetDp(screenWidthDp: Float, contentWidthDp: Float = ContentWidthDp): Float {
+        if (screenWidthDp <= 0f) return SettingsLayoutMath.SideInsetDp
+        return ((screenWidthDp - contentWidthDp) / 2f).coerceAtLeast(SettingsLayoutMath.SideInsetDp)
+    }
+
+    /** 字号阶梯里实际出现了几档：超过 [MaxFontTiers] 就是靠堆字号造层级。 */
+    fun fontTierCount(sizesSp: List<Int>): Int = sizesSp.toSet().size
+
+    /** 一页允许的语义色状态点数：只许一处。 */
+    const val StatusDotsPerPage = 1
 }
 

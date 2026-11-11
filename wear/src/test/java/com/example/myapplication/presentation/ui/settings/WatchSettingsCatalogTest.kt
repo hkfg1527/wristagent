@@ -6,18 +6,17 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 手表端 14 条新增设置项的清单校验：形态、落位页与偏好键都必须自洽。 */
+/** 手表端 10 条新增设置项的清单校验：形态、落位页与偏好键都必须自洽。 */
 class WatchSettingsCatalogTest {
 
     @Test
-    fun exactlyFourteenItemsLand() {
-        assertEquals(14, WatchSettingsCatalog.items.size)
-        assertEquals(14, WatchSettingsCatalog.items.map { it.id }.toSet().size)
+    fun exactlyTenItemsLand() {
+        assertEquals(10, WatchSettingsCatalog.items.size)
+        assertEquals(10, WatchSettingsCatalog.items.map { it.id }.toSet().size)
     }
 
     @Test
     fun everyItemBelongsToAWebPageThatExistsOnTheConsole() {
-        assertEquals(14, WatchSettingsCatalog.items.size)
         val webPages = setOf("model", "provider", "role", "generate", "dialog", "voice", "tools", "interface", "device")
         WatchSettingsCatalog.items.forEach { item ->
             assertTrue(
@@ -29,7 +28,6 @@ class WatchSettingsCatalogTest {
 
     @Test
     fun everyItemUsesAWatchHonestForm() {
-        assertEquals(14, WatchSettingsCatalog.items.size)
         // 手表只承载 开关 / 三档枚举 / 滑杆 / 只读状态；长文本与列表编辑一律不留
         val honest = setOf(
             WatchSettingForm.SWITCH,
@@ -44,7 +42,6 @@ class WatchSettingsCatalogTest {
 
     @Test
     fun switchItemsPointAtARealPreferenceKey() {
-        assertEquals(14, WatchSettingsCatalog.items.size)
         WatchSettingsCatalog.items.filter { it.form == WatchSettingForm.SWITCH }.forEach { item ->
             assertNotNull("开关必须有偏好键: " + item.id, item.preferenceKey)
         }
@@ -53,26 +50,29 @@ class WatchSettingsCatalogTest {
         }
     }
 
+    /** 审计删除的回归阀门：这四条一旦被加回来，说明"假开关"又被画上屏了。 */
     @Test
-    fun wakeOnScreenAndLockAreReadOnlyBecauseTheCapabilityIsGone() {
-        listOf("voice.wakeOnScreen", "voice.wakeOnLockScreen").forEach { id ->
-            val item = WatchSettingsCatalog.items.firstOrNull { it.id == id }
-            assertNotNull("缺项: " + id, item)
-            assertEquals(WatchSettingForm.READ_ONLY, item?.form)
-            assertNull("只读项不得挂在可写偏好键上: " + id, item?.preferenceKey)
-        }
+    fun theFourZeroValueItemsStayDeleted() {
+        val removed = listOf(
+            "voice.wakeOnScreen",
+            "voice.wakeOnLockScreen",
+            "interface.usePureBlack",
+            "interface.themeMode"
+        )
+        val present = WatchSettingsCatalog.items.map { it.id }.filter { it in removed }
+        assertEquals("这些项没有任何执行路径，不许再出现在清单里：", emptyList<String>(), present)
     }
 
     @Test
-    fun eachDomainOfTheFourteenIsCounted() {
+    fun eachDomainOfTheTenIsCounted() {
         assertEquals(
             mapOf(
-                WatchSettingsDomain.VOICE to 5,
+                WatchSettingsDomain.VOICE to 3,
                 WatchSettingsDomain.TOOLS to 1,
                 WatchSettingsDomain.MODEL to 1,
                 WatchSettingsDomain.MEMORY to 1,
                 WatchSettingsDomain.CONTEXT to 2,
-                WatchSettingsDomain.INTERFACE to 3,
+                WatchSettingsDomain.INTERFACE to 1,
                 WatchSettingsDomain.STATUS to 1
             ),
             WatchSettingsCatalog.items.groupingBy { it.domain }.eachCount()

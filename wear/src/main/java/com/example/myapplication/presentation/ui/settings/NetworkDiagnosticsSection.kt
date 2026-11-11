@@ -28,6 +28,7 @@ import com.example.myapplication.agent.net.RepairResult
 import com.example.myapplication.agent.net.ReportFormat
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.presentation.ui.components.Tone
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -55,6 +56,8 @@ fun NetworkDiagnosticsContent(
     var plans by remember { mutableStateOf<List<RepairItem>>(emptyList()) }
     var results by remember { mutableStateOf<List<RepairResult>>(emptyList()) }
     var running by remember { mutableStateOf(false) }
+    // 体检任务的句柄：连点时取消上一次并重开，而不是把按钮禁用掉当作"已受理"
+    var checkJob by remember { mutableStateOf<Job?>(null) }
     var copied by remember { mutableStateOf(false) }
     var generatedAt by remember { mutableStateOf(0L) }
 
@@ -83,10 +86,6 @@ fun NetworkDiagnosticsContent(
     SettingsSubPage(title = stringResource(R.string.settings_netdiag_title), onBack = onBack) {
         section(stringResource(R.string.settings_netdiag_checks_header))
         row { SettingsCaptionRow(text = stringResource(R.string.settings_netdiag_subtitle)) }
-
-        if (running) {
-            row { SettingsCaptionRow(text = stringResource(R.string.settings_netdiag_running)) }
-        }
 
         DiagnosticId.entries.forEach { id ->
             val check = checks.firstOrNull { it.id == id }
@@ -120,33 +119,15 @@ fun NetworkDiagnosticsContent(
             }
         }
 
-        if (results.isNotEmpty()) {
-            results.forEach { result ->
-                row {
-                    SettingsCaptionRow(
-                        text = stringResource(
-                            when (result.outcome) {
-                                RepairOutcome.SUCCEEDED -> R.string.settings_netdiag_repair_ok
-                                RepairOutcome.FAILED -> R.string.settings_netdiag_repair_fail
-                                RepairOutcome.NEEDS_MANUAL -> R.string.settings_netdiag_repair_manual
-                            },
-                            planLabel(plans, result),
-                        )
-                    )
-                }
-                if (result.detail.isNotBlank()) {
-                    row { SettingsCaptionRow(text = result.detail, mono = true) }
-                }
-            }
-        }
-
         row {
             SettingsActionButton(
                 label = stringResource(R.string.settings_netdiag_recheck),
-                enabled = !running,
+                // 不禁用：进页会自动体检一次，禁用会把这几秒里的点击静默吞掉
+                enabled = true,
                 onClick = {
                     context.vibrateTick()
-                    scope.launch { runCheck() }
+                    checkJob?.cancel()
+                    checkJob = scope.launch { runCheck() }
                 }
             )
         }
@@ -169,6 +150,30 @@ fun NetworkDiagnosticsContent(
                     }
                 }
             )
+        }
+        // 反馈块紧贴按钮：按钮在页面最底部，结果/进行中若追加在它上方（旧位置），
+        // 用户点完看到的仍是按钮本身 —— 真机上表现为"点了没反应"。
+        if (running) {
+            row { SettingsCaptionRow(text = stringResource(R.string.settings_netdiag_running)) }
+        }
+        if (results.isNotEmpty()) {
+            results.forEach { result ->
+                row {
+                    SettingsCaptionRow(
+                        text = stringResource(
+                            when (result.outcome) {
+                                RepairOutcome.SUCCEEDED -> R.string.settings_netdiag_repair_ok
+                                RepairOutcome.FAILED -> R.string.settings_netdiag_repair_fail
+                                RepairOutcome.NEEDS_MANUAL -> R.string.settings_netdiag_repair_manual
+                            },
+                            planLabel(plans, result),
+                        )
+                    )
+                }
+                if (result.detail.isNotBlank()) {
+                    row { SettingsCaptionRow(text = result.detail, mono = true) }
+                }
+            }
         }
         row {
             SettingsActionButton(

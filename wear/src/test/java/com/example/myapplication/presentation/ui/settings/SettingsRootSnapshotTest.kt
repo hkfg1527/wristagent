@@ -2,7 +2,7 @@ package com.example.myapplication.presentation.ui.settings
 
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.FakeSharedPreferences
-import com.example.myapplication.agent.contract.RightButtonAction
+import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.rootSnapshot
 import com.example.myapplication.readProjectFile
@@ -28,7 +28,8 @@ class SettingsRootSnapshotTest {
         assertEquals("custom-model-x", snapshot.modelName)
         assertEquals("https://example.invalid/v1", snapshot.baseUrl)
         assertEquals(SecurityMode.EXPERT, snapshot.securityMode)
-        assertEquals(RightButtonAction.CLEAR_MEMORY, snapshot.rightButtonAction)
+        assertEquals(GestureAction.STOP_TURN, snapshot.gestureBindings.longPress)
+        assertEquals(GestureAction.SWITCH_MODEL, snapshot.gestureBindings.sideKeyLong)
         assertEquals("http://127.0.0.1:9999/sse", snapshot.mcpEndpoint)
         assertFalse(snapshot.isMcpEnabled)
         assertEquals("you are a test", snapshot.customSystemPrompt)
@@ -44,7 +45,7 @@ class SettingsRootSnapshotTest {
         assertEquals(prefs.modelName, snapshot.modelName)
         assertEquals(prefs.baseUrl, snapshot.baseUrl)
         assertEquals(prefs.securityMode, snapshot.securityMode)
-        assertEquals(prefs.rightButtonAction, snapshot.rightButtonAction)
+        assertEquals(prefs.gestureBindings(), snapshot.gestureBindings)
         assertEquals(prefs.mcpEndpoint, snapshot.mcpEndpoint)
         assertEquals(prefs.isMcpEnabled, snapshot.isMcpEnabled)
         assertEquals(prefs.customSystemPrompt, snapshot.customSystemPrompt)
@@ -52,7 +53,6 @@ class SettingsRootSnapshotTest {
         assertEquals(prefs.maxOutputTokens, snapshot.maxOutputTokens)
         assertEquals(prefs.streamMode, snapshot.streamMode)
         assertEquals(prefs.animationsEnabled, snapshot.animationsEnabled)
-        assertEquals(prefs.visionBetaEnabled, snapshot.visionBetaEnabled)
         assertEquals(prefs.asrEnabled, snapshot.asrEnabled)
         assertEquals(prefs.asrProvider, snapshot.asrProviderKey)
         assertEquals(prefs.asrSettings().hasBaiduCredentials, snapshot.asrKeyReady)
@@ -96,7 +96,7 @@ class SettingsRootSnapshotTest {
         val readBack = source.substringAfter("fun AgentPreferences.rootSnapshot()")
             .substringBefore("\n}")
 
-        assertTrue("没扫到根页缓存初始化，扫描正则已失效", cached.size >= 16)
+        assertTrue("没扫到根页缓存初始化，扫描正则已失效", cached.size >= 15)
         val missing = cached.filterNot { readBack.contains(it) }
         assertEquals(
             "这些缓存没在 rootSnapshot() 里回读，清空记忆后会停在旧值：",
@@ -126,7 +126,8 @@ class SettingsRootSnapshotTest {
         modelName = "custom-model-x"
         baseUrl = "https://example.invalid/v1"
         securityMode = SecurityMode.EXPERT
-        rightButtonAction = RightButtonAction.CLEAR_MEMORY
+        longPressAction = GestureAction.STOP_TURN
+        sideKeyLongAction = GestureAction.SWITCH_MODEL
         mcpEndpoint = "http://127.0.0.1:9999/sse"
         isMcpEnabled = false
         customSystemPrompt = "you are a test"
@@ -134,7 +135,6 @@ class SettingsRootSnapshotTest {
         maxOutputTokens = 150
         streamMode = false
         animationsEnabled = false
-        visionBetaEnabled = true
         asrEnabled = true
         asrProvider = "asr-provider-x"
         baiduApiKey = "ak"

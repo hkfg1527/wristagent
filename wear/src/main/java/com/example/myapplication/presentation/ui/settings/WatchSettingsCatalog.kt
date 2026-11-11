@@ -35,11 +35,17 @@ data class WatchSettingItem(
     val landingPage: String get() = domain.landingPage
 }
 
-/** 手表端 14 条新增项的唯一清单（默认值一律落在 [AgentPreferences] 的 DEFAULT_* 常量上）。 */
+/**
+ * 手表端 10 条"网页新增项"的唯一清单（默认值一律落在 [AgentPreferences] 的 DEFAULT_* 常量上）。
+ *
+ * 本轮审计删掉 4 条：voice.wakeOnScreen / voice.wakeOnLockScreen（主源码零读取，
+ * 唤醒路径已整体删除）与 interface.usePureBlack / interface.themeMode（Bg 是编译期常量，
+ * 主题枚举只被取来渲染文案）。它们都是"画在屏上但拨不动任何东西"的项，见 docs/SETTINGS-AUDIT.md。
+ */
 object WatchSettingsCatalog {
 
     val items: List<WatchSettingItem> = listOf(
-        // 语音 5：总开关、出向播报、边说边显示 + 两条已移除的唤醒入口
+        // 语音 3：总开关、出向播报、边说边显示（两条自动唤醒项已按审计删除）
         WatchSettingItem(
             id = "voice.asrEnabled",
             domain = WatchSettingsDomain.VOICE,
@@ -64,19 +70,6 @@ object WatchSettingsCatalog {
             secondaryRes = R.string.settings_voice_live_transcript_secondary,
             preferenceKey = AgentPreferences.KEY_ASR_LIVE_TRANSCRIPT
         ),
-        WatchSettingItem(
-            id = "voice.wakeOnScreen",
-            domain = WatchSettingsDomain.VOICE,
-            form = WatchSettingForm.READ_ONLY,
-            labelRes = R.string.settings_voice_wake_screen
-        ),
-        WatchSettingItem(
-            id = "voice.wakeOnLockScreen",
-            domain = WatchSettingsDomain.VOICE,
-            form = WatchSettingForm.READ_ONLY,
-            labelRes = R.string.settings_voice_wake_lock
-        ),
-
         // 网页工具 1：Provider 托管搜索
         WatchSettingItem(
             id = "tools.providerManagedSearch",
@@ -123,19 +116,7 @@ object WatchSettingsCatalog {
             labelRes = R.string.settings_context_usage
         ),
 
-        // 界面 3：纯黑（令牌固定）、主题三档（网页可改）、简洁模式
-        WatchSettingItem(
-            id = "interface.usePureBlack",
-            domain = WatchSettingsDomain.INTERFACE,
-            form = WatchSettingForm.READ_ONLY,
-            labelRes = R.string.settings_appearance_pure_black
-        ),
-        WatchSettingItem(
-            id = "interface.themeMode",
-            domain = WatchSettingsDomain.INTERFACE,
-            form = WatchSettingForm.READ_ONLY,
-            labelRes = R.string.settings_appearance_theme
-        ),
+        // 界面 1：简洁模式（纯黑与主题模式已按审计删除）
         WatchSettingItem(
             id = "interface.compactMode",
             domain = WatchSettingsDomain.INTERFACE,

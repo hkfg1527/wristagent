@@ -2,17 +2,14 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -70,37 +67,33 @@ internal fun SettingsWebOnlyRow(form: WebSettingsForm, raw: String) {
         "$form 在表端可写，必须用开关 / 单选 / 滑轨 / 按钮行，不能走只读行入口"
     }
     val parts = webOnlyRowParts(raw, stringResource(R.string.settings_appearance_web_only))
-    Row(
+    // 左槽对齐：项名与全页所有行标签落在同一条左槽线上（旧版整行居中，读起来没有左边缘）
+    Column(
         modifier = Modifier
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             .heightIn(min = Wear.Size.Touch)
-            .padding(horizontal = Wear.Space.Sm, vertical = Wear.Space.Sm),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = Wear.Space.Sm),
+        verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)) {
-            BasicText(
-                text = parts.label,
-                style = Wear.TextRowTitle.copy(textAlign = TextAlign.Center),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            BasicText(
-                text = parts.guidance,
-                style = Wear.TextRowValue.copy(textAlign = TextAlign.Center),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            // 行内标记：手表端改不了的字段必须当场说明，不能让用户点进去才发现没有控件。
-            BasicText(
-                text = if (form == WebSettingsForm.WEB_ONLY) "仅网页端可改" else "只读",
-                style = Wear.TextCaption.copy(
-                    color = Wear.Palette.TextMuted,
-                    textAlign = TextAlign.Center
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        BasicText(
+            text = parts.label,
+            style = SettingsRowLabelStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        BasicText(
+            text = parts.guidance,
+            style = SettingsRowValueStyle,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        // 行内标记：手表端改不了的字段必须当场说明，不能让用户点进去才发现没有控件。
+        BasicText(
+            text = if (form == WebSettingsForm.WEB_ONLY) "仅网页端可改" else "只读",
+            style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

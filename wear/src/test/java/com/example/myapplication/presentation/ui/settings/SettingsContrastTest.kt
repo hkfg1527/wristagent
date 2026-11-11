@@ -53,6 +53,20 @@ class SettingsContrastTest {
     }
 
     @Test
+    fun semanticAccentsPassAAAsRowTextOnThePageBackground() {
+        // 语义色被用作"取值那一行"的文字色：Success / Warning / Danger 都必须过 AA，
+        // 否则"用颜色表达状态"就变成了用不可读的浅色表达状态。
+        listOf(
+            "Success" to Wear.Palette.Success,
+            "Warning" to Wear.Palette.Warning,
+            "Danger" to Wear.Palette.Danger,
+            "Accent" to Wear.Palette.Accent
+        ).forEach { (name, color) ->
+            assertTrue(name + " 作为行文字必须 >= 4.5:1", contrastRatio(color, Wear.Palette.Bg) >= 4.5f)
+        }
+    }
+
+    @Test
     fun dimGlyphColorPassesAAOnThePageBackground() {
         // 行尾箭头 / 胶囊秒数：黑底 5.04:1
         assertTrue(contrastRatio(Wear.Palette.TextMuted, Wear.Palette.Bg) >= 4.5f)
