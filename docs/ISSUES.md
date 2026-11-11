@@ -30,7 +30,7 @@
 | C1 | **控制台只在 Activity 生命周期内运行** | 原 `MainActivity.kt` 起停、Manifest 无前台服务 | **已修**：`ConsoleService.kt:24/30/72`（`startForeground` / `START_STICKY` / `startForegroundService`），`AndroidManifest.xml:9-10` 两条权限 + `:76` service 声明 |
 | C2 | **密钥掩码回填风险** | 原 `/api/state` 给掩码、`app.js` 原样 POST 回写 | **已修**：`ConsoleSecrets.kt:25-40` 服务端自己认掩码（`isMaskEcho`，省略号与 `**` 两种风格都拦），`ConsoleApi.kt:154-161` 任何响应只给掩码 |
 | C3 | 启动失败无日志 | 原 `ConsoleServer.kt` 两个 catch 全吞 | **已修**：`ConsoleServer.kt:57/60/65` 三条 `Log.w`（候选端口绑定失败 / 绑定异常 / 全部候选不可用） |
-| C4 | 端口会静默漂移 | `ConsolePortPolicy` 8080 占用则 8081/8082 | **未修**：手表端仍没有「当前真实端口」的用户可见提示；免鉴权 `GET /healthz` 已在（`ConsoleApi.kt:125/276`），但只服务 PC 侧排障，用户看不到 |
+| C4 | 端口会静默漂移 | `ConsolePortPolicy` 8080 占用则 8081/8082 | **已修**：新增纯函数 `ConsolePortStatus.of(preferred, actual)`（未运行 / 稳定 / 漂移）与 `ConsolePortStatusTest`；设置页那行改读**真实监听端口**，漂移时显示「8080 → 8081」+ 副标题「首选 8080 被占用 · 已改到 8081」，语义色只染 6dp 状态点。顺带修掉根页端口不随子页刷新的真 bug（原直接读非 Compose 状态） |
 | C5 | 一致性测试有 2 条死豁免 | 原 `ConsoleSettingsParityGuardTest.kt:254-273`（providerProfiles / longTermMemoryEnabled 其实已支持） | **已修**：`ConsoleSettingsParityGuardTest.kt:267-274` 记录五条已接通项从 `knownDroppedWebRows` 移除，基线只剩仍未接通的 13 条网页行 |
 
 ## D. 性能（实测，含结论）
@@ -63,10 +63,10 @@
 
 | # | 问题 | 数量 / 证据 | 状态 |
 |---|---|---|---|
-| E1 | 零引用的 public 声明 | 15 项 | **未修**（不影响行为，按 I.3 降为低优先） |
-| E2 | 未使用 import | 49 处 | **未修**（同上，低优先） |
+| E1 | 零引用的 public 声明 | 原 15 项 | **已修**：按「main + test 全域剔除定义行后整词 0 命中」重扫出 3 个候选，删 2 个（`AgentContracts.RightButtonAction` 枚举、`SettingsShared.ChevronMark` composable，均连 KDoc）。剩 `MinimalistSlidersIcon` 1 个，位于待处理文件 |
+| E2 | 未使用 import | 原 49 处 | **已修**：删 41 条（main 36 + test 5）。判定是「该符号在文件正文整词 0 命中」，KDoc 里的 `[Symbol]` 也算命中所以文档锚点不会被误删；`getValue/setValue` 这类 `by` 委托隐式操作符白名单保留 52 条，保护区文件内的 8 条留待对应负责人 |
 | E3 | 死字符串资源 | 原 7 条 | **部分已修**：本轮删除输入方式的两条提示串（键盘 / 语音各一条，`values` 与 `values-zh` 双侧共 4 行，`ChatViewModelTest` 的夹具已改为不依赖它们），剩 5 条 |
-| E4 | `DEFAULT_TIMEOUT_MS = 15_000L` 重复定义 | 4 处 | **未修** |
+| E4 | `DEFAULT_TIMEOUT_MS = 15_000L` 重复定义 | 实测 5 个声明（其中 2 个已是别名） | **部分已修**：`ShizukuShell.kt:144` 归一到 `ShellPolicy.DEFAULT_TIMEOUT_MS`（语义唯一重复的一处）。`SubAgentRunner` 的 120_000L 是「子代理整轮预算」、与单条命令超时语义不同，**刻意不合并** |
 | E5 | `SessionStore.save` 空 catch 吞写盘失败 | 1 处 | **已修**：`SessionStore.kt:25` 改为返回 `Result<Unit>`，`:10-23` 明令「丢弃返回值就等于回到空 catch」 |
 | E6 | 剪贴板遥测结构上永远取空（不在前台即拒绝） | 原 `AgentDispatcher.kt:113-117` | **已修**：`AgentDispatcher.kt:114-117` 整段剪贴板遥测删除（结构上取不到，就不留恒空的假遥测），现只保留时刻 / 设备形态 / 电量三项 |
 | E7 | 百度 ASR 3308–3317 错误码语义未确认 | 原 `BaiduAsrProvider.kt:133` | **已修**：`BaiduAsrProvider.kt:133-149` 不再自造语义——区间码只陈述「服务端返回该码、本次识别未完成」并让上层附带服务端 `err_msg`；`:149` 对语义未核实的码故意返回 false |
@@ -82,14 +82,14 @@
 
 | 序 | 阶段 | 状态 |
 |---|---|---|
-| 1 | P5 UI 大改 | 约 97%（B7 主键边缘高光已落地 `BottomInteractiveBlock.kt:534-544`；**剩审批首帧第 2 刀未做**） |
+| 1 | P5 UI 大改 | **完成**：B7 主键边缘高光 + 按压缩放 + 发送闪亮；审批浮层改常驻预合成 + `drawWithCache` + 1×1 预热节点（首帧不再付组合/布局成本）；真机已截图验收设置页、外观页、供应商页、引导页、聊天页、审批浮层 |
 | 2 | P6 模型读取 | **完成**（F1 真机实测 PASS：`refresh-models` 返回 2 个模型） |
 | 3 | P2 动画统一 | **完成**（统一入口 `SettingsMotion.kt:24` `motionSpec`，main 内 23 处调用；总开关 `LocalAnimationsEnabled` 由 `ChatApp.kt:99/161` 注入，三屏共用） |
-| 4 | P1 滚动卡顿 | 部分（只剩消息卡 `drawBehind`，D 节结论，收益不确定） |
+| 4 | P1 滚动卡顿 | **完成**：真机逐帧定位到根因是自动滚动锚点取卡片底边（每 32ms 被流式正文撑开又被缩放收回，目标在 ±20px 内来回跳），改为单一驱动 + 一格邮箱合并 + 不对称限速。`drawBehind` 一项按 D 节实测**结案不做** |
 | 5 | P4 删输入方式二选一状态 | **已完成**（18 文件删除；主键单击恒为语音起录，文字输入由左翼一步直接打开） |
 | 6 | P3 引导重写 | **完成**（`OnboardingScreen.kt:77-122` 五页手势文案 + `:437-566` 示意图；守门 `OnboardingPagerTest.kt`） |
-| 7 | P7 网页端 | **主体完成**（C1 前台服务 / C2 掩码 / C3 日志 / C5 死豁免 / B3 字段补齐 / B4 轮数滑杆）；**剩 C4 端口漂移的用户可见提示未做** |
-| 8 | P8 收口 | 未开始 |
+| 7 | P7 网页端 | **完成**（C1 前台服务 / C2 掩码 / C3 日志 / C4 端口漂移可见 / C5 死豁免 / B3 字段补齐 / B4 轮数滑杆 / B5 校验 / B6 默认值对齐 / `/healthz` / 按来源分桶限流 / 有界请求队列） |
+| 8 | P8 收口 | **完成**：删 `mobile` 模块（32 文件）、`docs/` 纳入版本控制（只忽略真机取证与工作草稿）、`versionName 1.0`、tag `v1.0.0`、CHANGELOG 补 1.0、推送 GitHub |
 
 ## H. 已独立验证通过的部分
 
