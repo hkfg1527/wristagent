@@ -82,8 +82,11 @@ export GRADLE_USER_HOME=/path/to/gradle-home
 
 诚实清单，写在这里而不是等你踩到：
 
-- **强调色覆盖不完整**：聊天页里还有 20 余处直接读 `Wear.Palette.Accent` 令牌的元素不跟随换色
-  （令牌本身必须是常量，`PaletteAuditTest` 依赖它）。字号档不受此限，因为它走 `Wear.Text*`
+- **配套的派生色不跟随强调色**：主强调色已全站走运行时投影（选绿就整套变绿），
+  但 `AccentDim` / `AccentTrack` 这两枚配套令牌没有运行时投影——用到它们的少数元素
+  （例如用户消息气泡的底色）仍停在默认蓝。要不要派生、按什么比例派生属产品决定
+- **主键边缘高光固定在令牌蓝**：`OrbEdgeHighlight.toneOf` 是零 Compose 依赖的纯函数，
+  被既有测试钉在 `Wear.Palette.Accent` 上；要让它跟随换色得同时改签名与那个测试
 - **长期记忆的写入工具只有源码级守卫**：`remember_fact` 的「注册表分派 → 落盘」这一跳在 JVM 单测里
   执行不了——它必经 `org.json`，而单测里那是 AGP 的桩（`unitTests.isReturnDefaultValues = true`）。
   规则层、存储层、注入层都有真测试，只有这一跳是读源码断言接线
