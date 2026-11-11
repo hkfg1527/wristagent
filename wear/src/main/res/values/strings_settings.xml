@@ -44,6 +44,10 @@
     <string name="settings_temp_balanced">Balanced 0.7</string>
     <string name="settings_temp_creative">Creative 1.2</string>
     <string name="settings_max_tokens">Max output tokens</string>
+    <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
+    <string name="settings_max_tokens_custom">Max output tokens · Custom</string>
+    <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
+    <string name="settings_max_tokens_range_hint">%1$d – %2$d</string>
     <string name="settings_transport">Transport protocol</string>
     <string name="settings_sse_on">Enable SSE streaming</string>
         <string name="settings_thought_group">Reasoning process</string>
@@ -156,7 +160,15 @@
     <string name="settings_temp_presets">Quick presets</string>
     <string name="settings_remote_console_title">Web Console</string>
     <string name="settings_remote_console_running">Running on port %1$d</string>
-    <string name="settings_remote_console_stopped">Stopped</string>
+    <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
+    <string name="settings_remote_console_not_running">Not running</string>
+    <!-- 报告的是 ConsoleServer 真实监听的端口，不是配置里的首选端口。 -->
+    <string name="settings_remote_console_port_value">Port %1$d</string>
+    <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
+    <string name="settings_remote_console_port_drifted">Preferred port %1$d is busy · using %2$d</string>
+    <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
+    <string name="settings_remote_console_refresh_port">Refresh port</string>
+    <string name="settings_remote_console_start">Start console</string>
     <string name="settings_remote_console_hint">Open this address in a phone browser on the same Wi-Fi to edit every setting.</string>
     <string name="settings_remote_console_token">Access token</string>
     <string name="settings_remote_console_copy_hint">Tap the address to copy it</string>
@@ -337,6 +349,18 @@
     <string name="settings_appearance_matrix_header">Dot matrix</string>
     <string name="settings_appearance_matrix_spacing">Matrix spacing</string>
     <string name="settings_appearance_web_only">Change this on the web console</string>
+    <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
+    <string name="settings_appearance_font_scale">Font size</string>
+    <string name="settings_font_scale_standard">Default</string>
+    <string name="settings_font_scale_large">Large</string>
+    <string name="settings_font_scale_xlarge">Extra large</string>
+    <!-- 强调色五档：档名是颜色名，不是令牌名。 -->
+    <string name="settings_appearance_accent_color">Accent color</string>
+    <string name="settings_accent_cyan">Cyan</string>
+    <string name="settings_accent_green">Green</string>
+    <string name="settings_accent_violet">Violet</string>
+    <string name="settings_accent_pink">Pink</string>
+    <string name="settings_accent_amber">Amber</string>
 
     <string name="settings_web_tools_header">Web tools</string>
     <string name="settings_flag_on">on</string>
@@ -349,6 +373,9 @@
     <string name="settings_context_usage">Context usage</string>
     <string name="settings_context_usage_value">%1$d turns cap · auto-compress %2$s</string>
     <string name="settings_web_only_header">Web console only</string>
+    <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
+    <string name="settings_web_only_badge">Web console only</string>
+    <string name="settings_read_only_badge">Read-only</string>
     <string name="settings_context_window_web">Context window: set on the web console</string>
     <string name="settings_context_truncation_web">Compress threshold and truncation strategy: web console</string>
 

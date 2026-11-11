@@ -155,12 +155,12 @@ fun AppearanceContent(
         }
 
         // 字号档：整体缩放现有 5 级字阶，改完立刻整站生效（读的是 WearAppearance 的快照状态）
-        section(FontScaleSectionLabel)
+        section(stringResource(R.string.settings_appearance_font_scale))
 
         FontScaleTier.values().forEach { tier ->
             row(subItem = true) {
                 SettingsSubRadioRow(
-                    label = tier.label,
+                    label = stringResource(tier.labelRes),
                     subtitle = tier.percent,
                     selected = FontScaleTier.nearest(WearAppearance.fontScale) == tier,
                     onSelect = {
@@ -172,12 +172,12 @@ fun AppearanceContent(
         }
 
         // 强调色档：运行时覆盖，不是新令牌；未选中的档也用小色点把颜色先给出来
-        section(AccentSectionLabel)
+        section(stringResource(R.string.settings_appearance_accent_color))
 
         AccentPreset.values().forEach { preset ->
             row(subItem = true) {
                 SettingsSubRadioRow(
-                    label = preset.label,
+                    label = stringResource(preset.labelRes),
                     selected = AccentPreset.of(WearAppearance.accent) == preset,
                     dotColor = preset.color,
                     onSelect = {

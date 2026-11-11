@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit
  */
 class ConsoleServer(
     private val api: ConsoleApi,
-    private val preferredPort: Int = ConsolePortPolicy.DEFAULT_PORT,
+    /** 首选端口：界面拿它与真实 [port] 比对，判定是否发生了端口漂移。 */
+    val preferredPort: Int = ConsolePortPolicy.DEFAULT_PORT,
     private val attempts: Int = ConsolePortPolicy.MAX_ATTEMPTS,
 ) : NanoHTTPD(preferredPort) {
 

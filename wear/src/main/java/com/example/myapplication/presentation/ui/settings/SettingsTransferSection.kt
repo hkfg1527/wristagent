@@ -29,6 +29,8 @@ fun SettingsTransferContent(
     onApplied: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    // 外观两项住在独立偏好文件里，快照必须同时带它们走，否则导出再导入等于换了个外观
+    val appearance = remember(context) { AppearanceStore.of(context) }
     var pasteOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var statusOk by remember { mutableStateOf(true) }
@@ -45,7 +47,8 @@ fun SettingsTransferContent(
                     onValueChange = { raw ->
                         when (val parsed = SettingsTransferCodec.parse(raw)) {
                             is TransferResult.Ok -> {
-                                val applied = SettingsTransferBridge.apply(preferences, parsed.entries)
+                                val applied =
+                                    SettingsTransferBridge.apply(preferences, parsed.entries, appearance)
                                 onApplied()
                                 statusOk = true
                                 status = context.getString(R.string.settings_transfer_imported, applied)
@@ -71,7 +74,7 @@ fun SettingsTransferContent(
                 onClick = {
                     context.vibrateConfirm()
                     val snapshot = SettingsTransferCodec.export(
-                        SettingsTransferBridge.snapshot(preferences)
+                        SettingsTransferBridge.snapshot(preferences, appearance)
                     )
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
                     clipboard?.setPrimaryClip(ClipData.newPlainText("settings", snapshot))
@@ -99,7 +102,8 @@ fun SettingsTransferContent(
                     } else {
                         when (val parsed = SettingsTransferCodec.parse(raw)) {
                             is TransferResult.Ok -> {
-                                val applied = SettingsTransferBridge.apply(preferences, parsed.entries)
+                                val applied =
+                                    SettingsTransferBridge.apply(preferences, parsed.entries, appearance)
                                 onApplied()
                                 statusOk = true
                                 status = context.getString(R.string.settings_transfer_imported, applied)

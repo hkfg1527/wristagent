@@ -85,7 +85,13 @@ internal fun SettingsWebOnlyRow(form: WebSettingsForm, raw: String) {
             )
             // 行内标记：手表端改不了的字段必须当场说明，不能让用户点进去才发现没有控件。
             BasicText(
-                text = if (form == WebSettingsForm.WEB_ONLY) "仅网页端可改" else "只读",
+                text = stringResource(
+                    if (form == WebSettingsForm.WEB_ONLY) {
+                        R.string.settings_web_only_badge
+                    } else {
+                        R.string.settings_read_only_badge
+                    }
+                ),
                 style = Wear.TextCaption.copy(color = Wear.Palette.TextMuted),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

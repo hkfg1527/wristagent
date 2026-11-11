@@ -49,6 +49,7 @@ import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.presentation.ui.settings.AppearanceContent
+import com.example.myapplication.presentation.ui.settings.ConsolePortStatus
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
@@ -175,12 +176,16 @@ fun SettingsScreen(
     val rowStagger = rememberSettingsRowStaggerState()
     val exit = rememberSettingsExitController()
 
-    // 特权层：随设置页存活（进入时探测一次、离开时释放监听），
-    // 状态用 StateFlow 收集，列表行只显示当前后端名，不参与任何系统调用。
+    // 控制台服务器：全进程单例，这里只取回同一实例（根页这一行要报它真实监听的端口）
     val consoleServer = remember { ConsoleServer.create(context.applicationContext) }
     var consolePort by remember { mutableIntStateOf(consoleServer.port) }
-    var consoleRunning by remember { mutableStateOf(consoleServer.isRunning) }
+    // 真实端口不是 Compose 状态（未运行时是 -1）：每次进出子页回读一次，这一行才不会停在旧端口上
+    LaunchedEffect(activeDialog) {
+        consolePort = consoleServer.port
+    }
 
+    // 特权层：随设置页存活（进入时探测一次、离开时释放监听），
+    // 状态用 StateFlow 收集，列表行只显示当前后端名，不参与任何系统调用。
     val privilegeManager = remember { PrivilegeManager(context) }
     val privilegeStatus by privilegeManager.status.collectAsState()
     DisposableEffect(privilegeManager) {
@@ -428,9 +433,24 @@ fun SettingsScreen(
                     // 8. 操作安全防线
                     item {
                         RootContentRow(index = 10, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
+                            val consoleStatus =
+                                ConsolePortStatus.of(consoleServer.preferredPort, consolePort)
                             SettingsNavRow(
                                 title = stringResource(R.string.settings_remote_console_title),
-                                value = if (consoleServer.isRunning) ":" + consoleServer.port else null,
+                                // 没在跑就没有端口可报：显示「未运行」，不显示配置里的首选端口
+                                value = when (consoleStatus) {
+                                    ConsolePortStatus.NOT_RUNNING ->
+                                        stringResource(R.string.settings_remote_console_not_running)
+                                    ConsolePortStatus.STABLE -> stringResource(
+                                        R.string.settings_remote_console_port_value,
+                                        consolePort
+                                    )
+                                    ConsolePortStatus.DRIFTED -> stringResource(
+                                        R.string.settings_remote_console_port_drifted_short,
+                                        consoleServer.preferredPort,
+                                        consolePort
+                                    )
+                                },
                                 onClick = {
                                     context.vibrateTick()
                                     activeDialog = SettingsSubDialog.REMOTE_CONSOLE

@@ -36,8 +36,11 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
     // 端口/运行态不是 Compose 状态，进入本页时读一次快照；点按钮后再刷新一次。
     var refreshTick by remember { mutableIntStateOf(0) }
     val token = remember(refreshTick) { tokenStore.getOrCreate() }
+    // 端口读的是真正绑上的那个（8080 被占用时会是 8081 / 8082），不是配置里的首选端口
     val port = remember(refreshTick) { server.port }
-    val running = remember(refreshTick) { server.isRunning }
+    val preferredPort = remember(refreshTick) { server.preferredPort }
+    val portStatus = ConsolePortStatus.of(preferredPort, port)
+    val running = portStatus != ConsolePortStatus.NOT_RUNNING
     val ip = remember(refreshTick) { localIpv4() ?: "0.0.0.0" }
     // 令牌走查询参数 t：控制台前端在 initToken() 里用 URLSearchParams 取 t 后立刻从地址栏抹掉
     val url = "http://$ip:$port/?t=$token"
@@ -46,14 +49,39 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
         section(stringResource(R.string.settings_remote_console_title))
 
         row {
-            SettingsInfoRow(
+            SettingsStatusRow(
                 title = stringResource(R.string.settings_remote_console_title),
-                value = if (running) {
-                    stringResource(R.string.settings_remote_console_running, port)
+                value = when (portStatus) {
+                    ConsolePortStatus.NOT_RUNNING ->
+                        stringResource(R.string.settings_remote_console_not_running)
+                    ConsolePortStatus.STABLE ->
+                        stringResource(R.string.settings_remote_console_running, port)
+                    ConsolePortStatus.DRIFTED ->
+                        stringResource(
+                            R.string.settings_remote_console_port_drifted_short,
+                            preferredPort,
+                            port
+                        )
+                },
+                // 漂移只染右端 6dp 状态点，整行与取值文字都不铺色
+                statusTone = if (portStatus == ConsolePortStatus.DRIFTED) {
+                    SettingsStatusTone.WARN
                 } else {
-                    stringResource(R.string.settings_remote_console_stopped)
+                    null
                 }
             )
+        }
+
+        if (portStatus == ConsolePortStatus.DRIFTED) {
+            row {
+                SettingsCaptionRow(
+                    text = stringResource(
+                        R.string.settings_remote_console_port_drifted,
+                        preferredPort,
+                        port
+                    )
+                )
+            }
         }
 
         if (running) {
@@ -85,7 +113,13 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
 
         standaloneRow {
             SettingsActionButton(
-                label = if (running) "重新读取端口" else "启动控制台",
+                label = stringResource(
+                    if (running) {
+                        R.string.settings_remote_console_refresh_port
+                    } else {
+                        R.string.settings_remote_console_start
+                    }
+                ),
                 onClick = {
                     context.vibrateTick()
                     // start() 内部幂等；这里读实时状态而不是渲染快照，连点也不会二次绑定端口

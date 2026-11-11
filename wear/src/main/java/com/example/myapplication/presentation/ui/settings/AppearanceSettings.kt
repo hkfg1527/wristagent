@@ -2,12 +2,14 @@ package com.example.myapplication.presentation.ui.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.abs
 
@@ -18,10 +20,10 @@ import kotlin.math.abs
  * Text* 访问器），所以 WearTypography 里仍然只有那 5 个 sp 数值，
  * WearTypographyAuthorityTest 与 SettingsDesignMathTest 的字阶断言都不受影响。
  */
-enum class FontScaleTier(val scale: Float, val label: String, val percent: String) {
-    STANDARD(1f, "标准", "100%"),
-    LARGE(1.15f, "大", "115%"),
-    XLARGE(1.30f, "特大", "130%");
+enum class FontScaleTier(val scale: Float, @StringRes val labelRes: Int, val percent: String) {
+    STANDARD(1f, R.string.settings_font_scale_standard, "100%"),
+    LARGE(1.15f, R.string.settings_font_scale_large, "115%"),
+    XLARGE(1.30f, R.string.settings_font_scale_xlarge, "130%");
 
     companion object {
         /** 存储里的浮点值 -> 最近的一档：跨版本写坏了也不会停在两档之间。 */
@@ -37,12 +39,12 @@ enum class FontScaleTier(val scale: Float, val label: String, val percent: Strin
  * 这里的取值是"用户可选的主题色"，默认一档与令牌 [Wear.Palette.Accent] 同值，
  * 因此没改过设置时像素与旧版逐位一致。每一档都过黑底 WCAG AA（见 AppearanceSettingsTest）。
  */
-enum class AccentPreset(val argb: Long, val label: String) {
-    CYAN(0xFF4FC3F7, "青"),
-    MINT(0xFF7BE495, "绿"),
-    VIOLET(0xFFC79BFF, "紫"),
-    ROSE(0xFFFF9EB5, "粉"),
-    AMBER(0xFFFFAB70, "橙");
+enum class AccentPreset(val argb: Long, @StringRes val labelRes: Int) {
+    CYAN(0xFF4FC3F7, R.string.settings_accent_cyan),
+    MINT(0xFF7BE495, R.string.settings_accent_green),
+    VIOLET(0xFFC79BFF, R.string.settings_accent_violet),
+    ROSE(0xFFFF9EB5, R.string.settings_accent_pink),
+    AMBER(0xFFFFAB70, R.string.settings_accent_amber);
 
     val color: Color get() = Color(argb.toInt())
 
@@ -163,12 +165,3 @@ fun applyAccentPreset(context: Context, preset: AccentPreset) {
     WearAppearance.accentOverride = preset.color
     AppearanceStore.of(context).saveAccent(preset.color)
 }
-
-/**
- * 外观页的两条分组标题与"自定义"后缀。
- *
- * 文案没能进资源文件：资源目录在本次改动的禁止清单里，这里只能先写字面量
- * （与 OnboardingScreen 的既有做法一致），待补 strings_settings.xml 时一并迁移。
- */
-internal const val FontScaleSectionLabel = "字号"
-internal const val AccentSectionLabel = "强调色"

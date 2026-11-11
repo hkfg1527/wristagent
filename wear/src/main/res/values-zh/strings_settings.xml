@@ -44,6 +44,10 @@
     <string name="settings_temp_balanced">平衡 0.7</string>
     <string name="settings_temp_creative">发散 1.2</string>
     <string name="settings_max_tokens">最大输出 Token</string>
+    <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
+    <string name="settings_max_tokens_custom">最大输出 Token · 自定义</string>
+    <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
+    <string name="settings_max_tokens_range_hint">%1$d – %2$d</string>
     <string name="settings_transport">传输协议</string>
     <string name="settings_sse_on">开启 SSE 流式</string>
         <string name="settings_thought_group">思考过程</string>
@@ -146,7 +150,15 @@
     <string name="settings_temp_presets">快捷预设</string>
     <string name="settings_remote_console_title">网页控制台</string>
     <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
-    <string name="settings_remote_console_stopped">已关闭</string>
+    <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
+    <string name="settings_remote_console_not_running">未运行</string>
+    <!-- 报告的是 ConsoleServer 真实监听的端口，不是配置里的首选端口。 -->
+    <string name="settings_remote_console_port_value">端口 %1$d</string>
+    <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
+    <string name="settings_remote_console_port_drifted">首选 %1$d 被占用 · 已改到 %2$d</string>
+    <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
+    <string name="settings_remote_console_refresh_port">重新读取端口</string>
+    <string name="settings_remote_console_start">启动控制台</string>
     <string name="settings_remote_console_hint">手机连同一 Wi-Fi，用浏览器打开下面的地址即可调整全部设置。</string>
     <string name="settings_remote_console_token">访问令牌</string>
     <string name="settings_remote_console_copy_hint">点击地址可复制</string>
@@ -327,6 +339,18 @@
     <string name="settings_appearance_matrix_header">点阵</string>
     <string name="settings_appearance_matrix_spacing">点阵间距</string>
     <string name="settings_appearance_web_only">请在手机网页修改</string>
+    <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
+    <string name="settings_appearance_font_scale">字号</string>
+    <string name="settings_font_scale_standard">标准</string>
+    <string name="settings_font_scale_large">大</string>
+    <string name="settings_font_scale_xlarge">特大</string>
+    <!-- 强调色五档：档名是颜色名，不是令牌名。 -->
+    <string name="settings_appearance_accent_color">强调色</string>
+    <string name="settings_accent_cyan">青</string>
+    <string name="settings_accent_green">绿</string>
+    <string name="settings_accent_violet">紫</string>
+    <string name="settings_accent_pink">粉</string>
+    <string name="settings_accent_amber">橙</string>
 
     <string name="settings_web_tools_header">网页工具</string>
     <string name="settings_flag_on">开</string>
@@ -339,6 +363,9 @@
     <string name="settings_context_usage">上下文用量</string>
     <string name="settings_context_usage_value">%1$d 轮上限 · 自动压缩%2$s</string>
     <string name="settings_web_only_header">仅在手机网页可改</string>
+    <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
+    <string name="settings_web_only_badge">仅网页端可改</string>
+    <string name="settings_read_only_badge">只读</string>
     <string name="settings_context_window_web">上下文窗口：请在手机网页修改</string>
     <string name="settings_context_truncation_web">压缩阈值与截断策略：请在手机网页修改</string>
 

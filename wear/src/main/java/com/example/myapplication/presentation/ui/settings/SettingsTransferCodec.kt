@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.SandboxLevel
@@ -60,8 +62,17 @@ object SettingsTransferCodec {
         "toolMatrixDensityEnabled",
         "toolPowerModeEnabled",
         "toolWeatherEnabled",
-        "toolWebSearchEnabled"
+        "toolWebSearchEnabled",
+        // 外观两项：存在独立的 wear_appearance 文件里，但漏了它们就等于"导出再导入换台设备外观全丢"
+        KeyFontScale,
+        KeyAccentArgb
     )
+
+    /** 字号档（浮点缩放系数）。 */
+    const val KeyFontScale = "fontScale"
+
+    /** 强调色档（ARGB 整数）。 */
+    const val KeyAccentArgb = "accentArgb"
 
     /** 把一份键值表编码成快照文本；不在白名单里的键被忽略。 */
     fun export(values: Map<String, String>): String {
@@ -204,7 +215,7 @@ object SettingsTransferCodec {
  */
 object SettingsTransferBridge {
 
-    fun snapshot(preferences: AgentPreferences): Map<String, String> = linkedMapOf(
+    fun snapshot(preferences: AgentPreferences, appearance: AppearanceStore): Map<String, String> = linkedMapOf(
         "securityMode" to preferences.securityMode.name,
         "toolApprovalPolicy" to preferences.toolApprovalPolicy.storageKey,
         "sandboxLevel" to preferences.sandboxLevel.storageKey,
@@ -235,17 +246,53 @@ object SettingsTransferBridge {
         "toolMatrixDensityEnabled" to preferences.toolMatrixDensityEnabled.toString(),
         "toolPowerModeEnabled" to preferences.toolPowerModeEnabled.toString(),
         "toolWeatherEnabled" to preferences.toolWeatherEnabled.toString(),
-        "toolWebSearchEnabled" to preferences.toolWebSearchEnabled.toString()
+        "toolWebSearchEnabled" to preferences.toolWebSearchEnabled.toString(),
+        SettingsTransferCodec.KeyFontScale to appearance.fontScale().toString(),
+        // 没有覆盖时导出令牌色：导入端只能落在五个预设档上，空值会让"默认档"无处可落
+        SettingsTransferCodec.KeyAccentArgb to
+            (appearance.accent() ?: AccentPreset.Default.color).toArgb().toString()
     )
 
-    /** 写回：返回真正落盘的项数。类型不合法的项被跳过，不会写坏存储。 */
-    fun apply(preferences: AgentPreferences, entries: List<TransferEntry>): Int {
+    /**
+     * 写回：返回真正落盘的项数。类型不合法的项被跳过，不会写坏存储。
+     *
+     * 外观两项单列一支：它们住在 [AppearanceStore]（独立偏好文件），且**非法值不跳过而是回落默认档** ——
+     * 跳过等于"导进去了但没生效"，用户拿到的是一台外观不对的设备，却没有任何反馈。
+     */
+    fun apply(
+        preferences: AgentPreferences,
+        entries: List<TransferEntry>,
+        appearance: AppearanceStore
+    ): Int {
         var applied = 0
+        var appearanceImported = false
         entries.forEach { entry ->
-            if (applyOne(preferences, entry)) applied++
+            when (entry.key) {
+                SettingsTransferCodec.KeyFontScale -> {
+                    appearance.saveFontScale(fontScaleOf(entry.value))
+                    applied++
+                    appearanceImported = true
+                }
+                SettingsTransferCodec.KeyAccentArgb -> {
+                    appearance.saveAccent(accentOf(entry.value))
+                    applied++
+                    appearanceImported = true
+                }
+                else -> if (applyOne(preferences, entry)) applied++
+            }
         }
+        // 界面读的是 WearAppearance 的快照状态：导入完立刻灌一次，不必等重启
+        if (appearanceImported) appearance.install()
         return applied
     }
+
+    /** 字号档：解析不了的字符串落到默认档；野值由 [FontScaleTier.nearest] 夹回最近的档。 */
+    private fun fontScaleOf(raw: String): Float =
+        FontScaleTier.nearest(raw.toFloatOrNull() ?: FontScaleTier.STANDARD.scale).scale
+
+    /** 强调色：解析不了或不属于五个预设档的颜色一律回落到默认档，野色不写进存储。 */
+    private fun accentOf(raw: String): Color =
+        AccentPreset.of(Color(raw.toIntOrNull() ?: AccentPreset.Default.color.toArgb())).color
 
     private fun applyOne(preferences: AgentPreferences, entry: TransferEntry): Boolean {
         val value = entry.value
