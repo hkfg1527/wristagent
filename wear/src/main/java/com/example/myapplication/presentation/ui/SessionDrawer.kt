@@ -19,6 +19,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,11 +48,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -68,10 +72,11 @@ import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.ChatSession
-import com.example.myapplication.presentation.ui.components.WearChip
 import com.example.myapplication.presentation.ui.components.WearDivider
 import com.example.myapplication.presentation.ui.components.WearRow
 import com.example.myapplication.presentation.ui.components.WearSectionHeader
+import com.example.myapplication.presentation.ui.settings.HeaderDotSignatureWidth
+import com.example.myapplication.presentation.ui.settings.headerDotSignature
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,7 +87,7 @@ import kotlin.math.abs
 
 /**
  * 会话抽屉：不透明实底，无重影
- * - 模型切换为 WearChip 横向滚动，会话条目为 WearRow 风格双行信息 + 44dp 删除键
+ * - 模型切换为 32dp 描边胶囊横向滚动（选中态只描边、不铺实底），会话条目为 WearRow 风格双行信息 + 44dp 删除键
  * - 屏幕曲率变形挤压：依托 ScalingLazyColumn，在圆屏上下边缘随物理边界平滑挤压缩放
  * - 右滑跟手阻尼退出，硬件表冠联动滚动并伴随轻微触觉微震
  */
@@ -198,7 +203,15 @@ fun SessionDrawer(
                         ) {
                             BasicText(
                                 text = stringResource(R.string.ui_drawer_title),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    // 点阵签名：与设置页组标题同一份实现，画在标题左侧的沟里。
+                                    // 负向平移不参与布局，标题的起始 x 一个像素都没动。
+                                    .drawBehind {
+                                        translate(left = -HeaderDotSignatureWidth.toPx()) {
+                                            headerDotSignature()
+                                        }
+                                    },
                                 style = Wear.TextTitle,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -229,7 +242,7 @@ fun SessionDrawer(
                                     horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
                                 ) {
                                     availableModels.forEach { modelKey ->
-                                        WearChip(
+                                        ModelChip(
                                             label = ModelLabels.label(modelKey),
                                             selected = currentModelName == modelKey,
                                             onClick = {
@@ -292,6 +305,56 @@ fun SessionDrawer(
 }
 
 /**
+ * 模型胶囊：选中态只用 1dp 描边 + 强调色文字指出"哪个是选中的"，不铺实底。
+ *
+ * 旧版选中态是整块强调色实底（32dp 高胶囊，约 90×50dp 命中区），是抽屉里最大的一块纯色 ——
+ * 强调色的作用是标出选中项，不是把一块面积刷成高饱和。未选中态维持深底 + 中性描边 + 次要文字。
+ */
+@Composable
+private fun ModelChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(Wear.Radius.Control)
+    Box(
+        modifier = Modifier
+            .heightIn(min = Wear.Size.Touch)
+            .widthIn(min = Wear.Size.Touch)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                role = Role.Button,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .height(Wear.Size.ChipHeight)
+                .clip(shape)
+                .background(if (selected) Color.Transparent else Wear.Palette.SurfaceAlt)
+                .border(
+                    width = 1.dp,
+                    color = if (selected) Wear.Palette.AccentTrack else Wear.Palette.Border,
+                    shape = shape
+                )
+                .padding(horizontal = Wear.Space.Md),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicText(
+                text = label,
+                style = Wear.TextCaption.copy(
+                    color = if (selected) Wear.Accent else Wear.Palette.TextSecondary
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/**
  * 单个会话条目：状态点 + 标题 + 时间 + 独立删除键
  * 删除为二次确认：点 ✕ 只把本行切到确认态（删除 / 取消 两个 44dp 键），3 秒无操作自动复原，
  * 确认态只挂在 session.id 上，不会误删其它会话。
@@ -321,11 +384,8 @@ private fun SessionRow(
         isSelected -> Wear.Palette.SurfaceAlt
         else -> Wear.Palette.Surface
     }
-    val strokeColor = when {
-        confirmingDelete -> Wear.Palette.Danger
-        isSelected -> Wear.Palette.Accent
-        else -> Wear.Palette.Border
-    }
+    // 描边一律中性：强调色不是装饰线，卡片的边界只表达"这里是一张卡"
+    val strokeColor = if (confirmingDelete) Wear.Palette.Danger else Wear.Palette.Border
 
     Row(
         modifier = Modifier
@@ -362,11 +422,12 @@ private fun SessionRow(
                 onClick = { confirmingDelete = false }
             )
         } else {
+            // 当前会话只由一颗 6dp 点标出，与设置页"语义色只染点"同一条规则
             Box(
                 modifier = Modifier
-                    .size(Wear.Space.Sm)
+                    .size(Wear.Size.StatusBlock)
                     .clip(CircleShape)
-                    .background(if (isSelected) Wear.Palette.Accent else Wear.Palette.TextMuted)
+                    .background(if (isSelected) Wear.Accent else Wear.Palette.TextMuted)
             )
 
             Column(modifier = Modifier.weight(1f)) {
