@@ -22,7 +22,6 @@
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
     <string name="settings_side_key">Bottom Bar Side Key</string>
-    <string name="settings_side_key_value">Right wing opens the session drawer</string>
     <string name="settings_security_policy">Security Policy</string>
     <string name="settings_mode_strict">Strict confirm</string>
     <string name="settings_mode_standard">Standard prompt</string>
@@ -36,7 +35,6 @@
     <string name="settings_done_back">Done</string>
     <string name="settings_sub_model_config">Model &amp; Endpoint</string>
     <string name="settings_sub_hyper_params">Inference</string>
-    <string name="settings_sub_wing_shortcut">Quick Action</string>
 
     <!-- Hyper parameters. -->
     <string name="settings_temperature">Sampling temperature</string>
@@ -60,13 +58,9 @@
 
     <!-- Memory and security sections. -->
     <string name="settings_turns_header">Turns kept per session</string>
-    <string name="settings_turns_4">4 turns saver</string>
-    <string name="settings_turns_10">10 turns standard</string>
-    <string name="settings_turns_30">30 turns deep</string>
     <string name="settings_memory_clear_header">Memory cleanup</string>
     <string name="settings_memory_cleared">Current memory and preferences cleared</string>
     <string name="settings_memory_clear_all">Clear all memory and preferences</string>
-    <string name="settings_side_key_header">Right Side Key Binding</string>
     <string name="settings_security_novice_title">Strict safety mode</string>
     <string name="settings_security_novice_desc">Every sensitive and system action needs approval, with a 3 second countdown against mis-taps</string>
     <string name="settings_security_standard_title">Standard prompt mode</string>
@@ -80,9 +74,7 @@
     <string name="settings_api_endpoint">API endpoint</string>
     <string name="settings_ping_running">Pinging...</string>
     <string name="settings_ping_idle">Endpoint speed test with a live handshake ping</string>
-    <string name="settings_probe_running">Handshaking...</string>
     <string name="settings_probe_ready">Endpoint ready • %1$dms latency (%2$d models available)</string>
-    <string name="settings_probe_failed">Handshake failed, the network timed out</string>
     <string name="settings_model_refresh_failed">Refresh failed \u00b7 %1$s</string>
     <string name="settings_model_error_dns">DNS lookup failed</string>
     <string name="settings_model_error_timeout">Timed out (3s), retried once</string>
@@ -364,15 +356,12 @@
     <string name="settings_accent_amber">Amber</string>
 
     <string name="settings_web_tools_header">Web tools</string>
-    <string name="settings_flag_on">on</string>
-    <string name="settings_flag_off">off</string>
 
     <string name="settings_memory_enabled">Long-term memory</string>
     <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
     <string name="settings_context_compress">Auto-compress context</string>
     <string name="settings_context_compress_secondary">Compress history once occupancy passes the threshold</string>
     <string name="settings_context_usage">Context usage</string>
-    <string name="settings_context_usage_value">%1$d turns cap · auto-compress %2$s</string>
     <string name="settings_web_only_header">Web console only</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
     <string name="settings_web_only_badge">Web console only</string>

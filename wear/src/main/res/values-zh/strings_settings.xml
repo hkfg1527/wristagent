@@ -22,7 +22,6 @@
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
     <string name="settings_side_key">底栏副键</string>
-    <string name="settings_side_key_value">右翼固定打开会话抽屉</string>
     <string name="settings_security_policy">安全策略</string>
     <string name="settings_mode_strict">严格确认</string>
     <string name="settings_mode_standard">标准提示</string>
@@ -36,7 +35,6 @@
     <string name="settings_done_back">完成返回</string>
     <string name="settings_sub_model_config">模型与端点</string>
     <string name="settings_sub_hyper_params">推理参数</string>
-    <string name="settings_sub_wing_shortcut">快捷操作</string>
 
     <!-- 推理参数。 -->
     <string name="settings_temperature">采样温度</string>
@@ -60,13 +58,9 @@
 
     <!-- 记忆与安全分区。 -->
     <string name="settings_turns_header">单会话保留轮数</string>
-    <string name="settings_turns_4">4轮 节能</string>
-    <string name="settings_turns_10">10轮 标准</string>
-    <string name="settings_turns_30">30轮 深度</string>
     <string name="settings_memory_clear_header">记忆清理</string>
     <string name="settings_memory_cleared">已清空当前记忆与偏好</string>
     <string name="settings_memory_clear_all">一键清空全部记忆与偏好</string>
-    <string name="settings_side_key_header">右侧副键绑定</string>
     <string name="settings_security_novice_title">严格安全模式</string>
     <string name="settings_security_novice_desc">所有敏感与系统操作均需审批（3 秒倒计时防误触）</string>
     <string name="settings_security_standard_title">标准提示模式</string>
@@ -80,9 +74,7 @@
     <string name="settings_api_endpoint">API 端点</string>
     <string name="settings_ping_running">正在 Ping 测试...</string>
     <string name="settings_ping_idle">端点测速与实时握手 Ping</string>
-    <string name="settings_probe_running">正在握手探测...</string>
     <string name="settings_probe_ready">端点就绪 • 延迟 %1$dms（%2$d 个可用模型）</string>
-    <string name="settings_probe_failed">端点握手失败，网络超时</string>
 
     <!-- 系统提示词分区。 -->
     <string name="settings_prompt_presets">预设角色</string>
@@ -354,15 +346,12 @@
     <string name="settings_accent_amber">橙</string>
 
     <string name="settings_web_tools_header">网页工具</string>
-    <string name="settings_flag_on">开</string>
-    <string name="settings_flag_off">关</string>
 
     <string name="settings_memory_enabled">启用记忆</string>
     <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
     <string name="settings_context_compress">自动压缩上下文</string>
     <string name="settings_context_compress_secondary">占用超过阈值后自动压缩历史</string>
     <string name="settings_context_usage">上下文用量</string>
-    <string name="settings_context_usage_value">%1$d 轮上限 · 自动压缩%2$s</string>
     <string name="settings_web_only_header">仅在手机网页可改</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
     <string name="settings_web_only_badge">仅网页端可改</string>
