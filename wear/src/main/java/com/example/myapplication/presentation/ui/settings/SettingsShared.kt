@@ -710,6 +710,10 @@ internal fun SettingsCardRow(
  * "deepseek-reaso" + "ner" 在列表里读起来像拼错，截断加省略号才像正常排版。
  * 副标题右侧不保留任何固定宽度的槽位：整行宽度都归这段文字，只有它自己会被截断。
  * [subtitleStatus] 是副标题行上的 6dp 语义色点（如"密钥未填写"），颜色不落到文字上。
+ *
+ * [subtitleBelowRow] = true 时副标题从标签列里搬出来，落到"标签 + 行尾控件"那一行的**下方**，
+ * 横向独占整行内宽（内容盒 176dp − 两侧 14dp 内边距 = 148dp）：模型名这类机器标识符因此能整串放下。
+ * 默认 false —— 其它页的副标题是中文说明，随标签列折行本来就正常，不需要这 148dp。
  */
 @Composable
 private fun SettingsSlotRow(
@@ -718,6 +722,7 @@ private fun SettingsSlotRow(
     subtitle: String? = null,
     subtitleMaxLines: Int = 2,
     subtitleStatus: SettingsStatusTone? = null,
+    subtitleBelowRow: Boolean = false,
     value: String? = null,
     onClick: (() -> Unit)? = null,
     titleMaxLines: Int = 2,
@@ -726,60 +731,94 @@ private fun SettingsSlotRow(
     trailing: (@Composable () -> Unit)? = null
 ) {
     SettingsCardRow(modifier = modifier, onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .then(
-                        if (subItem) Modifier.padding(start = SettingsSubItemIndent) else Modifier
-                    )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                BasicText(
-                    text = title,
-                    style = SettingsRowLabelStyle,
-                    maxLines = titleMaxLines,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (subtitle != null) {
-                    Spacer(Modifier.height(SettingsRowLineGap))
-                    // 副标题独占这一行的可用宽度：右边不摆固定槽位，超长时才在尾部省略。
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (subtitleStatus != null) {
-                            SettingsStatusDot(tone = subtitleStatus, description = subtitle)
-                            Spacer(Modifier.width(SettingsSubtitleStatusGap))
-                        }
-                        BasicText(
-                            text = subtitle,
-                            modifier = Modifier.weight(1f, fill = false),
-                            style = SettingsRowValueStyle,
-                            maxLines = subtitleMaxLines,
-                            overflow = TextOverflow.Ellipsis
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (subItem) Modifier.padding(start = SettingsSubItemIndent) else Modifier
+                        )
+                ) {
+                    BasicText(
+                        text = title,
+                        style = SettingsRowLabelStyle,
+                        maxLines = titleMaxLines,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle != null && !subtitleBelowRow) {
+                        Spacer(Modifier.height(SettingsRowLineGap))
+                        // 与标签同列时副标题只拿得到标签列剩下的宽度：右边没有固定槽位，超长才省略。
+                        SettingsSubtitleLine(
+                            subtitle = subtitle,
+                            subtitleMaxLines = subtitleMaxLines,
+                            subtitleStatus = subtitleStatus,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
+                // 右槽：取值靠右，右端落在行内边距以内；有行尾控件时控件才是最后一个元素
+                if (value != null) {
+                    Spacer(Modifier.width(SettingsLabelValueGap))
+                    BasicText(
+                        text = value,
+                        modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
+                        style = SettingsRowValueStyle,
+                        maxLines = valueMaxLines,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (trailing != null) {
+                    Spacer(Modifier.width(SettingsValueTailGap))
+                    trailing()
+                }
             }
-            // 右槽：取值靠右，右端落在行内边距以内；有行尾控件时控件才是最后一个元素
-            if (value != null) {
-                Spacer(Modifier.width(SettingsLabelValueGap))
-                BasicText(
-                    text = value,
-                    modifier = Modifier.widthIn(max = SettingsValueMaxWidth),
-                    style = SettingsRowValueStyle,
-                    maxLines = valueMaxLines,
-                    overflow = TextOverflow.Ellipsis
+            // 副标题的第二个落点：整行内宽全归它，取值 / 行尾圆点都不再与它分宽度。
+            if (subtitle != null && subtitleBelowRow) {
+                SettingsSubtitleLine(
+                    subtitle = subtitle,
+                    subtitleMaxLines = subtitleMaxLines,
+                    subtitleStatus = subtitleStatus,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = SettingsRowLineGap)
                 )
             }
-            if (trailing != null) {
-                Spacer(Modifier.width(SettingsValueTailGap))
-                trailing()
-            }
         }
+    }
+}
+
+/**
+ * 副标题行：可选 6dp 语义色点 + 文字，撑满交给它的那块宽度。
+ *
+ * 抽成一处是因为副标题有两个落点（标签列内 / 第一行之下），而两条规则必须逐字一致：
+ * 语义色只染点不染文字，超长一律尾部省略。
+ */
+@Composable
+private fun SettingsSubtitleLine(
+    subtitle: String,
+    subtitleMaxLines: Int,
+    subtitleStatus: SettingsStatusTone?,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (subtitleStatus != null) {
+            SettingsStatusDot(tone = subtitleStatus, description = subtitle)
+            Spacer(Modifier.width(SettingsSubtitleStatusGap))
+        }
+        BasicText(
+            text = subtitle,
+            modifier = Modifier.weight(1f, fill = false),
+            style = SettingsRowValueStyle,
+            maxLines = subtitleMaxLines,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1088,6 +1127,9 @@ private fun SettingsThinSlider(
  *
  * 副标题带机器标识符（模型名 / endpoint）时传 [subtitleMaxLines] = 1：
  * 单行 + 尾部省略号，绝不把标识符从词中间劈成两行。
+ *
+ * [subtitleBelowRow] = true 时副标题改画在"标签 + 圆点"那一行的下方，横向独占整行内宽；
+ * 行尾圆点因此不再从副标题嘴里分走 18dp + 10dp。默认 false，别的页一行都不用改。
  */
 @Composable
 fun SettingsRadioRow(
@@ -1098,6 +1140,7 @@ fun SettingsRadioRow(
     subtitle: String? = null,
     subtitleMaxLines: Int = 2,
     subtitleStatus: SettingsStatusTone? = null,
+    subtitleBelowRow: Boolean = false,
     dangerSelected: Boolean = false,
     dotColor: Color? = null
 ) {
@@ -1106,6 +1149,7 @@ fun SettingsRadioRow(
         subtitle = subtitle,
         subtitleMaxLines = subtitleMaxLines,
         subtitleStatus = subtitleStatus,
+        subtitleBelowRow = subtitleBelowRow,
         modifier = modifier.widthIn(max = SettingsContentWidth),
         onClick = onSelect,
         trailing = {

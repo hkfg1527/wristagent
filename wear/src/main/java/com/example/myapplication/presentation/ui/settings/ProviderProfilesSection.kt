@@ -55,6 +55,8 @@ fun ProviderProfilesContent(
                         label = profile.name,
                         // 单行 + 尾部省略号：deepseek-reasoner 不许从词中间折成
                         // "deepseek-reaso" + "ner"，右边也不再挂一段不参与截断的掩码跟它抢宽度。
+                        // 副标题下移到第二行独占整行内宽（148dp）：模型名是这一页唯一的决策信息，
+                        // 与标签同行时只剩 120dp，15sp 下 deepseek-reasoner 要约 136dp —— 会被截掉 2~3 个字符。
                         subtitle = if (keyMissing) {
                             stringResource(R.string.settings_asr_key_missing)
                         } else {
@@ -62,6 +64,7 @@ fun ProviderProfilesContent(
                         },
                         subtitleStatus = if (keyMissing) SettingsStatusTone.WARN else null,
                         subtitleMaxLines = 1,
+                        subtitleBelowRow = true,
                         selected = profile.id == book.activeProfileId,
                         onSelect = {
                             context.vibrateTick()
