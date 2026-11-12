@@ -52,7 +52,7 @@
 ### 法则 4 · 一页一个主气球，宽度只跟屏幕圆弦
 - 设置根页与每个子页都只保留**一个主气球**；分区标题、卡片行与卡外动作块全部装进同一条闭合轮廓，不再拆成多个小气球各自为政。
 - 外壳宽度取所在高度的屏幕弦长，中心最多 216dp，向屏幕上下边缘连续收缩；每一行共享同一弦宽，整页由一条 Catmull-Rom 转三次贝塞尔的轮廓封合。
-- 组首 / 组尾只用 12dp 单段浅弧收口，端点和侧边共用切线；没有第二个圆拱。
+- 组首 / 组尾只用 20dp 单段浅弧收口，端点和侧边共用切线；没有第二个圆拱。
 - 内容只允许**等比缩小**：屏心 1.0×，靠近屏幕边缘才收小；严禁 `scaleX` 单独拉伸、严禁任何横向形变动画。
 - `ScalingLazyColumn` 只负责滚动与视口裁剪，`edgeScale = 1`、`edgeAlpha = 1`；官方滚动显隐交给 `ScreenScaffold.edgeButton`，不逐行缩放。
 
@@ -65,7 +65,7 @@
 - 用户消息：AccentSurface → 强调色渐变，右下角收小尾，其余角保持大圆角；不做四角同半径的旧式气泡。
 
 ### 设置页
-- 每页一个主气球：中心 216dp、边缘按圆弦连续收缩、12dp 浅弧收口；内容基准 176dp。
+- 每页一个主气球：中心 216dp、边缘按圆弦连续收缩、20dp 浅弧收口；内容基准 176dp。
 - 行内左右各 14dp；内容只在屏幕边缘等比缩小，屏心保持原始字号。
 - 返回键使用官方 `ScreenScaffold` + `EdgeButton`：滚到列表末尾放大淡入，向上滚缩小淡出；不再保留左上角圆形返回键与底部重复“完成返回”。
 - 强调色只允许出现在组标题短横、滑轨已选段、单选选中态；语义色只允许出现在 6dp 状态点上，且一页最多一处。
@@ -96,7 +96,7 @@
 | 法则 2 交互=格点形变 | `UnifiedMatrixCanvas(keyPressAmplitude)` | falloff 3.5 格=56dp、峰值位移 0.9 格、半径增益上限 35% |
 | 法则 3 发丝分隔 | `SettingsGroupLineMath` | 1 物理像素 Border、右端留 24dp |
 | 组标题签名 | `SettingsSectionHeaderMark` | 8dp × 2dp 强调色短横、14dp 左槽线、6dp 间隔 |
-| 一页一个主气球 | `SettingsCurveGeometry.groupPath` | 全页共享一条屏幕弦长轮廓、12dp 单段浅弧收口 |
+| 一页一个主气球 | `SettingsCurveGeometry.groupPath` | 全页共享一条屏幕弦长轮廓、20dp 单段浅弧收口 |
 | 内容只缩不放 | `SettingsCurveMath.halfWidthDp` | 屏心 1.0×，靠近屏幕边缘等比缩小；禁止横向拉伸 |
 | 官方滚动返回键 | `ScreenScaffold.edgeButton` + `EdgeButton` | `edgeScale = 1f`、`edgeAlpha = 1f`；按钮随列表末尾放大/淡入 |
 | 唯一焦点 | 设置根页焦点块 | 模型名 18sp Medium + baseUrl 12sp Muted |

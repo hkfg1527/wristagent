@@ -300,7 +300,7 @@ fun SettingsScreen(
                     item {
                         SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
                             SettingsBalloonGroup {
-                                Spacer(Modifier.height(Wear.Space.Xl))
+                                Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
                                 SettingsSectionHeader(
                                     text = stringResource(R.string.settings_section_models),
                                     isFirstSection = true
@@ -461,7 +461,7 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                Spacer(Modifier.height(Wear.Space.Xl))
+                                Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
                             }
                         }
                     }

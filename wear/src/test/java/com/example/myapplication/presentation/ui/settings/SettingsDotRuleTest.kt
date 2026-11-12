@@ -83,6 +83,7 @@ class SettingsGroupLineGuardTest {
         assertFalse("按压不得加边框", cardRow.contains("border("))
         assertTrue("组内行必须按屏幕弦长计算比例", cardRow.contains("SettingsCurveMath.halfWidthDp"))
         assertTrue("横向与纵向必须使用同一个比例", cardRow.contains("scaleX = scale") && cardRow.contains("scaleY = scale"))
+        assertTrue("按压必须等比缩小而不是拉伸", cardRow.contains("pressScale"))
         assertFalse("禁止只做横向拉伸", cardRow.contains("scaleX = SettingsCurveMath.contentScaleX"))
         assertTrue(pressHelper.contains("Wear.Motion.quick()"))
         assertTrue(pressHelper.contains("lift.snapTo(1f)"))

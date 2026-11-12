@@ -78,8 +78,8 @@ object SettingsCurveMath {
  * 组首 / 组尾 / 单行用 14dp 椭圆穹顶封口；中间行只保留连续侧弧。
  */
 object SettingsCurveGeometry {
-    /** 封口浅弧高度：12dp，单段三次曲线与侧边共用切线，不做第二个圆拱。 */
-    const val CapHeightDp = 12f
+    /** 封口浅弧高度：20dp，单段三次曲线与侧边共用切线，不做第二个圆拱。 */
+    const val CapHeightDp = 20f
 
     /** 整页主气球：沿屏幕圆周采样成一条闭合贝塞尔曲线，顶底只留 6dp 浅弧。 */
     fun groupPath(

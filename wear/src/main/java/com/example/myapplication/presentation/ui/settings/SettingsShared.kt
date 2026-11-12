@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -425,7 +426,7 @@ fun SettingsSubPage(
                     ) {
                         SettingsBalloonGroup {
                             // 主气球上下各留一段纯曲面，首尾标题不会贴在收口尖上。
-                            Spacer(Modifier.height(Wear.Space.Xl))
+                            Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
                             chunk.indices.forEach { index ->
                                 val entry = content[index]
                                 val next = content.getOrNull(index + 1)
@@ -441,7 +442,7 @@ fun SettingsSubPage(
                                     entry.content()
                                 }
                             }
-                            Spacer(Modifier.height(Wear.Space.Xl))
+                            Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
                         }
                     }
                 } else {
@@ -795,6 +796,11 @@ internal fun SettingsCardRow(
     // y 只在绘制/图层阶段读；滚动时只失效绘制，不触发整行重组。
     val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }
     val groupChrome = LocalSettingsGroupChrome.current
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = Wear.Motion.micro(),
+        label = "settingsRowPressScale"
+    )
 
     if (groupChrome) {
         Column(
@@ -819,7 +825,7 @@ internal fun SettingsCardRow(
                         )
                         // 只允许等比缩小；屏心 1.0，绝不做横向拉伸。
                         val scale = (halfDp / (SettingsCurveMath.MinCardWidthDp / 2f))
-                            .coerceIn(0f, 1f)
+                            .coerceIn(0f, 1f) * pressScale
                         scaleX = scale
                         scaleY = scale
                     }
