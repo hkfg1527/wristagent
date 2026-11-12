@@ -577,6 +577,10 @@ private fun BoxScope.SettingsEdgeBackButton(
     exit: SettingsExitController,
     scrollState: ScalingLazyListState
 ) {
+    if (WearAppearance.style == SettingsStyle.SQUARE) {
+        SettingsSquareBackButton(onClick, exit, scrollState)
+        return
+    }
     val description = stringResource(R.string.settings_back)
     val density = LocalDensity.current
     val slidePx = with(density) { 56.dp.toPx() }
@@ -618,6 +622,63 @@ private fun BoxScope.SettingsEdgeBackButton(
 }
 
 /**
+ * 方角档的返回键：40dp 方框 + 1dp 描边 + 折角箭头。
+ *
+ * 与 [EdgeButton] 同一个底部槽位、同一套跟随列表滚动与淡出的动效，
+ * 只是把"贴底圆弧"换成"直角方块"，与方角档的整页语言一致。
+ */
+@Composable
+private fun BoxScope.SettingsSquareBackButton(
+    onClick: () -> Unit,
+    exit: SettingsExitController,
+    scrollState: ScalingLazyListState
+) {
+    val description = stringResource(R.string.settings_back)
+    val density = LocalDensity.current
+    val slidePx = with(density) { 56.dp.toPx() }
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = Wear.Space.Sm)
+            .size(40.dp)
+            .scrollable(
+                state = scrollState,
+                orientation = Orientation.Vertical,
+                reverseDirection = true,
+                overscrollEffect = rememberOverscrollEffect()
+            )
+            .graphicsLayer {
+                val leave = exitFraction(exit.elapsedMs, 0, SettingsRowExitDurationMs)
+                translationY = leave * slidePx
+                alpha = 1f - leave
+            }
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(40.dp)) {
+            val stroke = 1.dp.toPx()
+            drawRect(
+                color = Wear.Palette.Border,
+                topLeft = Offset(stroke / 2f, stroke / 2f),
+                size = Size(size.width - stroke, size.height - stroke),
+                style = Stroke(width = stroke)
+            )
+            val chevron = Path().apply {
+                moveTo(size.width * 0.58f, size.height * 0.33f)
+                lineTo(size.width * 0.42f, size.height * 0.5f)
+                lineTo(size.width * 0.58f, size.height * 0.67f)
+            }
+            drawPath(
+                path = chevron,
+                color = Wear.Palette.TextPrimary,
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+        }
+    }
+}
+
+/**
  * 组标题：12sp / TextMuted / 字重 Medium / 字距 +0.5sp，左对齐到左槽线。
  *
  * - 中性色：强调色全页只留给"选中值 / 当前状态"这一处语义，组标题不属于它；
@@ -630,6 +691,21 @@ private fun BoxScope.SettingsEdgeBackButton(
  */
 @Composable
 fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
+    if (WearAppearance.style == SettingsStyle.SQUARE) {
+        BasicText(
+            text = text,
+            modifier = Modifier
+                .width(SettingsContentWidth)
+                .padding(
+                    top = SettingsDesignMath.sectionGapDp(isFirstSection).dp,
+                    bottom = SettingsSectionHeaderBottomGap
+                ),
+            style = SettingsSectionStyle.copy(textAlign = TextAlign.Center),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
     val accent = Wear.Accent
     BasicText(
         text = text,
@@ -803,6 +879,61 @@ internal fun SettingsCardRow(
         animationSpec = Wear.Motion.micro(),
         label = "settingsRowPressScale"
     )
+
+    if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+        // 大卡片档：一行一张独立圆角卡，行与行之间靠 8dp 间隙分开，不再共用一张曲面。
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(SettingsContentWidth)
+                    .heightIn(min = minHeight)
+                    .clip(SettingsCardRowShape)
+                    .background(Wear.Palette.SurfaceAlt)
+                    .then(clickModifier)
+                    .padding(
+                        start = SettingsRowSidePadding,
+                        end = SettingsRowSidePadding,
+                        top = RowVerticalPadding,
+                        bottom = RowVerticalPadding
+                    ),
+                contentAlignment = Alignment.CenterStart
+            ) { content() }
+            Spacer(Modifier.height(SettingsCardStyle.Gap))
+        }
+        return
+    }
+
+    if (WearAppearance.style == SettingsStyle.SQUARE) {
+        // 方角档：不画曲面、不做等比缩放，行与行之间只留一根发丝线。
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(SettingsContentWidth)
+                    .heightIn(min = minHeight)
+                    .then(clickModifier)
+                    .padding(
+                        start = SettingsRowSidePadding,
+                        end = SettingsRowSidePadding,
+                        top = RowVerticalPadding,
+                        bottom = RowVerticalPadding
+                    ),
+                contentAlignment = Alignment.CenterStart
+            ) { content() }
+            Box(
+                modifier = Modifier
+                    .width(SettingsContentWidth)
+                    .height(1.dp)
+                    .background(Wear.Palette.Border)
+            )
+        }
+        return
+    }
 
     if (groupChrome) {
         Column(

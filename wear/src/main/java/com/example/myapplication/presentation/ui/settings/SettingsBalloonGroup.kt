@@ -67,6 +67,11 @@ fun SettingsBalloonGroup(
                 state.heightPx = coordinates.size.height.toFloat()
             }
             .drawWithContent {
+                if (WearAppearance.style != SettingsStyle.BALLOON) {
+                    // 方角与大卡片档自己画外壳，这里只放内容。
+                    drawContent()
+                    return@drawWithContent
+                }
                 val path = SettingsCurveGeometry.groupPath(
                     size = size,
                     topInRootPx = state.topPx,

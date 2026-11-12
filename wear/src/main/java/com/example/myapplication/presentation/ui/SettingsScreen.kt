@@ -53,7 +53,13 @@ import com.example.myapplication.presentation.ui.settings.AppearanceContent
 import com.example.myapplication.presentation.ui.settings.ConsolePortStatus
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
+import com.example.myapplication.presentation.ui.settings.SettingsCardAccents
+import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
+import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
+import com.example.myapplication.presentation.ui.settings.SettingsRingGlyph
+import com.example.myapplication.presentation.ui.settings.SettingsStyle
+import com.example.myapplication.presentation.ui.settings.WearAppearance
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
 import com.example.myapplication.presentation.ui.settings.SettingsRowSlot
 import com.example.myapplication.presentation.ui.settings.LocalSettingsRowSlot
@@ -302,6 +308,23 @@ fun SettingsScreen(
                     item {
                         SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
                             SettingsBalloonGroup {
+                                if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                                    SettingsHeroCard(
+                                        label = stringResource(R.string.settings_section_models),
+                                        value = currentModel,
+                                        accent = SettingsCardAccents.Model,
+                                        fraction = if (apiKeyConfigured) 1f else 0f,
+                                        chip = if (apiKeyConfigured) {
+                                            null
+                                        } else {
+                                            stringResource(R.string.settings_status_unconfigured)
+                                        },
+                                        ringIcon = {
+                                            SettingsRingGlyph("DS", SettingsCardAccents.Model)
+                                        }
+                                    )
+                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
+                                }
                                 Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 SettingsSectionHeader(
                                     text = stringResource(R.string.settings_section_models),
