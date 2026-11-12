@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
@@ -73,7 +74,15 @@ fun SettingsBalloonGroup(
                     screenMarginPx = screenMarginPx,
                     capHeightPx = capHeightPx
                 )
-                drawPath(path = path, color = Wear.Palette.Surface)
+                val highlightEnd = if (size.height < 320.dp.toPx()) size.height else 320.dp.toPx()
+                drawPath(
+                    path = path,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Wear.Palette.SurfaceAlt, Wear.Palette.Surface),
+                        startY = 0f,
+                        endY = highlightEnd
+                    )
+                )
                 drawContent()
             },
         horizontalAlignment = Alignment.CenterHorizontally
