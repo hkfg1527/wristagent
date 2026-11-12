@@ -49,14 +49,6 @@ internal object SettingsCardStyle {
     val RingProgress = 6.dp
 }
 
-/** 每张卡一个强调色：模型蓝、工具绿、语音琥珀、系统紫，全部取自既有令牌。 */
-internal object SettingsCardAccents {
-    val Model = Wear.Palette.Accent
-    val Tools = Wear.Palette.Success
-    val Voice = Wear.Palette.Warning
-    val System = Color(0xFFC79BFF)
-}
-
 /**
  * 谷歌大卡片：左上标签 → 大数值 → 可选药丸 chip，右侧一枚圆环指示器。
  *

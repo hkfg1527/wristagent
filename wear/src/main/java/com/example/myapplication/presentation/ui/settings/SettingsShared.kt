@@ -691,6 +691,7 @@ private fun BoxScope.SettingsSquareBackButton(
  */
 @Composable
 fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
+    val baseStyle = SettingsSectionStyle
     if (WearAppearance.style == SettingsStyle.SQUARE) {
         BasicText(
             text = text,
@@ -700,7 +701,7 @@ fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
                     top = SettingsDesignMath.sectionGapDp(isFirstSection).dp,
                     bottom = SettingsSectionHeaderBottomGap
                 ),
-            style = SettingsSectionStyle.copy(textAlign = TextAlign.Center),
+            style = baseStyle.copy(textAlign = TextAlign.Center),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -710,7 +711,7 @@ fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
     BasicText(
         text = text,
         modifier = Modifier.settingsSectionHeaderLayout(isFirstSection, accent),
-        style = SettingsSectionStyle,
+        style = baseStyle,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )

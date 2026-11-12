@@ -53,7 +53,6 @@ import com.example.myapplication.presentation.ui.settings.AppearanceContent
 import com.example.myapplication.presentation.ui.settings.ConsolePortStatus
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
-import com.example.myapplication.presentation.ui.settings.SettingsCardAccents
 import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
@@ -312,7 +311,7 @@ fun SettingsScreen(
                                     SettingsHeroCard(
                                         label = stringResource(R.string.settings_section_models),
                                         value = currentModel,
-                                        accent = SettingsCardAccents.Model,
+                                        accent = Wear.CardModel,
                                         fraction = if (apiKeyConfigured) 1f else 0f,
                                         chip = if (apiKeyConfigured) {
                                             null
@@ -320,7 +319,7 @@ fun SettingsScreen(
                                             stringResource(R.string.settings_status_unconfigured)
                                         },
                                         ringIcon = {
-                                            SettingsRingGlyph("DS", SettingsCardAccents.Model)
+                                            SettingsRingGlyph("DS", Wear.CardModel)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
