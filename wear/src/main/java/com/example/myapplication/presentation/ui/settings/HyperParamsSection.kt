@@ -174,6 +174,8 @@ fun HyperParamsContent(
         row {
             SettingsSplitToggleRow(
                 label = stringResource(R.string.settings_model_default_thinking),
+                secondary = stringResource(R.string.settings_model_default_thinking_secondary),
+                subtitleBelowRow = true,
                 checked = defaultThinking,
                 onCheckedChange = { enabled ->
                     defaultThinking = enabled
@@ -182,7 +184,6 @@ fun HyperParamsContent(
             )
         }
 
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_model_default_thinking_secondary)) }
 
         section(stringResource(R.string.settings_reasoning_effort))
 

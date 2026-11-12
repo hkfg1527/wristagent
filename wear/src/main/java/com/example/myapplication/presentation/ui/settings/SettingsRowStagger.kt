@@ -2,7 +2,6 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
@@ -22,14 +21,11 @@ import kotlinx.coroutines.delay
 /** 根设置列表参与逐行动画的内容行数：标题 + 3 个组标题 + 9 个分区入口 + 末尾"完成返回"。 */
 const val SettingsStaggeredRowCount = 14
 
-/** 进场位移 24dp：从下方浮上来。 */
-private val RowEnterOffset = Wear.Space.Xl
+/** 进场只上移 4dp：保留连续性，不产生飞入感。 */
+private val RowEnterOffset = Wear.Space.Xs
 
 /** 退场位移 16dp：向下沉出。 */
 private val RowExitOffset = Wear.Space.Lg
-
-private const val RowEnterDampingRatio = 0.75f
-private const val RowEnterStiffness = 320f
 
 /**
  * 入场记账本 + 入场窗口。
@@ -162,7 +158,7 @@ fun SettingsStaggeredRow(
         if (playsEnter) {
             val startMs = staggerDelayMs(index, SettingsRowEnterStepMs, SettingsRowEnterCapMs)
             if (startMs > 0) delay(startMs.toLong())
-            enter.animateTo(1f, spring(dampingRatio = RowEnterDampingRatio, stiffness = RowEnterStiffness))
+            enter.animateTo(1f, Wear.Motion.quick())
         }
     }
 

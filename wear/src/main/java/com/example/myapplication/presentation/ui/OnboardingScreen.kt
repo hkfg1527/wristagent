@@ -1,14 +1,9 @@
 package com.example.myapplication.presentation.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -51,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.settings.motionSpec
@@ -58,7 +54,7 @@ import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/** 引导页的一页文案：标题与说明都必须单行放得下 148dp 正文列。 */
+/** 引导页的一页文案：标题与说明都必须单行放得下 176dp 正文列。 */
 internal data class OnboardingPage(
     val title: String,
     val description: String
@@ -78,7 +74,7 @@ internal object OnboardingPager {
     /** 页数：与页码点个数恒等，不允许各自漂移。 */
     const val PageCount = 5
 
-    /** 五页文案：标题 ≤8 字、说明 ≤20 字，且说明必须单行放得进 148dp 正文列。 */
+    /** 五页文案：标题 ≤8 字、说明 ≤20 字，且说明必须单行放得进 176dp 正文列。 */
     val Pages: List<OnboardingPage> = listOf(
         OnboardingPage(
             title = "按住说话",
@@ -125,7 +121,7 @@ internal object OnboardingPager {
  * 引导页几何：所有尺寸在这里算，UI 只引用结果。
  *
  * 圆屏 466px @2x = 233dp，半径 116.5dp。内容宽 184dp 时竖直方向只剩 ±71.5dp 可用，
- * 因此宽度必须和高度做交易：正文收窄到 148dp 换取上下空间，页脚压到 136dp。
+ * 因此宽度必须和高度做交易：正文限宽 176dp，页脚压到 136dp。
  * 页脚曾经是「跳过 + 五个页码点 + 按钮」三件套同排；页码点搬到说明文字下方之后，
  * 页脚本体只剩左右两件，中段那 44dp（原点阵 36dp + 两道点距）留空，总宽一个像素没变。
  * "整块落在圆周内" = 矩形最远角点到圆心的距离不超过半径，判据见 [fitsInCircle]。
@@ -135,7 +131,7 @@ internal object OnboardingGeometry {
     const val CircleDiameterDp = 233f
 
     /** 正文列宽度（dp）：标题与说明的最大宽度。 */
-    const val ContentWidthDp = 148f
+    const val ContentWidthDp = 176f
 
     /** 示意图形边长（dp）。 */
     const val IllustrationDp = 96f
@@ -143,10 +139,16 @@ internal object OnboardingGeometry {
     /** 标题行高（dp）：titleMedium 18sp/24sp。 */
     const val TitleLineDp = 24f
 
-    /** 说明行高（dp）：bodySmall 12sp/16sp。 */
-    const val DescriptionLineDp = 16f
+    /** 说明行高（dp）：bodyMedium 15sp/20sp。 */
+    const val DescriptionLineDp = 20f
 
     val GapDp: Float = Wear.Space.Xs.value
+    val TextGroupGapDp: Float = Wear.Space.Xs.value
+    val FooterGapDp: Float = Wear.Space.Sm.value
+    const val EntryShiftDp = 4f
+
+    /** 96dp 画布中的公共外环半径，五页共用同一轮廓。 */
+    const val FrameRadiusDp = 40f
     val FooterHeightDp: Float = Wear.Size.Touch.value
     val SkipWidthDp: Float = Wear.Size.Touch.value
     val DotSizeDp: Float = Wear.Space.Xs.value
@@ -166,33 +168,23 @@ internal object OnboardingGeometry {
     val FooterWidthDp: Float = SkipWidthDp + FooterMiddleGapDp + ActionWidthDp
 
     /** 示意图 + 标题 + 说明 的总高，也就是翻页动画盒子的高度。 */
-    val BodyHeightDp: Float = IllustrationDp + GapDp + TitleLineDp + GapDp + DescriptionLineDp
+    val BodyHeightDp: Float = IllustrationDp + TitleLineDp + DescriptionLineDp
 
-    /** 内容总高：正文 + 点距 + 页码点行 + 页脚（页码点行与页脚之间不再隔空档）。 */
-    val ContentHeightDp: Float = BodyHeightDp + GapDp + DotsRowHeightDp + FooterHeightDp
+    /** 内容总高：正文、点阵和页脚之间分别保留 4dp、8dp 的组间留白。 */
+    val ContentHeightDp: Float =
+        BodyHeightDp + TextGroupGapDp + DotsRowHeightDp + FooterGapDp + FooterHeightDp
 
-    /**
-     * 内容盒上沿相对圆心的 y（dp）。
-     *
-     * 上沿与下沿两个最远角点必须同时落在半径 116.5dp 内，解得可用窗口 [-106.15, -101.4]，
-     * 取中点 -104：96dp 示意图的上沿角点 114.5dp、136dp 页脚的下沿角点 114.4dp，各留约 2dp。
-     */
-    const val ContentTopDp = -104f
+    /** 内容盒上沿相对圆心的 y；96dp 方形与页脚最远角点均压在上限 116.5dp 以内。 */
+    const val ContentTopDp = -106f
 
     /** Column 相对屏幕中心的竖直偏移。 */
     val ContentCenterOffsetDp: Float = ContentTopDp + ContentHeightDp / 2f
 
     val IllustrationTopDp: Float = ContentTopDp
-    val TitleTopDp: Float = IllustrationTopDp + IllustrationDp + GapDp
-    val DescriptionTopDp: Float = TitleTopDp + TitleLineDp + GapDp
-    val DotsTopDp: Float = DescriptionTopDp + DescriptionLineDp + GapDp
-    val FooterTopDp: Float = DotsTopDp + DotsRowHeightDp
-
-    /** 示意图形循环动效周期（ms）。 */
-    const val LoopDurationMs = 1700
-
-    /** 关闭动效时示意图形停留的静帧相位。 */
-    const val StaticPhase = 0.55f
+    val TitleTopDp: Float = IllustrationTopDp + IllustrationDp
+    val DescriptionTopDp: Float = TitleTopDp + TitleLineDp
+    val DotsTopDp: Float = DescriptionTopDp + DescriptionLineDp + TextGroupGapDp
+    val FooterTopDp: Float = DotsTopDp + DotsRowHeightDp + FooterGapDp
 
     /** 矩形最远角点到圆心的距离。 */
     fun farthestCornerRadiusDp(widthDp: Float, heightDp: Float, topDp: Float): Float {
@@ -213,8 +205,8 @@ internal object OnboardingGeometry {
 /**
  * 引导页：五页，每页一条真实手势。
  *
- * 背景沿用应用统一点阵；翻页只走 [Wear.Motion.page] 的淡入淡出；
- * 示意图形有克制的循环动效，但受 [LocalAnimationsEnabled] 总开关管辖（关掉即停在静帧）。
+ * 背景沿用应用统一点阵；换页正文只走 [Wear.Motion.page] 的 4dp 上推与淡入淡出。
+ * 图形保持静态，动画开关通过 [motionSpec] 统一归零。
  */
 @Composable
 fun OnboardingScreen(
@@ -250,7 +242,7 @@ fun OnboardingScreen(
                 .width(OnboardingGeometry.ContentWidthDp.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 翻页只淡入淡出正文块：页脚不跟着闪，按钮在切换途中始终可点
+            // 4dp 轻推只作用于正文；页码与页脚保持空间锚点，切换途中按钮始终可点
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -260,20 +252,30 @@ fun OnboardingScreen(
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
-                        fadeIn(motionSpec(animationsEnabled, Wear.Motion.page())) togetherWith
-                            fadeOut(motionSpec(animationsEnabled, Wear.Motion.page()))
+                        (
+                            fadeIn(motionSpec(animationsEnabled, Wear.Motion.page())) +
+                                slideInVertically(
+                                    animationSpec = motionSpec(animationsEnabled, Wear.Motion.page()),
+                                    initialOffsetY = { fullHeight ->
+                                        (fullHeight * OnboardingGeometry.EntryShiftDp /
+                                            OnboardingGeometry.BodyHeightDp).toInt()
+                                    }
+                                )
+                            ) togetherWith fadeOut(motionSpec(animationsEnabled, Wear.Motion.page()))
                     },
                     label = "onboardingPage"
                 ) { current ->
-                    PageBody(current, animationsEnabled)
+                    PageBody(current)
                 }
             }
 
-            Spacer(Modifier.height(OnboardingGeometry.GapDp.dp))
+            Spacer(Modifier.height(OnboardingGeometry.TextGroupGapDp.dp))
 
             // 页码点是「读到第几页」的辅助信息，跟着正文走：贴在说明文字正下方，
             // 不再和跳过 / 继续挤在同一条页脚基线上
             PageDots(page)
+
+            Spacer(Modifier.height(OnboardingGeometry.FooterGapDp.dp))
 
             OnboardingFooter(
                 page = page,
@@ -292,13 +294,12 @@ fun OnboardingScreen(
 
 /** 单页正文：示意图形 + 标题 + 说明。 */
 @Composable
-private fun PageBody(page: Int, animationsEnabled: Boolean) {
+private fun PageBody(page: Int) {
     val copy = OnboardingPager.Pages[page]
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(OnboardingGeometry.GapDp.dp)
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        GestureIllustration(page = page, animationsEnabled = animationsEnabled)
+        GestureIllustration(page = page)
         // 宽高都钉死成几何表里的数值：排版实测高矮与"落在圆周内"的判据是同一组数字
         BasicText(
             text = copy.title,
@@ -314,7 +315,11 @@ private fun PageBody(page: Int, animationsEnabled: Boolean) {
             modifier = Modifier
                 .width(OnboardingGeometry.ContentWidthDp.dp)
                 .height(OnboardingGeometry.DescriptionLineDp.dp),
-            style = Wear.TextCaption.copy(textAlign = TextAlign.Center),
+            style = Wear.TextBody.copy(
+                fontSize = 15.sp,
+                color = Wear.Palette.TextSecondary,
+                textAlign = TextAlign.Center
+            ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -326,8 +331,8 @@ private fun PageBody(page: Int, animationsEnabled: Boolean) {
  *
  * 页码点已经搬到说明文字下方（见 [PageDots]）：三类完全不同的元素挤在同一条基线上时，
  * 第 5 页去掉「跳过」之后页码点会紧贴按钮，看起来像按钮属于点阵的一部分。
- * 底部弦长预算没有变 —— 跳过 44 + 中段留白 44 + 按钮 48 = 136dp，仍塞进 143dp 弦长，
- * 页脚盒与三件套时代同宽同位，最远角点半径 114.4dp。
+ * 底部弦长预算没有变 —— 跳过 44 + 中段留白 44 + 按钮 48 = 136dp。
+ * 点阵与页脚之间保留 8dp 独立间隔；页脚最远角点半径约 114.40dp。
  * 跳过槽位在最后一页留空占位，保证按钮不因文案切换而左右跳动。
  */
 @Composable
@@ -427,90 +432,88 @@ private fun PageDots(page: Int) {
 }
 
 /**
- * 手势示意图：五个手势各画一张，全部用 Canvas 画，不引图片资源、不用 emoji。
- *
- * 循环动效只改绘制相位、不动布局；[LocalAnimationsEnabled] 关掉时相位钉在 [OnboardingGeometry.StaticPhase]，
- * 连无限动画都不创建。
+ * 五页共用 96dp 画布、40dp 外环和四个方位点；图形保持静态，状态由弧段、轨迹与触点表达。
  */
 @Composable
-private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
-    val phase: Float = if (animationsEnabled) {
-        val transition = rememberInfiniteTransition(label = "onboardingGestureLoop")
-        val animated: Float by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(OnboardingGeometry.LoopDurationMs, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "gesturePhase"
-        )
-        animated
-    } else {
-        OnboardingGeometry.StaticPhase
-    }
-
+private fun GestureIllustration(page: Int) {
     val accent = Wear.Accent
     val accentSurface = Wear.AccentSurface
-    Canvas(modifier = Modifier.size(OnboardingGeometry.IllustrationDp.dp)) {
-        // 96dp 设计稿 → 像素的比例：所有长度都按设计稿数值写
-        val unit = size.minDimension / 96f
+    Canvas(
+        modifier = Modifier
+            .size(OnboardingGeometry.IllustrationDp.dp)
+            .semantics { contentDescription = OnboardingPager.Pages[page].title }
+    ) {
+        val unit = size.minDimension / OnboardingGeometry.IllustrationDp
         val cx = size.width / 2f
         val cy = size.height / 2f
         fun px(value: Float): Float = value * unit
+        val center = Offset(cx, cy)
+        val frameRadius = px(OnboardingGeometry.FrameRadiusDp)
+
+        // 外环统一五页轮廓；四点共用页码点阵的语言，方位点标记当前手势方向。
+        drawCircle(
+            color = Wear.Palette.Border,
+            radius = frameRadius,
+            center = center,
+            style = Stroke(width = px(1.5f))
+        )
+        val anchors = listOf(
+            Offset(cx, cy - frameRadius),
+            Offset(cx + frameRadius, cy),
+            Offset(cx, cy + frameRadius),
+            Offset(cx - frameRadius, cy)
+        )
+        anchors.forEachIndexed { index, anchor ->
+            drawCircle(
+                color = if (index == page % anchors.size) accent else Wear.Palette.TextMuted,
+                radius = px(if (index == page % anchors.size) 2.5f else 1.75f),
+                center = anchor
+            )
+        }
 
         when (page) {
-            // 1. 长按主键：外圈进度弧扫一圈 = 按住不放满 340ms，主键内是起伏的收音波形
+            // 持续按压：闭合外环 + 长进度弧表示保持，键内三段波形对应收音状态。
             0 -> {
                 val orbRadius = px(22f)
-                drawCircle(
-                    color = accent.copy(alpha = 0.45f),
-                    radius = orbRadius + px(8f),
-                    center = Offset(cx, cy),
-                    style = Stroke(width = px(2f), cap = StrokeCap.Round)
-                )
+                val progressRadius = px(33f)
                 drawArc(
                     color = accent,
                     startAngle = -90f,
-                    sweepAngle = 360f * phase,
+                    sweepAngle = 285f,
                     useCenter = false,
-                    topLeft = Offset(cx - orbRadius - px(8f), cy - orbRadius - px(8f)),
-                    size = Size((orbRadius + px(8f)) * 2f, (orbRadius + px(8f)) * 2f),
-                    style = Stroke(width = px(2f), cap = StrokeCap.Round)
+                    topLeft = Offset(cx - progressRadius, cy - progressRadius),
+                    size = Size(progressRadius * 2f, progressRadius * 2f),
+                    style = Stroke(width = px(2.5f), cap = StrokeCap.Round)
                 )
-                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = Offset(cx, cy))
-                val barGap = px(7f)
-                val heights = floatArrayOf(
-                    orbRadius * (0.45f + 0.85f * phase),
-                    orbRadius * (1.15f - 0.5f * phase),
-                    orbRadius * (0.45f + 0.85f * (1f - phase))
-                )
-                for (index in 0..2) {
-                    val barX = cx + (index - 1) * barGap
-                    val half = heights[index].coerceAtMost(orbRadius * 0.8f) / 2f
+                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = center)
+                val heights = listOf(9f, 19f, 13f)
+                heights.forEachIndexed { index, height ->
+                    val x = cx + (index - 1) * px(7f)
+                    val half = px(height) / 2f
                     drawLine(
                         color = Wear.Palette.Bg,
-                        start = Offset(barX, cy - half),
-                        end = Offset(barX, cy + half),
+                        start = Offset(x, cy - half),
+                        end = Offset(x, cy + half),
                         strokeWidth = px(3f),
                         cap = StrokeCap.Round
                     )
                 }
             }
 
-            // 2. 轻触主键：两道扩散涟漪 + 主键里的输入光标 + 落在键上缘的触点
+            // 单击：单段短弧与上方触点表示一次落下，键内保留同一收音波形。
             1 -> {
                 val orbRadius = px(22f)
-                repeat(2) { index ->
-                    val ripple = (phase + index * 0.5f) % 1f
-                    drawCircle(
-                        color = accent.copy(alpha = (1f - ripple) * 0.55f),
-                        radius = orbRadius + px(6f) + px(16f) * ripple,
-                        center = Offset(cx, cy),
-                        style = Stroke(width = px(1.5f))
-                    )
-                }
-                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = Offset(cx, cy))
+                val responseRadius = px(33f)
+                drawArc(
+                    color = accent,
+                    startAngle = -55f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(cx - responseRadius, cy - responseRadius),
+                    size = Size(responseRadius * 2f, responseRadius * 2f),
+                    style = Stroke(width = px(2.5f), cap = StrokeCap.Round)
+                )
+                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = center)
                 drawLine(
                     color = Wear.Palette.Bg,
                     start = Offset(cx, cy - px(9f)),
@@ -518,123 +521,145 @@ private fun GestureIllustration(page: Int, animationsEnabled: Boolean) {
                     strokeWidth = px(3f),
                     cap = StrokeCap.Round
                 )
-                drawCircle(
-                    color = accent,
-                    radius = px(4f),
-                    center = Offset(cx + orbRadius * 0.62f, cy - orbRadius * 0.66f)
-                )
+                drawCircle(color = Wear.Palette.Bg, radius = px(1.5f), center = Offset(cx - px(7f), cy))
+                drawCircle(color = Wear.Palette.Bg, radius = px(1.5f), center = Offset(cx + px(7f), cy))
+                drawCircle(color = accent, radius = px(4f), center = Offset(cx, cy - px(23f)))
             }
 
-            // 3. 上滑主键：主键压在轨道底端，箭头随相位向上跑
+            // 上滑：主键留在下端，三枚轨迹点收束到向上的箭头，运动方向不依赖动画。
             2 -> {
-                val orbRadius = px(15f)
-                val orbCenterY = cy + px(24f)
+                val orbCenter = Offset(cx, cy + px(18f))
                 drawLine(
                     color = Wear.Palette.Border,
-                    start = Offset(cx, orbCenterY - orbRadius),
-                    end = Offset(cx, cy - px(32f)),
+                    start = Offset(cx, cy - px(28f)),
+                    end = Offset(cx, orbCenter.y - px(15f)),
                     strokeWidth = px(2f),
                     cap = StrokeCap.Round
                 )
-                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = Offset(cx, orbCenterY))
-                val arrowY = orbCenterY - orbRadius - px(4f) - px(30f) * phase
-                val arrowHalfWidth = px(9f)
+                listOf(8f, 15f, 22f).forEach { y ->
+                    drawCircle(color = Wear.Palette.TextMuted, radius = px(1.75f), center = Offset(cx, cy - px(y)))
+                }
+                drawCircle(color = Wear.Palette.Orb, radius = px(15f), center = orbCenter)
+                val tip = Offset(cx, cy - px(31f))
                 drawLine(
                     color = accent,
-                    start = Offset(cx - arrowHalfWidth, arrowY + px(7f)),
-                    end = Offset(cx, arrowY),
+                    start = Offset(cx - px(8f), tip.y + px(8f)),
+                    end = tip,
                     strokeWidth = px(3f),
                     cap = StrokeCap.Round
                 )
                 drawLine(
                     color = accent,
-                    start = Offset(cx + arrowHalfWidth, arrowY + px(7f)),
-                    end = Offset(cx, arrowY),
+                    start = Offset(cx + px(8f), tip.y + px(8f)),
+                    end = tip,
                     strokeWidth = px(3f),
                     cap = StrokeCap.Round
                 )
             }
 
-            // 4. 横滑主键：左右两翼从主键两侧弹出去
+            // 横滑：主键向左右两条等长支路延展，左键刻键盘、右键刻会话层叠，和真实两翼一一对应。
             3 -> {
                 val orbRadius = px(14f)
                 val wingRadius = px(11f)
-                val spread = px(20f) + px(12f) * phase
+                val leftWing = Offset(cx - px(32f), cy)
+                val rightWing = Offset(cx + px(32f), cy)
                 drawLine(
                     color = Wear.Palette.Border,
-                    start = Offset(cx - orbRadius, cy),
-                    end = Offset(cx - spread + wingRadius, cy),
+                    start = Offset(leftWing.x + wingRadius, cy),
+                    end = Offset(rightWing.x - wingRadius, cy),
                     strokeWidth = px(1.5f)
                 )
-                drawLine(
-                    color = Wear.Palette.Border,
-                    start = Offset(cx + orbRadius, cy),
-                    end = Offset(cx + spread - wingRadius, cy),
-                    strokeWidth = px(1.5f)
-                )
-                // 左翼：直接打开文字输入框，中性色
-                drawCircle(color = Wear.Palette.SurfaceAlt, radius = wingRadius, center = Offset(cx - spread, cy))
+                drawCircle(color = Wear.Palette.SurfaceAlt, radius = wingRadius, center = leftWing)
                 drawCircle(
                     color = Wear.Palette.Border,
                     radius = wingRadius,
-                    center = Offset(cx - spread, cy),
+                    center = leftWing,
                     style = Stroke(width = px(1.5f))
                 )
-                // 右翼：会话抽屉，强调色
-                drawCircle(color = accentSurface, radius = wingRadius, center = Offset(cx + spread, cy))
+                listOf(-4f, 0f, 4f).forEach { row ->
+                    listOf(-4f, 0f, 4f).forEach { column ->
+                        drawCircle(
+                            color = Wear.Palette.TextSecondary,
+                            radius = px(1f),
+                            center = Offset(leftWing.x + px(column), leftWing.y + px(row))
+                        )
+                    }
+                }
+                drawCircle(color = accentSurface, radius = wingRadius, center = rightWing)
                 drawCircle(
                     color = accent,
                     radius = wingRadius,
-                    center = Offset(cx + spread, cy),
+                    center = rightWing,
                     style = Stroke(width = px(1.5f))
                 )
-                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = Offset(cx, cy))
+                listOf(-4f, 0f, 4f).forEach { y ->
+                    drawLine(
+                        color = accent,
+                        start = Offset(rightWing.x - px(5f), rightWing.y + px(y)),
+                        end = Offset(rightWing.x + px(5f), rightWing.y + px(y)),
+                        strokeWidth = px(1.5f),
+                        cap = StrokeCap.Round
+                    )
+                }
+                drawCircle(color = Wear.Palette.Orb, radius = orbRadius, center = center)
             }
 
-            // 5. 审批滑轨：拇指自右端向左，未滑过区是等级色、已滑过区是放行绿
+            // 审批：滑轨保持单色语言，左侧强调面表示已扫过的放行区，拇指刻左向箭头。
             else -> {
-                val trackWidth = px(76f)
-                val trackHeight = px(26f)
+                val trackWidth = px(72f)
+                val trackHeight = px(24f)
                 val thumbRadius = px(10f)
                 val left = cx - trackWidth / 2f
                 val top = cy - trackHeight / 2f
                 val right = left + trackWidth
-                val corner = px(13f)
                 val capsule = Path().apply {
                     addRoundRect(
                         RoundRect(
                             rect = Rect(left, top, right, top + trackHeight),
-                            cornerRadius = CornerRadius(corner, corner)
+                            cornerRadius = CornerRadius(px(12f), px(12f))
                         )
                     )
                 }
                 val travel = trackWidth - px(6f) - thumbRadius * 2f
-                val thumbCenterX = right - px(3f) - thumbRadius - travel * phase
-                val sweptEdge = (thumbCenterX + thumbRadius).coerceIn(left, right)
-
-                drawPath(path = capsule, color = Wear.Palette.Orb)
+                val thumbCenterX = right - px(3f) - thumbRadius - travel * 0.85f
+                val sweptEdge = thumbCenterX + thumbRadius
+                drawPath(path = capsule, color = Wear.Palette.SurfaceAlt)
                 clipPath(capsule) {
                     drawRect(
-                        color = Wear.Palette.Danger.copy(alpha = 0.34f),
-                        topLeft = Offset(sweptEdge, top),
-                        size = Size((right - sweptEdge).coerceAtLeast(0f), trackHeight)
-                    )
-                    drawRect(
-                        color = Wear.Palette.Success.copy(alpha = 0.72f),
+                        color = accentSurface,
                         topLeft = Offset(left, top),
                         size = Size((sweptEdge - left).coerceAtLeast(0f), trackHeight)
                     )
                 }
-                drawCircle(
-                    color = Wear.Palette.Orb,
-                    radius = thumbRadius,
-                    center = Offset(thumbCenterX, cy)
+                drawLine(
+                    color = accent,
+                    start = Offset(sweptEdge, top + px(4f)),
+                    end = Offset(sweptEdge, top + trackHeight - px(4f)),
+                    strokeWidth = px(1.5f),
+                    cap = StrokeCap.Round
                 )
+                val thumbCenter = Offset(thumbCenterX, cy)
+                drawCircle(color = Wear.Palette.Orb, radius = thumbRadius, center = thumbCenter)
                 drawCircle(
                     color = Wear.Palette.TextPrimary,
                     radius = thumbRadius,
-                    center = Offset(thumbCenterX, cy),
+                    center = thumbCenter,
                     style = Stroke(width = px(1.5f))
+                )
+                val tip = Offset(thumbCenterX - px(4f), cy)
+                drawLine(
+                    color = Wear.Palette.Bg,
+                    start = Offset(tip.x + px(4f), cy - px(4f)),
+                    end = tip,
+                    strokeWidth = px(1.75f),
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = Wear.Palette.Bg,
+                    start = Offset(tip.x + px(4f), cy + px(4f)),
+                    end = tip,
+                    strokeWidth = px(1.75f),
+                    cap = StrokeCap.Round
                 )
             }
         }

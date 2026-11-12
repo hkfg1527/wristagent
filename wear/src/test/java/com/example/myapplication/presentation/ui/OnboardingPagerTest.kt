@@ -49,7 +49,7 @@ class OnboardingPagerTest {
         OnboardingPager.Pages.forEachIndexed { index, page ->
             val estimated = estimatedWidthDp(page.description)
             assertTrue(
-                "第 " + (index + 1) + " 页说明按 12sp 估宽 " + estimated + "dp，超过正文列 " +
+                "第 " + (index + 1) + " 页说明按 15sp 估宽 " + estimated + "dp，超过正文列 " +
                     OnboardingGeometry.ContentWidthDp + "dp 会被省略号截断：" + page.description,
                 estimated <= OnboardingGeometry.ContentWidthDp
             )
@@ -105,13 +105,27 @@ class OnboardingPagerTest {
         assertTrue(OnboardingPager.SkipLabel.isNotBlank())
     }
 
-    /** 按 12sp 的保守估宽：中日韩字形整格 12dp，其余半格 7dp。 */
+    /** 按 15sp 的保守估宽：中日韩字形整格 15dp，其余半格 9dp。 */
     private fun estimatedWidthDp(text: String): Float {
         var width = 0f
         text.forEach { char ->
-            width += if (char.code > 0x2E80) 12f else 7f
+            width += if (char.code > 0x2E80) 15f else 9f
         }
         return width
+    }
+
+    @Test
+    fun copyStillNamesTheRealGestureThresholds() {
+        assertEquals("按住说话", OnboardingPager.Pages[0].title)
+        assertEquals("长按 0.34 秒，松手发送", OnboardingPager.Pages[0].description)
+        assertEquals("轻触主键", OnboardingPager.Pages[1].title)
+        assertEquals("单击恒为语音起录", OnboardingPager.Pages[1].description)
+        assertEquals("上滑设置", OnboardingPager.Pages[2].title)
+        assertEquals("上滑越过 38dp 进设置", OnboardingPager.Pages[2].description)
+        assertEquals("横滑两翼", OnboardingPager.Pages[3].title)
+        assertEquals("左翼打字，右翼开会话", OnboardingPager.Pages[3].description)
+        assertEquals("滑动放行", OnboardingPager.Pages[4].title)
+        assertEquals("左滑放行，点按拒绝", OnboardingPager.Pages[4].description)
     }
 }
 
@@ -124,6 +138,7 @@ class OnboardingGeometryTest {
     @Test
     fun contentWidthRespectsTheSafeWidth() {
         assertEquals(233f, OnboardingGeometry.CircleDiameterDp, 0.001f)
+        assertEquals(176f, OnboardingGeometry.ContentWidthDp, 0.001f)
         assertTrue(
             "正文列 " + OnboardingGeometry.ContentWidthDp + "dp 超过 184dp 安全宽",
             OnboardingGeometry.ContentWidthDp <= 184f
@@ -132,6 +147,7 @@ class OnboardingGeometryTest {
 
     @Test
     fun illustrationStaysInTheSuggestedRange() {
+        assertEquals(96f, OnboardingGeometry.IllustrationDp, 0.001f)
         assertTrue(OnboardingGeometry.IllustrationDp >= 96f)
         assertTrue(OnboardingGeometry.IllustrationDp <= 120f)
     }
@@ -229,15 +245,18 @@ class OnboardingGeometryTest {
             0.001f
         )
         assertEquals(
-            "页码点行与页脚之间不再隔空档：内容总高由这三段相加",
+            "点阵与页脚保留独立 8dp 间隔",
             OnboardingGeometry.FooterTopDp,
-            OnboardingGeometry.DotsTopDp + OnboardingGeometry.DotsRowHeightDp,
+            OnboardingGeometry.DotsTopDp + OnboardingGeometry.DotsRowHeightDp +
+                OnboardingGeometry.FooterGapDp,
             0.001f
         )
         assertTrue(
             "页码点不许再回到页脚那一行里",
             OnboardingGeometry.DotsTopDp < OnboardingGeometry.FooterTopDp
         )
+        assertEquals(4f, OnboardingGeometry.TextGroupGapDp, 0.001f)
+        assertEquals(8f, OnboardingGeometry.FooterGapDp, 0.001f)
     }
 
     @Test
@@ -265,6 +284,39 @@ class OnboardingGeometryTest {
             OnboardingGeometry.FooterTopDp + OnboardingGeometry.FooterHeightDp,
             0.001f
         )
+    }
+
+    @Test
+    fun entryShiftIsSmallAndStillInsideTheCircle() {
+        assertEquals(4f, OnboardingGeometry.EntryShiftDp, 0.001f)
+        assertTrue(OnboardingGeometry.EntryShiftDp in 2f..4f)
+        rows.take(3).forEach { row ->
+            assertTrue(
+                row.name + "在 4dp 入场偏移时出圆",
+                OnboardingGeometry.fitsInCircle(
+                    row.widthDp,
+                    row.heightDp,
+                    row.topDp + OnboardingGeometry.EntryShiftDp
+                )
+            )
+        }
+    }
+
+    @Test
+    fun everyIllustrationKeepsItsStrokesInsideTheCanvas() {
+        assertEquals(40f, OnboardingGeometry.FrameRadiusDp, 0.001f)
+        val halfCanvas = OnboardingGeometry.IllustrationDp / 2f
+        val pageExtents = listOf(
+            33f + 1.25f,
+            33f + 1.25f,
+            maxOf(31f + 1.5f, 18f + 15f),
+            32f + 11f + 0.75f,
+            72f / 2f,
+            OnboardingGeometry.FrameRadiusDp + 2.5f
+        )
+        pageExtents.forEachIndexed { index, extreme ->
+            assertTrue("第 " + (index + 1) + " 页图形越过 96dp 画布", extreme <= halfCanvas)
+        }
     }
 
     @Test
@@ -306,5 +358,49 @@ class OnboardingSourceGuardTest {
             "页脚两件左右分置：跳过贴左、按钮贴右，中段留空",
             footer.contains("Arrangement.SpaceBetween")
         )
+    }
+
+    @Test
+    fun titleAndDescriptionKeepTheirRequiredFontSizes() {
+        val body = source
+            .substringAfter("private fun PageBody(")
+            .substringBefore("private fun OnboardingFooter(")
+        assertTrue(body.contains("Wear.TextTitle"))
+        assertTrue(body.contains("Wear.TextBody"))
+        assertTrue(body.contains("fontSize = 15.sp"))
+        assertTrue("说明必须降为次级文本，不能与标题抢焦点", body.contains("color = Wear.Palette.TextSecondary"))
+        assertTrue(body.contains("maxLines = 1"))
+    }
+
+    @Test
+    fun pageTransitionUsesSharedMotionAndOnlyASmallEntryShift() {
+        val screen = source
+            .substringAfter("fun OnboardingScreen(")
+            .substringBefore("private fun PageBody(")
+        assertTrue(screen.contains("slideInVertically"))
+        assertTrue(screen.contains("motionSpec(animationsEnabled, Wear.Motion.page())"))
+        assertTrue(screen.contains("OnboardingGeometry.EntryShiftDp"))
+        assertFalse("引导页不再有持续循环动画", source.contains("rememberInfiniteTransition"))
+        assertFalse(source.contains("infiniteRepeatable"))
+        assertFalse("审批示意不得用大面积红绿拼色", source.contains("Wear.Palette.Danger"))
+        assertFalse("审批示意不得用大面积红绿拼色", source.contains("Wear.Palette.Success"))
+    }
+
+    @Test
+    fun gestureCopyStillMatchesTheRealHandlers() {
+        val orb = readProjectFile("src/main/java/com/example/myapplication/presentation/ui/BottomInteractiveBlock.kt")
+        assertTrue(orb.contains("delay(340)"))
+        assertTrue(orb.contains("onVoiceStopAndTrigger()"))
+        assertTrue(orb.contains("totalDeltaY < -38.dp.toPx()"))
+        assertTrue(orb.contains("abs(deltaX) > 22.dp.toPx()"))
+        assertTrue(orb.contains("onLeftKeyboardClick()"))
+        assertTrue(orb.contains("onRightActionClick()"))
+        assertTrue(orb.contains("ApprovalSliderLogic.isRejectTap"))
+        assertTrue(orb.contains("ApprovalSliderLogic.shouldAllow"))
+
+        val approval = readProjectFile("src/main/java/com/example/myapplication/presentation/ui/ApprovalSliderState.kt")
+        assertTrue(approval.contains("ALLOW_THRESHOLD = 0.85f"))
+        assertTrue(approval.contains("fun shouldAllow(progress: Float): Boolean"))
+        assertTrue(approval.contains("progress >= ALLOW_THRESHOLD"))
     }
 }

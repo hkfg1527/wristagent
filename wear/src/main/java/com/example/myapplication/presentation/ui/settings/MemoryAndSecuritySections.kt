@@ -112,6 +112,7 @@ fun MemoryManagerContent(
             SettingsSwitchRow(
                 label = stringResource(R.string.settings_context_compress),
                 secondary = stringResource(R.string.settings_context_compress_secondary),
+                subtitleBelowRow = true,
                 checked = autoCompress,
                 onCheckedChange = { enabled ->
                     autoCompress = enabled
@@ -124,6 +125,7 @@ fun MemoryManagerContent(
             SettingsSwitchRow(
                 label = stringResource(R.string.settings_memory_enabled),
                 secondary = stringResource(R.string.settings_memory_enabled_secondary),
+                subtitleBelowRow = true,
                 checked = memoryEnabled,
                 onCheckedChange = { enabled ->
                     memoryEnabled = enabled
@@ -276,6 +278,7 @@ fun SecurityGuardrailContent(
                 SettingsSubRadioRow(
                     label = stringResource(titleRes),
                     subtitle = stringResource(descRes),
+                    subtitleBelowRow = true,
                     selected = currentMode == mode,
                     onSelect = {
                         onSelect(mode)

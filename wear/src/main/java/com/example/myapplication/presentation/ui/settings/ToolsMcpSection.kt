@@ -141,7 +141,8 @@ fun ToolsMcpContent(
             } else {
                 SettingsInfoRow(
                     title = stringResource(R.string.settings_sub_agent),
-                    value = stringResource(R.string.settings_sub_agent_requires_expert)
+                    subtitle = stringResource(R.string.settings_sub_agent_requires_expert),
+                    subtitleBelowRow = true
                 )
             }
         }
@@ -250,6 +251,7 @@ fun ToolsMcpContent(
             SettingsSwitchRow(
                 label = stringResource(R.string.settings_tools_provider_search),
                 secondary = stringResource(R.string.settings_tools_provider_search_secondary),
+                subtitleBelowRow = true,
                 checked = providerManagedSearch,
                 onCheckedChange = { enabled ->
                     providerManagedSearch = enabled

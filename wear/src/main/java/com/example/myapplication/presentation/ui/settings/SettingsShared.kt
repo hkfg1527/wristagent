@@ -248,7 +248,9 @@ internal class SettingsRowEntry(
  *
  * 之所以先登记再渲染，是因为退场要"从末行往前起跑"——只有先知道总行数才能算出反向延迟。
  */
-class SettingsRows internal constructor() {
+class SettingsRows internal constructor(
+    private val pageTitle: String = ""
+) {
     internal val items = mutableListOf<SettingsRowEntry>()
 
     /** 登记一行内容；[subItem] = true 表示它是某个组下的子项，用更短的分隔线。 */
@@ -277,9 +279,16 @@ class SettingsRows internal constructor() {
         )
     }
 
-    /** 登记一行分组标题。 */
+    /** 登记一行分组标题；首组紧跟页头，不再重复组间留白。 */
     fun section(text: String) {
-        items.add(SettingsRowEntry(isSection = true, content = { SettingsSectionHeader(text = text) }))
+        val isFirstSection = items.isEmpty()
+        if (!SettingsTextLayout.shouldRenderSectionHeader(text, pageTitle, isFirstSection)) return
+        items.add(
+            SettingsRowEntry(
+                isSection = true,
+                content = { SettingsSectionHeader(text = text, isFirstSection = isFirstSection) }
+            )
+        )
     }
 }
 
@@ -304,7 +313,7 @@ fun SettingsSubPage(
     val stagger = rememberSettingsRowStaggerState()
     val exit = rememberSettingsExitController()
 
-    val registry = SettingsRows()
+    val registry = SettingsRows(pageTitle = title)
     registry.rows()
     val content = registry.items
     // 组 = 一张卡：每行落在组里的哪个位置（组首 / 组中 / 组尾 / 单行）由行序列本身算出；
@@ -347,8 +356,7 @@ fun SettingsSubPage(
             flingBehavior = ScrollableDefaults.flingBehavior(),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
-            // 曲率缩放关死：edgeScale / edgeAlpha 都传 1，边缘行不再缩到 75% 并淡出，
-            // 同一行在任何滚动位置尺寸一致
+            // 与根页 / 聊天共用官方 M3E 曲率：边缘行缩小并淡出
             scalingParams = settingsScalingParams(),
             contentPadding = PaddingValues(
                 start = settingsSideInset(),
@@ -541,62 +549,39 @@ fun SettingsBackButton(onClick: () -> Unit) {
  *   组的边界改由 24dp 留白承担（组内只隔一根 1px 线，比例因此一眼可辨）；
  * - 上方 24dp 是**组间距**的唯一来源，下方 8dp 是标题与本组首行之间；
  * - 左内边距 14dp 与行标签同一条槽线：标题与行标签逐像素对齐。
- * - 左槽沟里那三颗 2dp 点是本页的点阵签名：它们画在**沟里**、不占布局宽度，
- *   标题的起笔 x 因此一个像素都没动（右移 20dp 就会脱离行标签的左槽线）。
+ * - 左槽沟里一根 8dp × 2dp 的强调色短横是本页的组签名：它画在**沟里**、不占布局宽度，
+ *   标题的起笔 x 因此一个像素都没动；8dp 与 14dp 槽线之间留 6dp，避免读成连字符。
  */
 @Composable
-fun SettingsSectionHeader(text: String) {
+fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
+    val accent = Wear.Accent
     BasicText(
         text = text,
-        modifier = Modifier.settingsSectionHeaderLayout(),
+        modifier = Modifier.settingsSectionHeaderLayout(isFirstSection, accent),
         style = SettingsSectionStyle,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
 }
 
-/**
- * 组标题的排版与点阵签名：上 24dp / 下 8dp 的组呼吸 + 左槽线 14dp，左槽沟里画三颗点。
- *
- * 先 padding 再 drawBehind，drawBehind 的坐标系就正好是「标题文字所在的那一条带」：
- * 点的横向起笔在内容盒左缘、纵向中线与文字中线重合，而标题本身不参与这次绘制 ——
- * 签名因此挂在沟里，标题仍起笔在 14dp 的左槽线上。
- */
-private fun Modifier.settingsSectionHeaderLayout(): Modifier = this
+/** 短横画在 14dp 槽沟内，标题仍从同一条左槽线起笔；首组不重复页头后的留白。 */
+private fun Modifier.settingsSectionHeaderLayout(isFirstSection: Boolean, accent: Color): Modifier = this
     .widthIn(max = SettingsContentWidth)
     .fillMaxWidth()
-    .padding(top = SettingsSectionGap, bottom = SettingsSectionHeaderBottomGap)
-    .drawBehind { headerDotSignature() }
+    .padding(
+        top = SettingsDesignMath.sectionGapDp(isFirstSection).dp,
+        bottom = SettingsSectionHeaderBottomGap
+    )
+    .drawBehind { headerAccentMark(accent) }
     .padding(start = SettingsRowSidePadding)
 
-/** 组标题签名点的直径：2dp —— 比行间点线的 3dp 再小一档，签名字符不抢标题。 */
-private val HeaderDotDiameter: Dp = 2.dp
-
-/** 组标题签名点的数量：三颗。 */
-private const val HeaderDotCount = 3
-
-/**
- * 标题左槽沟里的点阵签名：三颗 2dp 点、中心间距 6dp（= 2dp 点径 + 4dp 间隙），
- * 三颗正好占满 14dp 槽沟（3 × 2 + 2 × 4 = 14）；垂直中线贴文字中线，颜色走 TextMuted，
- * 既不引入新色，也不碰强调色。
- *
- * 只此一份实现，只给设置页组标题用。
- *
- * 会话抽屉曾想复用它，但抽屉标题在 ScalingLazyColumn 的 item 内、会被裁到节点边界，
- * drawBehind 画到节点左侧的点根本没渲染出来（真机像素扫描 x<35 区域 0 个非背景像素）。
- * 与其为了装饰去动列表内边距，不如这一页不放签名——抽屉不加它也协调。
- */
-private fun DrawScope.headerDotSignature() {
-    val diameterPx = HeaderDotDiameter.toPx()
-    val stepPx = diameterPx + Wear.Space.Xs.toPx()
-    val centerY = size.height / 2f
-    repeat(HeaderDotCount) { index ->
-        drawCircle(
-            color = Wear.Palette.TextMuted,
-            radius = diameterPx / 2f,
-            center = Offset(diameterPx / 2f + index * stepPx, centerY)
-        )
-    }
+private fun DrawScope.headerAccentMark(accent: Color) {
+    val mark = SettingsSectionHeaderMark.mark(size.height / density)
+    drawRect(
+        color = accent,
+        topLeft = Offset(mark.xDp.dp.toPx(), mark.yDp.dp.toPx()),
+        size = Size(mark.widthDp.dp.toPx(), mark.heightDp.dp.toPx())
+    )
 }
 
 /** 行内：左槽标签与右槽取值之间的最小呼吸。 */
@@ -663,16 +648,7 @@ private fun SettingsRowShape.toCornerShape(): Shape = RoundedCornerShape(
     bottomEnd = if (roundedBottom) GroupCardRadius else 0.dp
 )
 
-/**
- * 组内行与行之间的点线：沿格距 16dp 排 1.5dp 半径的小点（直径 3dp）/ Border 色，
- * 右端收法与发丝线同一条（从右槽线往左 24dp），左端缩进由 [LocalSettingsGroupHairlineStart] 给
- * （子项组上沿 12dp，普通行间 14dp）—— 首点圆心正落在该槽线上。
- *
- * 只画在卡片内部、只画在"行与行之间"：组内最后一行下面没有线，线数因此恒比行数少一。
- *
- * 带高仍是 1dp：行步进 49dp 由 [SettingsSpacingMath.RowStepDp] 钉死，不能为画点撑高。
- * 3dp 的圆以这条带的中线为中心、上下各溢出 1dp 绘制 —— 行边界不在卡缘上，溢出不会被卡片圆角裁到。
- */
+/** 组内分隔：一条 1 物理像素 Border 细线，右端保留 24dp 呼吸。 */
 @Composable
 private fun SettingsGroupHairline() {
     Box(
@@ -685,17 +661,14 @@ private fun SettingsGroupHairline() {
             )
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // 轨道宽（dp）→ 点数：右端 24dp 与"末点不许被切"都由 SettingsDotRule 算
-            val dotCount = SettingsDotRule.dotCount(size.width / density)
-            val radiusPx = SettingsDotRule.dotRadiusDp().dp.toPx()
+            val lineLength = SettingsGroupLineMath.lengthDp(size.width / density).dp.toPx()
             val centerY = size.height / 2f
-            repeat(dotCount) { index ->
-                drawCircle(
-                    color = Wear.Palette.Border,
-                    radius = radiusPx,
-                    center = Offset(SettingsDotRule.dotOffsetDp(index).dp.toPx(), centerY)
-                )
-            }
+            drawLine(
+                color = Wear.Palette.Border,
+                start = Offset(0f, centerY),
+                end = Offset(lineLength, centerY),
+                strokeWidth = SettingsGroupLineMath.StrokeWidthPx
+            )
         }
     }
 }
@@ -818,7 +791,7 @@ private fun SettingsSlotRow(
     subtitle: String? = null,
     subtitleMaxLines: Int = 2,
     subtitleStatus: SettingsStatusTone? = null,
-    subtitleBelowRow: Boolean = false,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(subtitle),
     value: String? = null,
     onClick: (() -> Unit)? = null,
     titleMaxLines: Int = 2,
@@ -826,6 +799,7 @@ private fun SettingsSlotRow(
     subItem: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    val valueBelowRow = SettingsTextLayout.shouldPlaceValueBelowRow(title, value)
     SettingsCardRow(modifier = modifier, onClick = onClick) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -852,12 +826,13 @@ private fun SettingsSlotRow(
                             subtitle = subtitle,
                             subtitleMaxLines = subtitleMaxLines,
                             subtitleStatus = subtitleStatus,
+                            belowRow = false,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
                 // 右槽：取值靠右，右端落在行内边距以内；有行尾控件时控件才是最后一个元素
-                if (value != null) {
+                if (value != null && !valueBelowRow) {
                     Spacer(Modifier.width(SettingsLabelValueGap))
                     BasicText(
                         text = value,
@@ -872,15 +847,33 @@ private fun SettingsSlotRow(
                     trailing()
                 }
             }
-            // 副标题的第二个落点：整行内宽全归它，取值 / 行尾圆点都不再与它分宽度。
+            // 标题 → 说明 → 值：长说明与长值分别独占整行，不再被右槽或单选点挤压。
             if (subtitle != null && subtitleBelowRow) {
                 SettingsSubtitleLine(
                     subtitle = subtitle,
                     subtitleMaxLines = subtitleMaxLines,
                     subtitleStatus = subtitleStatus,
+                    belowRow = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = SettingsRowLineGap)
+                        .padding(
+                            start = if (subItem) SettingsSubItemIndent else 0.dp,
+                            top = SettingsRowLineGap
+                        )
+                )
+            }
+            if (value != null && valueBelowRow) {
+                BasicText(
+                    text = value,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = if (subItem) SettingsSubItemIndent else 0.dp,
+                            top = SettingsRowLineGap
+                        ),
+                    style = SettingsRowValueStyle.copy(textAlign = TextAlign.Start),
+                    maxLines = Int.MAX_VALUE,
+                    overflow = TextOverflow.Visible
                 )
             }
         }
@@ -898,8 +891,10 @@ private fun SettingsSubtitleLine(
     subtitle: String,
     subtitleMaxLines: Int,
     subtitleStatus: SettingsStatusTone?,
+    belowRow: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val wrapsFully = belowRow && subtitleMaxLines > 1
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
@@ -911,9 +906,9 @@ private fun SettingsSubtitleLine(
         BasicText(
             text = subtitle,
             modifier = Modifier.weight(1f, fill = false),
-            style = SettingsRowValueStyle,
-            maxLines = subtitleMaxLines,
-            overflow = TextOverflow.Ellipsis
+            style = SettingsRowValueStyle.copy(textAlign = TextAlign.Start),
+            maxLines = if (wrapsFully) Int.MAX_VALUE else subtitleMaxLines,
+            overflow = if (wrapsFully) TextOverflow.Visible else TextOverflow.Ellipsis
         )
     }
 }
@@ -1010,9 +1005,11 @@ fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    secondary: String? = null
+    secondary: String? = null,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
 ) {
     SettingsCardRow(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
         SwitchButton(
             checked = checked,
             onCheckedChange = onCheckedChange,
@@ -1039,13 +1036,25 @@ fun SettingsSwitchRow(
                 horizontal = 0.dp,
                 vertical = Wear.Space.Sm
             ),
-            secondaryLabel = if (secondary == null) {
+            secondaryLabel = if (secondary == null || subtitleBelowRow) {
                 null
             } else {
                 { SettingsSecondaryLabel(text = secondary) }
             },
             label = { SettingsPrimaryLabel(text = label) }
         )
+        if (secondary != null && subtitleBelowRow) {
+            SettingsSubtitleLine(
+                subtitle = secondary,
+                subtitleMaxLines = Int.MAX_VALUE,
+                subtitleStatus = null,
+                belowRow = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = SettingsRowLineGap)
+            )
+        }
+        }
     }
 }
 
@@ -1060,15 +1069,30 @@ fun SettingsSplitToggleRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    secondary: String? = null,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
 ) {
     SettingsCardRow(modifier = modifier) {
-        TextToggleButton(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.fillMaxWidth(),
-            content = { SettingsPrimaryLabel(text = label) }
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            TextToggleButton(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                modifier = Modifier.fillMaxWidth(),
+                content = { SettingsPrimaryLabel(text = label) }
+            )
+            if (secondary != null) {
+                SettingsSubtitleLine(
+                    subtitle = secondary,
+                    subtitleMaxLines = 2,
+                    subtitleStatus = null,
+                    belowRow = subtitleBelowRow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = SettingsRowLineGap)
+                )
+            }
+        }
     }
 }
 
@@ -1241,7 +1265,7 @@ fun SettingsRadioRow(
     subtitle: String? = null,
     subtitleMaxLines: Int = 2,
     subtitleStatus: SettingsStatusTone? = null,
-    subtitleBelowRow: Boolean = false,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(subtitle),
     dangerSelected: Boolean = false,
     dotColor: Color? = null
 ) {
@@ -1310,12 +1334,16 @@ fun SettingsSubRadioRow(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleMaxLines: Int = 2,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(subtitle),
     dangerSelected: Boolean = false,
     dotColor: Color? = null
 ) {
     SettingsSlotRow(
         title = label,
         subtitle = subtitle,
+        subtitleMaxLines = subtitleMaxLines,
+        subtitleBelowRow = subtitleBelowRow,
         modifier = modifier.widthIn(max = SettingsContentWidth),
         onClick = onSelect,
         subItem = true,
@@ -1375,10 +1403,18 @@ fun SettingsStatusRow(
 
 /** 只读说明行：标签左槽 + 取值右槽，与可点行共用同两条槽线。 */
 @Composable
-fun SettingsInfoRow(title: String, value: String, modifier: Modifier = Modifier) {
+fun SettingsInfoRow(
+    title: String,
+    value: String? = null,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(subtitle)
+) {
     SettingsSlotRow(
         title = title,
         value = value,
+        subtitle = subtitle,
+        subtitleBelowRow = subtitleBelowRow,
         modifier = modifier.widthIn(max = SettingsContentWidth)
     )
 }
@@ -1397,7 +1433,7 @@ fun SettingsCaptionRow(
     text: String,
     modifier: Modifier = Modifier,
     mono: Boolean = false,
-    maxLines: Int = 2
+    maxLines: Int = Int.MAX_VALUE
 ) {
     SettingsCardRow(modifier = modifier, minHeight = 0.dp) {
         BasicText(
@@ -1407,7 +1443,7 @@ fun SettingsCaptionRow(
                 .fillMaxWidth(),
             style = if (mono) Wear.TextMono else Wear.TextCaption,
             maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis
+            overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Visible else TextOverflow.Ellipsis
         )
     }
 }

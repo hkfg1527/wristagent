@@ -67,6 +67,9 @@ fun SettingsTransferContent(
     ) {
         section(stringResource(R.string.settings_transfer_header))
 
+        // 先交代快照边界，再执行导出/导入：说明 → 动作保持一条阅读路径。
+        row { SettingsCaptionRow(text = stringResource(R.string.settings_transfer_hint)) }
+
         standaloneRow {
             SettingsActionButton(
                 label = stringResource(R.string.settings_transfer_export),
@@ -127,7 +130,5 @@ fun SettingsTransferContent(
                 )
             }
         }
-
-        row { SettingsCaptionRow(text = stringResource(R.string.settings_transfer_hint)) }
     }
 }

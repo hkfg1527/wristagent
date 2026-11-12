@@ -74,11 +74,13 @@ class SettingsVisualGuardTest {
 
         val shared = readSettings("SettingsShared.kt")
         assertEquals(
-            "全页强调色元素只允许三个：滑轨选中段 + 单选选中态 + 6dp 状态点（后者由纯映射取轨道位）",
-            3,
+            "全页强调色元素只允许四个：滑轨选中段 + 单选选中态 + 6dp 状态点 + 组标题短横",
+            4,
             Regex("Wear\\.Accent\\b").findAll(codeOnly(shared)).count()
         )
         assertTrue("滑轨选中段必须跟随运行时强调色", shared.contains("selectedBarColor = Wear.Accent"))
+        assertTrue("组标题短横必须在组合上下文读取运行时强调色", shared.contains("val accent = Wear.Accent"))
+        assertTrue("组标题短横必须接收该运行时颜色", shared.contains("headerAccentMark(accent)"))
         assertTrue(
             "单选圆点只在选中态上用强调色",
             shared.contains("val ring = if (selected) selectedColor else Wear.Palette.TextMuted")

@@ -478,6 +478,9 @@ object SettingsDesignMath {
     /** 组间留白：24dp，恒 >= 组内行距的 2 倍（实际 6 倍）。 */
     const val SectionGapDp = 24f
 
+    /** 首组之前已有页面头部，不重复制造组间留白；后续组仍保持 24dp。 */
+    fun sectionGapDp(isFirstSection: Boolean): Float = if (isFirstSection) 0f else SectionGapDp
+
     /** 组卡片内一行的左右内边距：取值右端因此距卡片右缘 14dp，不再贴死在圆角上。 */
     const val RowSidePaddingDp = 14f
 

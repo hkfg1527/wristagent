@@ -118,6 +118,7 @@ fun VoiceAsrContent(
                 SettingsRadioRow(
                     label = candidate.displayName,
                     subtitle = stringResource(descriptionRes),
+                    subtitleBelowRow = true,
                     selected = providerId == candidate,
                     onSelect = {
                         providerId = candidate

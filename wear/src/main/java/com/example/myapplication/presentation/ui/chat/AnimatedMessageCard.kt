@@ -21,7 +21,7 @@ internal fun AnimatedMessageCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val scale = remember(key) { Animatable(0.94f) }
+    val scale = remember(key) { Animatable(0.99f) }
     val alpha = remember(key) { Animatable(0f) }
 
     LaunchedEffect(key) {

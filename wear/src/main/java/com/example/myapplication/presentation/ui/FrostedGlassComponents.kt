@@ -441,7 +441,7 @@ fun UserChatBubble(
 }
 
 /**
- * Agent 回复卡片：Surface 实底 + 1dp 描边 + Card 圆角，无 RenderEffect 模糊层。
+ * Agent 回复卡片：Surface 实底 + 1dp 描边 + Group 圆角，无 RenderEffect 模糊层。
  */
 @Composable
 fun AgentSquareBlurBox(
@@ -459,7 +459,7 @@ fun AgentSquareBlurBox(
     // 还让"用户靠右 / 助手靠左"彻底看不出来。左侧一条 2dp 竖线就够标记"这是回答"。
     // 回答是一层"面"：实心 Surface + 发丝描边，把正文从背景里托起来。
     // 曾经为了"去装饰"把面和边一起删掉，结果文字直接浮在纯黑上 —— 没有前后关系，也就没有空间感。
-    val shape = RoundedCornerShape(Wear.Radius.Card)
+    val shape = RoundedCornerShape(Wear.Radius.Group)
     val edge = if (approvalVisualState == ApprovalVisualState.NONE) Wear.Palette.Border else borderColor
 
     Box(

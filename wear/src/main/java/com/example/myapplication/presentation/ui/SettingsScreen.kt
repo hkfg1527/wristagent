@@ -261,8 +261,7 @@ fun SettingsScreen(
                     // 关掉库自带的 rotary 与系统拉伸越界：表冠由上面的处理器接管，越界不做拉伸
                     rotaryScrollableBehavior = null,
                     overscrollEffect = null,
-                    // 曲率缩放关死：edgeScale / edgeAlpha 都传 1，边缘行不再缩到 75% 并淡出，
-                    // 同一行在任何滚动位置尺寸一致（真机实测同一分隔线曾有 168.0 / 142.0 / 126.0dp 三种宽度）
+                    // 沿用官方 M3E 曲率：边缘行随圆屏缩小并淡出，与聊天列表保持同一套观感
                     scalingParams = settingsScalingParams(),
                     contentPadding = PaddingValues(
                         // 左右内缩按圆周弦长推导（真机 32.5dp），不再写死 12dp
@@ -296,7 +295,10 @@ fun SettingsScreen(
                     // ================= 模型 =================
                     item {
                         RootSectionRow(index = 1, stagger = rowStagger, exit = exit) {
-                            SettingsSectionHeader(text = stringResource(R.string.settings_section_models))
+                            SettingsSectionHeader(
+                                text = stringResource(R.string.settings_section_models),
+                                isFirstSection = true
+                            )
                         }
                     }
 
@@ -786,7 +788,7 @@ private fun SettingsFocusBlock(modelName: String, baseUrl: String, configured: B
             .widthIn(max = SettingsContentWidth)
             .fillMaxWidth()
             // 起始内边距与行标签同一条左槽线：卡片行内的标签离卡片左缘 14dp，焦点块因此也内缩 14dp
-            .padding(start = SettingsRowSidePadding, top = Wear.Space.Sm, bottom = Wear.Space.Xs)
+            .padding(start = SettingsRowSidePadding, bottom = Wear.Space.Xs)
     ) {
         BasicText(
             text = title,
