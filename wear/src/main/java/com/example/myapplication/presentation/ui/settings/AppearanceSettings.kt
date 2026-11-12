@@ -74,6 +74,9 @@ object WearAppearance {
     /** 强调色覆盖：null = 用令牌默认值 [Wear.Palette.Accent]。 */
     var accentOverride: Color? by mutableStateOf(null)
 
+    /** 设置页外观预设：默认仍是气球档，老用户升级后像素不变。 */
+    var style: SettingsStyle by mutableStateOf(SettingsStyle.Default)
+
     /** 当前强调色：覆盖值优先，默认回到令牌。 */
     val accent: Color get() = accentOverride ?: Wear.Palette.Accent
 
@@ -84,6 +87,7 @@ object WearAppearance {
     internal fun reset() {
         fontScale = FontScaleTier.STANDARD.scale
         accentOverride = null
+        style = SettingsStyle.Default
     }
 }
 
@@ -109,10 +113,17 @@ class AppearanceStore internal constructor(private val prefs: SharedPreferences)
         prefs.edit().putInt(KEY_ACCENT, color.toArgb()).apply()
     }
 
+    fun style(): SettingsStyle = SettingsStyle.fromStorage(prefs.getString(KEY_STYLE, null))
+
+    fun saveStyle(style: SettingsStyle) {
+        prefs.edit().putString(KEY_STYLE, style.name).apply()
+    }
+
     /** 把存储值灌进全局状态；界面随后只跟 [WearAppearance] 打交道。 */
     fun install(): AppearanceStore {
         WearAppearance.fontScale = fontScale()
         WearAppearance.accentOverride = accent()
+        WearAppearance.style = style()
         return this
     }
 
@@ -121,6 +132,7 @@ class AppearanceStore internal constructor(private val prefs: SharedPreferences)
 
         internal const val KEY_FONT_SCALE = "font_scale"
         internal const val KEY_ACCENT = "accent_argb"
+        internal const val KEY_STYLE = "settings_style"
 
         /** 没有强调色覆盖时的哨兵：`getInt` 没有 null 可用。 */
         private const val NoAccent = Int.MIN_VALUE
@@ -164,4 +176,10 @@ fun applyFontScaleTier(context: Context, tier: FontScaleTier) {
 fun applyAccentPreset(context: Context, preset: AccentPreset) {
     WearAppearance.accentOverride = preset.color
     AppearanceStore.of(context).saveAccent(preset.color)
+}
+
+/** 外观预设写入：同上。设置页外壳读 [WearAppearance.style]，改完立刻换壳。 */
+fun applySettingsStyle(context: Context, style: SettingsStyle) {
+    WearAppearance.style = style
+    AppearanceStore.of(context).saveStyle(style)
 }

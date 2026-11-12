@@ -140,6 +140,23 @@ fun AppearanceContent(
         title = stringResource(R.string.settings_sub_appearance),
         onBack = onBack
     ) {
+        // 页面风格：整页外壳换装，不换数据、不换行的语义。
+        section(stringResource(R.string.settings_style_header))
+
+        SettingsStyle.values().forEach { style ->
+            row(subItem = true) {
+                SettingsSubRadioRow(
+                    label = stringResource(style.labelRes),
+                    subtitle = stringResource(style.summaryRes),
+                    selected = WearAppearance.style == style,
+                    onSelect = {
+                        applySettingsStyle(context, style)
+                        context.vibrateTick()
+                    }
+                )
+            }
+        }
+
         // 「主题」组整组删除：网页端 ConsoleFields 里已经没有 themeMode，表端的主题枚举也随偏好一起删了，
         // 留着「请在手机网页修改」就是把人指到一个不存在的选项上。
         row {

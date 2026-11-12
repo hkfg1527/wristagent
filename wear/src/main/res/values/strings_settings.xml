@@ -441,4 +441,11 @@
     <string name="settings_remembered_full">List is full: new "remember" calls are refused until you forget some</string>
     <string name="settings_remembered_forget">Forget all remembered commands</string>
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
+    <string name="settings_style_header">Page style</string>
+    <string name="settings_style_balloon">Balloon</string>
+    <string name="settings_style_balloon_summary">One balloon per page, width follows the round screen</string>
+    <string name="settings_style_square">Square</string>
+    <string name="settings_style_square_summary">Centered text, hairline dividers, square keys</string>
+    <string name="settings_style_card">Big cards</string>
+    <string name="settings_style_card_summary">Google-style cards with a ring indicator on the right</string>
 </resources>
