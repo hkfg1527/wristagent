@@ -89,6 +89,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -1172,6 +1173,9 @@ fun SettingsSwitchRow(
 
 @Composable
 private fun SettingsCompactSwitch(checked: Boolean) {
+    val stateLabel = stringResource(
+        if (checked) R.string.settings_switch_on else R.string.settings_switch_off
+    )
     val progress by animateFloatAsState(
         targetValue = if (checked) 1f else 0f,
         animationSpec = Wear.Motion.micro(),
@@ -1185,7 +1189,10 @@ private fun SettingsCompactSwitch(checked: Boolean) {
             .clip(shape)
             .background(if (checked) Wear.Accent.copy(alpha = 0.82f) else Wear.Palette.SurfaceAlt)
             .border(1.dp, if (checked) Wear.Accent else Wear.Palette.Border, shape)
-            .semantics { role = Role.Switch }
+            .semantics {
+                role = Role.Switch
+                stateDescription = stateLabel
+            }
     ) {
         Box(
             modifier = Modifier

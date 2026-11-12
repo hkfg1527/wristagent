@@ -55,6 +55,8 @@
     <string name="settings_reasoning_effort_medium">Medium</string>
     <string name="settings_reasoning_effort_high">High</string>
     <string name="settings_reasoning_effort_unsupported">This model ignores the reasoning effort setting</string>
+    <string name="settings_switch_on">On</string>
+    <string name="settings_switch_off">Off</string>
     <string name="settings_reply_style_header">Reply style</string>
     <string name="settings_reply_style_concise">Concise</string>
     <string name="settings_reply_style_concise_secondary">Conclusion first, key steps only</string>

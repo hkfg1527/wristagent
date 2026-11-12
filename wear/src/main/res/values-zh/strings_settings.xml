@@ -55,6 +55,8 @@
     <string name="settings_reasoning_effort_medium">中</string>
     <string name="settings_reasoning_effort_high">高</string>
     <string name="settings_reasoning_effort_unsupported">该模型不支持推理努力，将忽略</string>
+    <string name="settings_switch_on">已开启</string>
+    <string name="settings_switch_off">已关闭</string>
     <string name="settings_reply_style_header">回答风格</string>
     <string name="settings_reply_style_concise">精炼</string>
     <string name="settings_reply_style_concise_secondary">先给结论，只保留关键步骤</string>
