@@ -36,6 +36,7 @@ import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.R
@@ -52,6 +53,7 @@ import com.example.myapplication.presentation.ui.settings.AppearanceContent
 import com.example.myapplication.presentation.ui.settings.ConsolePortStatus
 import com.example.myapplication.presentation.ui.settings.RemoteConsoleContent
 import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
+import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
 import com.example.myapplication.presentation.ui.settings.SettingsRowSlot
 import com.example.myapplication.presentation.ui.settings.LocalSettingsRowSlot
@@ -300,7 +302,7 @@ fun SettingsScreen(
                     item {
                         SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
                             SettingsBalloonGroup {
-                                Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
+                                Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 SettingsSectionHeader(
                                     text = stringResource(R.string.settings_section_models),
                                     isFirstSection = true
@@ -461,7 +463,7 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
+                                Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                             }
                         }
                     }

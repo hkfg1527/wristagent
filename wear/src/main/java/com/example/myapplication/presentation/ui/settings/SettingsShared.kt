@@ -428,7 +428,7 @@ fun SettingsSubPage(
                     ) {
                         SettingsBalloonGroup {
                             // 主气球上下各留一段纯曲面，首尾标题不会贴在收口尖上。
-                            Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
+                            Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                             chunk.indices.forEach { index ->
                                 val entry = content[index]
                                 val next = content.getOrNull(index + 1)
@@ -444,7 +444,7 @@ fun SettingsSubPage(
                                     entry.content()
                                 }
                             }
-                            Spacer(Modifier.height(Wear.Space.Xl + Wear.Space.Sm))
+                            Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                         }
                     }
                 } else {

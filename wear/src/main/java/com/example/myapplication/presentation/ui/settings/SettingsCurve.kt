@@ -1,8 +1,8 @@
 package com.example.myapplication.presentation.ui.settings
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
+import kotlin.math.hypot
 import kotlin.math.sqrt
 
 /**
@@ -73,15 +73,167 @@ object SettingsCurveMath {
  * 把一行卡片的背景构造成圆弦曲面。
  *
  * 左右边取圆周上 1/3、2/3 处的点作为三次贝塞尔控制点；相邻行共享同一个边界 y，
- * 因此上一行的底边半宽与下一行的顶边半宽完全相等，切线也连续，整组拼成一条圆弧曲面。
+ * 因此上一行的底边半宽与下一行顶边半宽完全相等，切线也连续，整组拼成一条圆弧曲面。
  *
- * 组首 / 组尾 / 单行用 14dp 椭圆穹顶封口；中间行只保留连续侧弧。
+ * 组首 / 组尾 / 单行用 20dp 浅穹顶封口；中间行只保留连续侧弧。
  */
 object SettingsCurveGeometry {
-    /** 封口浅弧高度：20dp，单段三次曲线与侧边共用切线，不做第二个圆拱。 */
+    /** 穹顶最小高度：20dp；实际高度跟半宽走，保证封口是一段圆拱而不是平盖。 */
     const val CapHeightDp = 20f
 
-    /** 整页主气球：沿屏幕圆周采样成一条闭合贝塞尔曲线，顶底只留 6dp 浅弧。 */
+    /** 穹顶高度上限 = 最小高度的倍数：48dp，超过就会挤掉内容。 */
+    const val CapMaxRatio = 2.4f
+
+    /** 气球内容距顶/底的最小内缩：大于 [CapHeightDp] × [CapMaxRatio]，首末行不会坐进穹顶里。 */
+    const val CapInsetDp = 56f
+
+    /** 穹顶高度与半宽的比例：0.5 即 2:1，再扁就只剩一条平盖。 */
+    private const val CapAspect = 0.5f
+
+    /** 侧壁切分数：每段跨角小于 4°，肉眼不可分辨，也不产生折面。 */
+    private const val WallSlices = 16
+
+    /** 四分之一椭圆的三次曲线控制点系数。 */
+    private const val ArcKappa = 0.5522848f
+
+    /**
+     * 整页主气球的轮廓段。
+     *
+     * 一条闭合曲线：穹顶两端切线由侧壁解析导数给出，因此上肩、下肩都没有折角；
+     * 侧壁是圆弧的等比缩放，宽度单调变化，不会在肩部鼓出多余的一块。
+     */
+    internal fun outlineSegments(
+        widthPx: Float,
+        heightPx: Float,
+        topInRootPx: Float,
+        screenHeightPx: Float,
+        screenMarginPx: Float,
+        capHeightPx: Float
+    ): List<BalloonSegment> {
+        if (widthPx <= 0f || heightPx <= 0f) return emptyList()
+        val radius = (screenHeightPx / 2f - screenMarginPx).coerceAtLeast(0f)
+        if (radius <= 0f) return emptyList()
+        val cx = widthPx / 2f
+        val centerLocal = screenHeightPx / 2f - topInRootPx
+
+        fun chord(localY: Float): Float {
+            val dy = localY - centerLocal
+            return sqrt((radius * radius - dy * dy).coerceAtLeast(0f))
+        }
+
+        // 整组最大弦长等比缩到内容盒：轮廓仍是圆弧，但不会越过盒宽，
+        // 也不会像逐点夹平那样在夹平处留下折角。
+        val nearestY = centerLocal.coerceIn(0f, heightPx)
+        val scale = (cx / chord(nearestY).coerceAtLeast(0.001f)).coerceAtMost(1f)
+        fun half(localY: Float): Float = (chord(localY) * scale).coerceIn(0f, cx)
+
+        // 右壁解析导数 dx/dy，穹顶端点直接复用它，保证相接处切线完全一致。
+        fun slope(localY: Float): Float {
+            val chordAt = chord(localY)
+            return if (chordAt < 0.001f) 0f else (centerLocal - localY) / chordAt * scale
+        }
+
+        // 穹顶高度由半宽反解：半宽越大，拱越高，肩部的曲率突变越小，
+        // 不会像固定 20dp 那样把封口压成“平盖 + 中间一个尖”。
+        var cap = capHeightPx.coerceIn(0f, heightPx / 2f)
+        if (cap <= 0f) return emptyList()
+        val capMax = (capHeightPx * CapMaxRatio).coerceAtMost(heightPx / 2f)
+        repeat(6) {
+            cap = (half(cap) * CapAspect).coerceIn(capHeightPx, capMax)
+        }
+        cap = cap.coerceAtMost(heightPx / 2f)
+        val topY = cap
+        val bottomY = heightPx - cap
+        val aTop = half(topY)
+        val aBottom = half(bottomY)
+        val sTop = slope(topY)
+        val sBottom = slope(bottomY)
+        val nTop = hypot(sTop, 1f)
+        val nBottom = hypot(sBottom, 1f)
+        val capTopDx = sTop / nTop * ArcKappa * cap
+        val capTopDy = ArcKappa * cap / nTop
+        val capBottomDx = sBottom / nBottom * ArcKappa * cap
+        val capBottomDy = ArcKappa * cap / nBottom
+
+        val segments = ArrayList<BalloonSegment>(WallSlices * 2 + 4)
+        // 上穹顶：左肩 → 顶点 → 右肩
+        segments += BalloonSegment(
+            x0 = cx - aTop, y0 = topY,
+            c1x = cx - aTop + capTopDx, c1y = topY - capTopDy,
+            c2x = cx - ArcKappa * aTop, c2y = 0f,
+            x1 = cx, y1 = 0f
+        )
+        segments += BalloonSegment(
+            x0 = cx, y0 = 0f,
+            c1x = cx + ArcKappa * aTop, c1y = 0f,
+            c2x = cx + aTop - capTopDx, c2y = topY - capTopDy,
+            x1 = cx + aTop, y1 = topY
+        )
+        // 右壁：上肩 → 下肩
+        var fromX = cx + aTop
+        var fromY = topY
+        var fromSlope = sTop
+        for (i in 1..WallSlices) {
+            val y = topY + (bottomY - topY) * i / WallSlices
+            val x = cx + half(y)
+            val s = slope(y)
+            segments += wallSlice(fromX, fromY, fromSlope, x, y, s)
+            fromX = x
+            fromY = y
+            fromSlope = s
+        }
+        // 下穹顶：右肩 → 底点 → 左肩
+        segments += BalloonSegment(
+            x0 = cx + aBottom, y0 = bottomY,
+            c1x = cx + aBottom + capBottomDx, c1y = bottomY + capBottomDy,
+            c2x = cx + ArcKappa * aBottom, c2y = heightPx,
+            x1 = cx, y1 = heightPx
+        )
+        segments += BalloonSegment(
+            x0 = cx, y0 = heightPx,
+            c1x = cx - ArcKappa * aBottom, c1y = heightPx,
+            c2x = cx - aBottom - capBottomDx, c2y = bottomY + capBottomDy,
+            x1 = cx - aBottom, y1 = bottomY
+        )
+        // 左壁：下肩 → 上肩
+        fromX = cx - aBottom
+        fromY = bottomY
+        fromSlope = -sBottom
+        for (i in 1..WallSlices) {
+            val y = bottomY - (bottomY - topY) * i / WallSlices
+            val x = cx - half(y)
+            val s = -slope(y)
+            segments += wallSlice(fromX, fromY, fromSlope, x, y, s)
+            fromX = x
+            fromY = y
+            fromSlope = s
+        }
+        return segments
+    }
+
+    /** 一段侧壁：两端切线取解析导数（沿行进方向的 dx/dy），切片之间与穹顶之间都是 G1 连续。 */
+    private fun wallSlice(
+        x0: Float,
+        y0: Float,
+        s0: Float,
+        x1: Float,
+        y1: Float,
+        s1: Float
+    ): BalloonSegment {
+        val deltaY = y1 - y0
+        val n0 = hypot(s0, 1f)
+        val n1 = hypot(s1, 1f)
+        return BalloonSegment(
+            x0 = x0, y0 = y0,
+            c1x = x0 + s0 * deltaY / n0 / 3f,
+            c1y = y0 + deltaY / n0 / 3f,
+            c2x = x1 - s1 * deltaY / n1 / 3f,
+            c2y = y1 - deltaY / n1 / 3f,
+            x1 = x1, y1 = y1
+        )
+    }
+
+    /** 整页主气球：一条闭合轮廓，顶底为浅穹顶。 */
     fun groupPath(
         size: Size,
         topInRootPx: Float,
@@ -89,52 +241,19 @@ object SettingsCurveGeometry {
         screenMarginPx: Float,
         capHeightPx: Float
     ): Path {
-        if (size.height <= 0f || size.width <= 0f) return Path()
-        val centerY = screenHeightPx / 2f
-        val radius = (screenHeightPx / 2f - screenMarginPx).coerceAtLeast(0f)
-        val cx = size.width / 2f
-        val cap = capHeightPx.coerceIn(0f, size.height / 2f)
-        val topY = cap
-        val bottomY = size.height - cap
-        fun halfAt(localY: Float): Float {
-            val dy = topInRootPx + localY - centerY
-            val chord = sqrt((radius * radius - dy * dy).coerceAtLeast(0f))
-            return chord.coerceIn(0f, size.width / 2f)
-        }
-        val halfTop = halfAt(topY)
-        val halfBottom = halfAt(bottomY)
-        val steps = 48
-        val points = ArrayList<Offset>(steps * 2 + 4)
-        points += Offset(cx, 0f)
-        points += Offset(cx - halfTop, topY)
-        for (i in 1 until steps) {
-            val y = topY + (bottomY - topY) * i / steps
-            points += Offset(cx - halfAt(y), y)
-        }
-        points += Offset(cx - halfBottom, bottomY)
-        points += Offset(cx, size.height)
-        points += Offset(cx + halfBottom, bottomY)
-        for (i in steps - 1 downTo 1) {
-            val y = topY + (bottomY - topY) * i / steps
-            points += Offset(cx + halfAt(y), y)
-        }
-        points += Offset(cx + halfTop, topY)
-        return smoothClosedPath(points)
-    }
-
-    private fun smoothClosedPath(points: List<Offset>): Path {
         val path = Path()
-        if (points.size < 3) return path
-        val n = points.size
-        path.moveTo(points[0].x, points[0].y)
-        for (i in 0 until n) {
-            val p0 = points[(i - 1 + n) % n]
-            val p1 = points[i]
-            val p2 = points[(i + 1) % n]
-            val p3 = points[(i + 2) % n]
-            val c1 = Offset(p1.x + (p2.x - p0.x) / 6f, p1.y + (p2.y - p0.y) / 6f)
-            val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, p2.y - (p3.y - p1.y) / 6f)
-            path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
+        val segments = outlineSegments(
+            widthPx = size.width,
+            heightPx = size.height,
+            topInRootPx = topInRootPx,
+            screenHeightPx = screenHeightPx,
+            screenMarginPx = screenMarginPx,
+            capHeightPx = capHeightPx
+        )
+        if (segments.isEmpty()) return path
+        path.moveTo(segments[0].x0, segments[0].y0)
+        for (segment in segments) {
+            path.cubicTo(segment.c1x, segment.c1y, segment.c2x, segment.c2y, segment.x1, segment.y1)
         }
         path.close()
         return path
