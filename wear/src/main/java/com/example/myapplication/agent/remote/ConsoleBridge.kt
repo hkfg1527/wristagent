@@ -13,6 +13,7 @@ import com.example.myapplication.agent.SettingsChangeBus
 import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.ProviderProfile
 import com.example.myapplication.agent.ProviderProfileBook
+import com.example.myapplication.agent.ReplyStyle
 import com.example.myapplication.agent.providerProfileId
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.privilege.PrivilegeManager
@@ -86,6 +87,7 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "autoSpeakReplies" to preferences.autoSpeakReplies,
         "asrLiveTranscript" to preferences.asrLiveTranscript,
         "defaultThinkingEnabled" to preferences.defaultThinkingEnabled,
+        "replyStyle" to preferences.replyStyle,
         "memoryEnabled" to preferences.memoryEnabled,
         "autoCompressContext" to preferences.autoCompressContext,
         "sandboxLevel" to preferences.sandboxLevel.storageKey,
@@ -141,6 +143,12 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "defaultThinkingEnabled" -> preferences.defaultThinkingEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "replyStyle" -> {
+                val stored = value as? String ?: return ConsoleWriteResult.READ_ONLY
+                val style = ReplyStyle.values().firstOrNull { it.storageKey == stored }
+                    ?: return ConsoleWriteResult.READ_ONLY
+                preferences.replyStyle = style.storageKey
+            }
             "memoryEnabled" -> preferences.memoryEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "autoCompressContext" -> preferences.autoCompressContext =
