@@ -55,6 +55,16 @@
     <string name="settings_reasoning_effort_medium">Medium</string>
     <string name="settings_reasoning_effort_high">High</string>
     <string name="settings_reasoning_effort_unsupported">This model ignores the reasoning effort setting</string>
+    <string name="settings_reply_style_header">Reply style</string>
+    <string name="settings_reply_style_concise">Concise</string>
+    <string name="settings_reply_style_concise_secondary">Conclusion first, key steps only</string>
+    <string name="settings_reply_style_balanced">Balanced</string>
+    <string name="settings_reply_style_balanced_secondary">Conclusion with necessary context</string>
+    <string name="settings_reply_style_detailed">Detailed</string>
+    <string name="settings_reply_style_detailed_secondary">Reasoning and examples for complex tasks</string>
+    <string name="agent_reply_style_concise">Keep replies concise: conclusion first, only essential steps and risks, no restating the question.</string>
+    <string name="agent_reply_style_balanced">Keep replies balanced: conclusion first, then necessary explanation and actionable steps, no filler.</string>
+    <string name="agent_reply_style_detailed">Keep replies detailed: after the conclusion, include key reasoning, edge cases and examples, without repetition or boilerplate.</string>
 
     <!-- Memory and security sections. -->
     <string name="settings_turns_header">Turns kept per session</string>

@@ -13,6 +13,7 @@ import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.ReasoningEffort
 import com.example.myapplication.agent.ReasoningEffortPolicy
+import com.example.myapplication.agent.ReplyStyle
 import kotlin.math.roundToInt
 
 /**
@@ -32,6 +33,7 @@ fun HyperParamsContent(
     var showReasoning by remember { mutableStateOf(preferences.showThoughtChain) }
     var defaultThinking by remember { mutableStateOf(preferences.defaultThinkingEnabled) }
     var effort by remember { mutableStateOf(ReasoningEffort.fromStored(preferences.reasoningEffort)) }
+    var replyStyle by remember { mutableStateOf(ReplyStyle.fromStored(preferences.replyStyle)) }
     // 自定义 Token 输入框的开合：与阶梯滑轨并存，阶梯给常用值，输入框管任意值
     var editingTokens by remember { mutableStateOf(false) }
 
@@ -206,6 +208,22 @@ fun HyperParamsContent(
                 SettingsCaptionRow(text = stringResource(R.string.settings_reasoning_effort_unsupported))
             }
         }
+
+        section(stringResource(R.string.settings_reply_style_header))
+
+        ReplyStyle.values().forEach { style ->
+            row {
+                SettingsRadioRow(
+                    label = stringResource(replyStyleLabelRes(style)),
+                    subtitle = stringResource(replyStyleSecondaryRes(style)),
+                    selected = replyStyle == style,
+                    onSelect = {
+                        replyStyle = style
+                        preferences.replyStyle = style.storageKey
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -215,6 +233,20 @@ private fun reasoningEffortLabelRes(effort: ReasoningEffort): Int = when (effort
     ReasoningEffort.LOW -> R.string.settings_reasoning_effort_low
     ReasoningEffort.MEDIUM -> R.string.settings_reasoning_effort_medium
     ReasoningEffort.HIGH -> R.string.settings_reasoning_effort_high
+}
+
+@StringRes
+private fun replyStyleLabelRes(style: ReplyStyle): Int = when (style) {
+    ReplyStyle.CONCISE -> R.string.settings_reply_style_concise
+    ReplyStyle.BALANCED -> R.string.settings_reply_style_balanced
+    ReplyStyle.DETAILED -> R.string.settings_reply_style_detailed
+}
+
+@StringRes
+private fun replyStyleSecondaryRes(style: ReplyStyle): Int = when (style) {
+    ReplyStyle.CONCISE -> R.string.settings_reply_style_concise_secondary
+    ReplyStyle.BALANCED -> R.string.settings_reply_style_balanced_secondary
+    ReplyStyle.DETAILED -> R.string.settings_reply_style_detailed_secondary
 }
 
 /** 三档温度预设：与旧版 chip 完全相同的取值。 */

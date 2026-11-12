@@ -44,6 +44,12 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean("show_thought_chain", true)
         set(value) = prefs.edit().putBoolean("show_thought_chain", value).apply()
 
+    /** 回答风格：CONCISE / BALANCED / DETAILED，注入系统提示词的表达约束。 */
+    var replyStyle: String
+        get() = prefs.getString(KEY_REPLY_STYLE, ReplyStyle.DEFAULT_STORAGE)
+            ?: ReplyStyle.DEFAULT_STORAGE
+        set(value) = prefs.edit().putString(KEY_REPLY_STYLE, value).apply()
+
     /** 推理努力：LOW / MEDIUM / HIGH，映射到请求体 reasoning_effort；默认中档 */
     var reasoningEffort: String
         get() = prefs.getString("reasoning_effort", ReasoningEffort.DEFAULT_STORAGE)
@@ -388,6 +394,7 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_AUTO_SPEAK_REPLIES = "autoSpeakReplies"
         const val KEY_ASR_LIVE_TRANSCRIPT = "asrLiveTranscript"
         const val KEY_PROVIDER_MANAGED_SEARCH = "providerManagedSearchEnabled"
+        const val KEY_REPLY_STYLE = "replyStyle"
         const val KEY_DEFAULT_THINKING = "defaultThinking"
         const val KEY_MEMORY_ENABLED = "memoryEnabled"
         const val KEY_AUTO_COMPRESS_CONTEXT = "autoCompressContext"

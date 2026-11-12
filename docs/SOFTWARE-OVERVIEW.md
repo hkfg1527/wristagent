@@ -1,6 +1,6 @@
 # Wrist Agent · 软件现状
 
-> 快照于 2026-11-11（1.0）。**变更以 [CHANGELOG.md](../CHANGELOG.md) 为准，欠账以 [ISSUES.md](ISSUES.md) 为准，
+> 快照于 2026-11-12（0.03-beta）。**变更以 [CHANGELOG.md](../CHANGELOG.md) 为准，欠账以 [ISSUES.md](ISSUES.md) 为准，
 > 设计规范见 [UI-DOTMATRIX.md](UI-DOTMATRIX.md)** —— 这份文件只说明"现在是什么样"。
 
 ## 这是什么
@@ -8,7 +8,7 @@
 一只戴在手腕上的 AI Agent。不是"手表版聊天框"，而是能在设备上**真的做事**的代理：
 读电量、看天气、调点阵、开省电、发振动，也能调用自己造的工具执行 shell 命令（受审批与安全策略约束）。
 
-- 包名 `dev.ghr.wristagent`，versionName `1.0`，minSdk 33，targetSdk 37
+- 包名 `dev.ghr.wristagent`，versionName `0.03-beta`，minSdk 33，targetSdk 37
 - 单模块 `:wear`（另一个 `mobile` 模块已删除）
 - 体积：release APK 约 3.6 MB（R8 已开）
 

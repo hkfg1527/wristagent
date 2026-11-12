@@ -15,14 +15,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -97,9 +101,11 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.IconButton
-import androidx.wear.compose.material3.IconButtonDefaults
+import androidx.wear.compose.material3.EdgeButton
+import androidx.wear.compose.material3.EdgeButtonDefaults
+import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
@@ -327,6 +333,9 @@ fun SettingsSubPage(
     val listState = rememberScalingLazyListState()
     val listFocusRequester = remember { FocusRequester() }
 
+    // 子页切换时列表状态可能复用上一个页面的位置；标题变化先滚回页首。
+    LaunchedEffect(title) { listState.scrollToItem(0) }
+
     SettingsTopAnchorProbe(listState)
 
     Box(
@@ -344,6 +353,24 @@ fun SettingsSubPage(
             runCatching { listFocusRequester.requestFocus() }
         }
 
+        ScreenScaffold(
+            scrollState = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = settingsCardScreenInset(),
+                end = settingsCardScreenInset(),
+                top = Wear.Space.Xs
+            ),
+            timeText = null,
+            scrollIndicator = null,
+            edgeButton = {
+                SettingsEdgeBackButton(
+                    onClick = { exit.begin(onBack) },
+                    exit = exit,
+                    scrollState = listState
+                )
+            }
+        ) { scaffoldPadding ->
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -362,12 +389,7 @@ fun SettingsSubPage(
             overscrollEffect = null,
             // 关闭逐行等比缩放：曲面宽度与内容呼吸由卡片几何负责
             scalingParams = settingsScalingParams(),
-            contentPadding = PaddingValues(
-                start = settingsCardScreenInset(),
-                end = settingsCardScreenInset(),
-                top = Wear.Space.Xs,
-                bottom = Wear.Size.SettingsBottomInset
-            ),
+            contentPadding = scaffoldPadding,
             // 项间距 0：同组的行必须严丝合缝拼成一张卡，分组的呼吸只由组标题上方的 24dp 承担
             verticalArrangement = Arrangement.spacedBy(SettingsRowGap),
             // 关掉 autoCentering：它会在首项之上插入
@@ -376,77 +398,99 @@ fun SettingsSubPage(
             // 传 null 后顶部锚点就是 contentPadding.top，几何完全由常量决定（详见 SettingsTopAnchorMath）。
             autoCentering = null
         ) {
-            val rowCount = content.size + 2
+            val rowCount = content.size + 1
 
             item(key = "page-header") {
                 SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SettingsPageHeader(title = title, onBack = { exit.begin(onBack) })
+                        SettingsPageHeader(title = title)
                     }
                 }
             }
 
+            val chunks = SettingsPageChunking.chunks(content.map { it.kind })
             items(
-                count = content.size,
-                key = { index -> "page-row-" + index }
-            ) { index ->
-                val entry = content[index]
-                val previous = content.getOrNull(index - 1)
-                // 组内分隔线由卡（SettingsCardRow）在行尾画：左端缩进取决于"下一行"是不是子项组首 ——
-                // 子项组上沿从子项槽线（12dp）起笔，普通行间从卡片左内边距（14dp）起笔，仍是全页一种线。
-                val next = content.getOrNull(index + 1)
-                val hairlineStart = SettingsRowComposition.groupHairlineStartIndentDp(
-                    isSubItem = next?.isSubItem ?: false,
-                    previousIsSubItem = entry.isSubItem
-                )
-                // 卡外行（动作按钮）紧跟一张卡时补一档组间距：列表项间距已归 0，不补就贴死卡尾。
-                // 页首第一个卡外行（如提示词正文）与另一个卡外行之间不补：它们本是一体的整块内容。
-                val standaloneTopGap =
-                    if (entry.kind == SettingsRowEntryKind.STANDALONE &&
-                        previous != null && previous.kind == SettingsRowEntryKind.CARD_ROW
+                count = chunks.size,
+                key = { chunkIndex -> "page-chunk-" + chunkIndex }
+            ) { chunkIndex ->
+                val chunk = chunks[chunkIndex]
+                val firstIndex = chunk.indices.first()
+                if (chunk.grouped) {
+                    // 一组只画一张气球：所有行共享同一条闭合超椭圆，组内不再各自裁背景。
+                    SettingsStaggeredRow(
+                        index = firstIndex + 1,
+                        rowCount = rowCount,
+                        stagger = stagger,
+                        exit = exit
                     ) {
-                        SettingsSectionGap
-                    } else {
-                        0.dp
+                        SettingsBalloonGroup {
+                            // 主气球上下各留一段纯曲面，首尾标题不会贴在收口尖上。
+                            Spacer(Modifier.height(Wear.Space.Xl))
+                            chunk.indices.forEach { index ->
+                                val entry = content[index]
+                                val next = content.getOrNull(index + 1)
+                                val hairlineStart = SettingsRowComposition.groupHairlineStartIndentDp(
+                                    isSubItem = next?.isSubItem ?: false,
+                                    previousIsSubItem = entry.isSubItem
+                                )
+                                CompositionLocalProvider(
+                                    LocalSettingsRowSlot provides rowSlots[index],
+                                    LocalSettingsGroupHairlineStart provides hairlineStart.dp
+                                ) {
+                                    // 防止末端行的 hairline 判定跨出当前气球
+                                    entry.content()
+                                }
+                            }
+                            Spacer(Modifier.height(Wear.Space.Xl))
+                        }
                     }
-                SettingsStaggeredRow(index = index + 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        val entryWidth =
-                            if (rowSlots[index] == null) SettingsContentWidth else settingsCardWidth()
-                        CompositionLocalProvider(
-                            LocalSettingsRowSlot provides rowSlots[index],
-                            LocalSettingsGroupHairlineStart provides hairlineStart.dp
+                } else {
+                    val index = firstIndex
+                    val entry = content[index]
+                    val previous = content.getOrNull(index - 1)
+                    val next = content.getOrNull(index + 1)
+                    val hairlineStart = SettingsRowComposition.groupHairlineStartIndentDp(
+                        isSubItem = next?.isSubItem ?: false,
+                        previousIsSubItem = entry.isSubItem
+                    )
+                    val standaloneTopGap =
+                        if (entry.kind == SettingsRowEntryKind.STANDALONE &&
+                            previous != null && previous.kind == SettingsRowEntryKind.CARD_ROW
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(entryWidth)
-                                    .padding(top = standaloneTopGap)
+                            SettingsSectionGap
+                        } else {
+                            0.dp
+                        }
+                    SettingsStaggeredRow(
+                        index = index + 1,
+                        rowCount = rowCount,
+                        stagger = stagger,
+                        exit = exit
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            val entryWidth =
+                                if (rowSlots[index] == null) SettingsContentWidth else settingsCardWidth()
+                            CompositionLocalProvider(
+                                LocalSettingsRowSlot provides rowSlots[index],
+                                LocalSettingsGroupHairlineStart provides hairlineStart.dp
                             ) {
-                                entry.content()
+                                Box(
+                                    modifier = Modifier
+                                        .width(entryWidth)
+                                        .padding(top = standaloneTopGap)
+                                ) {
+                                    entry.content()
+                                }
                             }
                         }
                     }
                 }
             }
 
-            item(key = "page-footer") {
-                SettingsStaggeredRow(index = rowCount - 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SettingsActionButton(
-                            label = stringResource(R.string.settings_done_back),
-                            tone = Tone.MUTED,
-                            // 「完成返回」是动作按钮、不是卡片行：与上面那张卡之间留一整档组间距
-                            modifier = Modifier
-                                .width(SettingsContentWidth)
-                                .padding(top = SettingsSectionGap),
-                            onClick = { exit.begin(onBack) }
-                        )
-                    }
-                }
-            }
+        }
         }
 
         SettingsEdgeScrim()
@@ -496,26 +540,22 @@ fun SettingsEdgeScrim(modifier: Modifier = Modifier) {
 }
 
 /**
- * 子页头部：44dp 返回键 + 页面标题，整块压在曲面时钟带以下。
+ * 子页头部：只有页面标题，不重复一个左上角返回圆钮。
  *
- * 标题用 titleLarge 级 + 主色，是本屏**唯一**的视觉重点；下面所有行一律降为 secondary。
+ * 返回动作交给官方贴底 [EdgeButton]，标题仍是本屏**唯一**的视觉重点。
  */
 @Composable
-private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
+private fun SettingsPageHeader(title: String) {
     Row(
         modifier = Modifier
-            .widthIn(max = SettingsContentWidth)
-            .fillMaxWidth()
+            .width(SettingsContentWidth)
+            .heightIn(min = Wear.Size.Touch)
             .padding(top = SubPageHeaderTopPadding, bottom = Wear.Space.Xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsBackButton(onClick = onBack)
         BasicText(
             text = title,
-            modifier = Modifier
-                .widthIn(min = SettingsLayoutMath.SubtitleMinWidthDp.dp)
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             // 子页标题是本屏唯一的焦点：18sp / Medium，与根页的当前模型名同一档
             style = SettingsFocusStyle,
             maxLines = 1,
@@ -524,22 +564,38 @@ private fun SettingsPageHeader(title: String, onBack: () -> Unit) {
     }
 }
 
-/** 44dp 返回键：官方 IconButton + 令牌配色，图标用 Canvas 画折线，不引入图标依赖。 */
+/**
+ * 官方 M3E 贴底返回键：EdgeButton 的轮廓本身就是屏幕底部曲率的一部分，
+ * 比左上角圆形按钮更符合圆屏与气球卡片的语言。
+ */
 @Composable
-fun SettingsBackButton(onClick: () -> Unit) {
+private fun BoxScope.SettingsEdgeBackButton(
+    onClick: () -> Unit,
+    exit: SettingsExitController,
+    scrollState: ScalingLazyListState
+) {
     val description = stringResource(R.string.settings_back)
-    IconButton(
+    val density = LocalDensity.current
+    val slidePx = with(density) { 56.dp.toPx() }
+    EdgeButton(
         onClick = onClick,
         modifier = Modifier
-            .size(Wear.Size.Touch)
+            .fillMaxWidth()
+            .scrollable(
+                state = scrollState,
+                orientation = Orientation.Vertical,
+                reverseDirection = true,
+                overscrollEffect = rememberOverscrollEffect()
+            )
+            .graphicsLayer {
+                val leave = exitFraction(exit.elapsedMs, 0, SettingsRowExitDurationMs)
+                translationY = leave * slidePx
+                alpha = 1f - leave
+            }
             .semantics { contentDescription = description },
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = Wear.Palette.Surface,
-            contentColor = Wear.Palette.TextPrimary
-        ),
-        border = BorderStroke(SettingsDividerThickness, Wear.Palette.Border)
+        buttonSize = EdgeButtonSize.ExtraSmall
     ) {
-        Canvas(modifier = Modifier.size(Wear.Space.Lg)) {
+        Canvas(modifier = Modifier.size(EdgeButtonDefaults.ExtraSmallIconSize)) {
             val path = Path().apply {
                 moveTo(size.width * 0.62f, size.height * 0.2f)
                 lineTo(size.width * 0.34f, size.height * 0.5f)
@@ -547,7 +603,7 @@ fun SettingsBackButton(onClick: () -> Unit) {
             }
             drawPath(
                 path = path,
-                color = Wear.Palette.TextPrimary,
+                color = Wear.Palette.Bg,
                 style = Stroke(
                     width = 2.dp.toPx(),
                     cap = StrokeCap.Round,
@@ -738,6 +794,56 @@ internal fun SettingsCardRow(
     val capHeightPx = with(density) { SettingsCurveGeometry.CapHeightDp.dp.toPx() }
     // y 只在绘制/图层阶段读；滚动时只失效绘制，不触发整行重组。
     val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }
+    val groupChrome = LocalSettingsGroupChrome.current
+
+    if (groupChrome) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { coordinates ->
+                    val newY = coordinates.positionInRoot().y
+                    if (kotlin.math.abs(newY - yInRootPx.value) > 0.5f) yInRootPx.value = newY
+                },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(SettingsContentWidth)
+                    .graphicsLayer {
+                        val rowCenterY = yInRootPx.value + size.height / 2f
+                        val yFromCenterDp = (rowCenterY - screenHeightPx / 2f) / density.density
+                        val halfDp = SettingsCurveMath.halfWidthDp(
+                            yFromCenterDp = yFromCenterDp,
+                            screenHeightDp = screenHeightDp.toFloat(),
+                            maxHalfDp = maxHalfPx / density.density
+                        )
+                        // 只允许等比缩小；屏心 1.0，绝不做横向拉伸。
+                        val scale = (halfDp / (SettingsCurveMath.MinCardWidthDp / 2f))
+                            .coerceIn(0f, 1f)
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minHeight)
+                        .then(clickModifier)
+                        .padding(
+                            start = SettingsRowSidePadding,
+                            end = SettingsRowSidePadding,
+                            top = RowVerticalPadding,
+                            bottom = RowVerticalPadding
+                        ),
+                    contentAlignment = Alignment.CenterStart
+                ) { content() }
+                if (SettingsRowComposition.drawsGroupHairline(slot)) {
+                    SettingsGroupHairline()
+                }
+            }
+        }
+        return
+    }
 
     Column(
         modifier = modifier
@@ -761,19 +867,7 @@ internal fun SettingsCardRow(
             },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier
-                .width(SettingsContentWidth)
-                .graphicsLayer {
-                    scaleX = SettingsCurveMath.contentScaleX(
-                        topInRootPx = yInRootPx.value,
-                        rowHeightPx = size.height,
-                        screenHeightPx = screenHeightPx,
-                        minHalfPx = baseHalfPx,
-                        maxHalfPx = maxHalfPx
-                    )
-                }
-        ) {
+        Column(modifier = Modifier.width(SettingsContentWidth)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

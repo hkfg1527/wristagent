@@ -144,8 +144,19 @@ class AgentDispatcher(
         // memoryEnabled 关掉时连记忆头都不拼：长期笔记因此也不会进入上下文
         memoryHeader = MemoryInjection.header(preferences.memoryEnabled, memory.buildSystemMemoryHeader()),
         telemetryBlock = buildDynamicTelemetryBlock(),
-        customPrompt = preferences.customSystemPrompt
+        customPrompt = styledCustomPrompt()
     )
+
+    /** 用户自定义提示词与回答风格并列；风格只约束表达，不覆盖用户自己的指令。 */
+    private fun styledCustomPrompt(): String {
+        val style = ReplyStylePolicy.instruction(
+            context,
+            ReplyStyle.fromStored(preferences.replyStyle)
+        )
+        return listOf(preferences.customSystemPrompt.trim(), style.trim())
+            .filter { it.isNotEmpty() }
+            .joinToString("\n\n")
+    }
 
     /**
      * 新会话的系统头：资源段与自定义提示词都可能刚改过，因此强制重装一次。

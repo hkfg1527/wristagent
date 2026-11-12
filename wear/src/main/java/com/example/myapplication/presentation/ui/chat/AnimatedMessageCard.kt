@@ -21,7 +21,7 @@ internal fun AnimatedMessageCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val scale = remember(key) { Animatable(0.99f) }
+    val scale = remember(key) { Animatable(1.02f) }
     val alpha = remember(key) { Animatable(0f) }
 
     LaunchedEffect(key) {
@@ -33,7 +33,7 @@ internal fun AnimatedMessageCard(
         }
     }
 
-    // 入场只做"轻微放大 + 淡入"，不做纵向位移：
+    // 入场只做"从 1.02 等比收回到 1 + 淡入"，不做横向拉伸、不做纵向位移：
     // 卡片自己沿 Y 移动的同时镜头也在滚，两层位移叠加就是肉眼看到的"卡来卡去"。
     Box(
         modifier = modifier

@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import kotlin.math.sqrt
@@ -77,11 +78,67 @@ object SettingsCurveMath {
  * 组首 / 组尾 / 单行用 14dp 椭圆穹顶封口；中间行只保留连续侧弧。
  */
 object SettingsCurveGeometry {
-    /** 贝塞尔圆近似常数：用两段三次曲线拼出四分之一圆。 */
-    private const val BezierCircle = 0.5522848f
+    /** 封口浅弧高度：12dp，单段三次曲线与侧边共用切线，不做第二个圆拱。 */
+    const val CapHeightDp = 12f
 
-    /** 穹顶封口高度：组首向上鼓、组尾向下鼓，不再是平直切线。 */
-    const val CapHeightDp = 14f
+    /** 整页主气球：沿屏幕圆周采样成一条闭合贝塞尔曲线，顶底只留 6dp 浅弧。 */
+    fun groupPath(
+        size: Size,
+        topInRootPx: Float,
+        screenHeightPx: Float,
+        screenMarginPx: Float,
+        capHeightPx: Float
+    ): Path {
+        if (size.height <= 0f || size.width <= 0f) return Path()
+        val centerY = screenHeightPx / 2f
+        val radius = (screenHeightPx / 2f - screenMarginPx).coerceAtLeast(0f)
+        val cx = size.width / 2f
+        val cap = capHeightPx.coerceIn(0f, size.height / 2f)
+        val topY = cap
+        val bottomY = size.height - cap
+        fun halfAt(localY: Float): Float {
+            val dy = topInRootPx + localY - centerY
+            val chord = sqrt((radius * radius - dy * dy).coerceAtLeast(0f))
+            return chord.coerceIn(0f, size.width / 2f)
+        }
+        val halfTop = halfAt(topY)
+        val halfBottom = halfAt(bottomY)
+        val steps = 48
+        val points = ArrayList<Offset>(steps * 2 + 4)
+        points += Offset(cx, 0f)
+        points += Offset(cx - halfTop, topY)
+        for (i in 1 until steps) {
+            val y = topY + (bottomY - topY) * i / steps
+            points += Offset(cx - halfAt(y), y)
+        }
+        points += Offset(cx - halfBottom, bottomY)
+        points += Offset(cx, size.height)
+        points += Offset(cx + halfBottom, bottomY)
+        for (i in steps - 1 downTo 1) {
+            val y = topY + (bottomY - topY) * i / steps
+            points += Offset(cx + halfAt(y), y)
+        }
+        points += Offset(cx + halfTop, topY)
+        return smoothClosedPath(points)
+    }
+
+    private fun smoothClosedPath(points: List<Offset>): Path {
+        val path = Path()
+        if (points.size < 3) return path
+        val n = points.size
+        path.moveTo(points[0].x, points[0].y)
+        for (i in 0 until n) {
+            val p0 = points[(i - 1 + n) % n]
+            val p1 = points[i]
+            val p2 = points[(i + 1) % n]
+            val p3 = points[(i + 2) % n]
+            val c1 = Offset(p1.x + (p2.x - p0.x) / 6f, p1.y + (p2.y - p0.y) / 6f)
+            val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, p2.y - (p3.y - p1.y) / 6f)
+            path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
+        }
+        path.close()
+        return path
+    }
 
     fun cardPath(
         size: Size,
@@ -127,9 +184,8 @@ object SettingsCurveGeometry {
                 lTop, topY
             )
             if (roundTop) {
-                val k = BezierCircle
-                cubicTo(lTop, topY - cap * k, cx - halfTop * k, 0f, cx, 0f)
-                cubicTo(cx + halfTop * k, 0f, rTop, topY - cap * k, rTop, topY)
+                // 一段浅弧从左边直接连到右边；两个控制点保持竖向切线，和侧边共用同一条曲线。
+                cubicTo(lTop, topY - cap * 1.33f, rTop, topY - cap * 1.33f, rTop, topY)
             } else {
                 lineTo(rTop, 0f)
             }
@@ -142,9 +198,7 @@ object SettingsCurveGeometry {
                 rBottom, bottomY
             )
             if (roundBottom) {
-                val k = BezierCircle
-                cubicTo(rBottom, bottomY + cap * k, cx + halfBottom * k, size.height, cx, size.height)
-                cubicTo(cx - halfBottom * k, size.height, lBottom, bottomY + cap * k, lBottom, bottomY)
+                cubicTo(rBottom, bottomY + cap * 1.33f, lBottom, bottomY + cap * 1.33f, lBottom, bottomY)
             } else {
                 lineTo(lBottom, size.height)
             }

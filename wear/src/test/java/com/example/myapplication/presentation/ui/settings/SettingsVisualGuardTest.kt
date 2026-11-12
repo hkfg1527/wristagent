@@ -91,6 +91,16 @@ class SettingsVisualGuardTest {
     }
 
     @Test
+    fun subPagesUseTheOfficialScrollingEdgeButton() {
+        val shared = readSettings("SettingsShared.kt")
+        assertTrue("必须使用官方 ScreenScaffold", shared.contains("ScreenScaffold("))
+        assertTrue("必须使用官方 EdgeButton", shared.contains("EdgeButton("))
+        assertTrue("EdgeButton 必须跟随列表滚动", shared.contains(".scrollable("))
+        assertTrue(shared.contains("buttonSize = EdgeButtonSize.ExtraSmall"))
+        assertFalse("不得回退到自绘左上角返回键", shared.contains("SettingsBackButton(onClick"))
+    }
+
+    @Test
     fun onlyOneKindOfHairlineExistsAndItIsDrawnInsideGroupCardsOnly() {
         val shared = readSettings("SettingsShared.kt")
         assertFalse("整行分隔线必须已删除", shared.contains("fun SettingsRowDivider"))

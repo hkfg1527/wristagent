@@ -65,6 +65,7 @@ import com.example.myapplication.presentation.ui.settings.NetworkDiagnosticsCont
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
+import com.example.myapplication.presentation.ui.settings.SettingsBalloonGroup
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
 import com.example.myapplication.presentation.ui.settings.SettingsExitController
 import com.example.myapplication.presentation.ui.settings.SettingsFocusStyle
@@ -295,225 +296,173 @@ fun SettingsScreen(
                         }
                     }
 
-                    // ================= 模型 =================
+                    // 全页唯一主气球：三个分区共享同一条超椭圆轮廓
                     item {
-                        RootSectionRow(index = 1, stagger = rowStagger, exit = exit) {
-                            SettingsSectionHeader(
-                                text = stringResource(R.string.settings_section_models),
-                                isFirstSection = true
-                            )
-                        }
-                    }
-
-                    // 1. 模型与服务：取值改状态词（模型名进子页），行尾不再挂状态点 ——
-                    //    旧版取值是裸模型名，把标题压到折行、自己又被截成 "deepseek-…"
-                    item {
-                        RootContentRow(index = 2, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_model_and_service),
-                                value = if (apiKeyConfigured) {
-                                    stringResource(R.string.settings_status_configured)
-                                } else {
-                                    stringResource(R.string.settings_status_unconfigured)
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.MODEL_CONFIG
-                                }
-                            )
-                        }
-                    }
-
-                    // 2. 供应商：多套 baseUrl / apiKey / 模型的一键套用，套用即写回单值偏好
-                    item {
-                        RootContentRow(index = 3, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_provider_profiles),
-                                value = providerBook.active()?.name
-                                    ?: stringResource(R.string.settings_providers_none_active),
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.PROVIDER_PROFILES
-                                }
-                            )
-                        }
-                    }
-
-                    // 3. 模型参数：温度文案走资源，en/zh 同步
-                    item {
-                        RootContentRow(index = 4, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_model_params),
-                                value = stringResource(R.string.settings_temperature_value, currentTemp),
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.HYPER_PARAMS
-                                }
-                            )
-                        }
-                    }
-
-                    // ================= 语音与工具 =================
-                    item {
-                        RootSectionRow(index = 5, stagger = rowStagger, exit = exit) {
-                            SettingsSectionHeader(text = stringResource(R.string.settings_section_voice_tools))
-                        }
-                    }
-
-                    // 4. 语音：语音转写与"语音与唤醒"合并成一行，转写状态做取值，唤醒入口在子页里
-                    item {
-                        RootContentRow(index = 6, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
-                            val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_voice_entry),
-                                value = when {
-                                    !asrEnabled -> stringResource(R.string.settings_asr_off)
-                                    asrProvider == AsrProviderId.BAIDU && !asrKeyReady ->
-                                        stringResource(R.string.settings_asr_key_missing)
-                                    asrProvider == AsrProviderId.BAIDU -> stringResource(R.string.settings_asr_baidu)
-                                    else -> stringResource(R.string.settings_asr_system)
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.VOICE_ENTRY
-                                }
-                            )
-                        }
-                    }
-
-                    // 5. 内置工具与 MCP：取值改"全部启用"，不再暴露 6/6 这种内部计数
-                    item {
-                        RootContentRow(index = 7, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
-                            val enabledCount = listOf(
-                                preferences.toolDeviceStatusEnabled,
-                                preferences.toolVibrateEnabled,
-                                preferences.toolMatrixDensityEnabled,
-                                preferences.toolPowerModeEnabled,
-                                preferences.toolWeatherEnabled,
-                                preferences.toolWebSearchEnabled
-                            ).count { it }
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_tools_and_mcp),
-                                value = if (enabledCount == 6) {
-                                    stringResource(R.string.settings_tools_all_enabled)
-                                } else {
-                                    stringResource(R.string.settings_tools_enabled_count, enabledCount)
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.TOOLS_MCP
-                                }
-                            )
-                        }
-                    }
-
-                    // ================= 系统 =================
-                    item {
-                        RootSectionRow(index = 8, stagger = rowStagger, exit = exit) {
-                            SettingsSectionHeader(text = stringResource(R.string.settings_section_system))
-                        }
-                    }
-
-                    // 6. 提示词：系统提示词与会话上下文合并成一行，两者都是同一层的"模型行为"配置
-                    item {
-                        RootContentRow(index = 9, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.FIRST) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_prompt_context),
-                                value = if (customPrompt.isBlank()) {
-                                    stringResource(R.string.settings_prompt_default)
-                                } else {
-                                    stringResource(R.string.settings_prompt_custom)
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.PROMPT_CONTEXT
-                                }
-                            )
-                        }
-                    }
-
-                    // 8. 操作安全防线
-                    item {
-                        RootContentRow(index = 10, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
-                            val consoleStatus =
-                                ConsolePortStatus.of(consoleServer.preferredPort, consolePort)
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_remote_console_title),
-                                // 没在跑就没有端口可报：显示「未运行」，不显示配置里的首选端口
-                                value = when (consoleStatus) {
-                                    ConsolePortStatus.NOT_RUNNING ->
-                                        stringResource(R.string.settings_remote_console_not_running)
-                                    ConsolePortStatus.STABLE -> stringResource(
-                                        R.string.settings_remote_console_port_value,
-                                        consolePort
+                        SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
+                            SettingsBalloonGroup {
+                                Spacer(Modifier.height(Wear.Space.Xl))
+                                SettingsSectionHeader(
+                                    text = stringResource(R.string.settings_section_models),
+                                    isFirstSection = true
+                                )
+                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_model_and_service),
+                                        value = if (apiKeyConfigured) {
+                                            stringResource(R.string.settings_status_configured)
+                                        } else {
+                                            stringResource(R.string.settings_status_unconfigured)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.MODEL_CONFIG
+                                        }
                                     )
-                                    ConsolePortStatus.DRIFTED -> stringResource(
-                                        R.string.settings_remote_console_port_drifted_short,
-                                        consoleServer.preferredPort,
-                                        consolePort
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_provider_profiles),
+                                        value = providerBook.active()?.name
+                                            ?: stringResource(R.string.settings_providers_none_active),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.PROVIDER_PROFILES
+                                        }
                                     )
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.REMOTE_CONSOLE
                                 }
-                            )
-                        }
-                    }
-
-                    item {
-                        RootContentRow(index = 11, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_security_policy),
-                                value = when (currentSecurityMode) {
-                                    SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
-                                    SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
-                                    SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
-                                },
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_model_params),
+                                        value = stringResource(R.string.settings_temperature_value, currentTemp),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.HYPER_PARAMS
+                                        }
+                                    )
                                 }
-                            )
-                        }
-                    }
-
-                    // 7. 外观与点阵：取值原先是"matrixSpacingDp"这种内部实现量，已删除
-                    item {
-                        RootContentRow(index = 12, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_appearance),
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.APPEARANCE
+                                SettingsSectionHeader(text = stringResource(R.string.settings_section_voice_tools))
+                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
+                                    val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_voice_entry),
+                                        value = when {
+                                            !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                            asrProvider == AsrProviderId.BAIDU && !asrKeyReady ->
+                                                stringResource(R.string.settings_asr_key_missing)
+                                            asrProvider == AsrProviderId.BAIDU ->
+                                                stringResource(R.string.settings_asr_baidu)
+                                            else -> stringResource(R.string.settings_asr_system)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.VOICE_ENTRY
+                                        }
+                                    )
                                 }
-                            )
-                        }
-                    }
-
-                    // 8. 关于：快捷操作、重看引导、特权执行、网络体检四条低频项收进一层
-                    item {
-                        RootContentRow(index = 13, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.MIDDLE) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_about),
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.ABOUT
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    val enabledCount = listOf(
+                                        preferences.toolDeviceStatusEnabled,
+                                        preferences.toolVibrateEnabled,
+                                        preferences.toolMatrixDensityEnabled,
+                                        preferences.toolPowerModeEnabled,
+                                        preferences.toolWeatherEnabled,
+                                        preferences.toolWebSearchEnabled
+                                    ).count { it }
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_tools_and_mcp),
+                                        value = if (enabledCount == 6) {
+                                            stringResource(R.string.settings_tools_all_enabled)
+                                        } else {
+                                            stringResource(R.string.settings_tools_enabled_count, enabledCount)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.TOOLS_MCP
+                                        }
+                                    )
                                 }
-                            )
-                        }
-                    }
-
-                    // 配置导入导出：整份可移植设置的 JSON 快照，能复制出来也能粘贴回去
-                    item {
-                        RootContentRow(index = 14, stagger = rowStagger, exit = exit, slot = SettingsRowSlot.LAST) {
-                            SettingsNavRow(
-                                title = stringResource(R.string.settings_sub_transfer),
-                                onClick = {
-                                    context.vibrateTick()
-                                    activeDialog = SettingsSubDialog.TRANSFER
+                                SettingsSectionHeader(text = stringResource(R.string.settings_section_system))
+                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_prompt_context),
+                                        value = if (customPrompt.isBlank()) {
+                                            stringResource(R.string.settings_prompt_default)
+                                        } else {
+                                            stringResource(R.string.settings_prompt_custom)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.PROMPT_CONTEXT
+                                        }
+                                    )
                                 }
-                            )
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    val consoleStatus =
+                                        ConsolePortStatus.of(consoleServer.preferredPort, consolePort)
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_remote_console_title),
+                                        value = when (consoleStatus) {
+                                            ConsolePortStatus.NOT_RUNNING ->
+                                                stringResource(R.string.settings_remote_console_not_running)
+                                            ConsolePortStatus.STABLE -> stringResource(
+                                                R.string.settings_remote_console_port_value,
+                                                consolePort
+                                            )
+                                            ConsolePortStatus.DRIFTED -> stringResource(
+                                                R.string.settings_remote_console_port_drifted_short,
+                                                consoleServer.preferredPort,
+                                                consolePort
+                                            )
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.REMOTE_CONSOLE
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_security_policy),
+                                        value = when (currentSecurityMode) {
+                                            SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
+                                            SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
+                                            SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_appearance),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.APPEARANCE
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_about),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.ABOUT
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_sub_transfer),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.TRANSFER
+                                        }
+                                    )
+                                }
+                                Spacer(Modifier.height(Wear.Space.Xl))
+                            }
                         }
                     }
 
@@ -767,6 +716,17 @@ private fun RootContentRow(
                 Box(modifier = Modifier.width(width)) { content() }
             }
         }
+    }
+}
+
+/** 根页气球组内的一行：不再套逐行动画，整组由外层 [SettingsBalloonGroup] 统一入场。 */
+@Composable
+private fun RootGroupedRow(
+    slot: SettingsRowSlot,
+    content: @Composable () -> Unit
+) {
+    CompositionLocalProvider(LocalSettingsRowSlot provides slot) {
+        content()
     }
 }
 

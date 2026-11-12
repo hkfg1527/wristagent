@@ -9,29 +9,34 @@ import org.junit.Test
 class ChatMessageSurfaceVisualGuardTest {
 
     @Test
-    fun agentSurfaceUsesGroupRadiusWithoutLosingItsSurfaceOrBorder() {
+    fun agentSurfaceUsesAGradientAndNoPermanentBoxBorder() {
         val body = source(ComponentsPath).substringAfter("fun AgentSquareBlurBox(")
 
-        assertTrue(body.contains("val shape = RoundedCornerShape(Wear.Radius.Group)"))
-        assertTrue(body.contains(".background(Wear.Palette.Surface)"))
-        assertTrue(body.contains(".border(1.dp, edge, shape)"))
+        assertTrue(body.contains("Brush.verticalGradient"))
+        assertTrue(body.contains("Wear.Palette.Surface"))
+        assertTrue(body.contains("Wear.Palette.SurfaceAlt"))
+        assertTrue("只有审批态才允许出现描边", body.contains("approvalVisualState == ApprovalVisualState.NONE"))
+        assertFalse(".border(1.dp, edge, shape)" in body)
         assertFalse(body.contains(".shadow("))
     }
 
     @Test
-    fun userBubbleKeepsItsAccentSurface() {
+    fun userBubbleUsesAccentGradientAndAnAsymmetricTail() {
         val body = source(ComponentsPath)
             .substringAfter("fun UserChatBubble(")
             .substringBefore("fun AgentSquareBlurBox(")
 
-        assertTrue(body.contains(".background(Wear.AccentSurface)"))
+        assertTrue(body.contains("Brush.linearGradient"))
+        assertTrue(body.contains("Wear.AccentSurface"))
+        assertTrue(body.contains("bottomEnd = Wear.Radius.Control / 2"))
     }
 
     @Test
     fun messageEntryUsesMinimalScaleAndNoTranslation() {
         val code = source(AnimatedCardPath)
 
-        assertTrue(code.contains("Animatable(0.99f)"))
+        assertTrue("入场只允许从略大等比收回", code.contains("Animatable(1.02f)"))
+        assertTrue(code.contains("scaleX = scale.value") && code.contains("scaleY = scale.value"))
         assertTrue(code.contains("scale.animateTo(1f, Wear.Motion.micro())"))
         assertTrue(code.contains("alpha.animateTo(1f, Wear.Motion.base())"))
         assertFalse(code.contains("translationX"))

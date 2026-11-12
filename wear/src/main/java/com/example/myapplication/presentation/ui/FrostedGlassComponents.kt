@@ -46,7 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -425,16 +427,28 @@ fun UserChatBubble(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(Wear.Radius.Card)
+    // 右下角收成小尾，其余角走大圆角：仍是气泡，但不再是四角等高的大圆角盒子。
+    val shape = RoundedCornerShape(
+        topStart = Wear.Radius.Card,
+        topEnd = Wear.Radius.Card,
+        bottomEnd = Wear.Radius.Control / 2,
+        bottomStart = Wear.Radius.Card
+    )
     val padding = ChatVisualMetrics.BubblePaddingDp.dp
     Box(
         modifier = modifier
             .widthIn(max = ChatVisualMetrics.userBubbleWidthDp().dp)
             .clip(shape)
-            // 去描边：边框是版面里最贵的装饰，吃掉 2dp 宽度还把气泡封成一个盒子
-            .background(Wear.AccentSurface)
-            // 上下内边距由 16.5/14.5 改成对称 14/14：行距加到 20sp 后两行中文不再顶到边
-            .padding(horizontal = padding, vertical = padding)
+            .background(
+                brush = Brush.linearGradient(
+                    listOf(
+                        Wear.AccentSurface,
+                        lerp(Wear.AccentSurface, Wear.Accent, 0.22f)
+                    )
+                ),
+                shape = shape
+            )
+            .padding(horizontal = padding + 2.dp, vertical = padding - 2.dp)
     ) {
         content()
     }
@@ -459,16 +473,30 @@ fun AgentSquareBlurBox(
     // 还让"用户靠右 / 助手靠左"彻底看不出来。左侧一条 2dp 竖线就够标记"这是回答"。
     // 回答是一层"面"：实心 Surface + 发丝描边，把正文从背景里托起来。
     // 曾经为了"去装饰"把面和边一起删掉，结果文字直接浮在纯黑上 —— 没有前后关系，也就没有空间感。
-    val shape = RoundedCornerShape(Wear.Radius.Group)
-    val edge = if (approvalVisualState == ApprovalVisualState.NONE) Wear.Palette.Border else borderColor
+    val shape = RoundedCornerShape(
+        topStart = Wear.Radius.Card,
+        topEnd = Wear.Radius.Card,
+        bottomStart = Wear.Radius.Control / 2,
+        bottomEnd = Wear.Radius.Card
+    )
+    val approvalBorder = if (approvalVisualState == ApprovalVisualState.NONE) {
+        Modifier
+    } else {
+        Modifier.border(1.dp, borderColor, shape)
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Wear.Palette.Surface)
-            .border(1.dp, edge, shape)
-            .padding(Wear.Space.Md)
+            .background(
+                brush = Brush.verticalGradient(
+                    listOf(Wear.Palette.Surface, Wear.Palette.SurfaceAlt)
+                ),
+                shape = shape
+            )
+            .then(approvalBorder)
+            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Md + 2.dp)
     ) {
         content()
     }

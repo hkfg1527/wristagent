@@ -54,9 +54,9 @@ class SettingsTransferCodecTest {
         entries.forEach { entry ->
             assertEquals("键 " + entry.key + " 的值没原样往返", values[entry.key], entry.value)
         }
-        // —— 外观两项纳入快照后的扩充：键集 31 -> 33，且外观就在其中 ——
-        assertEquals("可移植键必须扩到 33 个", 33, SettingsTransferCodec.PortableKeys.size)
-        assertEquals(33, entries.size)
+        // —— 外观两项 + 回答风格后的扩充：键集 31 -> 34 ——
+        assertEquals("可移植键必须扩到 34 个", 34, SettingsTransferCodec.PortableKeys.size)
+        assertEquals(34, entries.size)
         assertTrue(
             "外观两项必须进可移植键，否则导出再导入会把外观丢掉",
             SettingsTransferCodec.PortableKeys.containsAll(

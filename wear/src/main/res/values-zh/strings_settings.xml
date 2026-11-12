@@ -55,6 +55,16 @@
     <string name="settings_reasoning_effort_medium">中</string>
     <string name="settings_reasoning_effort_high">高</string>
     <string name="settings_reasoning_effort_unsupported">该模型不支持推理努力，将忽略</string>
+    <string name="settings_reply_style_header">回答风格</string>
+    <string name="settings_reply_style_concise">精炼</string>
+    <string name="settings_reply_style_concise_secondary">先给结论，只保留关键步骤</string>
+    <string name="settings_reply_style_balanced">平衡</string>
+    <string name="settings_reply_style_balanced_secondary">结论加必要解释，不铺陈</string>
+    <string name="settings_reply_style_detailed">详尽</string>
+    <string name="settings_reply_style_detailed_secondary">展开推理与例子，适合复杂任务</string>
+    <string name="agent_reply_style_concise">回答保持精炼：先给结论，只保留关键步骤与必要风险提示，不重复问题。</string>
+    <string name="agent_reply_style_balanced">回答保持平衡：先给结论，再给必要解释与可执行步骤，避免空泛铺陈。</string>
+    <string name="agent_reply_style_detailed">回答保持详尽：在结论后展开关键推理、边界条件与例子，但仍避免重复和套话。</string>
 
     <!-- 记忆与安全分区。 -->
     <string name="settings_turns_header">单会话保留轮数</string>

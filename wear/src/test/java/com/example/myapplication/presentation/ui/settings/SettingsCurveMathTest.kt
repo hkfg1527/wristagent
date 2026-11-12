@@ -72,9 +72,10 @@ class SettingsCurveMathTest {
         val source = com.example.myapplication.readProjectFile(
             "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsCurve.kt"
         )
-        assertEquals(6, Regex("cubicTo\\s*\\(").findAll(source).count())
-        assertTrue("必须保留穹顶高度", source.contains("CapHeightDp = 14f"))
-        assertTrue("侧边必须使用圆近似常数", source.contains("BezierCircle"))
+        val cardPath = source.substringAfter("fun cardPath(").substringBefore("private fun smoothClosedPath")
+        assertEquals("两条侧边各一段 + 上下封口各一段", 4, Regex("cubicTo\\s*\\(").findAll(cardPath).count())
+        assertTrue("封口只保留 12dp 浅弧", source.contains("CapHeightDp = 12f"))
+        assertFalse("封口不得再用第二个四分之一圆拼出圆拱", source.contains("BezierCircle"))
         assertFalse("侧边不得用直线拼接", source.contains("lineTo(lTop"))
     }
 

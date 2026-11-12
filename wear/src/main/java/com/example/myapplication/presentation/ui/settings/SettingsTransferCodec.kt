@@ -3,6 +3,7 @@ package com.example.myapplication.presentation.ui.settings
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.ReplyStyle
 import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.ToolApprovalPolicy
@@ -53,6 +54,7 @@ object SettingsTransferCodec {
         "maxOutputTokens",
         "streamMode",
         "reasoningEffort",
+        "replyStyle",
         "showThoughtChain",
         "subAgentEnabled",
         "matrixSpacingDp",
@@ -237,6 +239,7 @@ object SettingsTransferBridge {
         "maxOutputTokens" to preferences.maxOutputTokens.toString(),
         "streamMode" to preferences.streamMode.toString(),
         "reasoningEffort" to preferences.reasoningEffort,
+        "replyStyle" to preferences.replyStyle,
         "showThoughtChain" to preferences.showThoughtChain.toString(),
         "subAgentEnabled" to preferences.subAgentEnabled.toString(),
         "matrixSpacingDp" to preferences.matrixSpacingDp.toString(),
@@ -338,6 +341,9 @@ object SettingsTransferBridge {
             "streamMode" -> boolValue(value)?.let { preferences.streamMode = it; true } ?: false
             "reasoningEffort" -> value.takeIf { it.isNotBlank() }
                 ?.let { preferences.reasoningEffort = it; true } ?: false
+            "replyStyle" -> ReplyStyle.values()
+                .firstOrNull { it.storageKey == value }
+                ?.let { preferences.replyStyle = it.storageKey; true } ?: false
             "showThoughtChain" -> boolValue(value)?.let { preferences.showThoughtChain = it; true } ?: false
             "subAgentEnabled" -> boolValue(value)?.let { preferences.subAgentEnabled = it; true } ?: false
             "matrixSpacingDp" -> value.toFloatOrNull()?.takeIf { it in 4f..32f }

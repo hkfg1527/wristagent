@@ -158,7 +158,7 @@ fun SettingsStaggeredRow(
         if (playsEnter) {
             val startMs = staggerDelayMs(index, SettingsRowEnterStepMs, SettingsRowEnterCapMs)
             if (startMs > 0) delay(startMs.toLong())
-            enter.animateTo(1f, Wear.Motion.quick())
+            enter.animateTo(1f, Wear.Motion.base())
         }
     }
 
