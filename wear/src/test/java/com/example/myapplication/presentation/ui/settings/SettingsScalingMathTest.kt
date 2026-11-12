@@ -32,13 +32,13 @@ class SettingsScalingMathTest {
     }
 
     @Test
-    fun theHelperUsesOfficialDefaultsWithoutLocalOverrides() {
+    fun theHelperDisablesUniformScalingAndKeepsOnlyTheOfficialFade() {
         val source = readProjectFile(
             "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsScaling.kt"
         )
-        assertTrue("必须直接调用官方工厂", source.contains("ScalingLazyColumnDefaults.scalingParams()"))
-        assertFalse("不许再覆盖官方 edgeScale", Regex("edgeScale\\s*=").containsMatchIn(source))
-        assertFalse("不许再覆盖官方 edgeAlpha", Regex("edgeAlpha\\s*=").containsMatchIn(source))
+        assertTrue("必须继续使用官方工厂", source.contains("ScalingLazyColumnDefaults.scalingParams("))
+        assertTrue("统一缩放必须关闭，宽度交给圆弦几何", source.contains("edgeScale = 1f"))
+        assertTrue("相邻行不得用不同透明度，否则接缝", source.contains("edgeAlpha = 1f"))
         assertFalse("本地系数对象必须删除", source.contains("object SettingsScalingMath"))
     }
 }

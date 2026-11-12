@@ -53,7 +53,7 @@ class SettingsGroupLineGuardTest {
     @Test
     fun lineStillOnlyExistsBetweenRowsInsideACard() {
         assertEquals(1, Regex("fun SettingsGroupHairline").findAll(shared).count())
-        assertTrue(shared.contains("SettingsRowComposition.drawsGroupHairline(LocalSettingsRowSlot.current)"))
+        assertTrue(Regex("drawsGroupHairline\\(\\s*slot\\s*\\)").containsMatchIn(shared))
         assertTrue(shared.contains("start = LocalSettingsGroupHairlineStart.current"))
         assertFalse(hairline.contains("Wear.Accent"))
     }
@@ -76,13 +76,13 @@ class SettingsGroupLineGuardTest {
     }
 
     @Test
-    fun pressFeedbackOnlyChangesTheRowBackground() {
+    fun pressFeedbackOnlyChangesTheCurvedSurfaceColor() {
         assertTrue(cardRow.contains("collectIsPressedAsState()"))
         assertTrue(cardRow.contains("indication = null"))
-        assertTrue(cardRow.contains("background(rowBackground)"))
-        assertFalse(cardRow.contains("graphicsLayer"))
-        assertFalse(cardRow.contains("scale("))
-        assertFalse(cardRow.contains("border("))
+        assertTrue("按压只改曲面填充色", cardRow.contains("drawPath(path = path, color = rowBackground)"))
+        assertFalse("按压不得改缩放", cardRow.contains("scaleY"))
+        assertFalse("按压不得加边框", cardRow.contains("border("))
+        assertTrue("内容膨胀只允许横向", cardRow.contains("scaleX = SettingsCurveMath.contentScaleX"))
         assertTrue(pressHelper.contains("Wear.Motion.quick()"))
         assertTrue(pressHelper.contains("lift.snapTo(1f)"))
         assertTrue(pressHelper.contains("Wear.Palette.SurfaceAlt"))

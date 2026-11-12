@@ -16,11 +16,14 @@ import org.junit.Test
 class SettingsVisualGuardTest {
 
     @Test
-    fun noSettingsPageCentresItsRowsHorizontally() {
-        val offenders = settingsSources()
-            .filter { (_, text) -> text.contains("Alignment.CenterHorizontally") }
-            .keys
-        assertEquals("行内必须是左右两槽，不是整体居中：", emptySet<String>(), offenders)
+    fun rowTextStillUsesTwoSlotsEvenThoughTheCardShellIsCentred() {
+        val shared = readSettings("SettingsShared.kt")
+        val slot = shared
+            .substringAfter("private fun SettingsSlotRow(")
+            .substringBefore("private fun SettingsSubtitleLine(")
+        assertFalse("行内文字必须仍是左右两槽，不是整体居中", slot.contains("Alignment.CenterHorizontally"))
+        assertTrue("左槽必须继续占剩余宽度", slot.contains(".weight(1f)"))
+        assertTrue("取值 / 控件必须仍落在右槽", slot.contains("trailing"))
     }
 
     @Test
@@ -101,8 +104,8 @@ class SettingsVisualGuardTest {
         assertEquals("组内发丝线只允许一处声明：", 1, occurrences)
         // 线只画在"行与行之间"：纯函数钉住，组尾 / 单行组 / 卡外行不画
         assertTrue(
-            "线的绘制必须走 drawsGroupHairline 判定",
-            shared.contains("SettingsRowComposition.drawsGroupHairline(LocalSettingsRowSlot.current)")
+            "线的绘制必须走当前行槽位判定",
+            Regex("drawsGroupHairline\\(\\s*slot\\s*\\)").containsMatchIn(shared)
         )
     }
 

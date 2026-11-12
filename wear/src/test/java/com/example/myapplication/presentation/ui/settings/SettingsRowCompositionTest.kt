@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -77,6 +78,20 @@ class SettingsRowCompositionTest {
         assertFalse("组尾下面不画线", SettingsRowComposition.drawsGroupHairline(slots[2]))
         assertFalse("卡外行永远不画线", SettingsRowComposition.drawsGroupHairline(slots[3]))
         assertFalse(SettingsRowComposition.drawsGroupHairline(null))
+    }
+
+    @Test
+    fun sectionRegistrationActuallyUsesTheSectionKind() {
+        val source = readProjectFile(
+            "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsShared.kt"
+        )
+        val section = source
+            .substringAfter("fun section(text: String)")
+            .substringBefore("fun standaloneRow")
+        assertTrue(
+            "组标题必须以 SECTION 登记，否则会被 rowSlots 当成卡片行，卡片上下穹顶永远不出现",
+            section.contains("kind = SettingsRowEntryKind.SECTION")
+        )
     }
 
     @Test

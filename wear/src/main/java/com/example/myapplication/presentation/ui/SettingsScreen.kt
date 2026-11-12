@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -70,8 +72,9 @@ import com.example.myapplication.presentation.ui.settings.SettingsNavRow
 import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.SettingsEdgeScrim
 import com.example.myapplication.presentation.ui.settings.SettingsSectionHeader
+import com.example.myapplication.presentation.ui.settings.settingsCardScreenInset
+import com.example.myapplication.presentation.ui.settings.settingsCardWidth
 import com.example.myapplication.presentation.ui.settings.settingsScalingParams
-import com.example.myapplication.presentation.ui.settings.settingsSideInset
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
@@ -261,12 +264,12 @@ fun SettingsScreen(
                     // 关掉库自带的 rotary 与系统拉伸越界：表冠由上面的处理器接管，越界不做拉伸
                     rotaryScrollableBehavior = null,
                     overscrollEffect = null,
-                    // 沿用官方 M3E 曲率：边缘行随圆屏缩小并淡出，与聊天列表保持同一套观感
+                    // 关闭逐行等比缩放：宽度与内容呼吸交给 SettingsCurveGeometry 的连续圆弦
                     scalingParams = settingsScalingParams(),
                     contentPadding = PaddingValues(
-                        // 左右内缩按圆周弦长推导（真机 32.5dp），不再写死 12dp
-                        start = settingsSideInset(),
-                        end = settingsSideInset(),
+                        // 列表内容盒宽 216dp：卡片外壳向两侧撑开，内容基准仍为 176dp
+                        start = settingsCardScreenInset(),
+                        end = settingsCardScreenInset(),
                         // 顶部只让给 24dp 渐变遮罩（本页没有曲面时钟，不必让 34dp）
                         top = RootContentTopPadding,
                         // 设置页没有主键：底部预留取 44dp 而不是聊天页的 76dp
@@ -735,7 +738,9 @@ private fun RootSectionRow(
     content: @Composable () -> Unit
 ) {
     SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
-        content()
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            content()
+        }
     }
 }
 
@@ -756,8 +761,11 @@ private fun RootContentRow(
 ) {
     SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
         // slot = null 的两种是焦点块与「完成返回」：它们不是卡片行，保持独立
-        CompositionLocalProvider(LocalSettingsRowSlot provides slot) {
-            Box(modifier = Modifier.widthIn(max = SettingsContentWidth)) { content() }
+        val width = if (slot == null) SettingsContentWidth else settingsCardWidth()
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            CompositionLocalProvider(LocalSettingsRowSlot provides slot) {
+                Box(modifier = Modifier.width(width)) { content() }
+            }
         }
     }
 }

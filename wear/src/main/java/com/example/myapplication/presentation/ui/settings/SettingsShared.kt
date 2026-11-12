@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -79,6 +78,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -118,15 +118,18 @@ import kotlinx.coroutines.launch
  */
 val SettingsContentWidth: Dp = SettingsDesignMath.ContentWidthDp.dp
 
-/**
- * 当前屏宽下的内容盒左右内缩（dp）：弦长推出来的值，真机 233dp 屏为 32.5dp。
- *
- * 用它替代固定的 12dp 内边距，窄屏（192dp）上的内容才不会画到圆周外。
- */
+/** 卡片外壳最大宽度：233dp 屏 216dp，192dp 屏退回 176dp。 */
 @Composable
-fun settingsSideInset(): Dp {
+fun settingsCardWidth(): Dp {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    return SettingsDesignMath.sideInsetDp(screenWidthDp.toFloat()).dp
+    return SettingsCurveMath.cardWidthDp(screenWidthDp.toFloat()).dp
+}
+
+/** 列表内容盒两侧到屏幕边缘的内缩，保证卡片外壳在屏上居中。 */
+@Composable
+fun settingsCardScreenInset(): Dp {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    return SettingsCurveMath.screenInsetDp(screenWidthDp.toFloat()).dp
 }
 
 /** 单行 44dp 触控热区之间的最小留白。 */
@@ -286,7 +289,8 @@ class SettingsRows internal constructor(
         items.add(
             SettingsRowEntry(
                 isSection = true,
-                content = { SettingsSectionHeader(text = text, isFirstSection = isFirstSection) }
+                content = { SettingsSectionHeader(text = text, isFirstSection = isFirstSection) },
+                kind = SettingsRowEntryKind.SECTION
             )
         )
     }
@@ -297,8 +301,8 @@ class SettingsRows internal constructor(
  *
  * 版面契约（与 [SettingsDesignMath] 一一对应）：
  * - 顶部：44dp 返回键 + 页面标题，整块落在 y=34dp 的曲面时钟带以下；
- * - 中部：ScalingLazyColumn，内容宽度固定 [SettingsContentWidth]（176dp），项间距 [SettingsRowGap]（0）；
- *   同组行拼成一张卡，卡内行与行之间一排 [SettingsGroupHairline] 点线（子项组上沿左端另收 12dp）；
+ * - 中部：ScalingLazyColumn，内容基准 [SettingsContentWidth]（176dp），卡片外壳最大 216dp；项间距 [SettingsRowGap]（0）；
+ *   同组行拼成一张连续曲面卡，卡内行与行之间一根 1px [SettingsGroupHairline]（子项组上沿左端另收 12dp）；
  * - 组间距 24dp，只由 [SettingsSectionHeader] 的顶部留白提供；
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
@@ -356,11 +360,11 @@ fun SettingsSubPage(
             flingBehavior = ScrollableDefaults.flingBehavior(),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
-            // 与根页 / 聊天共用官方 M3E 曲率：边缘行缩小并淡出
+            // 关闭逐行等比缩放：曲面宽度与内容呼吸由卡片几何负责
             scalingParams = settingsScalingParams(),
             contentPadding = PaddingValues(
-                start = settingsSideInset(),
-                end = settingsSideInset(),
+                start = settingsCardScreenInset(),
+                end = settingsCardScreenInset(),
                 top = Wear.Space.Xs,
                 bottom = Wear.Size.SettingsBottomInset
             ),
@@ -376,7 +380,9 @@ fun SettingsSubPage(
 
             item(key = "page-header") {
                 SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    SettingsPageHeader(title = title, onBack = { exit.begin(onBack) })
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        SettingsPageHeader(title = title, onBack = { exit.begin(onBack) })
+                    }
                 }
             }
 
@@ -404,12 +410,21 @@ fun SettingsSubPage(
                         0.dp
                     }
                 SettingsStaggeredRow(index = index + 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    Column(modifier = Modifier.widthIn(max = SettingsContentWidth)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val entryWidth =
+                            if (rowSlots[index] == null) SettingsContentWidth else settingsCardWidth()
                         CompositionLocalProvider(
                             LocalSettingsRowSlot provides rowSlots[index],
                             LocalSettingsGroupHairlineStart provides hairlineStart.dp
                         ) {
-                            Box(modifier = Modifier.padding(top = standaloneTopGap)) {
+                            Box(
+                                modifier = Modifier
+                                    .width(entryWidth)
+                                    .padding(top = standaloneTopGap)
+                            ) {
                                 entry.content()
                             }
                         }
@@ -419,15 +434,17 @@ fun SettingsSubPage(
 
             item(key = "page-footer") {
                 SettingsStaggeredRow(index = rowCount - 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    SettingsActionButton(
-                        label = stringResource(R.string.settings_done_back),
-                        tone = Tone.MUTED,
-                        // 「完成返回」是动作按钮、不是卡片行：与上面那张卡之间留一整档组间距
-                        modifier = Modifier
-                            .widthIn(max = SettingsContentWidth)
-                            .padding(top = SettingsSectionGap),
-                        onClick = { exit.begin(onBack) }
-                    )
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        SettingsActionButton(
+                            label = stringResource(R.string.settings_done_back),
+                            tone = Tone.MUTED,
+                            // 「完成返回」是动作按钮、不是卡片行：与上面那张卡之间留一整档组间距
+                            modifier = Modifier
+                                .width(SettingsContentWidth)
+                                .padding(top = SettingsSectionGap),
+                            onClick = { exit.begin(onBack) }
+                        )
+                    }
                 }
             }
         }
@@ -566,8 +583,7 @@ fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
 
 /** 短横画在 14dp 槽沟内，标题仍从同一条左槽线起笔；首组不重复页头后的留白。 */
 private fun Modifier.settingsSectionHeaderLayout(isFirstSection: Boolean, accent: Color): Modifier = this
-    .widthIn(max = SettingsContentWidth)
-    .fillMaxWidth()
+    .width(SettingsContentWidth)
     .padding(
         top = SettingsDesignMath.sectionGapDp(isFirstSection).dp,
         bottom = SettingsSectionHeaderBottomGap
@@ -610,9 +626,6 @@ private val RowVerticalPadding: Dp = 2.dp
  */
 val SettingsRowSidePadding: Dp = SettingsDesignMath.RowSidePaddingDp.dp
 
-/** 组卡片圆角：固定 16dp，不吃 MaterialTheme.shapes.small（它对一行来说太大）。 */
-private val GroupCardRadius: Dp = Wear.Radius.Group
-
 /**
  * 当前行在所属卡片里的位置，由列表构建侧（根页 / [SettingsSubPage]）按组提供。
  *
@@ -640,14 +653,6 @@ internal const val SettingsRowValueMinScreenWidthDp = 200
 internal fun settingsRowShowsValue(screenWidthDp: Int): Boolean =
     screenWidthDp > SettingsRowValueMinScreenWidthDp
 
-/** 位置 -> 圆角：组首只圆上两角，组尾只圆下两角，中间四角皆方 —— 整组拼起来才是一张圆角矩形。 */
-private fun SettingsRowShape.toCornerShape(): Shape = RoundedCornerShape(
-    topStart = if (roundedTop) GroupCardRadius else 0.dp,
-    topEnd = if (roundedTop) GroupCardRadius else 0.dp,
-    bottomStart = if (roundedBottom) GroupCardRadius else 0.dp,
-    bottomEnd = if (roundedBottom) GroupCardRadius else 0.dp
-)
-
 /** 组内分隔：一条 1 物理像素 Border 细线，右端保留 24dp 呼吸。 */
 @Composable
 private fun SettingsGroupHairline() {
@@ -674,10 +679,10 @@ private fun SettingsGroupHairline() {
 }
 
 /**
- * 组卡片里的一行：圆角只由 [LocalSettingsRowSlot] 决定，背景恒为 [Wear.Palette.Surface]。
+ * 组卡片里的一行：曲面轮廓由 [LocalSettingsRowSlot] 与行在屏幕上的 y 共同决定。
  *
  * 三个问题在这一处一次解决：
- * 1. 每行一张卡 → 组首只圆上两角、组尾只圆下两角，组内拼成一张圆角矩形；
+ * 1. 每行一张方卡 → 每行取所在高度的圆弦半宽，组首/组尾加穹顶，组内拼成一张连续曲面；
  * 2. 取值贴死在圆角上 → 行内左右各 [SettingsRowSidePadding]（14dp），取值右端因此离卡片右缘 14dp；
  * 3. 不可点的纯展示行没有背景 → 背景不再与 onClick 绑定，展示行也是同一张卡的一部分，不留白洞。
  */
@@ -702,7 +707,8 @@ internal fun SettingsCardRow(
                 onClick = onClick
             )
         }
-    val shape = SettingsRowComposition.shapeOf(LocalSettingsRowSlot.current)
+    val slot = LocalSettingsRowSlot.current
+    val shape = SettingsRowComposition.shapeOf(slot)
     val rowBackground = pressedRowBackground(
         pressed = onClick != null && pressed,
         rest = if (shape == null) Color.Transparent else Wear.Palette.Surface
@@ -718,28 +724,72 @@ internal fun SettingsCardRow(
         ) { content() }
         return
     }
+
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenHeightDp = configuration.screenHeightDp
+    val screenWidthDp = configuration.screenWidthDp
+    val screenHeightPx = with(density) { screenHeightDp.dp.toPx() }
+    val screenMarginPx = with(density) { SettingsCurveMath.ScreenEdgeMarginDp.dp.toPx() }
+    val baseHalfPx = with(density) { SettingsCurveMath.MinCardWidthDp.dp.toPx() / 2f }
+    val maxHalfPx = with(density) {
+        (SettingsCurveMath.cardWidthDp(screenWidthDp.toFloat()).dp.toPx() / 2f)
+    }
+    val capHeightPx = with(density) { SettingsCurveGeometry.CapHeightDp.dp.toPx() }
+    // y 只在绘制/图层阶段读；滚动时只失效绘制，不触发整行重组。
+    val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape.toCornerShape())
-            .background(Wear.Palette.Surface)
+            .onGloballyPositioned { coordinates ->
+                val newY = coordinates.positionInRoot().y
+                if (kotlin.math.abs(newY - yInRootPx.value) > 0.5f) yInRootPx.value = newY
+            }
+            .drawWithContent {
+                val path = SettingsCurveGeometry.cardPath(
+                    size = size,
+                    topInRootPx = yInRootPx.value,
+                    screenHeightPx = screenHeightPx,
+                    screenMarginPx = screenMarginPx,
+                    capHeightPx = capHeightPx,
+                    roundTop = shape.roundedTop,
+                    roundBottom = shape.roundedBottom
+                )
+                drawPath(path = path, color = rowBackground)
+                drawContent()
+            },
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = minHeight)
-                .background(rowBackground)
-                .then(clickModifier)
-                .padding(
-                    start = SettingsRowSidePadding,
-                    end = SettingsRowSidePadding,
-                    top = RowVerticalPadding,
-                    bottom = RowVerticalPadding
-                ),
-            contentAlignment = Alignment.CenterStart
-        ) { content() }
-        if (SettingsRowComposition.drawsGroupHairline(LocalSettingsRowSlot.current)) {
-            SettingsGroupHairline()
+                .width(SettingsContentWidth)
+                .graphicsLayer {
+                    scaleX = SettingsCurveMath.contentScaleX(
+                        topInRootPx = yInRootPx.value,
+                        rowHeightPx = size.height,
+                        screenHeightPx = screenHeightPx,
+                        minHalfPx = baseHalfPx,
+                        maxHalfPx = maxHalfPx
+                    )
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .then(clickModifier)
+                    .padding(
+                        start = SettingsRowSidePadding,
+                        end = SettingsRowSidePadding,
+                        top = RowVerticalPadding,
+                        bottom = RowVerticalPadding
+                    ),
+                contentAlignment = Alignment.CenterStart
+            ) { content() }
+            if (SettingsRowComposition.drawsGroupHairline(slot)) {
+                SettingsGroupHairline()
+            }
         }
     }
 }
@@ -1275,7 +1325,7 @@ fun SettingsRadioRow(
         subtitleMaxLines = subtitleMaxLines,
         subtitleStatus = subtitleStatus,
         subtitleBelowRow = subtitleBelowRow,
-        modifier = modifier.widthIn(max = SettingsContentWidth),
+        modifier = modifier,
         onClick = onSelect,
         trailing = {
             SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
@@ -1344,7 +1394,7 @@ fun SettingsSubRadioRow(
         subtitle = subtitle,
         subtitleMaxLines = subtitleMaxLines,
         subtitleBelowRow = subtitleBelowRow,
-        modifier = modifier.widthIn(max = SettingsContentWidth),
+        modifier = modifier,
         onClick = onSelect,
         subItem = true,
         trailing = {
@@ -1392,7 +1442,7 @@ fun SettingsStatusRow(
     SettingsSlotRow(
         title = title,
         value = value,
-        modifier = modifier.widthIn(max = SettingsContentWidth),
+        modifier = modifier,
         trailing = if (statusTone == null) {
             null
         } else {
@@ -1438,9 +1488,7 @@ fun SettingsCaptionRow(
     SettingsCardRow(modifier = modifier, minHeight = 0.dp) {
         BasicText(
             text = text,
-            modifier = Modifier
-                .widthIn(max = SettingsContentWidth)
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             style = if (mono) Wear.TextMono else Wear.TextCaption,
             maxLines = maxLines,
             overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Visible else TextOverflow.Ellipsis
