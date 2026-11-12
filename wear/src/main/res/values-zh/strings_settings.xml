@@ -441,6 +441,7 @@
     <string name="settings_remembered_full">清单已满：新的「记住」不会生效，请先忘掉一部分</string>
     <string name="settings_remembered_forget">忘掉全部已记住的命令</string>
     <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
+    <string name="settings_card_tools">工具与 MCP</string>
     <string name="settings_style_header">页面风格</string>
     <string name="settings_style_balloon">气泡</string>
     <string name="settings_style_balloon_summary">整页一个气球，宽度随圆屏收缩</string>

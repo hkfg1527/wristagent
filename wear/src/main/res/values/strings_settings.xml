@@ -441,6 +441,7 @@
     <string name="settings_remembered_full">List is full: new "remember" calls are refused until you forget some</string>
     <string name="settings_remembered_forget">Forget all remembered commands</string>
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
+    <string name="settings_card_tools">Tools &amp; MCP</string>
     <string name="settings_style_header">Page style</string>
     <string name="settings_style_balloon">Balloon</string>
     <string name="settings_style_balloon_summary">One balloon per page, width follows the round screen</string>

@@ -21,18 +21,25 @@ class SettingsBalloonOutlineTest {
     private val capDp = 20f
     private val centerX = widthDp / 2f
 
-    private fun outline() = SettingsCurveGeometry.outlineSegments(
+    private fun outline(
+        top: Float = topInRootDp,
+        height: Float = heightDp
+    ) = SettingsCurveGeometry.outlineSegments(
         widthPx = widthDp,
-        heightPx = heightDp,
-        topInRootPx = topInRootDp,
+        heightPx = height,
+        topInRootPx = top,
         screenHeightPx = screenDp,
         screenMarginPx = marginDp,
         capHeightPx = capDp
     )
 
-    private fun flatten(steps: Int = 32): List<Pair<Float, Float>> {
+    private fun flatten(
+        steps: Int = 24,
+        top: Float = topInRootDp,
+        height: Float = heightDp
+    ): List<Pair<Float, Float>> {
         val points = ArrayList<Pair<Float, Float>>()
-        for (s in outline()) {
+        for (s in outline(top, height)) {
             for (i in 0..steps) {
                 val t = i.toFloat() / steps
                 val mt = 1f - t
@@ -63,15 +70,38 @@ class SettingsBalloonOutlineTest {
 
     @Test
     fun theCapIsADomeNotAFlatLid() {
-        val cap = outline().first()
-        val capHeight = cap.y0
-        val shoulderHalf = kotlin.math.abs(cap.x0 - centerX)
+        val radius = screenDp / 2f - marginDp
+        val centerLocal = screenDp / 2f - topInRootDp
+        val cap = SettingsCurveGeometry.balloonCapPx(heightDp, centerX, centerLocal, radius, capDp)
+        assertTrue("收口必须高过 20dp 下限，肩部才有足够长度过渡", cap > capDp)
+        assertTrue("收口不得超过 2.4 倍下限（48dp）", cap <= capDp * SettingsCurveGeometry.CapMaxRatio + 0.01f)
+        val shoulder = (kotlin.math.sqrt((radius * radius - (cap - centerLocal) * (cap - centerLocal)).coerceAtLeast(0f)))
+            .coerceAtMost(centerX)
         assertTrue(
-            "穹顶半宽 " + shoulderHalf + " 与高 " + capHeight + " 必须成拱（不超过 2.4:1），" +
-                "否则封口会压成平盖加尖角",
-            shoulderHalf <= capHeight * 2.4f
+            "收口高 " + cap + " 不得超过肩部半宽 " + shoulder + "，否则窄气球会被收成一个尖",
+            cap <= shoulder + 0.01f
         )
-        assertTrue("穹顶必须高过 20dp 下限，肩部才有足够长度过渡", capHeight > 20f)
+        assertTrue("半宽:拱高必须大于 2:1 才不是平盖", shoulder / cap >= 2f - 0.01f)
+    }
+
+    @Test
+    fun theSilhouetteNeverBitesBackFromItsWidestRow() {
+        // 组落在屏幕中部偏下：旧的两段拼法会在这里把控制点甩到宽度极值之外，肩外鼓出一块。
+        val points = flatten(top = 15f, height = 200f)
+        val rows = points.groupBy { it.second.toInt() }
+            .mapValues { entry -> entry.value.maxOf { abs(it.first - centerX) } }
+        val keys = rows.keys.sorted()
+        val widestKey = keys.maxByOrNull { rows.getValue(it) } ?: return
+        var previous = 0f
+        keys.filter { it < widestKey }.forEach { key ->
+            val value = rows.getValue(key)
+            assertTrue(
+                "第 " + key + " 行半宽 " + value + " 小于之前的 " + previous +
+                    "：轮廓在肩部咬进去，这就是小犄角",
+                value >= previous - 0.6f
+            )
+            previous = maxOf(previous, value)
+        }
     }
 
     @Test
@@ -83,7 +113,7 @@ class SettingsBalloonOutlineTest {
     @Test
     fun theOutlineIsClosedAndSymmetric() {
         val segments = outline()
-        assertTrue("至少要有穹顶与侧壁", segments.size > 8)
+        assertTrue("至少要有收口与侧壁", segments.size > 8)
         val first = segments.first()
         val last = segments.last()
         assertEquals("首尾必须闭合", first.x0, last.x1, 0.01f)

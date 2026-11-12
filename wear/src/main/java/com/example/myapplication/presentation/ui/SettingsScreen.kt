@@ -323,6 +323,26 @@ fun SettingsScreen(
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
+                                    val calledTools = preferences.calledToolNames.size
+                                    val registeredTools = preferences.registeredToolCount
+                                    SettingsHeroCard(
+                                        label = stringResource(R.string.settings_card_tools),
+                                        value = if (registeredTools > 0) {
+                                            calledTools.toString() + " / " + registeredTools
+                                        } else {
+                                            "—"
+                                        },
+                                        accent = Wear.CardTools,
+                                        fraction = if (registeredTools > 0) {
+                                            (calledTools.toFloat() / registeredTools).coerceIn(0f, 1f)
+                                        } else {
+                                            0f
+                                        },
+                                        ringIcon = {
+                                            SettingsRingGlyph("M", Wear.CardTools)
+                                        }
+                                    )
+                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
                                 }
                                 Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 SettingsSectionHeader(

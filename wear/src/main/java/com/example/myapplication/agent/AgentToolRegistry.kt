@@ -248,6 +248,8 @@ class AgentToolRegistry(
             )
         )
 
+        // 注册数在这里落盘：每轮构建清单都会刷新，界面读到的永远是最新值。
+        preferences?.registeredToolCount = all.size
         return all
     }
 
@@ -255,6 +257,8 @@ class AgentToolRegistry(
      * 执行指定工具
      */
     suspend fun executeTool(call: ToolCall): ToolResult {
+        // 调用账本：只记名字，不记参数；大卡片档的「已调用 / 已注册」圆环读它。
+        preferences?.recordToolCall(call.name)
         // MCP 远端工具走独立分支：失败已经被翻译成结构化回执，不经过内置工具这条链路。
         // 同名的自写工具优先：define_tool 允许 mcp_ 开头的名字，注册表里已有它就按已有处理。
         if (mcpTools.isMcpToolName(call.name) && selfDefinedTool(call.name) == null) {

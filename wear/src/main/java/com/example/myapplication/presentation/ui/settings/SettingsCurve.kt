@@ -78,29 +78,30 @@ object SettingsCurveMath {
  * 组首 / 组尾 / 单行用 20dp 浅穹顶封口；中间行只保留连续侧弧。
  */
 object SettingsCurveGeometry {
-    /** 穹顶最小高度：20dp；实际高度跟半宽走，保证封口是一段圆拱而不是平盖。 */
+    /** 收口最小高度：20dp，实际高度由半宽反解，保证封口是一段圆拱而不是平盖。 */
     const val CapHeightDp = 20f
 
-    /** 穹顶高度上限 = 最小高度的倍数：48dp，超过就会挤掉内容。 */
+    /** 收口高度上限 = 最小高度的倍数：48dp，超过就会挤掉内容。 */
     const val CapMaxRatio = 2.4f
 
-    /** 气球内容距顶/底的最小内缩：大于 [CapHeightDp] × [CapMaxRatio]，首末行不会坐进穹顶里。 */
+    /** 气球内容距顶/底的最小内缩：大于 [CapHeightDp] × [CapMaxRatio]，首末行不会坐进收口里。 */
     const val CapInsetDp = 56f
 
-    /** 穹顶高度与半宽的比例：0.5 即 2:1，再扁就只剩一条平盖。 */
+    /** 收口高度与半宽的比例：0.5 即 2:1，再扁就只剩一条平盖。 */
     private const val CapAspect = 0.5f
 
     /** 侧壁切分数：每段跨角小于 4°，肉眼不可分辨，也不产生折面。 */
     private const val WallSlices = 16
 
-    /** 四分之一椭圆的三次曲线控制点系数。 */
+    /** 四分之一圆的三次曲线控制点系数。 */
     private const val ArcKappa = 0.5522848f
 
     /**
      * 整页主气球的轮廓段。
      *
-     * 一条闭合曲线：穹顶两端切线由侧壁解析导数给出，因此上肩、下肩都没有折角；
-     * 侧壁是圆弧的等比缩放，宽度单调变化，不会在肩部鼓出多余的一块。
+     * 一条闭合曲线：宽度 = 屏幕圆弦 × 收口窗口。窗口是四分之一圆，顶点处半宽归零、
+     * 切线水平；窗口终点导数为 0，所以它与侧壁的切线严格接上 —— 肩部既无折角，
+     * 也不会像"另画一段拱"那样把控制点甩到宽度极值之外鼓出一小块。
      */
     internal fun outlineSegments(
         widthPx: Float,
@@ -121,119 +122,141 @@ object SettingsCurveGeometry {
             return sqrt((radius * radius - dy * dy).coerceAtLeast(0f))
         }
 
-        // 整组最大弦长等比缩到内容盒：轮廓仍是圆弧，但不会越过盒宽，
-        // 也不会像逐点夹平那样在夹平处留下折角。
+        // 整组最大弦长等比缩到内容盒：轮廓仍是圆弧，但不会越过盒宽。
         val nearestY = centerLocal.coerceIn(0f, heightPx)
         val scale = (cx / chord(nearestY).coerceAtLeast(0.001f)).coerceAtMost(1f)
         fun half(localY: Float): Float = (chord(localY) * scale).coerceIn(0f, cx)
 
-        // 右壁解析导数 dx/dy，穹顶端点直接复用它，保证相接处切线完全一致。
-        fun slope(localY: Float): Float {
-            val chordAt = chord(localY)
-            return if (chordAt < 0.001f) 0f else (centerLocal - localY) / chordAt * scale
-        }
-
-        // 穹顶高度由半宽反解：半宽越大，拱越高，肩部的曲率突变越小，
-        // 不会像固定 20dp 那样把封口压成“平盖 + 中间一个尖”。
-        var cap = capHeightPx.coerceIn(0f, heightPx / 2f)
+        val cap = balloonCapPx(heightPx, cx, centerLocal, radius, capHeightPx)
         if (cap <= 0f) return emptyList()
-        val capMax = (capHeightPx * CapMaxRatio).coerceAtMost(heightPx / 2f)
-        repeat(6) {
-            cap = (half(cap) * CapAspect).coerceIn(capHeightPx, capMax)
-        }
-        cap = cap.coerceAtMost(heightPx / 2f)
-        val topY = cap
-        val bottomY = heightPx - cap
-        val aTop = half(topY)
-        val aBottom = half(bottomY)
-        val sTop = slope(topY)
-        val sBottom = slope(bottomY)
-        val nTop = hypot(sTop, 1f)
-        val nBottom = hypot(sBottom, 1f)
-        val capTopDx = sTop / nTop * ArcKappa * cap
-        val capTopDy = ArcKappa * cap / nTop
-        val capBottomDx = sBottom / nBottom * ArcKappa * cap
-        val capBottomDy = ArcKappa * cap / nBottom
 
-        val segments = ArrayList<BalloonSegment>(WallSlices * 2 + 4)
-        // 上穹顶：左肩 → 顶点 → 右肩
-        segments += BalloonSegment(
-            x0 = cx - aTop, y0 = topY,
-            c1x = cx - aTop + capTopDx, c1y = topY - capTopDy,
-            c2x = cx - ArcKappa * aTop, c2y = 0f,
-            x1 = cx, y1 = 0f
-        )
-        segments += BalloonSegment(
+        fun taperTop(localY: Float): Float {
+            val t = (localY / cap).coerceIn(0f, 1f)
+            return sqrt((1f - (1f - t) * (1f - t)).coerceAtLeast(0f))
+        }
+
+        fun taperBottom(localY: Float): Float {
+            val t = ((heightPx - localY) / cap).coerceIn(0f, 1f)
+            return sqrt((1f - (1f - t) * (1f - t)).coerceAtLeast(0f))
+        }
+
+        fun width(localY: Float): Float =
+            (half(localY) * taperTop(localY) * taperBottom(localY)).coerceIn(0f, cx)
+
+        fun widthSlope(localY: Float): Float {
+            val chordAt = chord(localY).coerceAtLeast(0.001f)
+            val halfBase = (chordAt * scale).coerceIn(0f, cx)
+            val halfSlope = (centerLocal - localY) / chordAt * scale
+            val tTop = (localY / cap).coerceIn(0f, 1f)
+            val tBottom = ((heightPx - localY) / cap).coerceIn(0f, 1f)
+            val uTop = taperTop(localY).coerceAtLeast(0.01f)
+            val uBottom = taperBottom(localY).coerceAtLeast(0.01f)
+            val dTop = if (tTop < 1f) (1f - tTop) / (uTop * cap) else 0f
+            val dBottom = if (tBottom < 1f) -(1f - tBottom) / (uBottom * cap) else 0f
+            return halfSlope * uTop * uBottom + halfBase * dTop * uBottom + halfBase * uTop * dBottom
+        }
+
+        // 结点：收口段密、侧壁段疏。收口在顶点附近变化最快。
+        val fractions = floatArrayOf(0f, 0.12f, 0.26f, 0.44f, 0.66f, 0.85f, 1f)
+        val knots = ArrayList<Float>(fractions.size * 2 + WallSlices)
+        fractions.forEach { knots += cap * it }
+        for (i in 1 until WallSlices) {
+            val y = cap + (heightPx - 2f * cap) * i / WallSlices
+            if (y > knots.last() + 0.01f) knots += y
+        }
+        for (i in fractions.indices.reversed()) {
+            val y = heightPx - cap * fractions[i]
+            if (y > knots.last() + 0.01f) knots += y
+        }
+
+        val right = ArrayList<BalloonSegment>(knots.size + 1)
+        // 顶点那一段单独给水平切线：解析导数在顶点是无穷大，换成等价的水平控制点。
+        val firstY = knots[1]
+        val firstSlope = widthSlope(firstY)
+        val firstHalf = width(firstY)
+        val firstNorm = hypot(firstSlope, 1f)
+        right += BalloonSegment(
             x0 = cx, y0 = 0f,
-            c1x = cx + ArcKappa * aTop, c1y = 0f,
-            c2x = cx + aTop - capTopDx, c2y = topY - capTopDy,
-            x1 = cx + aTop, y1 = topY
+            c1x = cx + firstHalf * ArcKappa, c1y = 0f,
+            c2x = cx + firstHalf - firstSlope * firstY / firstNorm / 3f,
+            c2y = firstY - firstY / firstNorm / 3f,
+            x1 = cx + firstHalf, y1 = firstY
         )
-        // 右壁：上肩 → 下肩
-        var fromX = cx + aTop
-        var fromY = topY
-        var fromSlope = sTop
-        for (i in 1..WallSlices) {
-            val y = topY + (bottomY - topY) * i / WallSlices
-            val x = cx + half(y)
-            val s = slope(y)
-            segments += wallSlice(fromX, fromY, fromSlope, x, y, s)
+        var fromY = firstY
+        var fromX = cx + firstHalf
+        var fromSlope = firstSlope
+        for (i in 2 until knots.size) {
+            val y = knots[i]
+            if (y <= fromY + 0.01f) continue
+            val x = cx + width(y)
+            val s = widthSlope(y)
+            right += wallSlice(fromX, fromY, fromSlope, x, y, s)
             fromX = x
             fromY = y
             fromSlope = s
         }
-        // 下穹顶：右肩 → 底点 → 左肩
-        segments += BalloonSegment(
-            x0 = cx + aBottom, y0 = bottomY,
-            c1x = cx + aBottom + capBottomDx, c1y = bottomY + capBottomDy,
-            c2x = cx + ArcKappa * aBottom, c2y = heightPx,
+        // 底点收尾：最后一段同样以水平切线落到 (cx, heightPx)。
+        val lastSpan = heightPx - fromY
+        val lastNorm = hypot(fromSlope, 1f)
+        right += BalloonSegment(
+            x0 = fromX, y0 = fromY,
+            c1x = fromX + fromSlope * lastSpan / lastNorm / 3f,
+            c1y = fromY + lastSpan / lastNorm / 3f,
+            c2x = cx + (fromX - cx) * ArcKappa, c2y = heightPx,
             x1 = cx, y1 = heightPx
         )
-        segments += BalloonSegment(
-            x0 = cx, y0 = heightPx,
-            c1x = cx - ArcKappa * aBottom, c1y = heightPx,
-            c2x = cx - aBottom - capBottomDx, c2y = bottomY + capBottomDy,
-            x1 = cx - aBottom, y1 = bottomY
-        )
-        // 左壁：下肩 → 上肩
-        fromX = cx - aBottom
-        fromY = bottomY
-        fromSlope = -sBottom
-        for (i in 1..WallSlices) {
-            val y = bottomY - (bottomY - topY) * i / WallSlices
-            val x = cx - half(y)
-            val s = -slope(y)
-            segments += wallSlice(fromX, fromY, fromSlope, x, y, s)
-            fromX = x
-            fromY = y
-            fromSlope = s
+
+        // 左半边直接镜像右半边（含反向），左右必然逐段对称。
+        val segments = ArrayList<BalloonSegment>(right.size * 2)
+        segments += right
+        for (index in right.indices.reversed()) {
+            val s = right[index]
+            segments += BalloonSegment(
+                x0 = 2f * cx - s.x1, y0 = s.y1,
+                c1x = 2f * cx - s.c2x, c1y = s.c2y,
+                c2x = 2f * cx - s.c1x, c2y = s.c1y,
+                x1 = 2f * cx - s.x0, y1 = s.y0
+            )
         }
         return segments
     }
 
-    /** 一段侧壁：两端切线取解析导数（沿行进方向的 dx/dy），切片之间与穹顶之间都是 G1 连续。 */
-    private fun wallSlice(
-        x0: Float,
-        y0: Float,
-        s0: Float,
-        x1: Float,
-        y1: Float,
-        s1: Float
-    ): BalloonSegment {
-        val deltaY = y1 - y0
-        val n0 = hypot(s0, 1f)
-        val n1 = hypot(s1, 1f)
-        return BalloonSegment(
-            x0 = x0, y0 = y0,
-            c1x = x0 + s0 * deltaY / n0 / 3f,
-            c1y = y0 + deltaY / n0 / 3f,
-            c2x = x1 - s1 * deltaY / n1 / 3f,
-            c2y = y1 - deltaY / n1 / 3f,
-            x1 = x1, y1 = y1
+    /**
+     * 收口段的高度：由半宽反解，半宽越大收口越长。
+     *
+     * 固定的 20dp 会把宽气球的封口压成平盖加一个尖；这里按比例放大，
+     * 上限 [CapMaxRatio] 倍，且永远不超过该处半宽 —— 否则窄气球会被收成一个尖。
+     */
+    internal fun balloonCapPx(
+        heightPx: Float,
+        halfWidthPx: Float,
+        centerLocalPx: Float,
+        radiusPx: Float,
+        capHeightPx: Float
+    ): Float {
+        if (heightPx <= 0f || capHeightPx <= 0f || radiusPx <= 0f) return 0f
+        val capMax = (capHeightPx * CapMaxRatio).coerceAtMost(heightPx / 2f)
+        val chordAtCenter = sqrt(
+            (radiusPx * radiusPx - centerLocalPx.coerceIn(-radiusPx, radiusPx) *
+                centerLocalPx.coerceIn(-radiusPx, radiusPx)).coerceAtLeast(0.001f)
         )
+        val scale = (halfWidthPx / chordAtCenter).coerceAtMost(1f)
+        fun shoulderHalf(candidate: Float): Float {
+            val dy = candidate - centerLocalPx
+            val chordAt = sqrt((radiusPx * radiusPx - dy * dy).coerceAtLeast(0f))
+            return (chordAt * scale).coerceIn(0f, halfWidthPx)
+        }
+        var cap = capHeightPx.coerceIn(0f, capMax)
+        repeat(6) {
+            val shoulder = shoulderHalf(cap)
+            cap = (shoulder * CapAspect).coerceIn(capHeightPx, capMax)
+            cap = cap.coerceAtMost(shoulder.coerceAtLeast(0.5f))
+            cap = cap.coerceAtMost(capMax)
+        }
+        return cap
     }
 
-    /** 整页主气球：一条闭合轮廓，顶底为浅穹顶。 */
+    /** 整页主气球：一条闭合轮廓，顶底为收口。 */
     fun groupPath(
         size: Size,
         topInRootPx: Float,
@@ -257,6 +280,28 @@ object SettingsCurveGeometry {
         }
         path.close()
         return path
+    }
+
+    /** 一段侧壁：两端切线取解析导数（沿行进方向的 dx/dy），切片之间与收口之间都是 G1 连续。 */
+    private fun wallSlice(
+        x0: Float,
+        y0: Float,
+        s0: Float,
+        x1: Float,
+        y1: Float,
+        s1: Float
+    ): BalloonSegment {
+        val deltaY = y1 - y0
+        val n0 = hypot(s0, 1f)
+        val n1 = hypot(s1, 1f)
+        return BalloonSegment(
+            x0 = x0, y0 = y0,
+            c1x = x0 + s0 * deltaY / n0 / 3f,
+            c1y = y0 + deltaY / n0 / 3f,
+            c2x = x1 - s1 * deltaY / n1 / 3f,
+            c2y = y1 - deltaY / n1 / 3f,
+            x1 = x1, y1 = y1
+        )
     }
 
     fun cardPath(

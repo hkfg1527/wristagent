@@ -56,6 +56,32 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             ?: ReasoningEffort.DEFAULT_STORAGE
         set(value) = prefs.edit().putString("reasoning_effort", value).apply()
 
+    /**
+     * 已经真正执行过的工具名：大卡片档用它算「已调用 / 已注册」的圆环比例。
+     *
+     * 存成一串逗号分隔的名字而不是字符串集合：默认值因此是一个命名常量，
+     * 与其它字段的 DEFAULT_* 约定一致，也便于导入导出时逐字段搬运。
+     */
+    var calledToolNames: Set<String>
+        get() {
+            val raw = prefs.getString(KEY_CALLED_TOOLS, DEFAULT_CALLED_TOOLS) ?: DEFAULT_CALLED_TOOLS
+            return raw.split(",").filter { it.isNotBlank() }.toSet()
+        }
+        set(value) = prefs.edit().putString(KEY_CALLED_TOOLS, value.joinToString(",")).apply()
+
+    /** 最近一次构建出来的工具清单条数：注册数由注册表自己写，界面不重复数一遍。 */
+    var registeredToolCount: Int
+        get() = prefs.getInt(KEY_REGISTERED_TOOLS, DEFAULT_REGISTERED_TOOLS)
+        set(value) = prefs.edit().putInt(KEY_REGISTERED_TOOLS, value).apply()
+
+    /** 记一次工具调用：同名工具只留一个名字，重复调用不会让圆环虚高。 */
+    fun recordToolCall(name: String) {
+        if (name.isBlank()) return
+        val current = calledToolNames
+        if (name in current) return
+        calledToolNames = current + name
+    }
+
     var ultraSaving: Boolean
         get() = prefs.getBoolean("ultra_saving", false)
         set(value) = prefs.edit().putBoolean("ultra_saving", value).apply()
@@ -395,6 +421,12 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_ASR_LIVE_TRANSCRIPT = "asrLiveTranscript"
         const val KEY_PROVIDER_MANAGED_SEARCH = "providerManagedSearchEnabled"
         const val KEY_REPLY_STYLE = "replyStyle"
+
+        /** 工具调用账本与注册数：大卡片档的圆环数据源。 */
+        internal const val KEY_CALLED_TOOLS = "called_tool_names"
+        internal const val KEY_REGISTERED_TOOLS = "registered_tool_count"
+        internal const val DEFAULT_CALLED_TOOLS = ""
+        internal const val DEFAULT_REGISTERED_TOOLS = 0
         const val KEY_DEFAULT_THINKING = "defaultThinking"
         const val KEY_MEMORY_ENABLED = "memoryEnabled"
         const val KEY_AUTO_COMPRESS_CONTEXT = "autoCompressContext"

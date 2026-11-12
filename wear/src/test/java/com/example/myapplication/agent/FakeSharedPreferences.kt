@@ -16,7 +16,8 @@ internal class FakeSharedPreferences(
 
     override fun getString(key: String?, defValue: String?): String? = map[key] as? String ?: defValue
 
-    override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? = defValues
+    override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+        (map[key] as? Set<String>)?.toMutableSet() ?: defValues
 
     override fun getInt(key: String?, defValue: Int): Int = map[key] as? Int ?: defValue
 
