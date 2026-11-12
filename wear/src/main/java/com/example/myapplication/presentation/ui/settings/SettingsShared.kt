@@ -88,6 +88,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -1148,7 +1149,7 @@ private fun Tone.statusBlockColor(accent: Color): Color = when (this) {
     Tone.MUTED -> Wear.Palette.TextMuted
 }
 
-/** 开关行：官方 SwitchButton（label + onCheckedChange），不再手绘开关。 */
+/** 开关行：左槽标签 + 右槽 44×26dp 胶囊开关；不再使用会吞掉整行宽度的 SwitchButton。 */
 @Composable
 fun SettingsSwitchRow(
     label: String,
@@ -1158,53 +1159,42 @@ fun SettingsSwitchRow(
     secondary: String? = null,
     subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
 ) {
-    SettingsCardRow(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-        SwitchButton(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-            // 容器一律透明：行本身就是"裸行 + 发丝线"，控件再自带一块实底就成了第二层卡片。
-            // 旧值：ON 态 #0E3A4E 整块实色（质量 ≈3–4 条 30dp 胶囊）、OFF 态 #10141A 边界 1.14:1 看不见。
-            colors = SwitchButtonDefaults.switchButtonColors(
-                checkedContainerColor = Color.Transparent,
-                checkedContentColor = Wear.Palette.TextPrimary,
-                checkedSecondaryContentColor = Wear.Palette.TextSecondary,
-                checkedThumbColor = Wear.Palette.Orb,
-                checkedTrackColor = Wear.AccentRail,
-                checkedTrackBorderColor = Wear.AccentRail,
-                uncheckedContainerColor = Color.Transparent,
-                uncheckedContentColor = Wear.Palette.TextPrimary,
-                uncheckedSecondaryContentColor = Wear.Palette.TextSecondary,
-                uncheckedThumbColor = Wear.Palette.TextSecondary,
-                uncheckedTrackColor = Wear.Palette.SurfaceAlt,
-                uncheckedTrackBorderColor = Wear.Palette.Border
-            ),
-            // 左右内边距归零：开关标签靠卡片行自己的 14dp 内边距落到左槽线上
-            contentPadding = PaddingValues(
-                horizontal = 0.dp,
-                vertical = Wear.Space.Sm
-            ),
-            secondaryLabel = if (secondary == null || subtitleBelowRow) {
-                null
-            } else {
-                { SettingsSecondaryLabel(text = secondary) }
-            },
-            label = { SettingsPrimaryLabel(text = label) }
+    SettingsSlotRow(
+        title = label,
+        subtitle = secondary,
+        subtitleMaxLines = Int.MAX_VALUE,
+        subtitleBelowRow = subtitleBelowRow,
+        modifier = modifier,
+        onClick = { onCheckedChange(!checked) },
+        trailing = { SettingsCompactSwitch(checked = checked) }
+    )
+}
+
+@Composable
+private fun SettingsCompactSwitch(checked: Boolean) {
+    val progress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = Wear.Motion.micro(),
+        label = "settingsSwitchThumb"
+    )
+    val shape = CircleShape
+    Box(
+        modifier = Modifier
+            .width(44.dp)
+            .height(26.dp)
+            .clip(shape)
+            .background(if (checked) Wear.Accent.copy(alpha = 0.82f) else Wear.Palette.SurfaceAlt)
+            .border(1.dp, if (checked) Wear.Accent else Wear.Palette.Border, shape)
+            .semantics { role = Role.Switch }
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = (4f + 18f * progress).dp)
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(if (checked) Wear.Palette.Orb else Wear.Palette.TextSecondary)
         )
-        if (secondary != null && subtitleBelowRow) {
-            SettingsSubtitleLine(
-                subtitle = secondary,
-                subtitleMaxLines = Int.MAX_VALUE,
-                subtitleStatus = null,
-                belowRow = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = SettingsRowLineGap)
-            )
-        }
-        }
     }
 }
 
@@ -1223,27 +1213,15 @@ fun SettingsSplitToggleRow(
     secondary: String? = null,
     subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
 ) {
-    SettingsCardRow(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            TextToggleButton(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                modifier = Modifier.fillMaxWidth(),
-                content = { SettingsPrimaryLabel(text = label) }
-            )
-            if (secondary != null) {
-                SettingsSubtitleLine(
-                    subtitle = secondary,
-                    subtitleMaxLines = 2,
-                    subtitleStatus = null,
-                    belowRow = subtitleBelowRow,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = SettingsRowLineGap)
-                )
-            }
-        }
-    }
+    SettingsSlotRow(
+        title = label,
+        subtitle = secondary,
+        subtitleMaxLines = 2,
+        subtitleBelowRow = subtitleBelowRow,
+        modifier = modifier,
+        onClick = { onCheckedChange(!checked) },
+        trailing = { SettingsCompactSwitch(checked = checked) }
+    )
 }
 
 /** 细滑轨的几何常量（轨道 / 滑块 / 外圈）钉在 [SettingsSliderMath]，测试直接钉死防回漂。 */
