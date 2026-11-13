@@ -59,6 +59,7 @@ import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
 import com.example.myapplication.presentation.ui.settings.SettingsMicGlyph
 import com.example.myapplication.presentation.ui.settings.SettingsSlidersGlyph
+import com.example.myapplication.presentation.ui.settings.SettingsTerminalGlyph
 import com.example.myapplication.presentation.ui.settings.SettingsRingGlyph
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
@@ -379,6 +380,27 @@ fun SettingsScreen(
                                         },
                                         ringIcon = {
                                             SettingsMicGlyph(Wear.CardVoice)
+                                        }
+                                    )
+                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
+                                    // 系统卡：提示词是否自定义 + 控制台端口，环表示"自定义 / 缺省"
+                                    val promptCustom = customPrompt.isNotBlank()
+                                    SettingsHeroCard(
+                                        label = stringResource(R.string.settings_section_system),
+                                        value = if (promptCustom) {
+                                            stringResource(R.string.settings_prompt_custom_value)
+                                        } else {
+                                            stringResource(R.string.settings_prompt_default)
+                                        },
+                                        accent = Wear.CardSystem,
+                                        fraction = if (promptCustom) 1f else 0f,
+                                        chip = if (consolePort > 0) {
+                                            stringResource(R.string.settings_card_console_port, consolePort)
+                                        } else {
+                                            null
+                                        },
+                                        ringIcon = {
+                                            SettingsTerminalGlyph(Wear.CardSystem)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))

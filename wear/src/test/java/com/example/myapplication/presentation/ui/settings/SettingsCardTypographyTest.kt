@@ -16,11 +16,15 @@ class SettingsCardTypographyTest {
     }
 
     @Test
-    fun longTextFallsBackToOneTierDownAndTwoLines() {
-        listOf("deepseek-v4-pro", "https://api.deepseek.com", "密钥未填写").forEach { value ->
+    fun longTextFallsBackOneTierAndOnlyWrapsWhenItStillDoesNotFit() {
+        listOf("deepseek-v4-pro", "https://api.deepseek.com").forEach { value ->
             assertFalse(value + " 不该用 30sp（会被截成省略号）", SettingsCardTypography.usesDisplayStyle(value))
-            assertEquals(2, SettingsCardTypography.maxLinesFor(value))
+            assertEquals(value + " 退档后一行放不下，应该给两行", 2, SettingsCardTypography.maxLinesFor(value))
         }
+        // 四个汉字 = 8 个半宽单位：退档到 titleLarge 后一行放得下，不该断成 3+1
+        assertEquals(8, SettingsCardTypography.widthUnits("预置默认"))
+        assertEquals(1, SettingsCardTypography.maxLinesFor("预置默认"))
+        assertEquals(1, SettingsCardTypography.maxLinesFor("密钥未填写"))
     }
 
     @Test

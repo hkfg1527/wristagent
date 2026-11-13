@@ -25,6 +25,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -205,6 +207,29 @@ internal fun SettingsMicGlyph(tint: Color) {
             color = tint,
             start = Offset(w * 0.5f, h * 0.68f),
             end = Offset(w * 0.5f, h * 0.9f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+/** 环内终端提示符：一个折角箭头加一条底线，代表系统与提示词。 */
+@Composable
+internal fun SettingsTerminalGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(SettingsRingIconSize)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.6.dp.toPx()
+        val chevron = Path().apply {
+            moveTo(w * 0.2f, h * 0.3f)
+            lineTo(w * 0.42f, h * 0.5f)
+            lineTo(w * 0.2f, h * 0.7f)
+        }
+        drawPath(chevron, color = tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.52f, h * 0.7f),
+            end = Offset(w * 0.82f, h * 0.7f),
             strokeWidth = stroke,
             cap = StrokeCap.Round
         )

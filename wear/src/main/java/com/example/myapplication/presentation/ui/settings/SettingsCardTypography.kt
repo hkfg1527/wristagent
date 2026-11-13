@@ -23,6 +23,18 @@ internal object SettingsCardTypography {
     /** 该用大字号还是退一档。 */
     fun usesDisplayStyle(value: String): Boolean = widthUnits(value) <= DisplayMaxUnits
 
-    /** 主数值最多几行。 */
-    fun maxLinesFor(value: String): Int = if (usesDisplayStyle(value)) 1 else 2
+    /** 退一档后仍能一行放下的上限（titleLarge 更窄，约 12 个半宽单位）。 */
+    const val TitleSingleLineUnits = 12
+
+    /**
+     * 主数值最多几行。
+     *
+     * 退档后先给一行：中文四字（8 单位）在 titleLarge 下本来一行放得下，
+     * 早先无脑两行会把「预置默认」断成「预置默 / 认」。
+     */
+    fun maxLinesFor(value: String): Int = when {
+        usesDisplayStyle(value) -> 1
+        widthUnits(value) <= TitleSingleLineUnits -> 1
+        else -> 2
+    }
 }

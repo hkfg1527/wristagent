@@ -18,6 +18,8 @@
     <string name="settings_about">About</string>
     <string name="settings_system_prompt">System Prompt</string>
     <string name="settings_prompt_default">Built-in default</string>
+    <string name="settings_prompt_custom_value">Custom</string>
+    <string name="settings_card_console_port">:%1$d</string>
     <string name="settings_prompt_custom">Custom</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>

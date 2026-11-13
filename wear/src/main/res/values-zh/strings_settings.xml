@@ -18,6 +18,8 @@
     <string name="settings_about">关于</string>
     <string name="settings_system_prompt">系统提示词</string>
     <string name="settings_prompt_default">预置默认</string>
+    <string name="settings_prompt_custom_value">自定义</string>
+    <string name="settings_card_console_port">:%1$d</string>
     <string name="settings_prompt_custom">自定义</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
