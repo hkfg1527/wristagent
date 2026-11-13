@@ -23,7 +23,7 @@ class SettingsStyleTest {
         SettingsStyle.values().forEach { style ->
             assertEquals(style, SettingsStyle.fromStorage(style.name))
         }
-        assertEquals(3, SettingsStyle.values().size)
+        assertEquals(4, SettingsStyle.values().size)
     }
 
     @Test

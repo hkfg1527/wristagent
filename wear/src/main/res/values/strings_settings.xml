@@ -449,6 +449,8 @@
     <string name="settings_style_square_summary">Centered text, hairline dividers, square keys</string>
     <string name="settings_style_card">Big cards</string>
     <string name="settings_style_card_summary">Google-style cards with a ring indicator on the right</string>
+    <string name="settings_style_terminal">Terminal</string>
+    <string name="settings_style_terminal_summary">Monospace list, no surfaces, keys read like a console</string>
     <string name="settings_section_network">Network &amp; feedback</string>
     <string name="settings_net_timeout">Request timeout</string>
     <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>

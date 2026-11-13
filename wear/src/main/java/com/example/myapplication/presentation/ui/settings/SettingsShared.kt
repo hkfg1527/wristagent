@@ -95,6 +95,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -696,6 +697,22 @@ private fun BoxScope.SettingsSquareBackButton(
 @Composable
 fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
     val baseStyle = SettingsSectionStyle
+    if (WearAppearance.style == SettingsStyle.TERMINAL) {
+        BasicText(
+            text = "> " + text,
+            modifier = Modifier
+                .width(SettingsContentWidth)
+                .padding(
+                    top = SettingsDesignMath.sectionGapDp(isFirstSection).dp,
+                    bottom = SettingsSectionHeaderBottomGap
+                )
+                .padding(start = SettingsRowSidePadding),
+            style = baseStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
     if (WearAppearance.style == SettingsStyle.SQUARE) {
         BasicText(
             text = text,
@@ -911,8 +928,9 @@ internal fun SettingsCardRow(
         return
     }
 
-    if (WearAppearance.style == SettingsStyle.SQUARE) {
-        // 方角档：不画曲面、不做等比缩放，行与行之间只留一根发丝线。
+    if (WearAppearance.style == SettingsStyle.SQUARE || WearAppearance.style == SettingsStyle.TERMINAL) {
+        // 方角档与终端档：不画曲面、不做等比缩放，行与行之间只留一根发丝线。
+        // 两者的差别在排版层（终端档整页等宽），外壳共用同一份实现。
         Column(
             modifier = modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -1238,21 +1256,30 @@ fun SettingsNavRow(
  * 层级靠**字重与位置**，不靠继续堆字号：行标签与行取值同为 15sp，
  * 二者的差别是颜色（主色 vs 次色）与槽位（左 vs 右），不是大小。
  */
+/** 终端档把三档正文全部换成等宽：这是它唯一的外壳，其余两套靠形状区分。 */
+private val terminalMono: FontFamily
+    @Composable get() = if (WearAppearance.style == SettingsStyle.TERMINAL) FontFamily.Monospace else FontFamily.Default
+
 /** 组标题档：12sp / TextMuted / Medium / 字距 +0.5sp。 */
 internal val SettingsSectionStyle: TextStyle
     @Composable get() = Wear.TextCaption.copy(
         color = Wear.Palette.TextMuted,
         fontWeight = FontWeight.Medium,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.5.sp,
+        fontFamily = terminalMono
     )
 
 /** 行标签档：15sp / TextPrimary / Normal。 */
 internal val SettingsRowLabelStyle: TextStyle
-    @Composable get() = Wear.TextBody.copy(fontWeight = FontWeight.Normal)
+    @Composable get() = Wear.TextBody.copy(fontWeight = FontWeight.Normal, fontFamily = terminalMono)
 
 /** 行取值档：15sp / TextSecondary / Normal，右槽对齐写在样式里（BasicText 没有 textAlign 参数）。 */
 internal val SettingsRowValueStyle: TextStyle
-    @Composable get() = Wear.TextRowValue.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.End)
+    @Composable get() = Wear.TextRowValue.copy(
+        fontWeight = FontWeight.Normal,
+        textAlign = TextAlign.End,
+        fontFamily = terminalMono
+    )
 
 /** 焦点档：18sp / TextPrimary / Medium，全页只给当前模型名和子页标题。 */
 internal val SettingsFocusStyle: TextStyle

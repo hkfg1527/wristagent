@@ -84,3 +84,7 @@ docs/netcheck.sh
 CRITIQUE_AND_RETROSPECTIVE.md
 _homepage/
 build_out.txt
+
+# 参考物料（APK 与资源转储）只在本地留存，不入库
+docs/ref/*.apk
+docs/ref/*.txt

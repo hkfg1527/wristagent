@@ -449,6 +449,8 @@
     <string name="settings_style_square_summary">文字居中，横线分隔，方形按键</string>
     <string name="settings_style_card">大卡片</string>
     <string name="settings_style_card_summary">谷歌风格卡片，右侧圆环指示器</string>
+    <string name="settings_style_terminal">终端</string>
+    <string name="settings_style_terminal_summary">等宽字体、无底色、按键像控制台</string>
     <string name="settings_section_network">网络与交互</string>
     <string name="settings_net_timeout">请求超时</string>
     <string name="settings_net_timeout_secondary">单次请求超过这个时长就放弃</string>
