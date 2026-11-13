@@ -58,5 +58,10 @@
 
 ## 0.04-beta 资产校验
 
-- 本地构建（`ccf386a` 之前那一版，即 Release 内容）：3640854 字节
-- SHA-256：`EB9999B39B3EE7F8266221300B706D8E196B39531DCE31F9760454B204ACB6D8`
+- **Release 资产** `wear-0.04-beta.apk`：3,640,006 字节（创建后由 GitHub API 回读 size 一致，上传完整）。
+  内容 = tag `v0.04-beta` 指向的提交 `b24fe1d` 构建出来的那一版（三张 hero 卡）。
+- **本地最新构建**（`ccf386a` 之后，含第四张系统卡）：3,640,854 字节，
+  SHA-256 `EB9999B39B3EE7F8266221300B706D8E196B39531DCE31F9760454B204ACB6D8`。
+  这份**没有**发布，留给下一个版本。
+- 直接下载校验被 DNS 污染挡住（`release-assets.githubusercontent.com` 连不上），
+  因此改用 API 的 size 回读作为完整性证据。
