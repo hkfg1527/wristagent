@@ -57,10 +57,6 @@ import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
 import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
-import com.example.myapplication.presentation.ui.settings.SettingsMicGlyph
-import com.example.myapplication.presentation.ui.settings.SettingsSlidersGlyph
-import com.example.myapplication.presentation.ui.settings.SettingsTerminalGlyph
-import com.example.myapplication.presentation.ui.settings.SettingsRingGlyph
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
@@ -88,6 +84,8 @@ import com.example.myapplication.presentation.ui.settings.SettingsSliderRow
 import com.example.myapplication.presentation.ui.settings.SettingsSwitchRow
 import com.example.myapplication.presentation.ui.settings.settingsCardScreenInset
 import com.example.myapplication.presentation.ui.settings.settingsCardWidth
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import com.example.myapplication.presentation.ui.settings.cardStyleScalingParams
 import com.example.myapplication.presentation.ui.settings.settingsScalingParams
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
@@ -132,6 +130,8 @@ fun SettingsScreen(
     onRestartOnboarding: () -> Unit
 ) {
     val context = LocalContext.current
+    // 大卡片档走官方 M3E 的缩放与居中吸附，其余三套保持自绘几何那套参数
+    val cardStyle = WearAppearance.style == SettingsStyle.GOOGLE_CARD
 
     var currentModel by remember { mutableStateOf(preferences.modelName) }
     var currentBaseUrl by remember { mutableStateOf(preferences.baseUrl) }
@@ -291,7 +291,7 @@ fun SettingsScreen(
                     rotaryScrollableBehavior = null,
                     overscrollEffect = null,
                     // 关闭逐行等比缩放：宽度与内容呼吸交给 SettingsCurveGeometry 的连续圆弦
-                    scalingParams = settingsScalingParams(),
+                    scalingParams = if (cardStyle) cardStyleScalingParams() else settingsScalingParams(),
                     contentPadding = PaddingValues(
                         // 列表内容盒宽 216dp：卡片外壳向两侧撑开，内容基准仍为 176dp
                         start = settingsCardScreenInset(),
@@ -306,7 +306,9 @@ fun SettingsScreen(
                     // 关掉 autoCentering：标题行不再撑 44dp 触摸高度后，itemIndex = 1 会让库
                     // 在首项之上插入约 60dp 的 spacer（233dp 屏），整列被推下半个屏幕。
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
-                    autoCentering = null
+                    // 大卡片档开启官方的居中吸附：滚动带惯性、当前卡停在屏幕中线，
+                    // 这正是谷歌表上手感的一半；其余三套保持 null，避免它给首项塞 spacer。
+                    autoCentering = if (cardStyle) AutoCenteringParams() else null
                 ) {
                     // ===== 全屏唯一的焦点：当前模型 =====
                     // 页面标题不承载信息（滑进来就知道在设置页），焦点让给"现在用的是哪个模型"：
@@ -330,15 +332,12 @@ fun SettingsScreen(
                                         label = stringResource(R.string.settings_section_models),
                                         value = currentModel,
                                         accent = Wear.CardModel,
-                                        fraction = if (apiKeyConfigured) 1f else 0f,
-                                        chip = if (apiKeyConfigured) {
-                                            null
-                                        } else {
-                                            stringResource(R.string.settings_status_unconfigured)
-                                        },
-                                        ringIcon = {
-                                            SettingsRingGlyph("DS", Wear.CardModel)
-                                        }
+                                        badge = "DS",
+                                        meta = stringResource(
+                                            R.string.settings_card_meta_context,
+                                            preferences.maxContextTurns,
+                                            currentTemp
+                                        )
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
                                     val calledTools = preferences.calledToolNames.size
@@ -351,13 +350,10 @@ fun SettingsScreen(
                                             "—"
                                         },
                                         accent = Wear.CardTools,
-                                        fraction = if (registeredTools > 0) {
-                                            (calledTools.toFloat() / registeredTools).coerceIn(0f, 1f)
+                                        meta = if (registeredTools > 0) {
+                                            stringResource(R.string.settings_card_tools_called_meta, calledTools, registeredTools)
                                         } else {
-                                            0f
-                                        },
-                                        ringIcon = {
-                                            SettingsSlidersGlyph(Wear.CardTools)
+                                            stringResource(R.string.settings_card_tools_pending)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
@@ -373,17 +369,13 @@ fun SettingsScreen(
                                             else -> stringResource(R.string.settings_asr_key_missing)
                                         },
                                         accent = Wear.CardVoice,
-                                        fraction = when {
-                                            !asrEnabled -> 0f
-                                            voiceReady -> 1f
-                                            else -> 0.5f
-                                        },
-                                        ringIcon = {
-                                            SettingsMicGlyph(Wear.CardVoice)
+                                        meta = if (voiceReady) {
+                                            stringResource(R.string.settings_voice_power_value)
+                                        } else {
+                                            stringResource(R.string.settings_asr_key_missing)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
-                                    // 系统卡：提示词是否自定义 + 控制台端口，环表示"自定义 / 缺省"
                                     val promptCustom = customPrompt.isNotBlank()
                                     SettingsHeroCard(
                                         label = stringResource(R.string.settings_section_system),
@@ -393,14 +385,10 @@ fun SettingsScreen(
                                             stringResource(R.string.settings_prompt_default)
                                         },
                                         accent = Wear.CardSystem,
-                                        fraction = if (promptCustom) 1f else 0f,
-                                        chip = if (consolePort > 0) {
-                                            stringResource(R.string.settings_card_console_port, consolePort)
+                                        meta = if (consolePort > 0) {
+                                            stringResource(R.string.settings_card_console_meta, consolePort)
                                         } else {
                                             null
-                                        },
-                                        ringIcon = {
-                                            SettingsTerminalGlyph(Wear.CardSystem)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))

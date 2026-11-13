@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.ReasoningEffort
@@ -59,6 +60,14 @@ fun HyperParamsContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_hyper_params),
         onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_sub_hyper_params),
+                value = stringResource(R.string.settings_temperature_value, temp),
+                accent = Wear.CardVoice,
+                meta = stringResource(R.string.settings_card_meta_tokens, preferences.maxOutputTokens)
+            )
+        },
         overlay = {
             if (editingTokens) {
                 SettingsTextDialog(

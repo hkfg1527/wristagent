@@ -20,6 +20,12 @@
     <string name="settings_prompt_default">预置默认</string>
     <string name="settings_prompt_custom_value">自定义</string>
     <string name="settings_card_console_port">:%1$d</string>
+    <string name="settings_card_meta_context">上下文 %1$d 轮 · 温度 %2$.1f</string>
+    <string name="settings_card_meta_profiles">已存 %1$d 套</string>
+    <string name="settings_card_meta_tokens">上限 %1$d tokens</string>
+    <string name="settings_card_tools_called_meta">已调用 %1$d / 共 %2$d</string>
+    <string name="settings_card_tools_pending">还没有工具调用</string>
+    <string name="settings_card_console_meta">网页控制台 :%1$d</string>
     <string name="settings_prompt_custom">自定义</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>

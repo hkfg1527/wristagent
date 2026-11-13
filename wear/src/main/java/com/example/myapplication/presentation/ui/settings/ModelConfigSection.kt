@@ -137,6 +137,19 @@ fun ModelConfigContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_model_config),
         onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_section_models),
+                value = preferences.modelName,
+                accent = Wear.CardModel,
+                badge = "DS",
+                meta = stringResource(
+                    R.string.settings_card_meta_context,
+                    preferences.maxContextTurns,
+                    preferences.temperature
+                )
+            )
+        },
         overlay = {
             when (editingField) {
                 ModelTextField.BASE_URL -> SettingsTextDialog(

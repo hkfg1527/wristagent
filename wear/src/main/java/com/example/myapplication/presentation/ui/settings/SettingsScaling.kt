@@ -21,3 +21,17 @@ fun settingsScalingParams(): ScalingParams = remember {
         edgeAlpha = 1f
     )
 }
+
+/**
+ * 大卡片档的曲率：**官方 M3E 行为** —— 上下边缘等比缩小并淡出。
+ *
+ * 其余三套把 edgeScale 钉成 1，因为它们的轮廓是自绘的圆弦；只有大卡片档用官方 Card，
+ * 该缩就缩，这才是谷歌表上"卡片从中间浮出、往边缘退去"的手感。
+ */
+@Composable
+fun cardStyleScalingParams(): ScalingParams = remember {
+    ScalingLazyColumnDefaults.scalingParams(
+        edgeScale = 0.84f,
+        edgeAlpha = 0.55f
+    )
+}

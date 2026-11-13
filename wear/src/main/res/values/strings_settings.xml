@@ -20,6 +20,12 @@
     <string name="settings_prompt_default">Built-in default</string>
     <string name="settings_prompt_custom_value">Custom</string>
     <string name="settings_card_console_port">:%1$d</string>
+    <string name="settings_card_meta_context">%1$d turns · %2$.1f</string>
+    <string name="settings_card_meta_profiles">%1$d saved</string>
+    <string name="settings_card_meta_tokens">max %1$d tokens</string>
+    <string name="settings_card_tools_called_meta">%1$d of %2$d tools used</string>
+    <string name="settings_card_tools_pending">no tool call yet</string>
+    <string name="settings_card_console_meta">web console :%1$d</string>
     <string name="settings_prompt_custom">Custom</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>

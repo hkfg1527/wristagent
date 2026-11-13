@@ -8,6 +8,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.Tone
@@ -67,6 +68,16 @@ fun VoiceAsrContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_asr),
         onBack = onBack,
+        hero = {
+            val provider = AsrProviderId.fromStorage(preferences.asrProvider)
+            val ready = provider != AsrProviderId.BAIDU || preferences.asrSettings().hasBaiduCredentials
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_asr),
+                value = if (ready) stringResource(R.string.settings_asr_baidu) else stringResource(R.string.settings_asr_key_missing),
+                accent = Wear.CardSystem,
+                meta = if (ready) null else stringResource(R.string.settings_asr_key_missing)
+            )
+        },
         overlay = {
             when (editingField) {
                 AsrKeyField.API_KEY -> SettingsTextDialog(

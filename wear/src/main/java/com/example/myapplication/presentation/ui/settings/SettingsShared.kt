@@ -102,6 +102,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
@@ -326,6 +327,12 @@ fun SettingsSubPage(
     title: String,
     onBack: () -> Unit,
     overlay: @Composable () -> Unit = {},
+    /**
+     * 卡片档的页首大卡：与根页同一套 hero 卡，让"每个设置页的初始项都是大卡片"成立。
+     *
+     * 只有 [SettingsStyle.GOOGLE_CARD] 才渲染；其余风格传了也看不见，因此各子页可以放心传入。
+     */
+    hero: (@Composable () -> Unit)? = null,
     rows: @Composable SettingsRows.() -> Unit
 ) {
     val stagger = rememberSettingsRowStaggerState()
@@ -396,7 +403,11 @@ fun SettingsSubPage(
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
             // 关闭逐行等比缩放：曲面宽度与内容呼吸由卡片几何负责
-            scalingParams = settingsScalingParams(),
+            scalingParams = if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                cardStyleScalingParams()
+            } else {
+                settingsScalingParams()
+            },
             contentPadding = scaffoldPadding,
             // 项间距 0：同组的行必须严丝合缝拼成一张卡，分组的呼吸只由组标题上方的 24dp 承担
             verticalArrangement = Arrangement.spacedBy(SettingsRowGap),
@@ -404,14 +415,30 @@ fun SettingsSubPage(
             // (viewportCenter − Σ前序高度) 的 spacer。头部行现在只有 32dp（不再为凑 spacer=0 而撑到
             // 86dp），算出来的 spacer 会是 26dp 级的空白 —— 那正是"顶部一大片黑再出现内容"的老问题。
             // 传 null 后顶部锚点就是 contentPadding.top，几何完全由常量决定（详见 SettingsTopAnchorMath）。
-            autoCentering = null
+            autoCentering = if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                AutoCenteringParams()
+            } else {
+                null
+            }
         ) {
-            val rowCount = content.size + 1
+            val showHero = hero != null && WearAppearance.style == SettingsStyle.GOOGLE_CARD
+            val rowCount = content.size + 1 + if (showHero) 1 else 0
 
             item(key = "page-header") {
                 SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         SettingsPageHeader(title = title)
+                    }
+                }
+            }
+
+            if (showHero) {
+                item(key = "page-hero") {
+                    SettingsStaggeredRow(index = 1, rowCount = rowCount, stagger = stagger, exit = exit) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            hero?.invoke()
+                        }
+                        Spacer(Modifier.height(SettingsCardStyle.Gap))
                     }
                 }
             }
@@ -908,21 +935,18 @@ internal fun SettingsCardRow(
             modifier = modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .width(SettingsContentWidth)
-                    .heightIn(min = minHeight)
-                    .clip(SettingsCardRowShape)
-                    .background(SettingsCardSurface)
-                    .then(clickModifier)
-                    .padding(
-                        start = SettingsRowSidePadding,
-                        end = SettingsRowSidePadding,
-                        top = RowVerticalPadding,
-                        bottom = RowVerticalPadding
-                    ),
-                contentAlignment = Alignment.CenterStart
-            ) { content() }
+            SettingsM3Card(
+                modifier = Modifier.width(SettingsContentWidth),
+                onClick = onClick
+            ) {
+                // 内边距交给官方 Card 的 contentPadding：这里再补一层会把文字挤成两行
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minHeight),
+                    contentAlignment = Alignment.CenterStart
+                ) { content() }
+            }
             Spacer(Modifier.height(SettingsCardStyle.Gap))
         }
         return

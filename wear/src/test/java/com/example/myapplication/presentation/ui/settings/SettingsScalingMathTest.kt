@@ -23,12 +23,20 @@ class SettingsScalingMathTest {
         )
         for (path in files) {
             val source = readProjectFile(path)
-            assertEquals(
-                path + " 必须显式传 scalingParams，否则走库默认 0.75 缩放：",
-                1,
-                Regex("scalingParams\\s*=\\s*settingsScalingParams\\(\\)").findAll(source).count()
+            assertTrue(
+                path + " 必须按风格选 scalingParams：大卡片档走官方缩放，其余三套保持平坦",
+                source.contains("cardStyleScalingParams") && source.contains("settingsScalingParams")
             )
         }
+    }
+
+    @Test
+    fun theCardStyleUsesOfficialEdgeScalingWhileTheOthersStayFlat() {
+        val source = readProjectFile(
+            "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsScaling.kt"
+        )
+        assertTrue("大卡片档必须真的缩放", source.contains("edgeScale = 0.84f"))
+        assertTrue("大卡片档必须跟着淡出", source.contains("edgeAlpha = 0.55f"))
     }
 
     @Test

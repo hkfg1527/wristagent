@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.ProviderProfileBook
@@ -38,7 +39,16 @@ fun ProviderProfilesContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_provider_profiles),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            val active = book.active()?.name
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_provider_profiles),
+                value = active ?: stringResource(R.string.settings_providers_none_active),
+                accent = Wear.CardTools,
+                meta = stringResource(R.string.settings_card_meta_profiles, book.profiles.size)
+            )
+        }
     ) {
         section(stringResource(R.string.settings_providers_saved))
 
