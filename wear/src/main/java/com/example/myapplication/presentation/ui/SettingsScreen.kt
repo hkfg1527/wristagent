@@ -57,7 +57,7 @@ import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
 import com.example.myapplication.presentation.ui.settings.SettingsRingGlyph
-import com.example.myapplication.presentation.ui.settings.SettingsStyle
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
 import com.example.myapplication.presentation.ui.settings.SettingsRowSlot

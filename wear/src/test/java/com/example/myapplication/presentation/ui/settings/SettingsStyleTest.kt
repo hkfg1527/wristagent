@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.FakeSharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -25,16 +27,16 @@ class SettingsStyleTest {
     }
 
     @Test
-    fun storePersistsTheChosenStyle() {
+    fun thePreferenceRepositoryIsTheSourceOfTruth() {
         val store = FakeSharedPreferences()
-        val appearance = AppearanceStore(store)
-        assertEquals(SettingsStyle.BALLOON, appearance.style())
+        val preferences = AgentPreferences(store)
+        assertEquals(SettingsStyle.BALLOON, preferences.settingsStyle)
 
-        appearance.saveStyle(SettingsStyle.GOOGLE_CARD)
-        assertEquals(SettingsStyle.GOOGLE_CARD, AppearanceStore(store).style())
+        preferences.settingsStyle = SettingsStyle.GOOGLE_CARD
+        assertEquals(SettingsStyle.GOOGLE_CARD, AgentPreferences(store).settingsStyle)
 
-        appearance.saveStyle(SettingsStyle.SQUARE)
-        assertEquals(SettingsStyle.SQUARE, AppearanceStore(store).style())
+        preferences.settingsStyle = SettingsStyle.SQUARE
+        assertEquals(SettingsStyle.SQUARE, AgentPreferences(store).settingsStyle)
     }
 
     @Test

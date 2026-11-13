@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.example.myapplication.R
+import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.abs
 
@@ -113,17 +115,11 @@ class AppearanceStore internal constructor(private val prefs: SharedPreferences)
         prefs.edit().putInt(KEY_ACCENT, color.toArgb()).apply()
     }
 
-    fun style(): SettingsStyle = SettingsStyle.fromStorage(prefs.getString(KEY_STYLE, null))
-
-    fun saveStyle(style: SettingsStyle) {
-        prefs.edit().putString(KEY_STYLE, style.name).apply()
-    }
 
     /** 把存储值灌进全局状态；界面随后只跟 [WearAppearance] 打交道。 */
     fun install(): AppearanceStore {
         WearAppearance.fontScale = fontScale()
         WearAppearance.accentOverride = accent()
-        WearAppearance.style = style()
         return this
     }
 
@@ -158,6 +154,8 @@ internal object AppearanceBootstrap {
         if (installed) return
         installed = true
         AppearanceStore.of(context).install()
+        // 外观预设的真值在偏好仓库里（导入导出与控制台都读它），这里只做一次运行时镜像。
+        WearAppearance.style = AgentPreferences(context).settingsStyle
     }
 
     /** 测试用：让下一次 [ensure] 重新灌一遍。 */
@@ -178,8 +176,10 @@ fun applyAccentPreset(context: Context, preset: AccentPreset) {
     AppearanceStore.of(context).saveAccent(preset.color)
 }
 
-/** 外观预设写入：同上。设置页外壳读 [WearAppearance.style]，改完立刻换壳。 */
+/**
+ * 外观预设写入：偏好仓库是真值（导入导出与控制台都读它），[WearAppearance.style] 是运行时镜像。
+ */
 fun applySettingsStyle(context: Context, style: SettingsStyle) {
+    AgentPreferences(context).settingsStyle = style
     WearAppearance.style = style
-    AppearanceStore.of(context).saveStyle(style)
 }

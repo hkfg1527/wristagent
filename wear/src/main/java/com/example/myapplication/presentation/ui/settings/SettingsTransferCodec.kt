@@ -8,6 +8,7 @@ import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.appearance.SettingsStyle
 
 /** 快照里的一项：键取 [SettingsTransferCodec] 的白名单，值一律是字符串。 */
 data class TransferEntry(val key: String, val value: String)
@@ -55,6 +56,7 @@ object SettingsTransferCodec {
         "streamMode",
         "reasoningEffort",
         "replyStyle",
+        "settingsStyle",
         "showThoughtChain",
         "subAgentEnabled",
         "matrixSpacingDp",
@@ -240,6 +242,7 @@ object SettingsTransferBridge {
         "streamMode" to preferences.streamMode.toString(),
         "reasoningEffort" to preferences.reasoningEffort,
         "replyStyle" to preferences.replyStyle,
+        "settingsStyle" to preferences.settingsStyle.name,
         "showThoughtChain" to preferences.showThoughtChain.toString(),
         "subAgentEnabled" to preferences.subAgentEnabled.toString(),
         "matrixSpacingDp" to preferences.matrixSpacingDp.toString(),
@@ -344,6 +347,9 @@ object SettingsTransferBridge {
             "replyStyle" -> ReplyStyle.values()
                 .firstOrNull { it.storageKey == value }
                 ?.let { preferences.replyStyle = it.storageKey; true } ?: false
+            "settingsStyle" -> SettingsStyle.values()
+                .firstOrNull { it.name == value }
+                ?.let { preferences.settingsStyle = it; WearAppearance.style = it; true } ?: false
             "showThoughtChain" -> boolValue(value)?.let { preferences.showThoughtChain = it; true } ?: false
             "subAgentEnabled" -> boolValue(value)?.let { preferences.subAgentEnabled = it; true } ?: false
             "matrixSpacingDp" -> value.toFloatOrNull()?.takeIf { it in 4f..32f }

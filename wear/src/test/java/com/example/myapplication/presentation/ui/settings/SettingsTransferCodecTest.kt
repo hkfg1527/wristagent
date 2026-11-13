@@ -8,6 +8,7 @@ import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.appearance.SettingsStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,9 +55,9 @@ class SettingsTransferCodecTest {
         entries.forEach { entry ->
             assertEquals("键 " + entry.key + " 的值没原样往返", values[entry.key], entry.value)
         }
-        // —— 外观两项 + 回答风格后的扩充：键集 31 -> 34 ——
-        assertEquals("可移植键必须扩到 34 个", 34, SettingsTransferCodec.PortableKeys.size)
-        assertEquals(34, entries.size)
+        // —— 外观两项 + 回答风格后的扩充：键集 31 -> 34；设置页风格再 +1 -> 35 ——
+        assertEquals("可移植键必须扩到 35 个", 35, SettingsTransferCodec.PortableKeys.size)
+        assertEquals(35, entries.size)
         assertTrue(
             "外观两项必须进可移植键，否则导出再导入会把外观丢掉",
             SettingsTransferCodec.PortableKeys.containsAll(
@@ -155,6 +156,7 @@ class SettingsTransferCodecTest {
             toolPowerModeEnabled = false
             toolWeatherEnabled = false
             toolWebSearchEnabled = false
+            settingsStyle = SettingsStyle.GOOGLE_CARD
         }
         val text = SettingsTransferCodec.export(
             SettingsTransferBridge.snapshot(source, AppearanceStore(FakeSharedPreferences()))
@@ -170,6 +172,7 @@ class SettingsTransferCodecTest {
         )
 
         assertEquals("每一条都必须落盘", parsed.entries.size, applied)
+        assertEquals("设置页风格必须跟着快照走", SettingsStyle.GOOGLE_CARD, target.settingsStyle)
         assertEquals(SecurityMode.EXPERT, target.securityMode)
         assertEquals(ToolApprovalPolicy.NEVER, target.toolApprovalPolicy)
         assertEquals(SandboxLevel.READ_ONLY, target.sandboxLevel)

@@ -14,6 +14,7 @@ import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.ProviderProfile
 import com.example.myapplication.agent.ProviderProfileBook
 import com.example.myapplication.agent.ReplyStyle
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.providerProfileId
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.privilege.PrivilegeManager
@@ -88,6 +89,7 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "asrLiveTranscript" to preferences.asrLiveTranscript,
         "defaultThinkingEnabled" to preferences.defaultThinkingEnabled,
         "replyStyle" to preferences.replyStyle,
+        "settingsStyle" to preferences.settingsStyle.name,
         "memoryEnabled" to preferences.memoryEnabled,
         "autoCompressContext" to preferences.autoCompressContext,
         "sandboxLevel" to preferences.sandboxLevel.storageKey,
@@ -148,6 +150,12 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 val style = ReplyStyle.values().firstOrNull { it.storageKey == stored }
                     ?: return ConsoleWriteResult.READ_ONLY
                 preferences.replyStyle = style.storageKey
+            }
+            "settingsStyle" -> {
+                val stored = value as? String ?: return ConsoleWriteResult.READ_ONLY
+                val style = SettingsStyle.values().firstOrNull { it.name == stored }
+                    ?: return ConsoleWriteResult.READ_ONLY
+                preferences.settingsStyle = style
             }
             "memoryEnabled" -> preferences.memoryEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY

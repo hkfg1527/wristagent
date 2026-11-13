@@ -1,4 +1,4 @@
-package com.example.myapplication.presentation.ui.settings
+package com.example.myapplication.appearance
 
 import androidx.annotation.StringRes
 import com.example.myapplication.R
@@ -6,7 +6,8 @@ import com.example.myapplication.R
 /**
  * 设置页外观预设：三套造型共用同一份数据、同一套行组件，只换外壳。
  *
- * 默认档固定为 [BALLOON]：0.03-beta 的老用户升级后像素不变。
+ * 放在 appearance 包而不是 ui.settings：偏好仓库（agent 包）、导入导出与控制台字段都要按名读写它，
+ * 都不该依赖界面包。默认档固定 [BALLOON]，0.03-beta 的老用户升级后像素不变。
  */
 enum class SettingsStyle(
     @StringRes val labelRes: Int,

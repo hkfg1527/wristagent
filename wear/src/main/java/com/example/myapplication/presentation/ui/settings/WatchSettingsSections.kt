@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.voice.AsrProviderId
 import kotlin.math.roundToInt

@@ -1,6 +1,7 @@
 package com.example.myapplication.agent.remote
 
 import com.example.myapplication.agent.ReplyStyle
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.agent.contract.SecurityMode
@@ -88,6 +89,11 @@ object ConsoleFields {
         ConsoleField("asrLiveTranscript", ConsoleFieldType.BOOLEAN),
         ConsoleField("defaultThinkingEnabled", ConsoleFieldType.BOOLEAN),
         ConsoleField("replyStyle", ConsoleFieldType.ENUM, allowed = ReplyStyle.values().map { it.storageKey }),
+        ConsoleField(
+            "settingsStyle",
+            ConsoleFieldType.ENUM,
+            allowed = SettingsStyle.values().map { it.name }
+        ),
         ConsoleField("memoryEnabled", ConsoleFieldType.BOOLEAN),
         ConsoleField("autoCompressContext", ConsoleFieldType.BOOLEAN),
         // 沙箱等级 / 审批策略 / 压缩阈值：手表端早就能改，网页控制台此前没接 HTTP 通路

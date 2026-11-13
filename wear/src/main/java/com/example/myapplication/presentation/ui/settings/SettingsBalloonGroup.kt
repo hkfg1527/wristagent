@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.theme.Wear
 
 /** 组内行：曲面背景由外层 [SettingsBalloonGroup] 统一绘制，本行不再画自己的卡。 */

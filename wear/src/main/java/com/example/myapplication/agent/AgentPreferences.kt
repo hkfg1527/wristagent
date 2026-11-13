@@ -3,6 +3,7 @@ package com.example.myapplication.agent
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.myapplication.agent.contract.SecurityMode
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.voice.AsrLanguage
 import com.example.myapplication.voice.AsrProviderId
 import com.example.myapplication.voice.AsrSettings
@@ -55,6 +56,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getString("reasoning_effort", ReasoningEffort.DEFAULT_STORAGE)
             ?: ReasoningEffort.DEFAULT_STORAGE
         set(value) = prefs.edit().putString("reasoning_effort", value).apply()
+
+    /** 设置页外观预设：界面外壳读它，导入导出与控制台也按名字搬运。 */
+    var settingsStyle: SettingsStyle
+        get() = SettingsStyle.fromStorage(prefs.getString(KEY_SETTINGS_STYLE, DEFAULT_SETTINGS_STYLE))
+        set(value) = prefs.edit().putString(KEY_SETTINGS_STYLE, value.name).apply()
 
     /**
      * 已经真正执行过的工具名：大卡片档用它算「已调用 / 已注册」的圆环比例。
@@ -425,6 +431,8 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         /** 工具调用账本与注册数：大卡片档的圆环数据源。 */
         internal const val KEY_CALLED_TOOLS = "called_tool_names"
         internal const val KEY_REGISTERED_TOOLS = "registered_tool_count"
+        internal const val KEY_SETTINGS_STYLE = "settings_style"
+        internal const val DEFAULT_SETTINGS_STYLE = "BALLOON"
         internal const val DEFAULT_CALLED_TOOLS = ""
         internal const val DEFAULT_REGISTERED_TOOLS = 0
         const val KEY_DEFAULT_THINKING = "defaultThinking"

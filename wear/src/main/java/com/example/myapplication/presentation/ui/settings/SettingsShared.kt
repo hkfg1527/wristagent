@@ -114,6 +114,7 @@ import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.theme.accentRailOf
 import kotlinx.coroutines.launch
