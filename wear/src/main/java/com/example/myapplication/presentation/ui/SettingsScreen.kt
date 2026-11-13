@@ -347,7 +347,7 @@ fun SettingsScreen(
                                         value = if (registeredTools > 0) {
                                             calledTools.toString() + " / " + registeredTools
                                         } else {
-                                            "—"
+                                            "0"
                                         },
                                         accent = Wear.CardTools,
                                         meta = if (registeredTools > 0) {
@@ -369,10 +369,11 @@ fun SettingsScreen(
                                             else -> stringResource(R.string.settings_asr_key_missing)
                                         },
                                         accent = Wear.CardVoice,
-                                        meta = if (voiceReady) {
-                                            stringResource(R.string.settings_voice_power_value)
-                                        } else {
-                                            stringResource(R.string.settings_asr_key_missing)
+                                        // 值已经说了「密钥未填写」，说明行不再复述同一句
+                                        meta = when {
+                                            !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                            voiceReady -> stringResource(R.string.settings_voice_power_value)
+                                            else -> null
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
