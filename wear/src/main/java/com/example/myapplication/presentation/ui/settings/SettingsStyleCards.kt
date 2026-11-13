@@ -68,6 +68,8 @@ internal fun SettingsHeroCard(
     ringIcon: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    // 卡片宽度是固定内容轴：文字列的账在这里算一次，字号决策与布局共用同一个数
+    val cardWidthDp = SettingsContentWidth.value
     Row(
         modifier = modifier
             .width(SettingsContentWidth)
@@ -92,12 +94,12 @@ internal fun SettingsHeroCard(
             )
             BasicText(
                 text = value,
-                style = if (SettingsCardTypography.usesDisplayStyle(value)) {
+                style = if (SettingsCardTypography.usesDisplayStyle(value, cardWidthDp)) {
                     Wear.TextDisplay
                 } else {
                     Wear.TextDisplayTitle
                 },
-                maxLines = SettingsCardTypography.maxLinesFor(value),
+                maxLines = SettingsCardTypography.maxLinesFor(value, cardWidthDp),
                 overflow = TextOverflow.Ellipsis
             )
             if (chip != null) {

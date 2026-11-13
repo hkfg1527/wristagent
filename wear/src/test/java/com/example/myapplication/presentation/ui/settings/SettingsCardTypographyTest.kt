@@ -5,48 +5,64 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * 大卡片字号决策：阈值必须由卡片宽度算出来，不能写死。
+ *
+ * 176dp 卡上文字列只有 82dp：displayMedium 一行放 5 个单位、titleLarge 一行放 10 个。
+ * 这两个数字一旦漂走，卡片里的模型名要么被截成 dee…，要么无谓地退成小字。
+ */
 class SettingsCardTypographyTest {
+
+    private val cardDp = SettingsContentWidth.value
+
+    @Test
+    fun theTextColumnMatchesTheCardGeometry() {
+        assertEquals(82f, SettingsCardMetrics.textColumnDp(cardDp), 0.01f)
+        assertEquals(5, SettingsCardMetrics.displayUnitsFor(cardDp))
+        assertEquals(10, SettingsCardMetrics.titleUnitsFor(cardDp))
+    }
 
     @Test
     fun shortNumbersKeepTheDisplayStyle() {
-        listOf("2,278", "0 / 12", "—", "100%", "0.7").forEach { value ->
-            assertTrue(value + " 应该用大字号", SettingsCardTypography.usesDisplayStyle(value))
-            assertEquals(1, SettingsCardTypography.maxLinesFor(value))
+        listOf("2,278", "100%", "0.7", "12").forEach { value ->
+            assertTrue(value + " 应该用大字号", SettingsCardTypography.usesDisplayStyle(value, cardDp))
+            assertEquals(1, SettingsCardTypography.maxLinesFor(value, cardDp))
         }
     }
 
     @Test
-    fun longTextFallsBackOneTierAndOnlyWrapsWhenItStillDoesNotFit() {
-        listOf("deepseek-v4-pro", "https://api.deepseek.com").forEach { value ->
-            assertFalse(value + " 不该用 30sp（会被截成省略号）", SettingsCardTypography.usesDisplayStyle(value))
-            assertEquals(value + " 退档后一行放不下，应该给两行", 2, SettingsCardTypography.maxLinesFor(value))
-        }
-        // 四个汉字 = 8 个半宽单位：退档到 titleLarge 后一行放得下，不该断成 3+1
+    fun sixUnitsNoLongerFitsAtDisplaySize() {
+        // 82dp / 15dp = 5 个单位的预算：6 个字符在 30sp 下会被裁掉，必须退档
+        assertEquals(6, SettingsCardTypography.widthUnits("0 / 12"))
+        assertFalse(SettingsCardTypography.usesDisplayStyle("0 / 12", cardDp))
+        assertEquals(1, SettingsCardTypography.maxLinesFor("0 / 12", cardDp))
+    }
+
+    @Test
+    fun fourChineseCharactersStayOnOneLineAfterFallingBack() {
         assertEquals(8, SettingsCardTypography.widthUnits("预置默认"))
-        assertEquals(1, SettingsCardTypography.maxLinesFor("预置默认"))
-        assertEquals(1, SettingsCardTypography.maxLinesFor("密钥未填写"))
+        assertFalse(SettingsCardTypography.usesDisplayStyle("预置默认", cardDp))
+        assertEquals("退档后一行放得下，不该断成 3+1", 1, SettingsCardTypography.maxLinesFor("预置默认", cardDp))
     }
 
     @Test
-    fun theBoundaryIsExactlySevenHalfWidthUnits() {
-        assertTrue(SettingsCardTypography.usesDisplayStyle("1234567"))
-        assertFalse(SettingsCardTypography.usesDisplayStyle("12345678"))
-        // 三个 CJK 字 = 6 个单位，仍在大字档；四个 CJK 字 = 8 个单位，退档
-        assertTrue(SettingsCardTypography.usesDisplayStyle("温度值"))
-        assertFalse(SettingsCardTypography.usesDisplayStyle("温度数值"))
+    fun onlyTrulyLongValuesGetTwoLines() {
+        listOf("deepseek-v4-pro", "https://api.deepseek.com").forEach { value ->
+            assertFalse(value + " 不该用 30sp", SettingsCardTypography.usesDisplayStyle(value, cardDp))
+            assertEquals(value + " 退档后仍放不下，给两行", 2, SettingsCardTypography.maxLinesFor(value, cardDp))
+        }
     }
 
     @Test
-    fun widthUnitsCountCjkDouble() {
-        assertEquals(5, SettingsCardTypography.widthUnits("2,278"))
-        assertEquals(10, SettingsCardTypography.widthUnits("密钥未填写"))
-        // 半角化的破折号（U+2014）算一个单位：它比 CJK 窄
-        assertEquals(1, SettingsCardTypography.widthUnits("—"))
+    fun widerCardsAffordMoreUnits() {
+        // 同一句话在更宽的卡上应该允许更大的字号：说明阈值真的是从宽度来的
+        assertFalse(SettingsCardTypography.usesDisplayStyle("0 / 12", 176f))
+        assertEquals(7, SettingsCardMetrics.displayUnitsFor(206f))
     }
 
     @Test
     fun surroundingWhitespaceDoesNotChangeTheTier() {
-        assertTrue(SettingsCardTypography.usesDisplayStyle("  2,278  "))
-        assertFalse(SettingsCardTypography.usesDisplayStyle("  deepseek-chat  "))
+        assertTrue(SettingsCardTypography.usesDisplayStyle("  2,278  ", cardDp))
+        assertFalse(SettingsCardTypography.usesDisplayStyle("  deepseek-chat  ", cardDp))
     }
 }

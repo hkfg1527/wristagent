@@ -105,6 +105,45 @@ class SettingsBalloonOutlineTest {
     }
 
     @Test
+    fun theSmallestWatchGeometryKeepsTheSameRules() {
+        // 192dp 圆屏（Pixel Watch 2）：内容盒 176dp，气球只有 88dp 半宽，是最紧的一档
+        val screen = 192f
+        val half = 88f
+        val segments = SettingsCurveGeometry.outlineSegments(
+            widthPx = 176f,
+            heightPx = 130f,
+            topInRootPx = 40f,
+            screenHeightPx = screen,
+            screenMarginPx = 4f,
+            capHeightPx = 20f
+        )
+        val points = ArrayList<Pair<Float, Float>>()
+        for (s in segments) {
+            for (i in 0..24) {
+                val t = i / 24f
+                val mt = 1f - t
+                points += Pair(
+                    mt * mt * mt * s.x0 + 3f * mt * mt * t * s.c1x + 3f * mt * t * t * s.c2x + t * t * t * s.x1,
+                    mt * mt * mt * s.y0 + 3f * mt * mt * t * s.c1y + 3f * mt * t * t * s.c2y + t * t * t * s.y1
+                )
+            }
+        }
+        val overshoot = points.maxOf { p ->
+            val fromCenter = 40f + p.second - screen / 2f
+            kotlin.math.abs(p.first - 88f) - SettingsCurveMath.halfWidthDp(fromCenter, screen, half)
+        }
+        assertTrue("192dp 屏上轮廓同样不得越过圆弦，实测超界 " + overshoot + "dp", overshoot <= 0.25f)
+        val widest = points.maxOf { p -> kotlin.math.abs(p.first - 88f) }
+        assertEquals("192dp 屏上气球仍要撑满 176dp 内容盒", 88f, widest, 0.5f)
+        // 左右镜像
+        for (p in points) {
+            val mirror = 176f - p.first
+            val nearest = points.minOf { q -> kotlin.math.hypot(q.first - mirror, q.second - p.second) }
+            assertTrue("192dp 屏上必须左右镜像，最近距离 " + nearest, nearest <= 0.1f)
+        }
+    }
+
+    @Test
     fun theOutlineStaysWideAtItsWidestPoint() {
         val widest = flatten().maxOf { point -> abs(point.first - centerX) }
         assertEquals("主气球仍要撑满内容盒", centerX, widest, 0.5f)
