@@ -15,9 +15,9 @@ class SettingsCoverageTest {
 
     @Test
     fun fixtureMatchesWebConsoleShape() {
-        // 9 页 / 56 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
-        assertEquals(9, WebFixture.pages.size)
-        assertEquals(56, WebFixture.pages.sumOf { it.rows.size })
+        // 10 页 / 63 行：与 app.js PAGES 的 sections[].rows[] 数量逐页一致
+        assertEquals(10, WebFixture.pages.size)
+        assertEquals(63, WebFixture.pages.sumOf { it.rows.size })
         assertEquals(
             listOf(
                 "model" to 11,
@@ -28,6 +28,7 @@ class SettingsCoverageTest {
                 "voice" to 4,
                 "tools" to 8,
                 "interface" to 7,
+                "network" to 7,
                 "device" to 6
             ),
             WebFixture.pages.map { it.id to it.rows.size }
@@ -65,8 +66,8 @@ class SettingsCoverageTest {
         assertTrue(SettingsCoverage.isStrictSuperset(WebFixture.pages))
         // 本轮把 3 行从"仅网页"提升为表端可写（压缩阈值 / 审批策略 / 沙箱等级），
         // 并把网页端新增的 generate.maxContextTurns 一起登记成 SLIDER
-        assertEquals(37, watchWritable.size)
-        assertEquals(56 - 37, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
+        assertEquals(44, watchWritable.size)
+        assertEquals(63 - 44, WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }
             .count { it !in watchWritable })
         // 手表可写的每一行都必须真实存在于网页端（不能凭空造出手表独有的可写项）
         val webIds = WebFixture.pages.flatMap { p -> p.rows.map { p.id + "." + it.id } }.toSet()
@@ -75,10 +76,10 @@ class SettingsCoverageTest {
 
     @Test
     fun watchSideSplitsIntoWritableReadOnlyAndWebOnly() {
-        assertEquals(37, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
+        assertEquals(44, SettingsCoverage.byForm(WebSettingsForm.WATCH_WRITABLE_FORMS).size)
         assertEquals(4, SettingsCoverage.byForm(listOf(WebSettingsForm.READ_ONLY)).size)
         assertEquals(15, SettingsCoverage.byForm(listOf(WebSettingsForm.WEB_ONLY)).size)
-        assertEquals(56, SettingsCoverage.entries.size)
+        assertEquals(63, SettingsCoverage.entries.size)
     }
 
     @Test
@@ -163,6 +164,15 @@ class SettingsCoverageTest {
                     row("isMcpEnabled", "switch"), row("mcpEndpoint", "text"), row("matrixSpacingDp", "slider"),
                     row("animationsEnabled", "switch"), row("compactMode", "switch"),
                     row("autoSpeakReplies", "switch"), row("asrLiveTranscript", "switch")
+                )
+            ),
+            WebSettingsPage(
+                "network",
+                listOf(
+                    row("requestTimeoutSeconds", "slider"), row("requestRetries", "slider"),
+                    row("retryBackoffMs", "slider"), row("wifiOnlyRequests", "switch"),
+                    row("settingsStyle", "segmented"), row("replyStyle", "segmented"),
+                    row("hapticsEnabled", "switch")
                 )
             ),
             WebSettingsPage(

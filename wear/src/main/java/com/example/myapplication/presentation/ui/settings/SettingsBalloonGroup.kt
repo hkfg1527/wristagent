@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
@@ -59,6 +60,11 @@ fun SettingsBalloonGroup(
             heightPx = 0f
         )
     }
+    // 每帧重建轮廓时复用同一个 Path：滚动掉帧主要来自逐帧分配，不是 GPU
+    val reusablePath = remember { Path() }
+    val brush = remember {
+        Brush.verticalGradient(colors = listOf(Wear.Palette.SurfaceAlt, Wear.Palette.Surface))
+    }
 
     Column(
         modifier = modifier
@@ -73,7 +79,8 @@ fun SettingsBalloonGroup(
                     drawContent()
                     return@drawWithContent
                 }
-                val path = SettingsCurveGeometry.groupPath(
+                val path = SettingsCurveGeometry.buildGroupPath(
+                    path = reusablePath,
                     size = size,
                     topInRootPx = state.topPx,
                     screenHeightPx = screenHeightPx,
@@ -81,14 +88,7 @@ fun SettingsBalloonGroup(
                     capHeightPx = capHeightPx
                 )
                 val highlightEnd = if (size.height < 320.dp.toPx()) size.height else 320.dp.toPx()
-                drawPath(
-                    path = path,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Wear.Palette.SurfaceAlt, Wear.Palette.Surface),
-                        startY = 0f,
-                        endY = highlightEnd
-                    )
-                )
+                drawPath(path = path, brush = brush)
                 drawContent()
             },
         horizontalAlignment = Alignment.CenterHorizontally

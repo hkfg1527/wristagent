@@ -33,9 +33,9 @@ enum class WebSettingsForm {
 data class WatchCoverage(val pageId: String, val rowId: String, val form: WebSettingsForm)
 
 /**
- * 网页 9 页 / 56 行到手表入口的逐行映射。
+ * 网页 10 页 / 63 行到手表入口的逐行映射。
  *
- * 56 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
+ * 63 行一条不漏：能改的给可写形态，改不动的给只读回显或「请在手机网页修改」，
  * 于是 [missingInWatch] 在真实清单上必须恒为空表 —— 这就是超集关系的证明。
  */
 object SettingsCoverage {
@@ -107,6 +107,15 @@ object SettingsCoverage {
         WatchCoverage("interface", "compactMode", WebSettingsForm.SWITCH),
         WatchCoverage("interface", "autoSpeakReplies", WebSettingsForm.SWITCH),
         WatchCoverage("interface", "asrLiveTranscript", WebSettingsForm.SWITCH),
+
+        // network · 网络与反馈：三项网络参数是可写滑杆，两个开关与两个分段控件都能在表端改
+        WatchCoverage("network", "requestTimeoutSeconds", WebSettingsForm.SLIDER),
+        WatchCoverage("network", "requestRetries", WebSettingsForm.SLIDER),
+        WatchCoverage("network", "retryBackoffMs", WebSettingsForm.SLIDER),
+        WatchCoverage("network", "wifiOnlyRequests", WebSettingsForm.SWITCH),
+        WatchCoverage("network", "settingsStyle", WebSettingsForm.SELECT),
+        WatchCoverage("network", "replyStyle", WebSettingsForm.SELECT),
+        WatchCoverage("network", "hapticsEnabled", WebSettingsForm.SWITCH),
 
         // device · 设备与控制台：三项运行状态只读回显，探针与语音自检可点，导出留在网页
         WatchCoverage("device", "infoRoot", WebSettingsForm.READ_ONLY),

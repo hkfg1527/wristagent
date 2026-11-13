@@ -16,7 +16,7 @@
   var CUSTOM_MODEL = '__custom__';
   var MODEL_FALLBACK = ['deepseek-chat', 'deepseek-reasoner'];
   var MAX_TOKEN_STEPS = [64, 150, 300, 600, 1200, 2048, 4096, 8192];   /* 契约 16..8192，档位覆盖首尾 */
-  /* 服务端可写键：唯一权威来源是 ConsoleFields.ALL 的 35 个可写键 + ALIASES 的 6 个镜像键。
+  /* 服务端可写键：唯一权威来源是 ConsoleFields.ALL 的可写键 + ALIASES 的 6 个镜像键。
      不在这份清单里的键服务端不认识，提交前一律剔除，值只留在本地草稿。改这里之前先核对 ConsoleFields.kt。 */
   var SERVER_KEYS = [
     'baseUrl', 'apiKey', 'modelName', 'temperature', 'maxOutputTokens', 'customSystemPrompt',
@@ -27,6 +27,8 @@
     'compactMode', 'providerManagedSearchEnabled', 'autoSpeakReplies',
     'asrLiveTranscript', 'defaultThinkingEnabled', 'memoryEnabled', 'autoCompressContext',
     'sandboxLevel', 'toolApprovalPolicy', 'historyCompressThreshold',
+    'replyStyle', 'settingsStyle', 'requestTimeoutSeconds', 'requestRetries', 'retryBackoffMs',
+    'wifiOnlyRequests', 'hapticsEnabled',
     'apiBaseUrl', 'maxTokens', 'systemPrompt', 'memoryRounds', 'longTermMemoryEnabled', 'asrEngine'
   ];
 
@@ -1146,6 +1148,22 @@
           { id: 'actProbe', type: 'action', label: '运行探针', hint: '检测执行后端与提权是否可用', actionName: 'probe-privilege', actionLabel: '运行探针', kw: 'probe 探针 检测 权限 诊断' },
           { id: 'actAsr', type: 'action', label: '测试语音', hint: '发起一次识别链路自检', actionName: 'test-asr', actionLabel: '测试语音', kw: 'asr 语音 测试 识别 自检' },
           { id: 'actExport', type: 'action', label: '导出设置', hint: '输出当前配置快照，便于备份', actionName: 'export-settings', actionLabel: '导出', kw: 'export 导出 备份 快照' }
+        ]
+      }]
+    }, {
+      id: 'network', title: '网络与反馈', sub: '超时、重试、仅 WiFi 与触觉反馈', icon: 'dialog',
+      sections: [{
+        title: '请求与重试', rows: [
+          { id: 'requestTimeoutSeconds', type: 'slider', label: '请求超时', hint: '单次请求超过这个时长就放弃（10–180 秒）', min: 10, max: 180, step: 10, int: true, fmt: function (v) { return Math.round(Number(v)) + 's'; }, keys: ['requestTimeoutSeconds'], def: 40, kw: 'timeout 超时 请求 网络 requestTimeoutSeconds' },
+          { id: 'requestRetries', type: 'slider', label: '自动重试', hint: '掉线或服务端报错时再试几次（0–3）', min: 0, max: 3, step: 1, int: true, fmt: function (v) { return Math.round(Number(v)) + ' 次'; }, keys: ['requestRetries'], def: 1, kw: 'retry 重试 次数 requestRetries' },
+          { id: 'retryBackoffMs', type: 'slider', label: '重试退避', hint: '重试前等待的毫秒数（0–5000）', min: 0, max: 5000, step: 200, int: true, fmt: function (v) { return Math.round(Number(v)) + 'ms'; }, keys: ['retryBackoffMs'], def: 800, kw: 'backoff 退避 等待 retryBackoffMs' },
+          { id: 'wifiOnlyRequests', type: 'switch', label: '仅 WiFi 请求', hint: '蜂窝网络下不发请求', keys: ['wifiOnlyRequests'], def: false, kw: 'wifi 蜂窝 流量 只允许 wifiOnlyRequests' }
+        ]
+      }, {
+        title: '外观与反馈', rows: [
+          { id: 'settingsStyle', type: 'segmented', label: '设置页风格', hint: '表端设置页的外壳', keys: ['settingsStyle'], def: 'BALLOON', options: [{ v: 'BALLOON', t: '气泡' }, { v: 'SQUARE', t: '方角' }, { v: 'GOOGLE_CARD', t: '大卡片' }, { v: 'TERMINAL', t: '终端' }], kw: 'style 风格 外观 设置页 settingsStyle 终端 气泡 方角 卡片' },
+          { id: 'replyStyle', type: 'segmented', label: '回答风格', hint: '注入系统提示词的表达约束', keys: ['replyStyle'], def: 'BALANCED', options: [{ v: 'CONCISE', t: '精炼' }, { v: 'BALANCED', t: '平衡' }, { v: 'DETAILED', t: '详尽' }], kw: 'reply 回答 风格 简洁 详细 replyStyle' },
+          { id: 'hapticsEnabled', type: 'switch', label: '触觉反馈', hint: '点按与确认时震动', keys: ['hapticsEnabled'], def: true, kw: 'haptic 震动 触觉 hapticsEnabled' }
         ]
       }]
     }

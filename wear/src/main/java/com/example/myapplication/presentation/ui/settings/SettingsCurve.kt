@@ -263,8 +263,30 @@ object SettingsCurveGeometry {
         screenHeightPx: Float,
         screenMarginPx: Float,
         capHeightPx: Float
+    ): Path = buildGroupPath(
+        path = Path(),
+        size = size,
+        topInRootPx = topInRootPx,
+        screenHeightPx = screenHeightPx,
+        screenMarginPx = screenMarginPx,
+        capHeightPx = capHeightPx
+    )
+
+    /**
+     * 把轮廓重建进调用方给的 [path]（先 reset）。
+     *
+     * 滚动时轮廓每帧都要变（宽度跟着屏幕 y 走），复用同一个 Path 就不必每帧新分配一个
+     * —— 表上滚动掉帧主要来自这种逐帧小分配，而不是 GPU。
+     */
+    fun buildGroupPath(
+        path: Path,
+        size: Size,
+        topInRootPx: Float,
+        screenHeightPx: Float,
+        screenMarginPx: Float,
+        capHeightPx: Float
     ): Path {
-        val path = Path()
+        path.reset()
         val segments = outlineSegments(
             widthPx = size.width,
             heightPx = size.height,

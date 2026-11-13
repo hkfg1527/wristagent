@@ -964,7 +964,9 @@ internal fun SettingsCardRow(
                 .fillMaxWidth()
                 .onGloballyPositioned { coordinates ->
                     val newY = coordinates.positionInRoot().y
-                    if (kotlin.math.abs(newY - yInRootPx.value) > 0.5f) yInRootPx.value = newY
+                    // 阈值取 2px（约 1dp）：滚动时行内缩放层每帧都在算，收小写入频率只为减少失效，
+                    // 1dp 的缩放差肉眼不可见。
+                    if (kotlin.math.abs(newY - yInRootPx.value) > 2f) yInRootPx.value = newY
                 },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -1012,7 +1014,9 @@ internal fun SettingsCardRow(
             .fillMaxWidth()
             .onGloballyPositioned { coordinates ->
                 val newY = coordinates.positionInRoot().y
-                if (kotlin.math.abs(newY - yInRootPx.value) > 0.5f) yInRootPx.value = newY
+                // 阈值取 2px（约 1dp）：滚动时行内缩放层每帧都在算，收小写入频率只为减少失效，
+                    // 1dp 的缩放差肉眼不可见。
+                    if (kotlin.math.abs(newY - yInRootPx.value) > 2f) yInRootPx.value = newY
             }
             .drawWithContent {
                 val path = SettingsCurveGeometry.cardPath(
