@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -39,8 +40,8 @@ internal object SettingsCardStyle {
     /** 卡间距。 */
     val Gap = Wear.Space.Sm
 
-    /** 环直径。 */
-    val RingSize = 44.dp
+    /** 环直径：Google Health 实测 100px @2x = 50dp。 */
+    val RingSize = 50.dp
 
     /** 环轨道宽度。 */
     val RingTrack = 4.dp
@@ -68,9 +69,9 @@ internal fun SettingsHeroCard(
     Row(
         modifier = modifier
             .width(SettingsContentWidth)
-            .heightIn(min = 88.dp)
+            .heightIn(min = 96.dp)
             .clip(RoundedCornerShape(SettingsCardStyle.Radius))
-            .background(accent.copy(alpha = 0.10f).compositeOver(Wear.Palette.SurfaceAlt))
+            .background(accent.copy(alpha = 0.10f).compositeOver(SettingsCardSurface))
             .padding(horizontal = Wear.Space.Lg, vertical = Wear.Space.Md),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -89,8 +90,12 @@ internal fun SettingsHeroCard(
             )
             BasicText(
                 text = value,
-                style = Wear.TextDisplay,
-                maxLines = 1,
+                style = if (SettingsCardTypography.usesDisplayStyle(value)) {
+                    Wear.TextDisplay
+                } else {
+                    Wear.TextDisplayTitle
+                },
+                maxLines = SettingsCardTypography.maxLinesFor(value),
                 overflow = TextOverflow.Ellipsis
             )
             if (chip != null) {
@@ -172,6 +177,69 @@ internal fun SettingsRingGlyph(glyph: String, tint: Color) {
         maxLines = 1
     )
 }
+
+/** 环内麦克风：胶囊 + 底弧 + 支架，与谷歌度量卡同一套 2dp 描边语言。 */
+@Composable
+internal fun SettingsMicGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(SettingsRingIconSize)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.6.dp.toPx()
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(w * 0.36f, h * 0.08f),
+            size = Size(w * 0.28f, h * 0.46f),
+            cornerRadius = CornerRadius(w * 0.14f),
+            style = Stroke(width = stroke)
+        )
+        drawArc(
+            color = tint,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(w * 0.22f, h * 0.3f),
+            size = Size(w * 0.56f, h * 0.38f),
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.5f, h * 0.68f),
+            end = Offset(w * 0.5f, h * 0.9f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+/** 环内滑轨：三条带旋钮的横线，代表工具与参数。 */
+@Composable
+internal fun SettingsSlidersGlyph(tint: Color) {
+    Canvas(modifier = Modifier.size(SettingsRingIconSize)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.6.dp.toPx()
+        val rows = listOf(Triple(0.26f, 0.64f, 0.7f), Triple(0.5f, 0.36f, 0.55f), Triple(0.74f, 0.58f, 0.62f))
+        rows.forEach { row ->
+            val y = h * row.first
+            drawLine(
+                color = tint,
+                start = Offset(w * 0.1f, y),
+                end = Offset(w * 0.9f, y),
+                strokeWidth = stroke * 0.7f,
+                cap = StrokeCap.Round
+            )
+            drawCircle(color = tint, radius = stroke * row.third, center = Offset(w * row.second, y))
+        }
+    }
+}
+
+/**
+ * 大卡片档的卡片底色：Pixel Watch 2 上 Google Health 步数卡实测值 #2A313C。
+ *
+ * 刻意不进 Palette：调色板上限 14 个 token，这枚颜色只服务这一套风格，
+ * 与 VoxelMatrixEffect 里的像素色同属"局部材质色"。
+ */
+internal val SettingsCardSurface = Color(0xFF2A313C)
 
 /** 大卡片档下的普通行：不再画曲面，改成一张独立的圆角卡。 */
 internal val SettingsCardRowShape = RoundedCornerShape(Wear.Radius.Card)

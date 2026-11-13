@@ -57,6 +57,11 @@ object SettingsTransferCodec {
         "reasoningEffort",
         "replyStyle",
         "settingsStyle",
+        "requestTimeoutSeconds",
+        "requestRetries",
+        "retryBackoffMs",
+        "wifiOnlyRequests",
+        "hapticsEnabled",
         "showThoughtChain",
         "subAgentEnabled",
         "matrixSpacingDp",
@@ -243,6 +248,11 @@ object SettingsTransferBridge {
         "reasoningEffort" to preferences.reasoningEffort,
         "replyStyle" to preferences.replyStyle,
         "settingsStyle" to preferences.settingsStyle.name,
+        "requestTimeoutSeconds" to preferences.requestTimeoutSeconds.toString(),
+        "requestRetries" to preferences.requestRetries.toString(),
+        "retryBackoffMs" to preferences.retryBackoffMs.toString(),
+        "wifiOnlyRequests" to preferences.wifiOnlyRequests.toString(),
+        "hapticsEnabled" to preferences.hapticsEnabled.toString(),
         "showThoughtChain" to preferences.showThoughtChain.toString(),
         "subAgentEnabled" to preferences.subAgentEnabled.toString(),
         "matrixSpacingDp" to preferences.matrixSpacingDp.toString(),
@@ -347,6 +357,14 @@ object SettingsTransferBridge {
             "replyStyle" -> ReplyStyle.values()
                 .firstOrNull { it.storageKey == value }
                 ?.let { preferences.replyStyle = it.storageKey; true } ?: false
+            "requestTimeoutSeconds" -> value.toIntOrNull()?.takeIf { it in 10..180 }
+                ?.let { preferences.requestTimeoutSeconds = it; true } ?: false
+            "requestRetries" -> value.toIntOrNull()?.takeIf { it in 0..3 }
+                ?.let { preferences.requestRetries = it; true } ?: false
+            "retryBackoffMs" -> value.toIntOrNull()?.takeIf { it in 0..5000 }
+                ?.let { preferences.retryBackoffMs = it; true } ?: false
+            "wifiOnlyRequests" -> boolValue(value)?.let { preferences.wifiOnlyRequests = it; true } ?: false
+            "hapticsEnabled" -> boolValue(value)?.let { preferences.hapticsEnabled = it; true } ?: false
             "settingsStyle" -> SettingsStyle.values()
                 .firstOrNull { it.name == value }
                 ?.let { preferences.settingsStyle = it; WearAppearance.style = it; true } ?: false

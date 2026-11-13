@@ -1,5 +1,6 @@
 package com.example.myapplication.agent.remote
 
+import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.ReplyStyle
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.SandboxLevel
@@ -66,6 +67,26 @@ object ConsoleFields {
         ConsoleField("customSystemPrompt", ConsoleFieldType.STRING),
         ConsoleField("securityMode", ConsoleFieldType.ENUM, allowed = SecurityMode.values().map { it.name }),
         ConsoleField("maxContextTurns", ConsoleFieldType.INT, min = 0.0, max = 200.0),
+        ConsoleField(
+            "requestTimeoutSeconds",
+            ConsoleFieldType.INT,
+            min = AgentPreferences.MinRequestTimeoutSeconds.toDouble(),
+            max = AgentPreferences.MaxRequestTimeoutSeconds.toDouble()
+        ),
+        ConsoleField(
+            "requestRetries",
+            ConsoleFieldType.INT,
+            min = 0.0,
+            max = AgentPreferences.MaxRequestRetries.toDouble()
+        ),
+        ConsoleField(
+            "retryBackoffMs",
+            ConsoleFieldType.INT,
+            min = 0.0,
+            max = AgentPreferences.MaxRetryBackoffMs.toDouble()
+        ),
+        ConsoleField("wifiOnlyRequests", ConsoleFieldType.BOOLEAN),
+        ConsoleField("hapticsEnabled", ConsoleFieldType.BOOLEAN),
         ConsoleField("asrProvider", ConsoleFieldType.ENUM, allowed = AsrProviderId.values().map { it.storageKey }),
         ConsoleField("baiduApiKey", ConsoleFieldType.STRING),
         ConsoleField("baiduSecretKey", ConsoleFieldType.STRING),

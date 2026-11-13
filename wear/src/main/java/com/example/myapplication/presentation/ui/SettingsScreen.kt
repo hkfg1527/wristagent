@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.myapplication.R
@@ -56,6 +57,8 @@ import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
 import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
+import com.example.myapplication.presentation.ui.settings.SettingsMicGlyph
+import com.example.myapplication.presentation.ui.settings.SettingsSlidersGlyph
 import com.example.myapplication.presentation.ui.settings.SettingsRingGlyph
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
@@ -80,6 +83,8 @@ import com.example.myapplication.presentation.ui.settings.SettingsNavRow
 import com.example.myapplication.presentation.ui.settings.SettingsRowStaggerState
 import com.example.myapplication.presentation.ui.settings.SettingsEdgeScrim
 import com.example.myapplication.presentation.ui.settings.SettingsSectionHeader
+import com.example.myapplication.presentation.ui.settings.SettingsSliderRow
+import com.example.myapplication.presentation.ui.settings.SettingsSwitchRow
 import com.example.myapplication.presentation.ui.settings.settingsCardScreenInset
 import com.example.myapplication.presentation.ui.settings.settingsCardWidth
 import com.example.myapplication.presentation.ui.settings.settingsScalingParams
@@ -148,6 +153,13 @@ fun SettingsScreen(
     var asrProviderKey by remember { mutableStateOf(preferences.asrProvider) }
     var asrKeyReady by remember { mutableStateOf(preferences.asrSettings().hasBaiduCredentials) }
 
+    // 网络与触觉：五项都从偏好初始化，改完立刻落盘（消费点见 AgentDispatcher 与 vibrateTick）
+    var requestTimeout by remember { mutableIntStateOf(preferences.requestTimeoutSeconds) }
+    var requestRetries by remember { mutableIntStateOf(preferences.requestRetries) }
+    var retryBackoff by remember { mutableIntStateOf(preferences.retryBackoffMs) }
+    var wifiOnly by remember { mutableStateOf(preferences.wifiOnlyRequests) }
+    var hapticsOn by remember { mutableStateOf(preferences.hapticsEnabled) }
+
     // 二级弹窗状态
     var activeDialog by remember { mutableStateOf<SettingsSubDialog?>(null) }
     var showVoiceAsr by remember { mutableStateOf(false) }
@@ -172,6 +184,11 @@ fun SettingsScreen(
         asrEnabled = snapshot.asrEnabled
         asrProviderKey = snapshot.asrProviderKey
         asrKeyReady = snapshot.asrKeyReady
+        requestTimeout = snapshot.requestTimeoutSeconds
+        requestRetries = snapshot.requestRetries
+        retryBackoff = snapshot.retryBackoffMs
+        wifiOnly = snapshot.wifiOnlyRequests
+        hapticsOn = snapshot.hapticsEnabled
     }
 
     // 任何子页 / 语音浮层收起都整体回读一次：清空记忆、远端控制台改设置、外观页写存储等
@@ -339,7 +356,29 @@ fun SettingsScreen(
                                             0f
                                         },
                                         ringIcon = {
-                                            SettingsRingGlyph("M", Wear.CardTools)
+                                            SettingsSlidersGlyph(Wear.CardTools)
+                                        }
+                                    )
+                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
+                                    val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
+                                    val voiceReady = asrEnabled && (asrProvider != AsrProviderId.BAIDU || asrKeyReady)
+                                    SettingsHeroCard(
+                                        label = stringResource(R.string.settings_voice_entry),
+                                        value = when {
+                                            !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                            voiceReady && asrProvider == AsrProviderId.BAIDU ->
+                                                stringResource(R.string.settings_asr_baidu)
+                                            voiceReady -> stringResource(R.string.settings_asr_system)
+                                            else -> stringResource(R.string.settings_asr_key_missing)
+                                        },
+                                        accent = Wear.CardVoice,
+                                        fraction = when {
+                                            !asrEnabled -> 0f
+                                            voiceReady -> 1f
+                                            else -> 0.5f
+                                        },
+                                        ringIcon = {
+                                            SettingsMicGlyph(Wear.CardVoice)
                                         }
                                     )
                                     Spacer(Modifier.height(SettingsCardStyle.Gap))
@@ -422,6 +461,80 @@ fun SettingsScreen(
                                         onClick = {
                                             context.vibrateTick()
                                             activeDialog = SettingsSubDialog.TOOLS_MCP
+                                        }
+                                    )
+                                }
+                                SettingsSectionHeader(text = stringResource(R.string.settings_section_network))
+                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
+                                    SettingsSliderRow(
+                                        label = stringResource(R.string.settings_net_timeout),
+                                        value = requestTimeout.toFloat(),
+                                        valueRange = 10f..180f,
+                                        steps = 16,
+                                        valueText = requestTimeout.toString() + "s",
+                                        onValueChange = { raw ->
+                                            val snapped = raw.roundToInt()
+                                            if (snapped != requestTimeout) {
+                                                requestTimeout = snapped
+                                                preferences.requestTimeoutSeconds = snapped
+                                                context.vibrateTick()
+                                            }
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsSliderRow(
+                                        label = stringResource(R.string.settings_net_retries),
+                                        value = requestRetries.toFloat(),
+                                        valueRange = 0f..3f,
+                                        steps = 2,
+                                        valueText = requestRetries.toString() + "×",
+                                        onValueChange = { raw ->
+                                            val snapped = raw.roundToInt()
+                                            if (snapped != requestRetries) {
+                                                requestRetries = snapped
+                                                preferences.requestRetries = snapped
+                                                context.vibrateTick()
+                                            }
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsSliderRow(
+                                        label = stringResource(R.string.settings_net_backoff),
+                                        value = retryBackoff.toFloat(),
+                                        valueRange = 0f..5000f,
+                                        steps = 24,
+                                        valueText = retryBackoff.toString() + "ms",
+                                        onValueChange = { raw ->
+                                            val snapped = (raw / 200f).roundToInt() * 200
+                                            if (snapped != retryBackoff) {
+                                                retryBackoff = snapped
+                                                preferences.retryBackoffMs = snapped
+                                                context.vibrateTick()
+                                            }
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsSwitchRow(
+                                        label = stringResource(R.string.settings_wifi_only),
+                                        secondary = stringResource(R.string.settings_wifi_only_secondary),
+                                        checked = wifiOnly,
+                                        onCheckedChange = { enabled ->
+                                            wifiOnly = enabled
+                                            preferences.wifiOnlyRequests = enabled
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsSwitchRow(
+                                        label = stringResource(R.string.settings_haptics),
+                                        secondary = stringResource(R.string.settings_haptics_secondary),
+                                        checked = hapticsOn,
+                                        onCheckedChange = { enabled ->
+                                            hapticsOn = enabled
+                                            preferences.hapticsEnabled = enabled
                                         }
                                     )
                                 }
@@ -844,7 +957,12 @@ internal data class SettingsRootSnapshot(
     val asrEnabled: Boolean,
     val asrProviderKey: String,
     val asrKeyReady: Boolean,
-    val providerBook: ProviderProfileBook
+    val providerBook: ProviderProfileBook,
+    val requestTimeoutSeconds: Int,
+    val requestRetries: Int,
+    val retryBackoffMs: Int,
+    val wifiOnlyRequests: Boolean,
+    val hapticsEnabled: Boolean
 )
 
 /**
@@ -871,6 +989,11 @@ internal fun AgentPreferences.rootSnapshot(): SettingsRootSnapshot {
         asrEnabled = asr.enabled,
         asrProviderKey = asrProvider,
         asrKeyReady = asr.hasBaiduCredentials,
-        providerBook = providerProfiles()
+        providerBook = providerProfiles(),
+        requestTimeoutSeconds = requestTimeoutSeconds,
+        requestRetries = requestRetries,
+        retryBackoffMs = retryBackoffMs,
+        wifiOnlyRequests = wifiOnlyRequests,
+        hapticsEnabled = hapticsEnabled
     )
 }

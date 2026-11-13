@@ -6,6 +6,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import com.example.myapplication.agent.AgentPreferences
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
@@ -192,6 +193,7 @@ val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
 private val DialogFieldMaxHeight = 120.dp
 
 fun Context.vibrateTick() {
+    if (!AgentPreferences(this).hapticsEnabled) return
     try {
         val vibrator = getSystemService(Vibrator::class.java) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -205,6 +207,7 @@ fun Context.vibrateTick() {
 
 /** 破坏性操作与真实提交的唯一确认震动：一次、短促，与滚动刻度震动彻底分开。 */
 fun Context.vibrateConfirm() {
+    if (!AgentPreferences(this).hapticsEnabled) return
     try {
         val vibrator = getSystemService(Vibrator::class.java) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -893,7 +896,7 @@ internal fun SettingsCardRow(
                     .width(SettingsContentWidth)
                     .heightIn(min = minHeight)
                     .clip(SettingsCardRowShape)
-                    .background(Wear.Palette.SurfaceAlt)
+                    .background(SettingsCardSurface)
                     .then(clickModifier)
                     .padding(
                         start = SettingsRowSidePadding,

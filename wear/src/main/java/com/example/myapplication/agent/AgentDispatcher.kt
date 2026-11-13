@@ -4,6 +4,8 @@ import com.example.myapplication.presentation.ErrorMessage
 
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.util.Log
@@ -22,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -819,6 +822,22 @@ class AgentDispatcher(
     }
 
     /** 轻量非流式补全：temperature 0、max_tokens 200、不携带工具定义，避免模型转去调工具。 */
+    /**
+     * 「仅 WiFi 请求」的判据：当前活动网络必须是已连接、具备 INTERNET 能力的 WiFi。
+     *
+     * 读不到网络状态时返回 true：宁可放过一次请求，也不要把"没有权限/服务缺失"误判成"不是 WiFi"。
+     */
+    private fun hasWifiNetwork(): Boolean = try {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val capabilities = manager?.getNetworkCapabilities(manager.activeNetwork)
+        capabilities == null || (
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            )
+    } catch (_: Exception) {
+        true
+    }
+
     private suspend fun requestNarration(prompt: String): String? = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
@@ -899,11 +918,20 @@ class AgentDispatcher(
                 setRequestProperty("Accept", if (preferences.streamMode) "text/event-stream" else "application/json")
                 setRequestProperty("Authorization", "Bearer ${preferences.apiKey.trim()}")
                 connectTimeout = 15000
-                readTimeout = 40000
+                // 读超时跟着设置走：表上网络抖动比手机大，默认给到 40s
+                readTimeout = preferences.requestTimeoutSeconds * 1000
                 doOutput = true
             }
 
+            if (preferences.wifiOnlyRequests && !hasWifiNetwork()) {
+                return@withContext Result.failure(
+                    IllegalStateException("已开启「仅 WiFi 请求」：当前没有可用的 WiFi 网络")
+                )
+            }
+
             var droppedEffort = false
+            // 自动重试只吃一次预算：网络异常与服务端 5xx 各自消耗，reasoning_effort 的退化重试不算
+            var retriesLeft = preferences.requestRetries
             // 思考耗时的起点 = 请求真正发出去的那一刻。以它为准，响应多久才回来都记作思考时间，
             // 非流式回显因此也不会退化成 0s（旧代码把起点记在了响应到达之后）。
             var requestStartedAtMs = 0L
@@ -912,9 +940,18 @@ class AgentDispatcher(
                 requestStartedAtMs = System.currentTimeMillis()
                 val activeConn = openConnection()
                 conn = activeConn
-                OutputStreamWriter(activeConn.outputStream, "UTF-8").use { it.write(buildRequestBody().toString()) }
-
-                val responseCode = activeConn.responseCode
+                val responseCode = try {
+                    OutputStreamWriter(activeConn.outputStream, "UTF-8")
+                        .use { it.write(buildRequestBody().toString()) }
+                    activeConn.responseCode
+                } catch (e: IOException) {
+                    if (retriesLeft > 0) {
+                        retriesLeft--
+                        if (preferences.retryBackoffMs > 0) delay(preferences.retryBackoffMs.toLong())
+                        continue
+                    }
+                    return@withContext Result.failure(e)
+                }
                 if (responseCode in 200..299) break
 
                 val errorBody = activeConn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
@@ -925,6 +962,11 @@ class AgentDispatcher(
                     droppedEffort = true
                     reasoningEffortValue = null
                     onReasoningEffortIgnored?.invoke()
+                    continue
+                }
+                if (responseCode >= 500 && retriesLeft > 0) {
+                    retriesLeft--
+                    if (preferences.retryBackoffMs > 0) delay(preferences.retryBackoffMs.toLong())
                     continue
                 }
                 return@withContext Result.failure(Exception("HTTP $responseCode: $errorBody"))

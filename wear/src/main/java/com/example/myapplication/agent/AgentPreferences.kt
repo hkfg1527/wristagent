@@ -57,6 +57,34 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             ?: ReasoningEffort.DEFAULT_STORAGE
         set(value) = prefs.edit().putString("reasoning_effort", value).apply()
 
+    /** 单次请求的读超时（秒）：默认 40，夹在 10..180。表上网络抖，给得比手机宽。 */
+    var requestTimeoutSeconds: Int
+        get() = prefs.getInt(KEY_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT)
+            .coerceIn(MinRequestTimeoutSeconds, MaxRequestTimeoutSeconds)
+        set(value) = prefs.edit()
+            .putInt(KEY_REQUEST_TIMEOUT, value.coerceIn(MinRequestTimeoutSeconds, MaxRequestTimeoutSeconds))
+            .apply()
+
+    /** 网络失败自动重试次数：默认 1 次，0..3。 */
+    var requestRetries: Int
+        get() = prefs.getInt(KEY_REQUEST_RETRIES, DEFAULT_REQUEST_RETRIES).coerceIn(0, MaxRequestRetries)
+        set(value) = prefs.edit().putInt(KEY_REQUEST_RETRIES, value.coerceIn(0, MaxRequestRetries)).apply()
+
+    /** 重试前的退避（毫秒）：默认 800，0..5000。 */
+    var retryBackoffMs: Int
+        get() = prefs.getInt(KEY_RETRY_BACKOFF, DEFAULT_RETRY_BACKOFF).coerceIn(0, MaxRetryBackoffMs)
+        set(value) = prefs.edit().putInt(KEY_RETRY_BACKOFF, value.coerceIn(0, MaxRetryBackoffMs)).apply()
+
+    /** 仅 WiFi 下发起请求：默认关。开着时蜂窝网络会直接给出可读回执。 */
+    var wifiOnlyRequests: Boolean
+        get() = prefs.getBoolean(KEY_WIFI_ONLY, DEFAULT_WIFI_ONLY)
+        set(value) = prefs.edit().putBoolean(KEY_WIFI_ONLY, value).apply()
+
+    /** 触觉反馈：默认开。关掉后所有震动（含确认震动）都不再触发。 */
+    var hapticsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_HAPTICS, DEFAULT_HAPTICS)
+        set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
+
     /** 设置页外观预设：界面外壳读它，导入导出与控制台也按名字搬运。 */
     var settingsStyle: SettingsStyle
         get() = SettingsStyle.fromStorage(prefs.getString(KEY_SETTINGS_STYLE, DEFAULT_SETTINGS_STYLE))
@@ -433,6 +461,22 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         internal const val KEY_REGISTERED_TOOLS = "registered_tool_count"
         internal const val KEY_SETTINGS_STYLE = "settings_style"
         internal const val DEFAULT_SETTINGS_STYLE = "BALLOON"
+
+        /** 网络与触觉四件套：键、默认值、上下限都具名，避免四处散落字面量。 */
+        const val KEY_REQUEST_TIMEOUT = "requestTimeoutSeconds"
+        const val KEY_REQUEST_RETRIES = "requestRetries"
+        const val KEY_RETRY_BACKOFF = "retryBackoffMs"
+        const val KEY_WIFI_ONLY = "wifiOnlyRequests"
+        const val KEY_HAPTICS = "hapticsEnabled"
+        const val DEFAULT_REQUEST_TIMEOUT = 40
+        const val DEFAULT_REQUEST_RETRIES = 1
+        const val DEFAULT_RETRY_BACKOFF = 800
+        const val DEFAULT_WIFI_ONLY = false
+        const val DEFAULT_HAPTICS = true
+        const val MinRequestTimeoutSeconds = 10
+        const val MaxRequestTimeoutSeconds = 180
+        const val MaxRequestRetries = 3
+        const val MaxRetryBackoffMs = 5000
         internal const val DEFAULT_CALLED_TOOLS = ""
         internal const val DEFAULT_REGISTERED_TOOLS = 0
         const val KEY_DEFAULT_THINKING = "defaultThinking"

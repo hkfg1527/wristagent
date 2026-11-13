@@ -256,68 +256,40 @@ object Wear {
             .withTokenColor(Palette.TextSecondary)
 
     /**
-     * 大卡片档的第 [index] 张卡的强调色。
+     * 大卡片档每张卡自己的强调色。
      *
-     * 从当前运行时强调色派生色相（不新增调色板色值，调色板仍钉在 14 个 token），
-     * 因此用户换强调色时四张卡会一起换色调，而不是死在默认蓝上。
+     * 取值来自 Pixel Watch 2 上 Google Health 主页的实测像素（见 docs/DESIGN-GOOGLE-HEALTH.md）：
+     * 卡片色不是主题强调色派生的，谷歌给每种度量固定一种色相，换主题色不该把步数卡变绿。
+     * 调色板上限 14 个 token，这四枚只服务单套风格，因此留在投影里而不进 Palette。
      */
     val CardModel: Color
         @Composable @ReadOnlyComposable
-        get() = Accent
+        get() = CardAccentBlue
 
     val CardTools: Color
         @Composable @ReadOnlyComposable
-        get() = shiftHue(Accent, 118f)
+        get() = CardAccentPeriwinkle
 
     val CardVoice: Color
         @Composable @ReadOnlyComposable
-        get() = shiftHue(Accent, -65f)
+        get() = CardAccentMint
 
     val CardSystem: Color
         @Composable @ReadOnlyComposable
-        get() = shiftHue(Accent, 168f)
+        get() = CardAccentSlate
 }
 
-/**
- * 色相旋转：RGB -> HSL -> RGB，饱和与明度夹在可读区间。
- *
- * 只做色相偏移与夹取，不做混色，因此同一强调色算出的四张卡颜色稳定可测。
- */
-internal fun shiftHue(color: Color, degrees: Float): Color {
-    val r = color.red
-    val g = color.green
-    val b = color.blue
-    val max = maxOf(r, g, b)
-    val min = minOf(r, g, b)
-    val lightness = (max + min) / 2f
-    val delta = max - min
-    val saturation = if (delta < 1e-4f) 0f else delta / (1f - kotlin.math.abs(2f * lightness - 1f))
-    var hue: Float
-    if (delta < 1e-4f) {
-        hue = 0f
-    } else if (max == r) {
-        hue = 60f * (((g - b) / delta) % 6f)
-    } else if (max == g) {
-        hue = 60f * (((b - r) / delta) + 2f)
-    } else {
-        hue = 60f * (((r - g) / delta) + 4f)
-    }
-    hue = ((hue + degrees) % 360f + 360f) % 360f
-    val s = saturation.coerceIn(0.35f, 0.92f)
-    val l = lightness.coerceIn(0.56f, 0.74f)
-    val c = (1f - kotlin.math.abs(2f * l - 1f)) * s
-    val x = c * (1f - kotlin.math.abs((hue / 60f) % 2f - 1f))
-    val m = l - c / 2f
-    val (r1, g1, b1) = when {
-        hue < 60f -> Triple(c, x, 0f)
-        hue < 120f -> Triple(x, c, 0f)
-        hue < 180f -> Triple(0f, c, x)
-        hue < 240f -> Triple(0f, x, c)
-        hue < 300f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    return Color(r1 + m, g1 + m, b1 + m)
-}
+/** Google Health 实测强调色：步数卡进度环与 chip。 */
+private val CardAccentBlue = Color(0xFF7FCFFF)
+
+/** Google Health 实测强调色：第二档度量（爬楼层数）。 */
+private val CardAccentPeriwinkle = Color(0xFFA8C7FA)
+
+/** Google Health 实测强调色：第三档度量（锻炼天数）。 */
+private val CardAccentMint = Color(0xFFC4EED0)
+
+/** Google Health 的次级文字色，用作第四张卡（系统）的强调色。 */
+private val CardAccentSlate = Color(0xFFBDCBE2)
 
 /**
  * 主题内可覆盖的强调色；null = 没有主题覆盖，读 [WearAppearance] 的运行时值。

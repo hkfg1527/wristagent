@@ -14,11 +14,15 @@ import org.junit.Test
 class SettingsScreenStructureGuardTest {
 
     @Test
-    fun rootPageRendersExactlyThreeGroupHeaders() {
+    fun rootPageRendersExactlyFourGroupHeaders() {
         val rendered = groupHeaderCall.findAll(readSettingsScreen())
             .map { it.groupValues[1] }
             .toList()
-        assertEquals("根页组标题必须恰好三个且按 模型 / 语音与工具 / 系统 排序：", expectedSections, rendered)
+        assertEquals(
+            "根页组标题必须恰好四个且按 模型 / 语音与工具 / 网络与交互 / 系统 排序：",
+            expectedSections,
+            rendered
+        )
     }
 
     @Test
@@ -73,6 +77,7 @@ class SettingsScreenStructureGuardTest {
         val expectedSections = listOf(
                 "settings_section_models",
                 "settings_section_voice_tools",
+                "settings_section_network",
                 "settings_section_system"
         )
     }

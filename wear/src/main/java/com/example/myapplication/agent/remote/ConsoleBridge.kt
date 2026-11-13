@@ -95,6 +95,11 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
         "sandboxLevel" to preferences.sandboxLevel.storageKey,
         "toolApprovalPolicy" to preferences.toolApprovalPolicy.storageKey,
         "historyCompressThreshold" to preferences.historyCompressThreshold,
+        "requestTimeoutSeconds" to preferences.requestTimeoutSeconds,
+        "requestRetries" to preferences.requestRetries,
+        "retryBackoffMs" to preferences.retryBackoffMs,
+        "wifiOnlyRequests" to preferences.wifiOnlyRequests,
+        "hapticsEnabled" to preferences.hapticsEnabled,
         "hasCompletedOnboarding" to preferences.hasCompletedOnboarding,
     )
 
@@ -113,6 +118,16 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 preferences.securityMode = mode
             }
             "maxContextTurns" -> preferences.maxContextTurns = value as? Int ?: return ConsoleWriteResult.READ_ONLY
+            "requestTimeoutSeconds" -> preferences.requestTimeoutSeconds =
+                value as? Int ?: return ConsoleWriteResult.READ_ONLY
+            "requestRetries" -> preferences.requestRetries =
+                value as? Int ?: return ConsoleWriteResult.READ_ONLY
+            "retryBackoffMs" -> preferences.retryBackoffMs =
+                value as? Int ?: return ConsoleWriteResult.READ_ONLY
+            "wifiOnlyRequests" -> preferences.wifiOnlyRequests =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
+            "hapticsEnabled" -> preferences.hapticsEnabled =
+                value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "asrProvider" -> preferences.asrProvider = value as? String ?: return ConsoleWriteResult.READ_ONLY
             "baiduApiKey" -> preferences.baiduApiKey = value as? String ?: return ConsoleWriteResult.READ_ONLY
             "baiduSecretKey" -> preferences.baiduSecretKey = value as? String ?: return ConsoleWriteResult.READ_ONLY

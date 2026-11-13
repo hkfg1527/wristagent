@@ -40,7 +40,14 @@ class ConsoleSettingsMappingTest {
             val max = field.max ?: 1.0
             (min + (max - min) / 2.0).toFloat()
         }
-        ConsoleFieldType.INT -> 7
+        ConsoleFieldType.INT -> {
+            // 取样必须落在字段自己声明的区间里：新增字段带上下限时，7 这种硬编码值会被夹取，
+            // 于是"写入后读回原值"这条断言测的就不再是映射，而是夹取。
+            val min = (field.min ?: 0.0).toInt()
+            val max = (field.max ?: Int.MAX_VALUE.toDouble()).toInt()
+            val mid = min + (max - min) / 2
+            if (mid == (current as? Number)?.toInt()) (mid + 1).coerceAtMost(max) else mid
+        }
         ConsoleFieldType.BOOLEAN -> !(current as? Boolean ?: false)
         ConsoleFieldType.ENUM -> field.allowed.last()
     }

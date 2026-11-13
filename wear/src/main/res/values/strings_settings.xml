@@ -449,4 +449,15 @@
     <string name="settings_style_square_summary">Centered text, hairline dividers, square keys</string>
     <string name="settings_style_card">Big cards</string>
     <string name="settings_style_card_summary">Google-style cards with a ring indicator on the right</string>
+    <string name="settings_section_network">Network &amp; feedback</string>
+    <string name="settings_net_timeout">Request timeout</string>
+    <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
+    <string name="settings_net_retries">Auto retry</string>
+    <string name="settings_net_retries_secondary">Retry once on a dropped connection or a server error</string>
+    <string name="settings_net_backoff">Retry backoff</string>
+    <string name="settings_net_backoff_secondary">Wait this long before retrying</string>
+    <string name="settings_wifi_only">Wi-Fi only</string>
+    <string name="settings_wifi_only_secondary">Refuse to spend cellular data on a request</string>
+    <string name="settings_haptics">Haptics</string>
+    <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
 </resources>
