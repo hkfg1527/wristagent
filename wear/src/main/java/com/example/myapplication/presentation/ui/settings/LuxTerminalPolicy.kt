@@ -39,6 +39,12 @@ object LuxTerminalPolicy {
         return "❯ " + command + "\n" + trimmed.trimEnd()
     }
 
+    /**
+     * 输入的原始文本 → 可执行命令。空串与纯空白一律返回 null（不发空命令给 shell）。
+     * 只做 trim：不替换引号、不拆管道 —— 那是 shell 的事，替用户改写命令比不执行更糟。
+     */
+    fun parseCommand(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() }
+
     /** 只留最近 [max] 条。 */
     fun trimEntries(entries: List<String>, max: Int = MAX_ENTRIES): List<String> =
         if (entries.size <= max) entries else entries.takeLast(max)

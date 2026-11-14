@@ -40,6 +40,10 @@
     <string name="settings_side_key">底栏副键</string>
     <string name="settings_lux_entry_value">命令面板</string>
     <string name="settings_lux_terminal">Lux 终端</string>
+    <string name="settings_lux_input">运行命令</string>
+    <string name="settings_lux_free_input">输入命令…</string>
+    <string name="settings_lux_input_title">命令</string>
+    <string name="settings_lux_input_placeholder">echo lux</string>
     <string name="settings_lux_quick">快捷命令</string>
     <string name="settings_lux_output">转录</string>
     <string name="settings_lux_empty">还没有运行过命令。</string>

@@ -48,6 +48,20 @@ class LuxTerminalPolicyTest {
     }
 
     @Test
+    fun blankInputNeverReachesTheShell() {
+        assertEquals(null, LuxTerminalPolicy.parseCommand(""))
+        assertEquals(null, LuxTerminalPolicy.parseCommand("   "))
+        assertEquals(null, LuxTerminalPolicy.parseCommand("\n\t "))
+    }
+
+    @Test
+    fun commandsAreTrimmedButNotRewritten() {
+        assertEquals("ls -la", LuxTerminalPolicy.parseCommand("  ls -la  "))
+        // 引号与管道原样保留：替用户改写命令比不执行更糟
+        assertEquals("echo 'a b' | wc -l", LuxTerminalPolicy.parseCommand("echo 'a b' | wc -l"))
+    }
+
+    @Test
     fun theTranscriptKeepsOnlyTheMostRecentEntries() {
         val entries = (1..20).map { "entry-" + it }
         val trimmed = LuxTerminalPolicy.trimEntries(entries)

@@ -44,6 +44,8 @@ fun LuxTerminalContent(
     val scope = rememberCoroutineScope()
     var entries by remember { mutableStateOf<List<String>>(emptyList()) }
     var running by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    var lastCommand by remember { mutableStateOf("") }
 
     fun run(command: String) {
         if (running) return
@@ -73,6 +75,23 @@ fun LuxTerminalContent(
         title = stringResource(R.string.settings_lux_terminal),
         heroLabel = stringResource(R.string.settings_lux_terminal),
         onBack = onBack,
+        overlay = {
+            if (editing) {
+                SettingsTextDialog(
+                    title = stringResource(R.string.settings_lux_input_title),
+                    initial = lastCommand,
+                    placeholder = stringResource(R.string.settings_lux_input_placeholder),
+                    onValueChange = { raw ->
+                        editing = false
+                        LuxTerminalPolicy.parseCommand(raw)?.let { command ->
+                            lastCommand = command
+                            run(command)
+                        }
+                    },
+                    onDismiss = { editing = false }
+                )
+            }
+        },
         hero = {
             SettingsHeroCard(
                 label = stringResource(R.string.settings_lux_terminal),
@@ -83,6 +102,15 @@ fun LuxTerminalContent(
             )
         }
     ) {
+        section(stringResource(R.string.settings_lux_input))
+        row {
+            SettingsTextEntryRow(
+                label = stringResource(R.string.settings_lux_free_input),
+                value = lastCommand,
+                onClick = { editing = true }
+            )
+        }
+
         section(stringResource(R.string.settings_lux_quick))
         LuxTerminalPolicy.QuickCommands.forEach { command ->
             row {
