@@ -415,11 +415,7 @@ fun SettingsSubPage(
             // (viewportCenter − Σ前序高度) 的 spacer。头部行现在只有 32dp（不再为凑 spacer=0 而撑到
             // 86dp），算出来的 spacer 会是 26dp 级的空白 —— 那正是"顶部一大片黑再出现内容"的老问题。
             // 传 null 后顶部锚点就是 contentPadding.top，几何完全由常量决定（详见 SettingsTopAnchorMath）。
-            autoCentering = if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
-                AutoCenteringParams()
-            } else {
-                null
-            }
+            autoCentering = null
         ) {
             val showHero = hero != null && WearAppearance.style == SettingsStyle.GOOGLE_CARD
             val rowCount = content.size + 1 + if (showHero) 1 else 0

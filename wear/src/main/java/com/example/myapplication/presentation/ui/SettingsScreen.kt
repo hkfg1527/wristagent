@@ -313,93 +313,122 @@ fun SettingsScreen(
                     // 传 null 后顶部锚点 = contentPadding.top = 24dp 遮罩下沿，位置只由常量决定。
                     // 大卡片档开启官方的居中吸附：滚动带惯性、当前卡停在屏幕中线，
                     // 这正是谷歌表上手感的一半；其余三套保持 null，避免它给首项塞 spacer。
-                    autoCentering = if (cardStyle) AutoCenteringParams() else null
+                    // 不开 autoCentering：它会把首项撑到屏心，而这一页的首项是「当前模型」文字块 ——
+                    // 用户进来要看的是最上面那张卡，不是半块被切掉的标题。
+                    // 传 null 后顶部锚点就是 contentPadding.top，位置只由常量决定。
+                    autoCentering = null
                 ) {
                     // ===== 全屏唯一的焦点：当前模型 =====
                     // 页面标题不承载信息（滑进来就知道在设置页），焦点让给"现在用的是哪个模型"：
                     // 18sp / Medium 比任何一行都重，眯眼看时页面因此有唯一落点。
-                    item {
-                        RootContentRow(index = 0, stagger = rowStagger, exit = exit) {
-                            SettingsFocusBlock(
-                                modelName = currentModel,
-                                baseUrl = currentBaseUrl,
-                                configured = apiKeyConfigured
-                            )
+                    // 卡片档不画这块焦点文字：品牌身份卡已经把现在用的是哪个模型、挂在哪家端点说得更清楚，
+                    // 两处并排只会把同一个模型名在 200px 内印两遍。
+                    if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) {
+                        item {
+                            RootContentRow(index = 0, stagger = rowStagger, exit = exit) {
+                                SettingsFocusBlock(
+                                    modelName = currentModel,
+                                    baseUrl = currentBaseUrl,
+                                    configured = apiKeyConfigured
+                                )
+                            }
                         }
                     }
 
-                    // 全页唯一主气球：三个分区共享同一条超椭圆轮廓
-                    item {
-                        SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
+                    // 卡片档：每张卡都是一个独立的 lazy item。
+                    // 官方的居中吸附与边缘缩放都以 item 为单位：整页塞进一个 item 时，首卡永远贴不到屏心，
+                    // 滚动也只剩一整块位移 —— 这正是没有惯性、也没有上下缩小的成因。
+                    if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                        item(key = "card-brand") {
+                            RootContentRow(index = 1, stagger = rowStagger, exit = exit) {
+                                SettingsBrandCard(
+                                    brand = currentBrand,
+                                    label = stringResource(R.string.settings_section_models),
+                                    value = currentModel,
+                                    accent = Wear.CardModel,
+                                    meta = stringResource(
+                                        R.string.settings_card_meta_context,
+                                        preferences.maxContextTurns,
+                                        currentTemp
+                                    )
+                                )
+                                Spacer(Modifier.height(SettingsCardStyle.Gap))
+                            }
+                        }
+                        item(key = "card-tools") {
+                            RootContentRow(index = 2, stagger = rowStagger, exit = exit) {
+                                val calledTools = preferences.calledToolNames.size
+                                val registeredTools = preferences.registeredToolCount
+                                SettingsHeroCard(
+                                    label = stringResource(R.string.settings_card_tools),
+                                    value = if (registeredTools > 0) {
+                                        calledTools.toString() + " / " + registeredTools
+                                    } else {
+                                        "0"
+                                    },
+                                    accent = Wear.CardTools,
+                                    meta = if (registeredTools > 0) {
+                                        stringResource(R.string.settings_card_tools_called_meta, calledTools, registeredTools)
+                                    } else {
+                                        stringResource(R.string.settings_card_tools_pending)
+                                    }
+                                )
+                                Spacer(Modifier.height(SettingsCardStyle.Gap))
+                            }
+                        }
+                        item(key = "card-voice") {
+                            RootContentRow(index = 3, stagger = rowStagger, exit = exit) {
+                                val voiceProvider = AsrProviderId.fromStorage(asrProviderKey)
+                                val voiceReady = asrEnabled && (voiceProvider != AsrProviderId.BAIDU || asrKeyReady)
+                                SettingsHeroCard(
+                                    label = stringResource(R.string.settings_voice_entry),
+                                    value = when {
+                                        !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                        voiceReady && voiceProvider == AsrProviderId.BAIDU ->
+                                            stringResource(R.string.settings_asr_baidu)
+                                        voiceReady -> stringResource(R.string.settings_asr_system)
+                                        else -> stringResource(R.string.settings_asr_key_missing)
+                                    },
+                                    accent = Wear.CardVoice,
+                                    meta = when {
+                                        !asrEnabled -> stringResource(R.string.settings_asr_off)
+                                        voiceReady -> stringResource(R.string.settings_voice_power_value)
+                                        else -> null
+                                    }
+                                )
+                                Spacer(Modifier.height(SettingsCardStyle.Gap))
+                            }
+                        }
+                        item(key = "card-system") {
+                            RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
+                                SettingsHeroCard(
+                                    label = stringResource(R.string.settings_section_system),
+                                    value = if (customPrompt.isNotBlank()) {
+                                        stringResource(R.string.settings_prompt_custom_value)
+                                    } else {
+                                        stringResource(R.string.settings_prompt_default)
+                                    },
+                                    accent = Wear.CardSystem,
+                                    meta = if (consolePort > 0) {
+                                        stringResource(R.string.settings_card_console_meta, consolePort)
+                                    } else {
+                                        null
+                                    }
+                                )
+                                Spacer(Modifier.height(SettingsCardStyle.Gap))
+                            }
+                        }
+                    }
+
+                    // 分区行仍然拼成一片连续曲面：气球必须整组一起画，切开就不再是一个连续的气球。
+                    // 卡片档里这张曲面只承载分区行，四张 hero 卡在它上面各占一个独立 item。
+                    item(key = "root-sections") {
+                        SettingsStaggeredRow(index = 5, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
                             SettingsBalloonGroup {
-                                if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
-                                    SettingsBrandCard(
-                                        brand = currentBrand,
-                                        label = stringResource(R.string.settings_section_models),
-                                        value = currentModel,
-                                        accent = Wear.CardModel,
-                                        meta = stringResource(
-                                            R.string.settings_card_meta_context,
-                                            preferences.maxContextTurns,
-                                            currentTemp
-                                        )
-                                    )
-                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
-                                    val calledTools = preferences.calledToolNames.size
-                                    val registeredTools = preferences.registeredToolCount
-                                    SettingsHeroCard(
-                                        label = stringResource(R.string.settings_card_tools),
-                                        value = if (registeredTools > 0) {
-                                            calledTools.toString() + " / " + registeredTools
-                                        } else {
-                                            "0"
-                                        },
-                                        accent = Wear.CardTools,
-                                        meta = if (registeredTools > 0) {
-                                            stringResource(R.string.settings_card_tools_called_meta, calledTools, registeredTools)
-                                        } else {
-                                            stringResource(R.string.settings_card_tools_pending)
-                                        }
-                                    )
-                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
-                                    val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
-                                    val voiceReady = asrEnabled && (asrProvider != AsrProviderId.BAIDU || asrKeyReady)
-                                    SettingsHeroCard(
-                                        label = stringResource(R.string.settings_voice_entry),
-                                        value = when {
-                                            !asrEnabled -> stringResource(R.string.settings_asr_off)
-                                            voiceReady && asrProvider == AsrProviderId.BAIDU ->
-                                                stringResource(R.string.settings_asr_baidu)
-                                            voiceReady -> stringResource(R.string.settings_asr_system)
-                                            else -> stringResource(R.string.settings_asr_key_missing)
-                                        },
-                                        accent = Wear.CardVoice,
-                                        // 值已经说了「密钥未填写」，说明行不再复述同一句
-                                        meta = when {
-                                            !asrEnabled -> stringResource(R.string.settings_asr_off)
-                                            voiceReady -> stringResource(R.string.settings_voice_power_value)
-                                            else -> null
-                                        }
-                                    )
-                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
-                                    val promptCustom = customPrompt.isNotBlank()
-                                    SettingsHeroCard(
-                                        label = stringResource(R.string.settings_section_system),
-                                        value = if (promptCustom) {
-                                            stringResource(R.string.settings_prompt_custom_value)
-                                        } else {
-                                            stringResource(R.string.settings_prompt_default)
-                                        },
-                                        accent = Wear.CardSystem,
-                                        meta = if (consolePort > 0) {
-                                            stringResource(R.string.settings_card_console_meta, consolePort)
-                                        } else {
-                                            null
-                                        }
-                                    )
-                                    Spacer(Modifier.height(SettingsCardStyle.Gap))
+                                // 气球两端的收口留白只属于曲面：卡片档每行自带 8dp 间隙，再留 56dp 就是一块空屏
+                                if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) {
+                                    Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 }
-                                Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 SettingsSectionHeader(
                                     text = stringResource(R.string.settings_section_models),
                                     isFirstSection = true

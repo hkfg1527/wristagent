@@ -76,3 +76,14 @@ internal object SettingsCardTypography {
         return 3
     }
 }
+
+/**
+ * 品牌身份卡的主数值是否要退一档字号。
+ *
+ * 卡片内宽约 144dp：titleLarge（20sp）下一行只装得下 12 个单位，`deepseek-v4-pro` 有 15 个，
+ * 一旦放不下 Compose 会在连字符处折行，读起来像拼错的型号。超过 [BrandTitleCompactUnits] 就用
+ * titleMedium 让它在同一行里排完 —— 宁可小一档，也不要在型号中间断行。
+ */
+internal const val BrandTitleCompactUnits = 12
+
+internal fun brandTitleIsCompact(value: String): Boolean = value.length > BrandTitleCompactUnits
