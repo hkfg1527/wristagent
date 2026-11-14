@@ -19,8 +19,14 @@
 
 1. **预热着色器 / 量化图层 alpha**：剩下 >64ms 的帧被 `shader_compile`(29ms)、`cache_miss`(28ms)、
    `postAndWait`(88ms) 占掉，是图形管线一次性成本。要么启动时预热，要么把每帧变化的 alpha 步进量化。
-2. **网页控制台鉴权后截图**：GUI 被别的窗口盖住、Edge headless 在这台机不产出文件（4 种调用都试过）。
-   换一台机或用 `--remote-debugging-port` + CDP 截图应该能解。
+2. ~~网页控制台鉴权后截图~~ **已解决**，配方记在这里：
+   `msedge --headless=new --remote-debugging-port=<port> --user-data-dir=<临时目录> about:blank`
+   → `PUT /json/new?<url>` 拿 `webSocketDebuggerUrl` → 自己发 WebSocket 帧
+   `{"id":1,"method":"Page.captureScreenshot"}` → 响应里的 base64 存 PNG。
+   **关键坑**：不要加 `--virtual-time-budget`（页面有轮询，虚拟时间永远走不完，headless 就不写文件）；
+   `--screenshot=<path>` 只在 file:// 页面可靠，http 页面一律不产出。
+   打出来的图在 `docs/device/v11/console-authed.png`（顶栏「令牌 有效 / 端口 8080」、网络与反馈真值、
+   设置页风格选中"大卡片"）。
 3. **brand art 的 48dp 打磨**：`CHARACTERS.md` 第 4 节列了每个角色在 48dp 的风险点与改法
    （deepseek 喷水点太小、openai 叶尖缺口只有 1 格、qwen 问号杆太细、ollama/llama 太像）。
    注意当前点阵渲染器所有点同半径，要做"小点"得先给渲染器加一种符号。
