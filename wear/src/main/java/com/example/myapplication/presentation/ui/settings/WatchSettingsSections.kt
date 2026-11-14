@@ -245,6 +245,22 @@ fun AppearanceContent(
             )
         }
 
+        // 触觉强度：用官方 primitive 的 scale 表达轻/标准/强，不换波形
+        section(stringResource(R.string.settings_haptic_amplitude))
+
+        HapticAmplitude.entries.forEach { level ->
+            row(subItem = true) {
+                SettingsSubRadioRow(
+                    label = stringResource(level.labelRes),
+                    selected = preferences.hapticAmplitude == level,
+                    onSelect = {
+                        preferences.hapticAmplitude = level
+                        context.vibrateTick()
+                    }
+                )
+            }
+        }
+
         // 表冠增益：一格刻度走多远。真实的消费者是根页与全部子页的 onRotaryScrollEvent。
         row {
             SettingsSliderRow(

@@ -196,28 +196,41 @@ val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
 private val DialogFieldMaxHeight = 120.dp
 
 fun Context.vibrateTick() {
-    if (!AgentPreferences(this).hapticsEnabled) return
-    try {
-        val vibrator = getSystemService(Vibrator::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(15L)
-        }
-    } catch (_: Exception) {}
+    val preferences = AgentPreferences(this)
+    if (!preferences.hapticsEnabled) return
+    vibratePrimitive(
+        primitive = VibrationEffect.Composition.PRIMITIVE_TICK,
+        scale = preferences.hapticAmplitude.scale
+    )
 }
 
 /** 破坏性操作与真实提交的唯一确认震动：一次、短促，与滚动刻度震动彻底分开。 */
 fun Context.vibrateConfirm() {
-    if (!AgentPreferences(this).hapticsEnabled) return
+    val preferences = AgentPreferences(this)
+    if (!preferences.hapticsEnabled) return
+    vibratePrimitive(
+        primitive = VibrationEffect.Composition.PRIMITIVE_CLICK,
+        scale = preferences.hapticAmplitude.scale
+    )
+}
+
+/**
+ * 按档位缩放一个官方 primitive。
+ *
+ * 用 Composition 而不是 createPredefined：后者不接受强度参数，想改强度只能换波形 ——
+ * 那就把"滴"的系统语义丢了。scale 取值 (0,1]，越界一律夹到 [0.1, 1]。
+ */
+private fun Context.vibratePrimitive(primitive: Int, scale: Float) {
     try {
         val vibrator = getSystemService(Vibrator::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val composed = VibrationEffect.startComposition()
+                .addPrimitive(primitive, scale.coerceIn(0.1f, 1f))
+                .compose()
+            vibrator.vibrate(composed)
         } else {
             @Suppress("DEPRECATION")
-            vibrator.vibrate(20L)
+            vibrator.vibrate(15L)
         }
     } catch (_: Exception) {}
 }

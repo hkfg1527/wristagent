@@ -481,6 +481,10 @@
     <string name="settings_net_backoff_secondary">Wait this long before retrying</string>
     <string name="settings_wifi_only">Wi-Fi only</string>
     <string name="settings_wifi_only_secondary">Refuse to spend cellular data on a request</string>
+    <string name="settings_haptic_amplitude">Haptic strength</string>
+    <string name="settings_haptic_light">Light</string>
+    <string name="settings_haptic_standard">Standard</string>
+    <string name="settings_haptic_strong">Strong</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>

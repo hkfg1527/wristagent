@@ -11,6 +11,19 @@
 
 ---
 
+## [0.0.0.13] - 2026-11-15（内部版，不对外发布）
+
+### 新增第 9 个真实设置：触觉强度（`haptic_amplitude`）
+- 三档：轻 / 标准 / 强，对应官方 **primitive 缩放** scale 0.4 / 0.7 / 1.0。
+  用 `VibrationEffect.startComposition().addPrimitive(primitive, scale)`，而不是
+  `createPredefined` —— 后者不接受强度参数，想改强度只能换波形，那就把系统"滴"的语义丢了。
+- 消费点两处：`vibrateTick`（滚动刻度）与 `vibrateConfirm`（提交确认），都读同一档位。
+- UI：外观与动效页新增「触觉强度」三选一，选中即震一下作为试听。
+- 新增 `HapticAmplitudeTest` 4 个（未知值回退标准档、名称往返、三档严格递增且落在 (0,1]、两个震动入口都读档位）。
+- **端到端证据**：真机点「轻」后，`/data/data/dev.ghr.wristagent/shared_prefs/*.xml` 里出现
+  `<string name="haptic_amplitude">LIGHT</string>` —— UI → 偏好落盘这条链是通的。
+- 合计 **1227 全绿**。
+
 ## [0.0.0.12] - 2026-11-15（内部版，不对外发布）
 
 ### 新增第 8 个真实设置：工具结果上限（`tool_result_max_chars`）

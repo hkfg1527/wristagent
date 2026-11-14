@@ -2,6 +2,7 @@ package com.example.myapplication.agent
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.myapplication.presentation.ui.settings.HapticAmplitude
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.voice.AsrLanguage
@@ -141,6 +142,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
     var hapticsEnabled: Boolean
         get() = prefs.getBoolean(KEY_HAPTICS, DEFAULT_HAPTICS)
         set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
+
+    /** 触觉幅度档位（存枚举名，未知值退回标准档）。 */
+    var hapticAmplitude: HapticAmplitude
+        get() = HapticAmplitude.fromStorage(prefs.getString(KEY_HAPTIC_AMPLITUDE, null))
+        set(value) = prefs.edit().putString(KEY_HAPTIC_AMPLITUDE, value.name).apply()
 
     /**
      * 表冠滚动增益：一格刻度换算成多少像素位移的倍数。
@@ -563,6 +569,7 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_RETRY_BACKOFF = "retryBackoffMs"
         const val KEY_WIFI_ONLY = "wifiOnlyRequests"
         const val KEY_HAPTICS = "hapticsEnabled"
+        const val KEY_HAPTIC_AMPLITUDE = "haptic_amplitude"
         const val KEY_ROTARY_SCROLL_GAIN = "rotary_scroll_gain"
         const val DEFAULT_ROTARY_SCROLL_GAIN = 1f
         const val MIN_ROTARY_SCROLL_GAIN = 0.5f

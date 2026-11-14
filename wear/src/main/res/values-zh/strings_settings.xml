@@ -481,6 +481,10 @@
     <string name="settings_net_backoff_secondary">重试之前先等这么久</string>
     <string name="settings_wifi_only">仅 WiFi 请求</string>
     <string name="settings_wifi_only_secondary">开启后蜂窝网络下不发请求</string>
+    <string name="settings_haptic_amplitude">触觉强度</string>
+    <string name="settings_haptic_light">轻</string>
+    <string name="settings_haptic_standard">标准</string>
+    <string name="settings_haptic_strong">强</string>
     <string name="settings_haptics">触觉反馈</string>
     <string name="settings_haptics_secondary">点按与确认时震动</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
