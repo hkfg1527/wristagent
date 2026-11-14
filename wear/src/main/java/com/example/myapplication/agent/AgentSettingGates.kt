@@ -17,7 +17,9 @@ data class AgentDisplayPreferences(
     /** 播报语速：每次合成前交给 TextToSpeech.setSpeechRate。 */
     val ttsSpeechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE,
     /** 播报音量（0..1）：与语速一样，每次合成前都要重设。 */
-    val ttsVolume: Float = AgentPreferences.DEFAULT_TTS_VOLUME
+    val ttsVolume: Float = AgentPreferences.DEFAULT_TTS_VOLUME,
+    /** 播报队列语义：打断或排队。 */
+    val ttsQueueMode: TtsQueueMode = TtsQueueMode.INTERRUPT
 )
 
 /**

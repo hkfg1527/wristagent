@@ -494,6 +494,9 @@
     <string name="settings_shell_timeout_value">%1$d ms</string>
     <string name="settings_approval_threshold">Allow threshold</string>
     <string name="settings_approval_threshold_value">%1$.2f</string>
+    <string name="settings_tts_queue_mode">Reply queue</string>
+    <string name="settings_tts_queue_interrupt">Interrupt the previous reply</string>
+    <string name="settings_tts_queue_append">Queue after the previous reply</string>
     <string name="settings_tts_volume">Reply volume</string>
     <string name="settings_tts_speech_rate">Speech rate</string>
     <string name="settings_tts_speech_rate_value">%1$.1f×</string>

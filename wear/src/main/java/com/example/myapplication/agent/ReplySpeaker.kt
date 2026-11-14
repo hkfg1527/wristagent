@@ -27,7 +27,8 @@ class ReplySpeaker(private val context: Context) {
     fun speak(
         text: String,
         speechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE,
-        volume: Float = AgentPreferences.DEFAULT_TTS_VOLUME
+        volume: Float = AgentPreferences.DEFAULT_TTS_VOLUME,
+        queueMode: TtsQueueMode = TtsQueueMode.INTERRUPT
     ) {
         if (text.isBlank()) return
         try {
@@ -43,7 +44,7 @@ class ReplySpeaker(private val context: Context) {
             val params = android.os.Bundle().apply {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volumeFor(volume))
             }
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "reply-" + utteranceSeq)
+            tts.speak(text, queueMode.queueConstant, params, "reply-" + utteranceSeq)
         } catch (t: Throwable) {
             Log.w(TAG, "播报失败，忽略：" + t.javaClass.simpleName)
         }

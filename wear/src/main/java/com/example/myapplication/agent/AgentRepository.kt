@@ -100,7 +100,8 @@ class AgentRepository(
         asrLiveTranscript = preferences.asrLiveTranscript,
         streamEmitIntervalMs = preferences.streamEmitIntervalMs,
         ttsSpeechRate = preferences.ttsSpeechRate,
-            ttsVolume = preferences.ttsVolume
+            ttsVolume = preferences.ttsVolume,
+            ttsQueueMode = preferences.ttsQueueMode
     )
 
     override fun registeredTools(): List<ToolDefinition> = dispatcher.getRegisteredTools()

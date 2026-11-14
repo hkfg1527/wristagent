@@ -133,6 +133,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             .putFloat(KEY_TTS_VOLUME, value.coerceIn(MIN_TTS_VOLUME, MAX_TTS_VOLUME))
             .apply()
 
+    /** 播报队列语义（存枚举名，未知值退回打断）。 */
+    var ttsQueueMode: TtsQueueMode
+        get() = TtsQueueMode.fromStorage(prefs.getString(KEY_TTS_QUEUE_MODE, null))
+        set(value) = prefs.edit().putString(KEY_TTS_QUEUE_MODE, value.name).apply()
+
     /** 仅 WiFi 下发起请求：默认关。开着时蜂窝网络会直接给出可读回执。 */
     var wifiOnlyRequests: Boolean
         get() = prefs.getBoolean(KEY_WIFI_ONLY, DEFAULT_WIFI_ONLY)
@@ -595,6 +600,7 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val DEFAULT_APPROVAL_ALLOW_THRESHOLD = 0.85f
         const val DEFAULT_TTS_SPEECH_RATE = 1.0f
         const val KEY_TTS_VOLUME = "tts_volume"
+        const val KEY_TTS_QUEUE_MODE = "tts_queue_mode"
         const val DEFAULT_TTS_VOLUME = 0.8f
         const val MIN_TTS_VOLUME = 0.1f
         const val MAX_TTS_VOLUME = 1f

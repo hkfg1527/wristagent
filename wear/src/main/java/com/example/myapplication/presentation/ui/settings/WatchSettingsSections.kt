@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.TtsQueueMode
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import kotlin.math.roundToInt
@@ -143,6 +144,19 @@ fun VoiceEntryContent(
                     }
                 }
             )
+        }
+
+        // 播报队列：打断 = 说下一句时上一句让位；排队 = 把一段读完
+        section(stringResource(R.string.settings_tts_queue_mode))
+
+        TtsQueueMode.entries.forEach { mode ->
+            row(subItem = true) {
+                SettingsSubRadioRow(
+                    label = stringResource(mode.labelRes),
+                    selected = preferences.ttsQueueMode == mode,
+                    onSelect = { preferences.ttsQueueMode = mode }
+                )
+            }
         }
 
         // 唤醒方式：两条自动入口由 VoiceEntryPolicy 判为已移除，这里只回显结论，不给可写开关
