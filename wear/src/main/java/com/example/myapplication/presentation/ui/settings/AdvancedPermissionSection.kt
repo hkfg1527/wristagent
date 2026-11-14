@@ -33,6 +33,7 @@ fun AdvancedPermissionContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_privilege_title),
+        heroLabel = stringResource(R.string.settings_privilege_title),
         onBack = onBack,
         hero = {
             SettingsHeroCard(

@@ -333,6 +333,13 @@ fun SettingsSubPage(
      * 只有 [SettingsStyle.GOOGLE_CARD] 才渲染；其余风格传了也看不见，因此各子页可以放心传入。
      */
     hero: (@Composable () -> Unit)? = null,
+    /**
+     * 页首 hero 自己的标签（就是卡片里那行强调色小字）。
+     *
+     * 它和页面标题是同一个字符串时，卡片档**不再画标题行** —— 否则同一句话会在 200px 内出现两次
+     * （标题一行、hero 标签一行）。其余风格没有 hero，标题永远照画。
+     */
+    heroLabel: String? = null,
     rows: @Composable SettingsRows.() -> Unit
 ) {
     val stagger = rememberSettingsRowStaggerState()
@@ -418,12 +425,16 @@ fun SettingsSubPage(
             autoCentering = null
         ) {
             val showHero = hero != null && WearAppearance.style == SettingsStyle.GOOGLE_CARD
+            // hero 的标签就是这句话时不再画页标题：卡片档里标题与 hero 标签会紧挨着重两次
+            val showPageHeader = SettingsTextLayout.shouldRenderPageHeader(showHero, heroLabel, title)
             val rowCount = content.size + 1 + if (showHero) 1 else 0
 
-            item(key = "page-header") {
-                SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        SettingsPageHeader(title = title)
+            if (showPageHeader) {
+                item(key = "page-header") {
+                    SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            SettingsPageHeader(title = title)
+                        }
                     }
                 }
             }

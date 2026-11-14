@@ -25,6 +25,18 @@ object SettingsTextLayout {
     fun shouldRenderSectionHeader(text: String, pageTitle: String, isFirstSection: Boolean): Boolean =
         !(isFirstSection && text.trim() == pageTitle.trim())
 
+    /**
+     * 卡片档的页标题要不要画。
+     *
+     * hero 卡里那行强调色小字就是页面的名字；当它和页标题是同一句话时，标题再画一次
+     * 就是同一句话在 200px 内出现两遍。其余风格没有 hero，标题永远照画。
+     */
+    fun shouldRenderPageHeader(showHero: Boolean, heroLabel: String?, title: String): Boolean {
+        if (!showHero) return true
+        if (heroLabel == null) return true
+        return heroLabel.trim() != title.trim()
+    }
+
     fun subtitleWidthDp(
         subItem: Boolean,
         contentWidthDp: Float = SettingsDesignMath.ContentWidthDp,

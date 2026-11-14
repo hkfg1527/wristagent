@@ -67,6 +67,7 @@ fun VoiceAsrContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_asr),
+        heroLabel = stringResource(R.string.settings_asr),
         onBack = onBack,
         hero = {
             val provider = AsrProviderId.fromStorage(preferences.asrProvider)

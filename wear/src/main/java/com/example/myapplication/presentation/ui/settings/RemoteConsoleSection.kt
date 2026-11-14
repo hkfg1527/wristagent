@@ -48,6 +48,7 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
 
     SettingsSubPage(
         title = stringResource(R.string.settings_remote_console_title),
+        heroLabel = stringResource(R.string.settings_remote_console_title),
         onBack = onBack,
         hero = {
             SettingsHeroCard(

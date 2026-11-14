@@ -122,3 +122,25 @@ class SettingsSectionHeaderMarkTest {
         assertEquals(0f, SettingsSectionHeaderMark.mark(trackHeightDp = -4f).yDp, 0.001f)
     }
 }
+
+/** 页标题与 hero 标签重复时，标题不再画。 */
+class SettingsPageHeaderDedupeTest {
+
+    @Test
+    fun aHeroLabelThatRepeatsTheTitleSuppressesTheTitle() {
+        assertFalse(SettingsTextLayout.shouldRenderPageHeader(true, "提示词", "提示词"))
+        assertFalse(SettingsTextLayout.shouldRenderPageHeader(true, " 安全策略 ", "安全策略"))
+    }
+
+    @Test
+    fun aDifferentLabelKeepsTheTitle() {
+        assertTrue(SettingsTextLayout.shouldRenderPageHeader(true, "模型", "模型与端点"))
+        assertTrue(SettingsTextLayout.shouldRenderPageHeader(true, "设置快照", "配置导入导出"))
+    }
+
+    @Test
+    fun noHeroOrNoLabelAlwaysKeepsTheTitle() {
+        assertTrue(SettingsTextLayout.shouldRenderPageHeader(false, "提示词", "提示词"))
+        assertTrue(SettingsTextLayout.shouldRenderPageHeader(true, null, "提示词"))
+    }
+}

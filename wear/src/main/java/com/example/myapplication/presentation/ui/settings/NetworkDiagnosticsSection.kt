@@ -86,6 +86,7 @@ fun NetworkDiagnosticsContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_netdiag_title),
+        heroLabel = stringResource(R.string.settings_netdiag_title),
         onBack = onBack,
         hero = {
             val issues = plans.count { it.id != RepairPlanId.ALL_OK }

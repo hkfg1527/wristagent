@@ -102,6 +102,7 @@ fun PromptViewerContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_system_prompt),
+        heroLabel = stringResource(R.string.settings_system_prompt),
         onBack = onBack,
         hero = {
             SettingsHeroCard(

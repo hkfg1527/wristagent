@@ -59,6 +59,7 @@ fun HyperParamsContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_hyper_params),
+        heroLabel = stringResource(R.string.settings_sub_hyper_params),
         onBack = onBack,
         hero = {
             SettingsHeroCard(

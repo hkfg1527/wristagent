@@ -33,6 +33,7 @@ fun PromptContextContent(
     BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
     SettingsSubPage(
         title = stringResource(R.string.settings_prompt_context),
+        heroLabel = stringResource(R.string.settings_prompt_context),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
         hero = {
             SettingsHeroCard(
@@ -87,6 +88,7 @@ fun AboutContent(
     BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
     SettingsSubPage(
         title = stringResource(R.string.settings_about),
+        heroLabel = stringResource(R.string.settings_about),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
         hero = {
             SettingsHeroCard(

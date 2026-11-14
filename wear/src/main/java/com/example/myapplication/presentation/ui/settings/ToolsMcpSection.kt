@@ -51,6 +51,7 @@ fun ToolsMcpContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_tools_and_mcp),
+        heroLabel = stringResource(R.string.settings_tools_and_mcp),
         onBack = onBack,
         hero = {
             val toolSwitches = listOf(

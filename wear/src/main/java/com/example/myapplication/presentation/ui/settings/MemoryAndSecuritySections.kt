@@ -52,6 +52,7 @@ fun MemoryManagerContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_memory_management),
+        heroLabel = stringResource(R.string.settings_memory_management),
         onBack = onBack,
         hero = {
             SettingsHeroCard(
@@ -204,6 +205,7 @@ fun GestureBindingsContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_gesture),
+        heroLabel = stringResource(R.string.settings_sub_gesture),
         onBack = onBack,
         hero = {
             val bound = listOf(
@@ -293,6 +295,7 @@ fun SecurityGuardrailContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_security_policy),
+        heroLabel = stringResource(R.string.settings_security_policy),
         onBack = onBack,
         hero = {
             val current = modes.first { it.first == currentMode }

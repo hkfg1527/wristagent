@@ -39,6 +39,7 @@ fun VoiceEntryContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_voice_entry),
+        heroLabel = stringResource(R.string.settings_sub_voice_entry),
         onBack = onBack,
         hero = {
             SettingsHeroCard(

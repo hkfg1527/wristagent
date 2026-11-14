@@ -40,6 +40,7 @@ fun ProviderProfilesContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_provider_profiles),
+        heroLabel = stringResource(R.string.settings_provider_profiles),
         onBack = onBack,
         hero = {
             val active = book.active()?.name
