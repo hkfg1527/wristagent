@@ -86,7 +86,8 @@ class AgentDispatcher(
         executeTool = { call -> executeSubAgentTool(call) },
         availableTools = { toolRegistry.getToolDefinitions() },
         isCancelled = { isCancelled },
-        idleSpinStopAfter = preferences.idleSpinStopAfter
+        idleSpinStopAfter = preferences.idleSpinStopAfter,
+        subagentMaxDepth = preferences.subagentMaxDepth
     )
 
     init {

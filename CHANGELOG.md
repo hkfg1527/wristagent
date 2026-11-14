@@ -11,6 +11,24 @@
 
 ---
 
+## [0.0.0.22] - 2026-11-15（内部版，不对外发布）
+
+### 第 18–20 个真实设置 —— **20 个设置目标达成**
+| 键 | 范围 | 默认 | 消费点 |
+|---|---|---|---|
+| `memory_max_fact_length` | 40..240 字 | 120 | `MemoryFactBook.add(...)` 的超长拒绝（写入方 remember_fact 传偏好） |
+| `console_lockout_minutes` | 1..60 分钟 | 1 | `ConsoleBridge` 构造 `ConsoleAuthThrottle(lockDurationMs = ...)` |
+| `subagent_max_depth` | 0..1 层 | 1 | `SubAgentPolicy.depthAllowed(depth, maxDepth)`（0 = 关闭，工具不出现） |
+
+- 记忆上限在**两处**夹取（偏好与写入判定），因为 remember_fact 也会被工具层直接调用；
+  子代理层数的 0 档等于彻底关闭，不是"灰显"。
+- 真机核对：网页控制台页「锁定窗口 → 1 分钟」。
+- `SettingsPersistenceTest` 覆盖 **20 / 20** 项；新增 `LimiterSettingsTest` 7 个；合计 **1266 全绿**。
+
+### 一处命名不一致（记下来，下轮统一）
+- 根页/子页里这个入口叫「网页控制台」，而 IA 文档与代码枚举叫「远程控制台」。
+  我这轮按界面文字找了两轮才找到，说明名字不一致会真实地浪费人的时间。
+
 ## [0.0.0.21] - 2026-11-15（内部版，不对外发布）
 
 ### 新增第 17 个真实设置：空转收口轮次（`idle_spin_stop_after`）

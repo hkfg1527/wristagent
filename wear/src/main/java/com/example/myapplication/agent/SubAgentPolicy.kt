@@ -19,7 +19,11 @@ object SubAgentPolicy {
     fun isEffective(mode: SecurityMode, enabled: Boolean): Boolean =
         mode == SecurityMode.EXPERT && enabled
 
-    fun depthAllowed(depth: Int): Boolean = depth >= 0 && depth < MAX_DEPTH
+    /**
+     * 允许在 [depth] 处开子代理吗。[maxDepth] 来自设置项 subagent_max_depth：0 = 关闭，1 = 一层。
+     */
+    fun depthAllowed(depth: Int, maxDepth: Int = MAX_DEPTH): Boolean =
+        depth >= 0 && depth < maxDepth.coerceIn(0, MAX_DEPTH)
 
     /** 工具清单只有一份真源：不生效时返回空表，调用方 addAll 之后清单里就没有这一行（不是灰显）。 */
     fun toolDefinitions(mode: SecurityMode, enabled: Boolean): List<ToolDefinition> =

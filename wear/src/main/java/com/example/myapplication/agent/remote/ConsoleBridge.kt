@@ -256,7 +256,10 @@ internal object ConsoleBridge {
             token = { tokens.getOrCreate() },
             serverPort = serverPort,
             uptime = { SystemClock.elapsedRealtime() - startedAtMs },
-            throttle = ConsoleAuthThrottle(maxFailures = preferences.consoleMaxFailures),
+            throttle = ConsoleAuthThrottle(
+                maxFailures = preferences.consoleMaxFailures,
+                lockDurationMs = preferences.consoleLockoutMinutes * 60_000L
+            ),
         )
     }
 

@@ -8,6 +8,7 @@ import com.example.myapplication.agent.remote.ConsoleAuthThrottle
 import com.example.myapplication.agent.net.NetworkDiagnostics
 import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.presentation.ui.settings.HapticAmplitude
+import com.example.myapplication.agent.contract.MemoryFactBook
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.voice.AsrLanguage
@@ -115,6 +116,35 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             .putInt(
                 KEY_IDLE_SPIN_STOP_AFTER,
                 value.coerceIn(AgentLoopPolicy.MIN_IDLE_SPIN_STOP, AgentLoopPolicy.MAX_IDLE_SPIN_STOP)
+            )
+            .apply()
+    /** 单条记忆长度上限（40..240）：超长记忆会把系统提示词的长度预算吃掉大半。 */
+    var memoryMaxFactLength: Int
+        get() = prefs.getInt(KEY_MEMORY_MAX_FACT_LENGTH, MemoryFactBook.MAX_FACT_LENGTH)
+            .coerceIn(MemoryFactBook.MIN_FACT_LENGTH, MemoryFactBook.MAX_FACT_LENGTH_LIMIT)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_MEMORY_MAX_FACT_LENGTH,
+                value.coerceIn(MemoryFactBook.MIN_FACT_LENGTH, MemoryFactBook.MAX_FACT_LENGTH_LIMIT)
+            )
+            .apply()
+
+    /** 子代理最大层数：0 = 关闭（工具不出现），1 = 允许一层（默认）。 */
+    var subagentMaxDepth: Int
+        get() = prefs.getInt(KEY_SUBAGENT_MAX_DEPTH, SubAgentPolicy.MAX_DEPTH)
+            .coerceIn(0, SubAgentPolicy.MAX_DEPTH)
+        set(value) = prefs.edit()
+            .putInt(KEY_SUBAGENT_MAX_DEPTH, value.coerceIn(0, SubAgentPolicy.MAX_DEPTH))
+            .apply()
+
+    /** 控制台锁定窗口（分钟，1..60）：连续错误达到上限后封禁该来源多久。 */
+    var consoleLockoutMinutes: Long
+        get() = prefs.getLong(KEY_CONSOLE_LOCKOUT_MINUTES, DEFAULT_CONSOLE_LOCKOUT_MINUTES)
+            .coerceIn(MIN_CONSOLE_LOCKOUT_MINUTES, MAX_CONSOLE_LOCKOUT_MINUTES)
+        set(value) = prefs.edit()
+            .putLong(
+                KEY_CONSOLE_LOCKOUT_MINUTES,
+                value.coerceIn(MIN_CONSOLE_LOCKOUT_MINUTES, MAX_CONSOLE_LOCKOUT_MINUTES)
             )
             .apply()
 
@@ -679,6 +709,12 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_STREAM_EMIT_INTERVAL_MS = "stream_emit_interval_ms"
         const val KEY_STREAM_EMIT_CHARS = "stream_emit_chars"
         const val KEY_IDLE_SPIN_STOP_AFTER = "idle_spin_stop_after"
+        const val KEY_MEMORY_MAX_FACT_LENGTH = "memory_max_fact_length"
+        const val MAX_CONSOLE_LOCKOUT_MINUTES = 60L
+        const val MIN_CONSOLE_LOCKOUT_MINUTES = 1L
+        const val DEFAULT_CONSOLE_LOCKOUT_MINUTES = 1L
+        const val KEY_CONSOLE_LOCKOUT_MINUTES = "console_lockout_minutes"
+        const val KEY_SUBAGENT_MAX_DEPTH = "subagent_max_depth"
         const val KEY_SHELL_COMMAND_TIMEOUT_MS = "shell_command_timeout_ms"
         const val KEY_APPROVAL_ALLOW_THRESHOLD = "approval_allow_threshold"
         const val KEY_TTS_SPEECH_RATE = "tts_speech_rate"

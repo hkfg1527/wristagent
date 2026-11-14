@@ -14,6 +14,10 @@ object MemoryFactBook {
     /** 单条记忆的长度上限：手表上下文极小，一条超长记忆等于把长度预算吃掉大半。 */
     const val MAX_FACT_LENGTH = 120
 
+    /** 设置项可调范围：40（很紧）到 240（宽松）。 */
+    const val MIN_FACT_LENGTH = 40
+    const val MAX_FACT_LENGTH_LIMIT = 240
+
     enum class Status { ADDED, DUPLICATE, FULL, INVALID }
 
     /**
@@ -40,12 +44,18 @@ object MemoryFactBook {
      * 写入判定：空值 / 超长 → INVALID，命中已有条目 → DUPLICATE，清单已满 → FULL，
      * 其余才真的追加。重复与超限都不改动已有清单。
      */
-    fun add(notes: String, raw: String, maxFacts: Int): WriteResult {
+    fun add(
+        notes: String,
+        raw: String,
+        maxFacts: Int,
+        /** 单条长度上限，来自设置项 memory_max_fact_length；夹取在设置层完成。 */
+        maxLength: Int = MAX_FACT_LENGTH
+    ): WriteResult {
         val fact = normalize(raw)
         val current = facts(notes)
         val keep = { status: Status -> WriteResult(status, fact, render(current), current.size) }
         return when {
-            fact.isEmpty() || fact.length > MAX_FACT_LENGTH -> keep(Status.INVALID)
+            fact.isEmpty() || fact.length > maxLength.coerceIn(MIN_FACT_LENGTH, MAX_FACT_LENGTH_LIMIT) -> keep(Status.INVALID)
             current.any { key(it) == key(fact) } -> keep(Status.DUPLICATE)
             current.size >= maxFacts -> keep(Status.FULL)
             else -> {
@@ -87,8 +97,12 @@ class AgentMemory(context: Context) {
      * 长期记忆的唯一写入方：归一化 → 去重 → 上限 → 落盘。
      * 只有真正新增时才写盘；重复与超限保持原清单不变。
      */
-    fun rememberFact(raw: String, maxFacts: Int): MemoryFactBook.WriteResult {
-        val result = MemoryFactBook.add(longTermNotes, raw, maxFacts)
+    fun rememberFact(
+        raw: String,
+        maxFacts: Int,
+        maxLength: Int = MemoryFactBook.MAX_FACT_LENGTH
+    ): MemoryFactBook.WriteResult {
+        val result = MemoryFactBook.add(longTermNotes, raw, maxFacts, maxLength)
         if (result.status == MemoryFactBook.Status.ADDED) longTermNotes = result.notes
         return result
     }

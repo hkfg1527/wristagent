@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.agent.contract.MemoryFactBook
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -39,6 +40,7 @@ fun MemoryManagerContent(
     var turns by remember { mutableIntStateOf(preferences.maxContextTurns) }
     var compressThreshold by remember { mutableFloatStateOf(preferences.historyCompressThreshold) }
     var memoryEnabled by remember { mutableStateOf(preferences.memoryEnabled) }
+    var memoryMaxLength by remember { mutableIntStateOf(preferences.memoryMaxFactLength) }
     var autoCompress by remember { mutableStateOf(preferences.autoCompressContext) }
 
     // 清空会重写全部偏好：本页四处本地状态必须立刻跟真值对齐，
@@ -131,6 +133,25 @@ fun MemoryManagerContent(
             )
         }
 
+        // 单条记忆长度上限：超长记忆会把系统提示词的长度预算吃掉大半
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_memory_max_fact_length),
+                value = memoryMaxLength.toFloat(),
+                valueRange = MemoryFactBook.MIN_FACT_LENGTH.toFloat()..
+                    MemoryFactBook.MAX_FACT_LENGTH_LIMIT.toFloat(),
+                steps = 9,
+                valueText = memoryMaxLength.toString(),
+                onValueChange = { raw ->
+                    val snapped = ((raw / 20f).roundToInt() * 20)
+                        .coerceIn(MemoryFactBook.MIN_FACT_LENGTH, MemoryFactBook.MAX_FACT_LENGTH_LIMIT)
+                    if (snapped != memoryMaxLength) {
+                        memoryMaxLength = snapped
+                        preferences.memoryMaxFactLength = snapped
+                    }
+                }
+            )
+        }
         row {
             SettingsSwitchRow(
                 label = stringResource(R.string.settings_memory_enabled),

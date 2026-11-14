@@ -685,7 +685,11 @@ class AgentToolRegistry(
             return errorJson("memory_disabled", "长期记忆总开关已关闭，先打开再记")
         }
         val store = memory ?: return errorJson("memory_unavailable", "长期记忆仓储尚未接线")
-        val result = store.rememberFact(args.optString("fact", ""), AgentPreferences.MAX_MEMORY_FACTS)
+        val result = store.rememberFact(
+            args.optString("fact", ""),
+            AgentPreferences.MAX_MEMORY_FACTS,
+            preferences?.memoryMaxFactLength ?: MemoryFactBook.MAX_FACT_LENGTH
+        )
         return when (result.status) {
             MemoryFactBook.Status.ADDED -> JSONObject().apply {
                 put("status", "success")

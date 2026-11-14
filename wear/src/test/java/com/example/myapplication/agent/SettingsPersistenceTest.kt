@@ -21,6 +21,9 @@ class SettingsPersistenceTest {
         p.streamEmitIntervalMs = 48
         p.streamEmitChars = 20
         p.idleSpinStopAfter = 6
+        p.memoryMaxFactLength = 80
+        p.consoleLockoutMinutes = 5L
+        p.subagentMaxDepth = 0
         p.shellCommandTimeoutMs = 30_000L
         p.approvalAllowThreshold = 0.6f
         p.ttsSpeechRate = 1.4f
@@ -40,6 +43,9 @@ class SettingsPersistenceTest {
         assertEquals(48, p.streamEmitIntervalMs)
         assertEquals(20, p.streamEmitChars)
         assertEquals(6, p.idleSpinStopAfter)
+        assertEquals(80, p.memoryMaxFactLength)
+        assertEquals(5L, p.consoleLockoutMinutes)
+        assertEquals(0, p.subagentMaxDepth)
         assertEquals(30_000L, p.shellCommandTimeoutMs)
         assertEquals(0.6f, p.approvalAllowThreshold, 0.0001f)
         assertEquals(1.4f, p.ttsSpeechRate, 0.0001f)
@@ -70,6 +76,9 @@ class SettingsPersistenceTest {
         assertEquals("tool_result_max_chars", AgentPreferences.KEY_TOOL_RESULT_MAX_CHARS)
         assertEquals("bottom_bar_auto_hide_ms", AgentPreferences.KEY_BOTTOM_BAR_AUTO_HIDE_MS)
         assertEquals("idle_spin_stop_after", AgentPreferences.KEY_IDLE_SPIN_STOP_AFTER)
+        assertEquals("memory_max_fact_length", AgentPreferences.KEY_MEMORY_MAX_FACT_LENGTH)
+        assertEquals("console_lockout_minutes", AgentPreferences.KEY_CONSOLE_LOCKOUT_MINUTES)
+        assertEquals("subagent_max_depth", AgentPreferences.KEY_SUBAGENT_MAX_DEPTH)
         assertEquals("sampling_top_p", AgentPreferences.KEY_SAMPLING_TOP_P)
         assertEquals("mcp_max_tool_pages", AgentPreferences.KEY_MCP_MAX_TOOL_PAGES)
         assertEquals("subagent_read_timeout_ms", AgentPreferences.KEY_SUBAGENT_READ_TIMEOUT_MS)

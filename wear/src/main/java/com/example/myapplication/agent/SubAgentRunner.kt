@@ -62,7 +62,9 @@ class SubAgentRunner(
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
     /** 空转收口阈值，来自设置项 idle_spin_stop_after；子代理与主循环共用同一份判据。 */
-    private val idleSpinStopAfter: Int = AgentLoopPolicy.IDLE_SPIN_STOP_AFTER
+    private val idleSpinStopAfter: Int = AgentLoopPolicy.IDLE_SPIN_STOP_AFTER,
+    /** 子代理最大层数，来自设置项 subagent_max_depth。 */
+    private val subagentMaxDepth: Int = SubAgentPolicy.MAX_DEPTH
 ) {
     suspend fun run(
         parentDepth: Int,
@@ -71,7 +73,7 @@ class SubAgentRunner(
         focus: String?
     ): SubAgentReport {
         val startedAt = clock()
-        if (!SubAgentPolicy.depthAllowed(parentDepth)) {
+        if (!SubAgentPolicy.depthAllowed(parentDepth, subagentMaxDepth)) {
             return errorReport(
                 type = SubAgentReport.ERROR_DEPTH,
                 message = "子代理里不能再开子代理（最大深度 " + SubAgentPolicy.MAX_DEPTH + "）",

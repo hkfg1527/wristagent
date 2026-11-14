@@ -55,8 +55,9 @@ class ConnectivityLimitsTest {
     fun theBridgeHandsTheLimitToTheThrottle() {
         val bridge = readProjectFile("src/main/java/com/example/myapplication/agent/remote/ConsoleBridge.kt")
         assertTrue(
-            "控制台必须按偏好构造防爆破节流器",
-            bridge.contains("ConsoleAuthThrottle(maxFailures = preferences.consoleMaxFailures)")
+            "控制台必须按偏好构造防爆破节流器（上限与锁定窗口都要读偏好）",
+            bridge.contains("maxFailures = preferences.consoleMaxFailures") &&
+                bridge.contains("lockDurationMs = preferences.consoleLockoutMinutes * 60_000L")
         )
     }
 }

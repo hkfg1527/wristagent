@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.compose.runtime.mutableFloatStateOf
 import com.example.myapplication.agent.AgentPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
     var refreshTick by remember { mutableIntStateOf(0) }
     val preferences = remember { AgentPreferences(context.applicationContext) }
     var maxFailures by remember { mutableIntStateOf(preferences.consoleMaxFailures) }
+    var lockoutMinutes by remember { mutableFloatStateOf(preferences.consoleLockoutMinutes.toFloat()) }
     val token = remember(refreshTick) { tokenStore.getOrCreate() }
     // 端口读的是真正绑上的那个（8080 被占用时会是 8081 / 8082），不是配置里的首选端口
     val port = remember(refreshTick) { server.port }
@@ -80,6 +82,24 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
     ) {
         section(stringResource(R.string.settings_remote_console_title))
 
+        // 锁定窗口：连续错误达到上限后封这个来源多久
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_console_lockout_minutes),
+                value = lockoutMinutes,
+                valueRange = AgentPreferences.MIN_CONSOLE_LOCKOUT_MINUTES.toFloat()..
+                    AgentPreferences.MAX_CONSOLE_LOCKOUT_MINUTES.toFloat(),
+                steps = 8,
+                valueText = String.format("%.0f 分钟", lockoutMinutes),
+                onValueChange = { raw ->
+                    val snapped = raw.roundToInt().toFloat()
+                    if (snapped != lockoutMinutes) {
+                        lockoutMinutes = snapped
+                        preferences.consoleLockoutMinutes = snapped.toLong()
+                    }
+                }
+            )
+        }
         // 防爆破：连续错几次就锁这个来源。改完下一次错误就按新上限计数。
         row {
             SettingsSliderRow(

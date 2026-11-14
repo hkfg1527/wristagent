@@ -64,6 +64,7 @@ fun ToolsMcpContent(
     var shellTimeoutMs by remember { mutableIntStateOf(preferences.shellCommandTimeoutMs.toInt()) }
     var toolChars by remember { mutableIntStateOf(preferences.toolResultMaxChars) }
     var mcpPages by remember { mutableIntStateOf(preferences.mcpMaxToolPages) }
+    var subagentDepth by remember { mutableIntStateOf(preferences.subagentMaxDepth) }
     var subagentTimeoutMs by remember { mutableFloatStateOf(preferences.subagentReadTimeoutMs.toFloat()) }
     var allowThreshold by remember { mutableFloatStateOf(preferences.approvalAllowThreshold) }
     // 审批放行清单：条数必须可见（上限满了新的"记住"会被静默拒绝），撤销必须是显式二次确认
@@ -193,6 +194,24 @@ fun ToolsMcpContent(
                     subtitleBelowRow = true
                 )
             }
+        }
+
+        // 子代理层数：0 = 关闭（工具不出现），1 = 允许一层
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_subagent_max_depth),
+                value = subagentDepth.toFloat(),
+                valueRange = 0f..SubAgentPolicy.MAX_DEPTH.toFloat(),
+                steps = 0,
+                valueText = if (subagentDepth == 0) stringResource(R.string.settings_subagent_depth_off) else "1",
+                onValueChange = { raw ->
+                    val snapped = raw.roundToInt()
+                    if (snapped != subagentDepth) {
+                        subagentDepth = snapped
+                        preferences.subagentMaxDepth = snapped
+                    }
+                }
+            )
         }
 
         // ===== MCP 分页与子代理读超时：远端慢的时候先丢子代理，不拖住主循环 =====

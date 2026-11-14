@@ -387,6 +387,10 @@
 
     <string name="settings_web_tools_header">Web tools</string>
 
+    <string name="settings_memory_max_fact_length">Max length per memory</string>
+    <string name="settings_console_lockout_minutes">Lockout window</string>
+    <string name="settings_subagent_max_depth">Sub-agent depth</string>
+    <string name="settings_subagent_depth_off">Off</string>
     <string name="settings_memory_enabled">Long-term memory</string>
     <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
     <string name="settings_context_compress">Auto-compress context</string>

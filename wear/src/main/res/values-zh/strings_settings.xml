@@ -377,6 +377,10 @@
 
     <string name="settings_web_tools_header">网页工具</string>
 
+    <string name="settings_memory_max_fact_length">单条记忆长度上限</string>
+    <string name="settings_console_lockout_minutes">锁定窗口</string>
+    <string name="settings_subagent_max_depth">子代理层数</string>
+    <string name="settings_subagent_depth_off">关闭</string>
     <string name="settings_memory_enabled">启用记忆</string>
     <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
     <string name="settings_context_compress">自动压缩上下文</string>
