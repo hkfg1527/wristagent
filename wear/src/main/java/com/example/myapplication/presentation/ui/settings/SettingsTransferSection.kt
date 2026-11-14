@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
  * 配置导入导出：整份可移植设置的 JSON 快照。
@@ -38,6 +39,17 @@ fun SettingsTransferContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_transfer),
         onBack = onBack,
+        hero = {
+            val portable = remember(preferences, appearance) {
+                SettingsTransferBridge.snapshot(preferences, appearance).size
+            }
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_transfer_header),
+                value = stringResource(R.string.settings_card_transfer_items, portable),
+                accent = Wear.CardTools,
+                badge = "IO"
+            )
+        },
         overlay = {
             if (pasteOpen) {
                 SettingsTextDialog(

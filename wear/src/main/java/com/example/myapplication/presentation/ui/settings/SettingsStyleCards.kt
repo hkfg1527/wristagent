@@ -1,26 +1,33 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.example.myapplication.presentation.ui.brand.BrandCharacter
+import com.example.myapplication.presentation.ui.brand.BrandCharacterSize
+import com.example.myapplication.presentation.ui.brand.BrandId
 import com.example.myapplication.presentation.ui.theme.Wear
 
 /** 大卡片档的间距与圆角：圆角仍取卡片令牌，间距 8dp。 */
@@ -51,7 +58,9 @@ internal fun SettingsM3Card(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val cardModifier = modifier.fillMaxWidth()
+    // 卡片档的边缘空间缩放：每张卡按自己离屏心的距离等比缩小并淡出（只缩不放）。
+    // 挂在这一层是因为英雄卡与行卡都从这里出去 —— 一处接线，两种卡都有。
+    val cardModifier = modifier.fillMaxWidth().cardEdgeZoom()
     if (onClick != null) {
         Card(
             onClick = onClick,
@@ -84,6 +93,8 @@ internal fun SettingsHeroCard(
     accent: Color,
     meta: String? = null,
     badge: String? = null,
+    /** 品牌徽标矢量；给了它就代替 [badge] 里那串缩写。 */
+    badgeMark: Int? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -92,7 +103,23 @@ internal fun SettingsHeroCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (badge != null) {
+            if (badgeMark != null) {
+                Spacer(Modifier.width(Wear.Space.Xs))
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(Wear.Radius.Control))
+                        .background(accent.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(badgeMark),
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else if (badge != null) {
                 Spacer(Modifier.width(Wear.Space.Xs))
                 Text(
                     text = badge,
@@ -137,3 +164,58 @@ internal val SettingsCardRowShape = RoundedCornerShape(Wear.Radius.Card)
 
 /** 徽标尺寸上限：没有位图时用缩写，宽度受控。 */
 internal val SettingsBadgeSize = 26.dp
+
+/**
+ * 品牌身份卡：拟人角色在上，标签 / 主数值 / 说明行居中排在下面，整卡吃满内容宽度。
+ *
+ * 刻意把角色放**上方居中**而不是塞进右侧徽标位：卡片只有 176dp 宽，
+ * 角色一旦跟正文并排，长模型名会被挤成两行甚至截断（这个坑踩过一次）。
+ * 角色在上、文字在下的竖排结构，让两者都拿到完整宽度。
+ */
+@Composable
+internal fun SettingsBrandCard(
+    brand: BrandId,
+    label: String,
+    value: String,
+    accent: Color,
+    meta: String? = null,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    SettingsM3Card(modifier = modifier, onClick = onClick) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            BrandCharacter(
+                brand = brand,
+                eyeColor = SettingsCardSurface,
+                modifier = Modifier.size(BrandCharacterSize.Inline)
+            )
+            Spacer(Modifier.height(Wear.Space.Sm))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (meta != null) {
+                Spacer(Modifier.height(Wear.Space.Xs))
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}

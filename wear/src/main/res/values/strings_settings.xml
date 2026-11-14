@@ -23,6 +23,10 @@
     <string name="settings_card_meta_context">%1$d turns · %2$.1f</string>
     <string name="settings_card_meta_profiles">%1$d saved</string>
     <string name="settings_card_meta_tokens">max %1$d tokens</string>
+    <string name="settings_card_meta_privilege_root">Root %1$s</string>
+    <string name="settings_card_meta_console_token">Token %1$s</string>
+    <string name="settings_card_prompt_chars">%1$d chars</string>
+    <string name="settings_card_transfer_items">%1$d portable items</string>
     <string name="settings_card_tools_called_meta">%1$d of %2$d tools used</string>
     <string name="settings_card_tools_pending">no tool call yet</string>
     <string name="settings_card_console_meta">web console :%1$d</string>

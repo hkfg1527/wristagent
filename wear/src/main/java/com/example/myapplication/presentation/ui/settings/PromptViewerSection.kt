@@ -103,6 +103,19 @@ fun PromptViewerContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_system_prompt),
         onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_system_prompt),
+                value = if (customPrompt.isBlank()) {
+                    stringResource(R.string.settings_prompt_default)
+                } else {
+                    stringResource(R.string.settings_card_prompt_chars, customPrompt.length)
+                },
+                accent = Wear.CardModel,
+                meta = selectedPreset,
+                badge = "TXT"
+            )
+        },
         overlay = {
             if (editorOpen) {
                 SettingsTextDialog(

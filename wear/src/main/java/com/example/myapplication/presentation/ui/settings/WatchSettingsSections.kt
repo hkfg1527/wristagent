@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.voice.AsrProviderId
 import kotlin.math.roundToInt
 
@@ -38,7 +39,21 @@ fun VoiceEntryContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_voice_entry),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_sub_voice_entry),
+                value = when {
+                    !asr.enabled -> stringResource(R.string.settings_asr_off)
+                    asr.providerId == AsrProviderId.BAIDU && !asr.hasBaiduCredentials ->
+                        stringResource(R.string.settings_asr_key_missing)
+                    asr.providerId == AsrProviderId.BAIDU -> stringResource(R.string.settings_asr_baidu)
+                    else -> stringResource(R.string.settings_asr_system)
+                },
+                accent = Wear.CardVoice,
+                badge = "VOX"
+            )
+        }
     ) {
         section(stringResource(R.string.settings_voice_switch_header))
 
@@ -139,7 +154,16 @@ fun AppearanceContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_appearance),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_style_header),
+                value = stringResource(WearAppearance.style.labelRes),
+                accent = Wear.CardSystem,
+                meta = stringResource(WearAppearance.style.summaryRes),
+                badge = "UI"
+            )
+        }
     ) {
         // 页面风格：整页外壳换装，不换数据、不换行的语义。
         section(stringResource(R.string.settings_style_header))

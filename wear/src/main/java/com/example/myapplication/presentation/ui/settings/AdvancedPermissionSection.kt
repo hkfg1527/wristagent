@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.agent.privilege.PrivilegeStatusText
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.launch
 
 /**
@@ -32,7 +33,19 @@ fun AdvancedPermissionContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_privilege_title),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_privilege_title),
+                value = status.activeBackend.name,
+                accent = Wear.CardSystem,
+                meta = stringResource(
+                    R.string.settings_card_meta_privilege_root,
+                    stringResource(PrivilegeStatusText.rootRes(status.rootAvailable))
+                ),
+                badge = "SYS"
+            )
+        }
     ) {
         section(stringResource(R.string.settings_privilege_title))
 

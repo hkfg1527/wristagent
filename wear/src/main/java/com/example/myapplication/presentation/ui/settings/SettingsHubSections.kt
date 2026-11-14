@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
+import com.example.myapplication.presentation.ui.theme.Wear
 
 /** 中转页内层子页的哨兵下标：等于它表示"只停在中转页本身"。 */
 private const val NoInnerPage = -1
@@ -33,6 +34,15 @@ fun PromptContextContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_prompt_context),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_prompt_context),
+                value = promptValue,
+                accent = Wear.CardModel,
+                meta = turnsValue,
+                badge = "TXT"
+            )
+        },
         overlay = {
             when (inner) {
                 0 -> promptPage { inner = NoInnerPage }
@@ -78,6 +88,15 @@ fun AboutContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_about),
         onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_about),
+                value = privilegeValue,
+                accent = Wear.CardSystem,
+                meta = netDiagValue,
+                badge = "APP"
+            )
+        },
         overlay = {
             when (inner) {
                 0 -> sideKeyPage { inner = NoInnerPage }

@@ -15,6 +15,7 @@ import com.example.myapplication.agent.CompressPolicy
 import com.example.myapplication.agent.GestureAction
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.roundToInt
 
 /** 上下文轮数滑杆区间：与网页端 maxContextTurns 的合法区间一致。 */
@@ -51,7 +52,15 @@ fun MemoryManagerContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_memory_management),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_memory_management),
+                value = stringResource(R.string.settings_memory_turns, turns),
+                accent = Wear.CardModel,
+                badge = "MEM"
+            )
+        }
     ) {
         section(stringResource(R.string.settings_turns_header))
 
@@ -195,7 +204,22 @@ fun GestureBindingsContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_gesture),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            val bound = listOf(
+                bindings.longPress,
+                bindings.doubleTap,
+                bindings.sideKeyShort,
+                bindings.sideKeyLong
+            ).count { it != GestureAction.NONE }
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_sub_gesture),
+                value = gestureActionLabel(bindings.longPress),
+                accent = Wear.CardSystem,
+                meta = stringResource(R.string.settings_gesture_bound_count, bound),
+                badge = "KEY"
+            )
+        }
     ) {
         GestureBindingSection(
             header = stringResource(R.string.settings_gesture_long_press),
@@ -269,7 +293,17 @@ fun SecurityGuardrailContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_security_policy),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            val current = modes.first { it.first == currentMode }
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_security_policy),
+                value = stringResource(current.second),
+                accent = Wear.CardSystem,
+                meta = stringResource(current.third),
+                badge = "MODE"
+            )
+        }
     ) {
         section(stringResource(R.string.settings_security_policy))
 

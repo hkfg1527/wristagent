@@ -15,6 +15,7 @@ import com.example.myapplication.R
 import com.example.myapplication.agent.remote.ConsoleServer
 import com.example.myapplication.agent.remote.ConsoleToken
 import com.example.myapplication.agent.remote.ConsoleTokenStore
+import com.example.myapplication.presentation.ui.theme.Wear
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -45,7 +46,33 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
     // 令牌走查询参数 t：控制台前端在 initToken() 里用 URLSearchParams 取 t 后立刻从地址栏抹掉
     val url = "http://$ip:$port/?t=$token"
 
-    SettingsSubPage(title = stringResource(R.string.settings_remote_console_title), onBack = onBack) {
+    SettingsSubPage(
+        title = stringResource(R.string.settings_remote_console_title),
+        onBack = onBack,
+        hero = {
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_remote_console_title),
+                value = when (portStatus) {
+                    ConsolePortStatus.NOT_RUNNING ->
+                        stringResource(R.string.settings_remote_console_not_running)
+                    ConsolePortStatus.STABLE ->
+                        stringResource(R.string.settings_remote_console_running, port)
+                    ConsolePortStatus.DRIFTED ->
+                        stringResource(
+                            R.string.settings_remote_console_port_drifted_short,
+                            preferredPort,
+                            port
+                        )
+                },
+                accent = Wear.CardTools,
+                meta = stringResource(
+                    R.string.settings_card_meta_console_token,
+                    ConsoleToken.mask(token)
+                ),
+                badge = "NET"
+            )
+        }
+    ) {
         section(stringResource(R.string.settings_remote_console_title))
 
         row {

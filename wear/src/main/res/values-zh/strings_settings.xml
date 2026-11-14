@@ -23,6 +23,10 @@
     <string name="settings_card_meta_context">上下文 %1$d 轮 · 温度 %2$.1f</string>
     <string name="settings_card_meta_profiles">已存 %1$d 套</string>
     <string name="settings_card_meta_tokens">上限 %1$d tokens</string>
+    <string name="settings_card_meta_privilege_root">Root %1$s</string>
+    <string name="settings_card_meta_console_token">令牌 %1$s</string>
+    <string name="settings_card_prompt_chars">%1$d 字</string>
+    <string name="settings_card_transfer_items">%1$d 项可移植设置</string>
     <string name="settings_card_tools_called_meta">已调用 %1$d / 共 %2$d</string>
     <string name="settings_card_tools_pending">还没有工具调用</string>
     <string name="settings_card_console_meta">网页控制台 :%1$d</string>

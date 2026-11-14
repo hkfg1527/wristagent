@@ -14,6 +14,7 @@ import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.SubAgentPolicy
 import com.example.myapplication.agent.ToolApprovalPolicy
+import com.example.myapplication.presentation.ui.theme.Wear
 
 /**
  * 工具集细粒度放行与 MCP 协议探针：六个内置工具改用官方 SwitchButton，
@@ -50,7 +51,29 @@ fun ToolsMcpContent(
 
     SettingsSubPage(
         title = stringResource(R.string.settings_tools_and_mcp),
-        onBack = onBack
+        onBack = onBack,
+        hero = {
+            val toolSwitches = listOf(
+                toolDeviceStatus,
+                toolVibrate,
+                toolMatrixDensity,
+                toolPowerMode,
+                toolWeather,
+                toolWebSearch
+            )
+            val enabled = toolSwitches.count { it }
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_tools_and_mcp),
+                value = if (enabled == toolSwitches.size) {
+                    stringResource(R.string.settings_tools_all_enabled)
+                } else {
+                    stringResource(R.string.settings_tools_enabled_count, enabled)
+                },
+                accent = Wear.CardTools,
+                meta = if (isMcpEnabled) mcpEndpoint else null,
+                badge = "MCP"
+            )
+        }
     ) {
         section(stringResource(R.string.settings_tools_release_header))
 

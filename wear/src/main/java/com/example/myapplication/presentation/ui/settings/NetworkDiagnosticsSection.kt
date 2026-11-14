@@ -28,6 +28,7 @@ import com.example.myapplication.agent.net.RepairResult
 import com.example.myapplication.agent.net.ReportFormat
 import com.example.myapplication.agent.privilege.PrivilegeManager
 import com.example.myapplication.presentation.ui.components.Tone
+import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -83,7 +84,24 @@ fun NetworkDiagnosticsContent(
 
     LaunchedEffect(Unit) { runCheck() }
 
-    SettingsSubPage(title = stringResource(R.string.settings_netdiag_title), onBack = onBack) {
+    SettingsSubPage(
+        title = stringResource(R.string.settings_netdiag_title),
+        onBack = onBack,
+        hero = {
+            val issues = plans.count { it.id != RepairPlanId.ALL_OK }
+            SettingsHeroCard(
+                label = stringResource(R.string.settings_netdiag_title),
+                value = when {
+                    running -> stringResource(R.string.settings_netdiag_running)
+                    checks.isEmpty() -> stringResource(R.string.settings_netdiag_value_never)
+                    issues == 0 -> stringResource(R.string.settings_netdiag_value_ok)
+                    else -> stringResource(R.string.settings_netdiag_value_issues, issues)
+                },
+                accent = Wear.CardTools,
+                badge = "NET"
+            )
+        }
+    ) {
         section(stringResource(R.string.settings_netdiag_checks_header))
         row { SettingsCaptionRow(text = stringResource(R.string.settings_netdiag_subtitle)) }
 

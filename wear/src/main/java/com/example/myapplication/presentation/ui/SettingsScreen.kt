@@ -89,6 +89,8 @@ import com.example.myapplication.presentation.ui.settings.cardStyleScalingParams
 import com.example.myapplication.presentation.ui.settings.settingsScalingParams
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
+import com.example.myapplication.presentation.ui.brand.BrandId
+import com.example.myapplication.presentation.ui.settings.SettingsBrandCard
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
 import com.example.myapplication.presentation.ui.settings.GestureBindingsContent
 import com.example.myapplication.presentation.ui.settings.ProviderProfilesContent
@@ -273,6 +275,9 @@ fun SettingsScreen(
                 // 模型与服务分区的真实配置状态：以 API Key 是否填写为准
                 val apiKeyConfigured = preferences.apiKey.isNotBlank()
 
+                // 当前供应商：端点为权威，模型名兜底；两者都不中就是自建端点（统一兜底标识）
+                val currentBrand = BrandId.fromEndpoint(currentBaseUrl, currentModel)
+
                 ScalingLazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -328,11 +333,11 @@ fun SettingsScreen(
                         SettingsStaggeredRow(index = 1, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
                             SettingsBalloonGroup {
                                 if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
-                                    SettingsHeroCard(
+                                    SettingsBrandCard(
+                                        brand = currentBrand,
                                         label = stringResource(R.string.settings_section_models),
                                         value = currentModel,
                                         accent = Wear.CardModel,
-                                        badge = "DS",
                                         meta = stringResource(
                                             R.string.settings_card_meta_context,
                                             preferences.maxContextTurns,
