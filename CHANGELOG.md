@@ -11,6 +11,31 @@
 
 ---
 
+## [0.0.0.20] - 2026-11-15 · **第 2 个对外发布点**（内部版 0.0.0.11–0.0.0.20 的汇总）
+
+### 这十个内部版做了什么
+- **真实设置从 4 个做到 16 个**（每个都有单一消费点 + 落盘守门 + 守卫测试）：
+  `stream_emit_interval_ms` · `stream_emit_chars` · `shell_command_timeout_ms` · `approval_allow_threshold` ·
+  `tts_speech_rate` · `tts_volume` · `tts_queue_mode` · `rotary_scroll_gain` · `haptic_amplitude` ·
+  `tool_result_max_chars` · `bottom_bar_auto_hide_ms` · `sampling_top_p` · `mcp_max_tool_pages` ·
+  `subagent_read_timeout_ms` · `net_diag_timeout_ms` · `console_max_failures`
+- **信息架构收口**：根页按意图分四区（让它答得好 / 让它听懂我 / 让它能做事 / 连得上）；
+  新增「网络与请求」页；提示词与记忆、外观与动效改名；网络体检从「关于」改挂到连接参数旁。
+- **视觉**：官方品牌图替代自绘点阵角色（10 家）；环形指示器换成官方 M3 `CircularProgressIndicator`；
+  所有卡片统一 352px 宽（缩放恒 1.0，边缘只淡出）；hero 主数值环感知退档，长值不再折行。
+
+### 发布点回归（本机真实执行，2026-11-15 05:45–06:00）
+| 项 | 结果 |
+|---|---|
+| 干净构建（clean + assembleRelease） | **BUILD SUCCESSFUL**，APK **3.55 MB** |
+| 单测 | **1253 / 178 套件 / 0 失败** |
+| 真机安装 | versionCode **58** / versionName **0.0.0.20** |
+| 根页四分区 | 四个意图名按序出现（让它答得好 → 让它听懂我 → 让它能做事 → 连得上） |
+| 卡片几何 | 同屏宽度 **348–352px**（差异仅来自圆角），x=233 竖向连通段 `48..392` 与 `409..431` —— 卡片**不重叠**，间隙约 17px ≈ 8dp |
+| 子页 | 「网络与请求」打开正常：首项「‹ 返回」+ hero 报 40s |
+
+**未覆盖**：聊天主页面与语音识别的端到端（需麦克风与外网）、控制台网页未在本机构建。
+
 ## [0.0.0.19] - 2026-11-15（内部版，不对外发布）
 
 ### 新增第 15、16 个真实设置（「连得上」分区）
