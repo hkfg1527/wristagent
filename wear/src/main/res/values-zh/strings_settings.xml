@@ -458,6 +458,7 @@
     <string name="settings_remembered_forget">忘掉全部已记住的命令</string>
     <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
     <string name="settings_card_tools">工具与 MCP</string>
+    <string name="settings_rotary_gain">表冠滚动增益</string>
     <string name="settings_style_header">页面风格</string>
     <string name="settings_style_options">可选风格</string>
     <string name="settings_style_balloon">气泡</string>

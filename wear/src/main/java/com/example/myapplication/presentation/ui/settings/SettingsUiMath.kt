@@ -574,3 +574,11 @@ internal fun settingsSliderValueAt(
     return valueRange.start + span * snapped
 }
 
+
+/**
+ * 表冠一格刻度换算成列表位移：纯乘法 + 四舍五入，供根页与全部子页共用。
+ *
+ * 抽成纯函数是为了能在 JVM 单测里钉住夹取与取整行为 —— 表冠手感调错了没人看得见。
+ */
+internal fun rotaryDeltaFor(rawPixels: Float, gain: Float): Float =
+    rawPixels * gain.coerceIn(0.5f, 3f)

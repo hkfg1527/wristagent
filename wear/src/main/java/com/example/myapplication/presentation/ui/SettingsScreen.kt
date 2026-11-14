@@ -96,6 +96,7 @@ import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.brand.BrandId
 import com.example.myapplication.presentation.ui.settings.NetworkRequestContent
 import com.example.myapplication.presentation.ui.settings.SettingsBrandCard
+import com.example.myapplication.presentation.ui.settings.rotaryDeltaFor
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
 import com.example.myapplication.presentation.ui.settings.GestureBindingsContent
 import com.example.myapplication.presentation.ui.settings.ProviderProfilesContent
@@ -307,7 +308,7 @@ fun SettingsScreen(
                         // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                         .onRotaryScrollEvent {
                             // 表冠：同步吃位移，每格刻度都生效
-                            listState.dispatchRawDelta(it.verticalScrollPixels)
+                            listState.dispatchRawDelta(rotaryDeltaFor(it.verticalScrollPixels, preferences.rotaryScrollGain))
                             true
                         }
                         .focusRequester(settingsFocusRequester)

@@ -458,6 +458,7 @@
     <string name="settings_remembered_forget">Forget all remembered commands</string>
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
     <string name="settings_card_tools">Tools &amp; MCP</string>
+    <string name="settings_rotary_gain">Crown scroll gain</string>
     <string name="settings_style_header">Page style</string>
     <string name="settings_style_options">Available styles</string>
     <string name="settings_style_balloon">Balloon</string>

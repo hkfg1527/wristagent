@@ -130,6 +130,17 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getBoolean(KEY_HAPTICS, DEFAULT_HAPTICS)
         set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
 
+    /**
+     * 表冠滚动增益：一格刻度换算成多少像素位移的倍数。
+     *
+     * 1.0 = 库默认手感；调大转一格走得更远（适合习惯快滚的人），调小更细腻。
+     */
+    var rotaryScrollGain: Float
+        get() = prefs.getFloat(KEY_ROTARY_SCROLL_GAIN, DEFAULT_ROTARY_SCROLL_GAIN)
+            .coerceIn(MIN_ROTARY_SCROLL_GAIN, MAX_ROTARY_SCROLL_GAIN)
+        set(value) = prefs.edit()
+            .putFloat(KEY_ROTARY_SCROLL_GAIN, value.coerceIn(MIN_ROTARY_SCROLL_GAIN, MAX_ROTARY_SCROLL_GAIN))
+            .apply()
     /** 设置页外观预设：界面外壳读它，导入导出与控制台也按名字搬运。 */
     var settingsStyle: SettingsStyle
         get() = SettingsStyle.fromStorage(prefs.getString(KEY_SETTINGS_STYLE, DEFAULT_SETTINGS_STYLE))
@@ -513,6 +524,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_RETRY_BACKOFF = "retryBackoffMs"
         const val KEY_WIFI_ONLY = "wifiOnlyRequests"
         const val KEY_HAPTICS = "hapticsEnabled"
+        const val KEY_ROTARY_SCROLL_GAIN = "rotary_scroll_gain"
+        const val DEFAULT_ROTARY_SCROLL_GAIN = 1f
+        const val MIN_ROTARY_SCROLL_GAIN = 0.5f
+        const val MAX_ROTARY_SCROLL_GAIN = 3f
         const val DEFAULT_REQUEST_TIMEOUT = 40
         const val DEFAULT_REQUEST_RETRIES = 1
         const val DEFAULT_RETRY_BACKOFF = 800

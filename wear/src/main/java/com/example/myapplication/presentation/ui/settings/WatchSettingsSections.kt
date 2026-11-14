@@ -179,6 +179,7 @@ fun AppearanceContent(
     val context = LocalContext.current
     var compactMode by remember { mutableStateOf(preferences.compactMode) }
     var spacing by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
+    var rotaryGain by remember { mutableFloatStateOf(preferences.rotaryScrollGain) }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_appearance),
@@ -221,6 +222,25 @@ fun AppearanceContent(
                 onCheckedChange = { enabled ->
                     compactMode = enabled
                     preferences.compactMode = enabled
+                }
+            )
+        }
+
+        // 表冠增益：一格刻度走多远。真实的消费者是根页与全部子页的 onRotaryScrollEvent。
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_rotary_gain),
+                value = rotaryGain,
+                valueRange = 0.5f..3f,
+                steps = 9,
+                valueText = String.format("%.1f×", rotaryGain),
+                onValueChange = { raw ->
+                    val snapped = (raw * 10f).roundToInt() / 10f
+                    if (snapped != rotaryGain) {
+                        rotaryGain = snapped
+                        preferences.rotaryScrollGain = snapped
+                        context.vibrateTick()
+                    }
                 }
             )
         }

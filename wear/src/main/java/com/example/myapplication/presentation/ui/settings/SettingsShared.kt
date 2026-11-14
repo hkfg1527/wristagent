@@ -121,6 +121,7 @@ import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.presentation.ui.theme.accentRailOf
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * 所有设置页共用的固定内容宽度：176dp。
@@ -377,6 +378,10 @@ fun SettingsSubPage(
         }
 
         // 卡片档的返回控件进列表（跟着列表滚），所以这个判断要在 ScreenScaffold 之前算好
+        // 表冠增益是全局偏好：子页每次进入取一次，改完立刻对下一次转动生效
+        val context = LocalContext.current
+        val rotaryGain = remember(context) { AgentPreferences(context).rotaryScrollGain }
+
         val backInList = WearAppearance.style == SettingsStyle.GOOGLE_CARD
 
         ScreenScaffold(
@@ -406,7 +411,7 @@ fun SettingsSubPage(
                 // 顺序即作用域：处理器必须在 focusable 之外，否则 rotary 事件冒不进来
                 .onRotaryScrollEvent {
                     // 表冠：同步吃位移，每格刻度都生效
-                    listState.dispatchRawDelta(it.verticalScrollPixels)
+                    listState.dispatchRawDelta(rotaryDeltaFor(it.verticalScrollPixels, rotaryGain))
                     true
                 }
                 .focusRequester(listFocusRequester)
