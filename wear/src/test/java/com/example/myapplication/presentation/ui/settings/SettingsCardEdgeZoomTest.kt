@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -87,5 +88,29 @@ class SettingsCardEdgeZoomTest {
     fun aNonFiniteOrEmptyScreenFallsBackToIdentity() {
         assertEquals(0f, CardEdgeZoom.progress(Float.NaN), 0.0001f)
         assertEquals(0f, CardEdgeZoom.progressForCenter(100f, 0f), 0.0001f)
+    }
+}
+
+/** 主数值退档判据：按宽度（em）算，不按字符数 —— 中日韩字符是拉丁字符的两倍宽。 */
+class SettingsCardTitleWidthTest {
+
+    @Test
+    fun latinAndCjkAreWeighedDifferently() {
+        assertEquals(8.25f, titleEmUnits("deepseek-v4-pro"), 0.001f)
+        assertEquals(7.65f, titleEmUnits("40 项可移植设置"), 0.001f)
+        assertEquals(3f, titleEmUnits("已配置"), 0.001f)
+    }
+
+    @Test
+    fun theModelNameThatUsedToWrapNowDropsAStep() {
+        assertTrue("deepseek-v4-pro 必须退档", brandTitleIsCompact("deepseek-v4-pro"))
+        assertTrue("40 项可移植设置 必须退档", brandTitleIsCompact("40 项可移植设置"))
+    }
+
+    @Test
+    fun shortValuesKeepTheLargeStep() {
+        assertFalse(brandTitleIsCompact("已配置"))
+        assertFalse(brandTitleIsCompact("配置 1"))
+        assertFalse(brandTitleIsCompact(""))
     }
 }

@@ -78,12 +78,22 @@ internal object SettingsCardTypography {
 }
 
 /**
- * 品牌身份卡的主数值是否要退一档字号。
+ * 主数值的宽度估算，单位是 em（1em = 当前字号一格）。
  *
- * 卡片内宽约 144dp：titleLarge（20sp）下一行只装得下 12 个单位，`deepseek-v4-pro` 有 15 个，
- * 一旦放不下 Compose 会在连字符处折行，读起来像拼错的型号。超过 [BrandTitleCompactUnits] 就用
- * titleMedium 让它在同一行里排完 —— 宁可小一档，也不要在型号中间断行。
+ * 卡片内宽约 144dp：titleLarge（20sp）一行只装得下约 7.2em。ASCII 按 0.55em、其它（中日韩、全角）按 1em 估 ——
+ * 之前只看字符数，`deepseek-v4-pro`（15 字符 / 8.25em）会折行，`40 项可移植设置`（8 字符 / 7.65em）同样放不下，
+ * 两种文字宽度差一倍，字符数不是尺子。
  */
-internal const val BrandTitleCompactUnits = 12
+internal fun titleEmUnits(value: String): Float {
+    var units = 0f
+    for (ch in value) {
+        units += if (ch.code < 0x2000) 0.55f else 1f
+    }
+    return units
+}
 
-internal fun brandTitleIsCompact(value: String): Boolean = value.length > BrandTitleCompactUnits
+/** titleLarge 一行能装下的宽度上限（em）。 */
+internal const val TitleLargeLineEm = 7.2f
+
+/** 主数值是否要退一档字号（titleLarge → titleMedium）。 */
+internal fun brandTitleIsCompact(value: String): Boolean = titleEmUnits(value) > TitleLargeLineEm
