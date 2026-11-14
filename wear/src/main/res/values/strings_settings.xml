@@ -475,4 +475,12 @@
     <string name="settings_wifi_only_secondary">Refuse to spend cellular data on a request</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
+    <string name="settings_stream_emit_interval">Stream frame interval</string>
+    <string name="settings_stream_emit_interval_value">%1$d ms</string>
+    <string name="settings_shell_timeout">Command timeout</string>
+    <string name="settings_shell_timeout_value">%1$d ms</string>
+    <string name="settings_approval_threshold">Allow threshold</string>
+    <string name="settings_approval_threshold_value">%1$.2f</string>
+    <string name="settings_tts_speech_rate">Speech rate</string>
+    <string name="settings_tts_speech_rate_value">%1$.1f×</string>
 </resources>

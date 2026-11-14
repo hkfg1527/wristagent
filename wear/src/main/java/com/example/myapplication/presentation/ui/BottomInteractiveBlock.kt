@@ -158,6 +158,8 @@ fun BottomInteractiveBlock(
     onSwipeUpSettings: () -> Unit,           // 阻尼跟手上滑进设置
     onApprovalProgress: (Float) -> Unit = {}, // 审批滑块当前进度（0 拒绝红 → 1 放行绿），退出审批时回调 0f
     approvalTone: Color = Wear.Palette.Danger, // 审批强调色：随 AI 风险等级变化（调用方传入等级色）
+    // 放行阈值：来自设置项 approval_allow_threshold，滑到多少算放行由它决定
+    approvalAllowThreshold: Float = ApprovalSliderLogic.ALLOW_THRESHOLD,
     // 记住并放行：只有风险声明"可记住"（非破坏性 + 有命令原文）时才出现，见 ApprovalRememberPolicy
     rememberable: Boolean = false,
     onRememberAndAllow: () -> Unit = {},
@@ -614,6 +616,7 @@ fun BottomInteractiveBlock(
                     trackHeight = capsuleHeight,
                     cooldownSeconds = cooldownSeconds,
                     approvalTone = approvalTone,
+                    allowThreshold = approvalAllowThreshold,
                     onAllow = onAllow,
                     onReject = onReject,
                     onApprovalProgress = onApprovalProgress
@@ -733,7 +736,8 @@ private fun RememberAndAllowBand(
  * 1 恒为放行绿，中间由 [ApprovalTrackTone.colorOf] 连续插值，于是越往左越绿、滑回去退回等级色。
  * 未滑过区域保留 0.34 的等级色调，已滑过区域取 0.72 的插值调；
  * 交互只有两种结局：位移都在 [ApprovalSliderLogic.TAP_SLOP_PX] 内是单击（拒绝），
- * 左滑松手达到 [ApprovalSliderLogic.ALLOW_THRESHOLD] 才放行，滑不够则弹簧回弹且什么都不发生。
+ * 左滑松手达到 [allowThreshold]（默认 [ApprovalSliderLogic.ALLOW_THRESHOLD]，生产取设置项）才放行，
+ * 滑不够则弹簧回弹且什么都不发生。
  */
 @Composable
 private fun ApprovalTrack(
@@ -742,6 +746,7 @@ private fun ApprovalTrack(
     trackHeight: Dp,
     cooldownSeconds: Int,
     approvalTone: Color,
+    allowThreshold: Float,
     onAllow: () -> Unit,
     onReject: () -> Unit,
     onApprovalProgress: (Float) -> Unit
@@ -792,7 +797,7 @@ private fun ApprovalTrack(
         modifier = modifier
             .width(trackWidth)
             .height(ApprovalTrackTouchHeight)
-            .pointerInput(isLocked, trackPx, thumbSlotPx, tapSlopPx) {
+            .pointerInput(isLocked, trackPx, thumbSlotPx, tapSlopPx, allowThreshold) {
                 // 锁定倒计时内单击与滑动都无效
                 if (isLocked) return@pointerInput
                 awaitEachGesture {
@@ -816,7 +821,7 @@ private fun ApprovalTrack(
                                     trackWidthPx = trackPx,
                                     thumbWidthPx = thumbSlotPx
                                 )
-                                if (ApprovalSliderLogic.shouldAllow(releasedProgress)) {
+                                if (ApprovalSliderLogic.shouldAllow(releasedProgress, allowThreshold)) {
                                     scope.launch { dragProgress.snapTo(1f) }
                                     onAllow()
                                 } else {

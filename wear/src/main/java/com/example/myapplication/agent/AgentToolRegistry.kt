@@ -718,7 +718,8 @@ class AgentToolRegistry(
         ShellPolicy.validate(command)?.let { return errorJson("invalid_command", it) }
         val runner = shellRunner ?: return errorJson("privilege_unavailable", "特权执行层尚未接线")
         val requested = if (args.has("timeout")) args.optLong("timeout") else null
-        val run = runner.run(command, ShellPolicy.clampTimeout(requested))
+        // 模型没给超时时用设置项 shell_command_timeout_ms，而不是出厂常量
+        val run = runner.run(command, ShellPolicy.clampTimeout(requested, shellTimeoutFallbackMs()))
         return shellResultJson(run)
     }
 
@@ -812,9 +813,13 @@ class AgentToolRegistry(
         val command = tool.bind(stringArray(args))
         ShellPolicy.validate(command)?.let { return errorJson("invalid_command", it) }
         val runner = shellRunner ?: return errorJson("privilege_unavailable", "特权执行层尚未接线")
-        val run = runner.run(command, ShellPolicy.DEFAULT_TIMEOUT_MS)
+        val run = runner.run(command, ShellPolicy.clampTimeout(null, shellTimeoutFallbackMs()))
         return shellResultJson(run).apply { put("tool", tool.name) }
     }
+
+    /** 执行上限的兜底值：设置项存在就用它，注册表没接线时退回出厂常量。 */
+    private fun shellTimeoutFallbackMs(): Long =
+        preferences?.shellCommandTimeoutMs ?: ShellPolicy.DEFAULT_TIMEOUT_MS
 
     private fun shellResultJson(run: ShellRun): JSONObject = JSONObject().apply {
         put("status", if (run.isSuccess) "success" else "failed")

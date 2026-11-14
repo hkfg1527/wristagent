@@ -11,7 +11,11 @@ import kotlin.math.ceil
 data class AgentDisplayPreferences(
     val compactMode: Boolean = false,
     val autoSpeakReplies: Boolean = false,
-    val asrLiveTranscript: Boolean = false
+    val asrLiveTranscript: Boolean = false,
+    /** 流式合帧间隔（毫秒）：ChatViewModel 每轮开场套到节流器上（StreamingThrottleState.updateInterval）。 */
+    val streamEmitIntervalMs: Int = AgentPreferences.DEFAULT_STREAM_EMIT_INTERVAL_MS,
+    /** 播报语速：每次合成前交给 TextToSpeech.setSpeechRate。 */
+    val ttsSpeechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE
 )
 
 /**

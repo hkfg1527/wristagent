@@ -10,9 +10,12 @@ package com.example.myapplication.presentation.ui
 object StreamingThrottle {
 
     /**
-     * 相邻两次 UI 更新的最小间隔：32ms ≈ 30fps。
+     * 相邻两次 UI 更新的最小间隔的出厂默认值：32ms ≈ 30fps。
      * 太长（如 70ms）会让"卡片长高"和"列表跟随"之间出现肉眼可见的滞后，
      * 表现为文字被往下顶一下再跳回来；太快又会逐 token 重排导致抖动。
+     *
+     * 真实生效的窗口由设置项 `stream_emit_interval_ms` 决定
+     * （[com.example.myapplication.agent.AgentPreferences.streamEmitIntervalMs]，夹在 8..200）。
      */
     const val DEFAULT_INTERVAL_MS = 32L
 
@@ -48,7 +51,7 @@ object StreamingThrottle {
  * 被节流掉的更新不推进基线，因此 [isBurst] 衡量的始终是屏幕上可见的增量。
  */
 class StreamingThrottleState(
-    private val intervalMs: Long = StreamingThrottle.DEFAULT_INTERVAL_MS,
+    private var intervalMs: Long = StreamingThrottle.DEFAULT_INTERVAL_MS,
     private val charsPerEmitThreshold: Int = StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD
 ) {
     var lastEmitMs: Long = 0L
@@ -60,6 +63,17 @@ class StreamingThrottleState(
     /** 最近一次放行的更新是否为突发增量。 */
     var isBurst: Boolean = false
         private set
+
+    /** 当前生效的合帧窗口：测试与设置页用它确认"偏好真的落到了节流器上"。 */
+    val currentIntervalMs: Long get() = intervalMs
+
+    /**
+     * 换一个合帧窗口（毫秒）：设置项 `stream_emit_interval_ms` 的唯一落点。
+     * 只换窗口、不动基线，因此改完设置不需要重建状态机，也不会凭空补放或吞掉一帧。
+     */
+    fun updateInterval(intervalMs: Long) {
+        this.intervalMs = intervalMs
+    }
 
     /**
      * 放行则记录本次时刻/文本/突发标记并返回 true；被节流则原样返回 false。

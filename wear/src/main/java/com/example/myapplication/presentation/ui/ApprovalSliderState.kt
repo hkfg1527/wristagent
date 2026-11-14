@@ -36,8 +36,18 @@ object ApprovalSliderLogic {
     fun colorFor(progress: Float): Color =
         lerp(Wear.Palette.Danger, Wear.Palette.Success, progress.coerceIn(0f, 1f))
 
-    /** 松手时是否构成放行决定。 */
+    /** 松手时是否构成放行决定（按出厂阈值 [ALLOW_THRESHOLD]）。 */
     fun shouldAllow(progress: Float): Boolean = progress >= ALLOW_THRESHOLD
+
+    /**
+     * 松手时是否构成放行决定，阈值由调用方给。
+     *
+     * 唯一的真实调用点在审批滑杆（`BottomInteractiveBlock`），它传入的是设置项
+     * `approval_allow_threshold` 的值（[com.example.myapplication.agent.AgentPreferences.approvalAllowThreshold]，
+     * 读写两侧已夹在 0.5..0.98）。于是把阈值调低，同样一段位移就能放行；
+     * 调高则必须拖得更靠左。
+     */
+    fun shouldAllow(progress: Float, allowThreshold: Float): Boolean = progress >= allowThreshold
 
     /**
      * 松手时是否构成"单击拒绝"：横纵位移都在容差内（按下→抬起没有真正滑动）。

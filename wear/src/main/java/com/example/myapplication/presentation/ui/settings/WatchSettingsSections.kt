@@ -20,6 +20,12 @@ private const val MatrixSpacingMinDp = 4f
 private const val MatrixSpacingMaxDp = 16f
 private const val MatrixSpacingSteps = 11
 
+/** 播报语速的滑杆台阶：0.1 一格，(2.0 - 0.5) / 0.1 共 15 个区间。 */
+private const val SpeechRateStep = 0.1f
+private val SpeechRateSteps: Int = (
+    (AgentPreferences.MaxTtsSpeechRate - AgentPreferences.MinTtsSpeechRate) / SpeechRateStep
+    ).roundToInt() - 1
+
 /**
  * 语音与唤醒。
  *
@@ -35,6 +41,8 @@ fun VoiceEntryContent(
     val context = LocalContext.current
     var autoSpeak by remember { mutableStateOf(preferences.autoSpeakReplies) }
     var liveTranscript by remember { mutableStateOf(preferences.asrLiveTranscript) }
+    // 播报语速：出向语音唯一的可调量，0.5..2.0 按 0.1 一格
+    var speechRate by remember { mutableFloatStateOf(preferences.ttsSpeechRate) }
     val asr = remember { preferences.asrSettings() }
 
     SettingsSubPage(
@@ -95,6 +103,25 @@ fun VoiceEntryContent(
                 onCheckedChange = { enabled ->
                     liveTranscript = enabled
                     preferences.asrLiveTranscript = enabled
+                }
+            )
+        }
+
+        // 播报语速：只在自动播报打开时有听觉差异，但值本身始终可调，不藏起来
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_tts_speech_rate),
+                value = speechRate,
+                valueRange = AgentPreferences.MinTtsSpeechRate..AgentPreferences.MaxTtsSpeechRate,
+                steps = SpeechRateSteps,
+                valueText = stringResource(R.string.settings_tts_speech_rate_value, speechRate),
+                onValueChange = { raw ->
+                    val snapped = ((raw / SpeechRateStep).roundToInt() * SpeechRateStep)
+                        .coerceIn(AgentPreferences.MinTtsSpeechRate, AgentPreferences.MaxTtsSpeechRate)
+                    if (snapped != speechRate) {
+                        speechRate = snapped
+                        preferences.ttsSpeechRate = snapped
+                    }
                 }
             )
         }

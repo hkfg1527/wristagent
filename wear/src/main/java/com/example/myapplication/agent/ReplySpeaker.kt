@@ -17,7 +17,14 @@ class ReplySpeaker(private val context: Context) {
     private var ready = false
     private var utteranceSeq = 0
 
-    fun speak(text: String) {
+    /**
+     * 朗读一段正文。
+     *
+     * [speechRate] 来自设置项 `tts_speech_rate`（[AgentPreferences.ttsSpeechRate]）。
+     * 语速是引擎级状态而不是单条 utterance 的参数，因此每次合成前都要重设一遍：
+     * 否则上一轮设过倍速、之后被别处改回 1.0，用户就会看到"设置还在 1.5 但读得越来越慢"。
+     */
+    fun speak(text: String, speechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE) {
         if (text.isBlank()) return
         try {
             val tts = ensureEngine()
@@ -25,6 +32,7 @@ class ReplySpeaker(private val context: Context) {
                 Log.i(TAG, "TTS 未就绪，跳过本次播报")
                 return
             }
+            tts.setSpeechRate(speechRateFor(speechRate))
             utteranceSeq++
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reply-" + utteranceSeq)
         } catch (t: Throwable) {
@@ -58,7 +66,24 @@ class ReplySpeaker(private val context: Context) {
         return created
     }
 
-    private companion object {
-        const val TAG = "ReplySpeaker"
+    companion object {
+        private const val TAG = "ReplySpeaker"
+
+        /**
+         * 合成前真正交给引擎的语速。
+         *
+         * 上下限与出厂值都取自 [AgentPreferences]，与设置项是同一份真值：
+         * NaN（控制台写坏的值）退回出厂语速，越界值夹到 0.5..2.0，
+         * 于是"语速设有值但引擎收到 0 或 Infinity"这条路在结构上不存在。
+         */
+        fun speechRateFor(preferenceRate: Float): Float =
+            if (preferenceRate.isNaN()) {
+                AgentPreferences.DEFAULT_TTS_SPEECH_RATE
+            } else {
+                preferenceRate.coerceIn(
+                    AgentPreferences.MinTtsSpeechRate,
+                    AgentPreferences.MaxTtsSpeechRate
+                )
+            }
     }
 }

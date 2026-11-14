@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -246,6 +247,55 @@ internal fun SettingsBrandCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+    }
+}
+
+/**
+ * 卡片档的返回卡：**返回控件跟着列表滚**（用户 01:15 拍板选 ②）。
+ *
+ * 以前返回键挂在 `ScreenScaffold` 的固定槽位里，滚动时永远贴在那儿；
+ * 现在它是列表的第一个 item，往下滚就跟着滚出去 —— 想返回要么滚回顶部，
+ * 要么用常驻的下拉退出手势（那条手势不看滚动位置）。
+ *
+ * 点它同样走 [SettingsExitController]，所以退场动画与其它风格一致。
+ */
+@Composable
+internal fun SettingsBackCardRow(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SettingsM3Card(modifier = modifier, onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 主题色 getter 是 @Composable，不能进绘制 lambda
+            val chevronColor = MaterialTheme.colorScheme.onSurface
+            Canvas(modifier = Modifier.size(12.dp)) {
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(size.width * 0.72f, size.height * 0.12f)
+                    lineTo(size.width * 0.28f, size.height * 0.5f)
+                    lineTo(size.width * 0.72f, size.height * 0.88f)
+                }
+                drawPath(
+                    path = path,
+                    color = chevronColor,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 2.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round
+                    )
+                )
+            }
+            Spacer(Modifier.width(Wear.Space.Sm))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

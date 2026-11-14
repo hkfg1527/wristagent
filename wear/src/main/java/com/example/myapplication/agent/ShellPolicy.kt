@@ -238,8 +238,16 @@ object ShellPolicy {
         return null
     }
 
-    fun clampTimeout(requested: Long?): Long =
-        (requested ?: DEFAULT_TIMEOUT_MS).coerceIn(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
+    /**
+     * 把一次执行的超时夹进 [MIN_TIMEOUT_MS]..[MAX_TIMEOUT_MS]。
+     *
+     * [fallbackMs] 是"调用方没有指定超时"时的取值：默认仍是 [DEFAULT_TIMEOUT_MS]，
+     * 生产路径传入设置项 `shell_command_timeout_ms`
+     * （[AgentPreferences.shellCommandTimeoutMs]），于是同一次夹紧既守住了上下限，
+     * 又让设置页的滑杆真的决定长命令能跑多久。
+     */
+    fun clampTimeout(requested: Long?, fallbackMs: Long = DEFAULT_TIMEOUT_MS): Long =
+        (requested ?: fallbackMs).coerceIn(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
 
     /** run_shell 与全部自写工具都是特权工具：执行前必须过审批闸门。 */
     fun isPrivilegedTool(toolName: String, selfDefinedNames: Set<String>): Boolean =

@@ -35,6 +35,8 @@ fun HyperParamsContent(
     var defaultThinking by remember { mutableStateOf(preferences.defaultThinkingEnabled) }
     var effort by remember { mutableStateOf(ReasoningEffort.fromStored(preferences.reasoningEffort)) }
     var replyStyle by remember { mutableStateOf(ReplyStyle.fromStored(preferences.replyStyle)) }
+    // 流式合帧间隔：32ms 出厂值，滑杆按 8ms 台阶落在 8..200
+    var streamIntervalMs by remember { mutableIntStateOf(preferences.streamEmitIntervalMs) }
     // 自定义 Token 输入框的开合：与阶梯滑轨并存，阶梯给常用值，输入框管任意值
     var editingTokens by remember { mutableStateOf(false) }
 
@@ -55,6 +57,16 @@ fun HyperParamsContent(
         maxTokens = next
         preferences.maxOutputTokens = next
         notifyChange()
+    }
+
+    fun applyStreamInterval(next: Int) {
+        val clamped = next.coerceIn(
+            AgentPreferences.MinStreamEmitIntervalMs,
+            AgentPreferences.MaxStreamEmitIntervalMs
+        )
+        if (clamped == streamIntervalMs) return
+        streamIntervalMs = clamped
+        preferences.streamEmitIntervalMs = clamped
     }
 
     SettingsSubPage(
@@ -170,6 +182,26 @@ fun HyperParamsContent(
             )
         }
 
+        // 合帧间隔：逐字渲染多快落到屏幕上。太长会滞后、太短会逐 token 重排
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_stream_emit_interval),
+                value = streamIntervalMs.toFloat(),
+                valueRange = AgentPreferences.MinStreamEmitIntervalMs.toFloat()..
+                    AgentPreferences.MaxStreamEmitIntervalMs.toFloat(),
+                steps = StreamIntervalSteps,
+                valueText = stringResource(
+                    R.string.settings_stream_emit_interval_value,
+                    streamIntervalMs
+                ),
+                onValueChange = { raw ->
+                    applyStreamInterval(
+                        (raw / StreamIntervalStepMs).roundToInt() * StreamIntervalStepMs
+                    )
+                }
+            )
+        }
+
         section(stringResource(R.string.settings_thought_group))
 
         row {
@@ -258,6 +290,12 @@ private fun replyStyleSecondaryRes(style: ReplyStyle): Int = when (style) {
     ReplyStyle.BALANCED -> R.string.settings_reply_style_balanced_secondary
     ReplyStyle.DETAILED -> R.string.settings_reply_style_detailed_secondary
 }
+
+/** 合帧间隔的滑杆台阶：8ms 一格，(200 - 8) / 8 共 24 个区间。 */
+private const val StreamIntervalStepMs = 8
+
+private val StreamIntervalSteps: Int = (AgentPreferences.MaxStreamEmitIntervalMs -
+    AgentPreferences.MinStreamEmitIntervalMs) / StreamIntervalStepMs - 1
 
 /** 三档温度预设：与旧版 chip 完全相同的取值。 */
 private const val TempFast = 0.2f

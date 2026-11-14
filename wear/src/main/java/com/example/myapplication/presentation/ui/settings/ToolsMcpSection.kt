@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,9 +13,25 @@ import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.SandboxLevel
+import com.example.myapplication.agent.ShellPolicy
 import com.example.myapplication.agent.SubAgentPolicy
 import com.example.myapplication.agent.ToolApprovalPolicy
 import com.example.myapplication.presentation.ui.theme.Wear
+import kotlin.math.roundToInt
+
+/** 命令超时的滑杆区间与台阶：与 [ShellPolicy] 的 MIN/MAX 同源，1000ms 一格。 */
+private val ShellTimeoutMinMs: Int = ShellPolicy.MIN_TIMEOUT_MS.toInt()
+private val ShellTimeoutMaxMs: Int = ShellPolicy.MAX_TIMEOUT_MS.toInt()
+private const val ShellTimeoutStepMs = 1000
+private val ShellTimeoutSteps: Int =
+    (ShellTimeoutMaxMs - ShellTimeoutMinMs) / ShellTimeoutStepMs - 1
+
+/** 放行阈值的滑杆台阶：0.01 一格，(0.98 - 0.5) / 0.01 共 48 个区间。 */
+private const val AllowThresholdStep = 0.01f
+private val AllowThresholdSteps: Int = (
+    (AgentPreferences.MaxApprovalAllowThreshold - AgentPreferences.MinApprovalAllowThreshold) /
+        AllowThresholdStep
+    ).roundToInt() - 1
 
 /**
  * 工具集细粒度放行与 MCP 协议探针：六个内置工具改用官方 SwitchButton，
@@ -42,6 +59,9 @@ fun ToolsMcpContent(
     // 审批策略与沙箱等级：一个决定"什么时候问人"，一个决定"能碰多远"，互不覆盖
     var approvalPolicy by remember { mutableStateOf(preferences.toolApprovalPolicy) }
     var sandboxLevel by remember { mutableStateOf(preferences.sandboxLevel) }
+    // 命令超时与审批放行阈值：两条都是"数值可调"，落盘前按 1000ms / 0.01 台阶量化
+    var shellTimeoutMs by remember { mutableIntStateOf(preferences.shellCommandTimeoutMs.toInt()) }
+    var allowThreshold by remember { mutableFloatStateOf(preferences.approvalAllowThreshold) }
     // 审批放行清单：条数必须可见（上限满了新的"记住"会被静默拒绝），撤销必须是显式二次确认
     var rememberedCount by remember { mutableIntStateOf(preferences.rememberedShellCommandCount) }
     var forgetArmed by remember { mutableStateOf(false) }
@@ -171,6 +191,27 @@ fun ToolsMcpContent(
             }
         }
 
+        // ===== 命令执行上限：长命令挂死时唯一能改的量 =====
+        section(stringResource(R.string.settings_shell_timeout))
+
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_shell_timeout),
+                value = shellTimeoutMs.toFloat(),
+                valueRange = ShellTimeoutMinMs.toFloat()..ShellTimeoutMaxMs.toFloat(),
+                steps = ShellTimeoutSteps,
+                valueText = stringResource(R.string.settings_shell_timeout_value, shellTimeoutMs),
+                onValueChange = { raw ->
+                    val snapped = ((raw / ShellTimeoutStepMs).roundToInt() * ShellTimeoutStepMs)
+                        .coerceIn(ShellTimeoutMinMs, ShellTimeoutMaxMs)
+                    if (snapped != shellTimeoutMs) {
+                        shellTimeoutMs = snapped
+                        preferences.shellCommandTimeoutMs = snapped.toLong()
+                    }
+                }
+            )
+        }
+
         // ===== 审批策略与沙箱等级：本轮补全的两档"工具能做什么"=====
         section(stringResource(R.string.settings_approval_policy))
 
@@ -195,6 +236,32 @@ fun ToolsMcpContent(
                     }
                 )
             }
+        }
+
+        // 放行阈值：滑杆拖到多少算放行。调低 = 更容易放行，调高 = 必须拖得更靠左
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_approval_threshold),
+                value = allowThreshold,
+                valueRange = AgentPreferences.MinApprovalAllowThreshold..
+                    AgentPreferences.MaxApprovalAllowThreshold,
+                steps = AllowThresholdSteps,
+                valueText = stringResource(
+                    R.string.settings_approval_threshold_value,
+                    allowThreshold
+                ),
+                onValueChange = { raw ->
+                    val snapped = ((raw / AllowThresholdStep).roundToInt() * AllowThresholdStep)
+                        .coerceIn(
+                            AgentPreferences.MinApprovalAllowThreshold,
+                            AgentPreferences.MaxApprovalAllowThreshold
+                        )
+                    if (snapped != allowThreshold) {
+                        allowThreshold = snapped
+                        preferences.approvalAllowThreshold = snapped
+                    }
+                }
+            )
         }
 
         section(stringResource(R.string.settings_sandbox_level))

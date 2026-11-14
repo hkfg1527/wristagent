@@ -811,6 +811,8 @@ fun ChatScreen(
                 .padding(bottom = BottomBarBottomInset),
             cooldownSeconds = state.pendingApproval?.risk?.requireCooldownSeconds ?: 0,
             riskExplanation = state.pendingApproval?.risk?.riskSummary ?: "",
+            // 放行阈值来自设置项：滑到多少算放行由用户调，不在代码里写死
+            approvalAllowThreshold = preferences.approvalAllowThreshold,
             onVoiceStartRecord = {
                 launchVoiceInputAction()
             },

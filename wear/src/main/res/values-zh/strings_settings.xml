@@ -475,4 +475,12 @@
     <string name="settings_wifi_only_secondary">开启后蜂窝网络下不发请求</string>
     <string name="settings_haptics">触觉反馈</string>
     <string name="settings_haptics_secondary">点按与确认时震动</string>
+    <string name="settings_stream_emit_interval">流式合帧间隔</string>
+    <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
+    <string name="settings_shell_timeout">命令超时</string>
+    <string name="settings_shell_timeout_value">%1$d 毫秒</string>
+    <string name="settings_approval_threshold">放行阈值</string>
+    <string name="settings_approval_threshold_value">%1$.2f</string>
+    <string name="settings_tts_speech_rate">播报语速</string>
+    <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>
 </resources>

@@ -75,6 +75,51 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getInt(KEY_RETRY_BACKOFF, DEFAULT_RETRY_BACKOFF).coerceIn(0, MaxRetryBackoffMs)
         set(value) = prefs.edit().putInt(KEY_RETRY_BACKOFF, value.coerceIn(0, MaxRetryBackoffMs)).apply()
 
+    // ===================== 四个真实可调的数值项 =====================
+    // 每一项都有真实消费点（流式节流 / run_shell 上限 / 审批滑杆 / TTS 语速）；
+    // 读写两侧都夹取 —— 越界值落在盘上会让消费点永远为真或永远为假，等于把功能关死。
+
+    /** 流式合帧间隔（毫秒）：默认 32，夹在 8..200。 */
+    var streamEmitIntervalMs: Int
+        get() = prefs.getInt(KEY_STREAM_EMIT_INTERVAL_MS, DEFAULT_STREAM_EMIT_INTERVAL_MS)
+            .coerceIn(MinStreamEmitIntervalMs, MaxStreamEmitIntervalMs)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_STREAM_EMIT_INTERVAL_MS,
+                value.coerceIn(MinStreamEmitIntervalMs, MaxStreamEmitIntervalMs)
+            )
+            .apply()
+
+    /** run_shell 的默认执行上限（毫秒）：默认 15000，夹在 [ShellPolicy] 已有的 MIN/MAX 上。 */
+    var shellCommandTimeoutMs: Long
+        get() = prefs.getLong(KEY_SHELL_COMMAND_TIMEOUT_MS, DEFAULT_SHELL_COMMAND_TIMEOUT_MS)
+            .coerceIn(ShellPolicy.MIN_TIMEOUT_MS, ShellPolicy.MAX_TIMEOUT_MS)
+        set(value) = prefs.edit()
+            .putLong(
+                KEY_SHELL_COMMAND_TIMEOUT_MS,
+                value.coerceIn(ShellPolicy.MIN_TIMEOUT_MS, ShellPolicy.MAX_TIMEOUT_MS)
+            )
+            .apply()
+
+    /** 审批滑杆的放行阈值：默认 0.85，夹在 0.5..0.98。 */
+    var approvalAllowThreshold: Float
+        get() = prefs.getFloat(KEY_APPROVAL_ALLOW_THRESHOLD, DEFAULT_APPROVAL_ALLOW_THRESHOLD)
+            .coerceIn(MinApprovalAllowThreshold, MaxApprovalAllowThreshold)
+        set(value) = prefs.edit()
+            .putFloat(
+                KEY_APPROVAL_ALLOW_THRESHOLD,
+                value.coerceIn(MinApprovalAllowThreshold, MaxApprovalAllowThreshold)
+            )
+            .apply()
+
+    /** 播报语速：默认 1.0（引擎原始语速），夹在 0.5..2.0。 */
+    var ttsSpeechRate: Float
+        get() = prefs.getFloat(KEY_TTS_SPEECH_RATE, DEFAULT_TTS_SPEECH_RATE)
+            .coerceIn(MinTtsSpeechRate, MaxTtsSpeechRate)
+        set(value) = prefs.edit()
+            .putFloat(KEY_TTS_SPEECH_RATE, value.coerceIn(MinTtsSpeechRate, MaxTtsSpeechRate))
+            .apply()
+
     /** 仅 WiFi 下发起请求：默认关。开着时蜂窝网络会直接给出可读回执。 */
     var wifiOnlyRequests: Boolean
         get() = prefs.getBoolean(KEY_WIFI_ONLY, DEFAULT_WIFI_ONLY)
@@ -477,6 +522,24 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val MaxRequestTimeoutSeconds = 180
         const val MaxRequestRetries = 3
         const val MaxRetryBackoffMs = 5000
+
+        /** 本轮四个数值项的键：与偏好字段同名；不进可移植键白名单，也不进网页控制台字段表。 */
+        const val KEY_STREAM_EMIT_INTERVAL_MS = "stream_emit_interval_ms"
+        const val KEY_SHELL_COMMAND_TIMEOUT_MS = "shell_command_timeout_ms"
+        const val KEY_APPROVAL_ALLOW_THRESHOLD = "approval_allow_threshold"
+        const val KEY_TTS_SPEECH_RATE = "tts_speech_rate"
+
+        const val DEFAULT_STREAM_EMIT_INTERVAL_MS = 32
+        const val DEFAULT_SHELL_COMMAND_TIMEOUT_MS = ShellPolicy.DEFAULT_TIMEOUT_MS
+        const val DEFAULT_APPROVAL_ALLOW_THRESHOLD = 0.85f
+        const val DEFAULT_TTS_SPEECH_RATE = 1.0f
+
+        const val MinStreamEmitIntervalMs = 8
+        const val MaxStreamEmitIntervalMs = 200
+        const val MinApprovalAllowThreshold = 0.5f
+        const val MaxApprovalAllowThreshold = 0.98f
+        const val MinTtsSpeechRate = 0.5f
+        const val MaxTtsSpeechRate = 2.0f
         internal const val DEFAULT_CALLED_TOOLS = ""
         internal const val DEFAULT_REGISTERED_TOOLS = 0
         const val KEY_DEFAULT_THINKING = "defaultThinking"

@@ -375,6 +375,9 @@ fun SettingsSubPage(
             runCatching { listFocusRequester.requestFocus() }
         }
 
+        // 卡片档的返回控件进列表（跟着列表滚），所以这个判断要在 ScreenScaffold 之前算好
+        val backInList = WearAppearance.style == SettingsStyle.GOOGLE_CARD
+
         ScreenScaffold(
             scrollState = listState,
             modifier = Modifier.fillMaxSize(),
@@ -386,11 +389,14 @@ fun SettingsSubPage(
             timeText = null,
             scrollIndicator = null,
             edgeButton = {
-                SettingsEdgeBackButton(
-                    onClick = { exit.begin(onBack) },
-                    exit = exit,
-                    scrollState = listState
-                )
+                // 卡片档把返回做成列表首项（跟着列表滚，用户 01:15 拍板）；其余风格保持固定槽位
+                if (!backInList) {
+                    SettingsEdgeBackButton(
+                        onClick = { exit.begin(onBack) },
+                        exit = exit,
+                        scrollState = listState
+                    )
+                }
             }
         ) { scaffoldPadding ->
         ScalingLazyColumn(
@@ -428,6 +434,22 @@ fun SettingsSubPage(
             // hero 的标签就是这句话时不再画页标题：卡片档里标题与 hero 标签会紧挨着重两次
             val showPageHeader = SettingsTextLayout.shouldRenderPageHeader(showHero, heroLabel, title)
             val rowCount = content.size + 1 + if (showHero) 1 else 0
+
+            if (backInList) {
+                item(key = "page-back") {
+                    SettingsStaggeredRow(index = 0, rowCount = rowCount, stagger = stagger, exit = exit) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            SettingsBackCardRow(
+                                label = stringResource(R.string.settings_back),
+                                onClick = { exit.begin(onBack) },
+                                modifier = Modifier
+                                    .width(SettingsContentWidth)
+                                    .padding(bottom = SettingsCardStyle.Gap)
+                            )
+                        }
+                    }
+                }
+            }
 
             if (showPageHeader) {
                 item(key = "page-header") {

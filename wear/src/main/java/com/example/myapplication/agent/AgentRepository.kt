@@ -97,7 +97,9 @@ class AgentRepository(
     override fun displayPreferences(): AgentDisplayPreferences = AgentDisplayPreferences(
         compactMode = preferences.compactMode,
         autoSpeakReplies = preferences.autoSpeakReplies,
-        asrLiveTranscript = preferences.asrLiveTranscript
+        asrLiveTranscript = preferences.asrLiveTranscript,
+        streamEmitIntervalMs = preferences.streamEmitIntervalMs,
+        ttsSpeechRate = preferences.ttsSpeechRate
     )
 
     override fun registeredTools(): List<ToolDefinition> = dispatcher.getRegisteredTools()

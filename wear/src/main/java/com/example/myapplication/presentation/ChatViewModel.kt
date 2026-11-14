@@ -222,6 +222,9 @@ class ChatViewModel(
             it.copy(isExecuting = true, isThinkingActive = true, isTaskCompleted = false)
         }
 
+        // 合帧窗口来自设置项 stream_emit_interval_ms：每轮开场重读一次，
+        // 于是设置页调完不必杀进程，下一轮就按新窗口合帧
+        throttle.updateInterval(gateway.displayPreferences().streamEmitIntervalMs.toLong())
         // 新一轮从空基线起算：首帧立即可见，突发判定不看上一轮的残留文本
         throttle.reset()
         _uiState.update { it.copy(isStreamingBurst = false) }
@@ -316,9 +319,10 @@ class ChatViewModel(
      * 没有 TTS 引擎、初始化失败都只记日志（见 [ReplySpeaker]），绝不影响对话链路。
      */
     private fun speakReplyIfEnabled(blocks: List<ConversationBlock>) {
-        val text = ReplySpeech.spokenText(gateway.displayPreferences().autoSpeakReplies, blocks) ?: return
+        val display = gateway.displayPreferences()
+        val text = ReplySpeech.spokenText(display.autoSpeakReplies, blocks) ?: return
         val speaker = replySpeaker ?: ReplySpeaker(getApplication<Application>()).also { replySpeaker = it }
-        speaker.speak(text)
+        speaker.speak(text, display.ttsSpeechRate)
     }
 
     // ======================== 胶囊展开态 ========================
