@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import com.example.myapplication.BuildConfig
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.GestureBindings
@@ -403,11 +404,9 @@ fun SettingsScreen(
                             RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
                                 SettingsHeroCard(
                                     label = stringResource(R.string.settings_section_system),
-                                    value = if (customPrompt.isNotBlank()) {
-                                        stringResource(R.string.settings_prompt_custom_value)
-                                    } else {
-                                        stringResource(R.string.settings_prompt_default)
-                                    },
+                                    // 系统卡报版本号：这是内测版最有用的一条系统信息；
+                                    // 提示词状态在「提示词」子页的 hero 里已经说了，根页不重复。
+                                    value = BuildConfig.VERSION_NAME,
                                     accent = Wear.CardSystem,
                                     meta = if (consolePort > 0) {
                                         stringResource(R.string.settings_card_console_meta, consolePort)
