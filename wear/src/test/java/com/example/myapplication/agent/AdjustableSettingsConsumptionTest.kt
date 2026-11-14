@@ -246,7 +246,7 @@ class AdjustableSettingsConsumptionTest {
         )
         assertTrue(
             "ChatViewModel 必须把 tts_speech_rate 交给播报器",
-            viewModel.contains("displayPreferences().ttsSpeechRate") &&
+            viewModel.contains("val display = gateway.displayPreferences()") &&
                 viewModel.contains("speaker.speak(text, display.ttsSpeechRate)")
         )
 
