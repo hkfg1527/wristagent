@@ -1,4 +1,4 @@
-# 交接（状态更新 2026-11-14 21:12，硬截止 11-15 05:00）
+# 交接（状态更新 2026-11-14 23:00，硬截止 11-15 05:00）
 
 ## 已发布（都可下载，APK 均在 GitHub release 里）
 
@@ -8,10 +8,13 @@
 | `v0.06-beta` | 33 | 卡片档改成一卡一个 lazy item、关掉 autoCentering、去掉重复的焦点块 |
 | `v0.07-beta` | 34 | 性能：干掉每帧重画的 432×3113 图层（doFrame p90 52.7→20.8ms） |
 | `v0.08-beta` | 35 | 品牌卡上标识与角色同框；中西混排副标题不再折行 |
+| `v0.09-beta` | 36 | 外观页文案：「大卡片」说明不再提早已删掉的圆环；组标题改「可选风格」 |
+| `v0.10-beta` | 37 | 根页「系统」卡报当前版本号 |
+| `v0.11-beta` | 38 | 二级页标题不再与 hero 标签重复（14 个页传 heroLabel，判据有单测） |
 
 ## 这一段的硬证据
 
-- 单测 **1186 条全绿**（`./gradlew :wear:testDebugUnitTest`）。
+- 单测 **1189 条全绿**（`./gradlew :wear:testDebugUnitTest`）。
 - 性能：`docs/PERF-0.05.md` —— 直方图 + `framestats` 相位拆解 + `atrace` 切片 + 修完复测，
   含 4 条**被实验推翻的推断**（谁写谁知道，别重蹈）。
 - 视觉：`docs/device/v11/` 下 `percard-*`、`flatcard-zoom`、`walk-1..4`、`mark-02-modelconfig` 等实机截图。
