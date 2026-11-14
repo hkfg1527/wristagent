@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.brand.BrandId
 import com.example.myapplication.presentation.ui.ModelLabels
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -142,7 +143,7 @@ fun ModelConfigContent(
                 label = stringResource(R.string.settings_section_models),
                 value = preferences.modelName,
                 accent = Wear.CardModel,
-                badge = "DS",
+                badgeMark = BrandId.fromEndpoint(inputBaseUrl, preferences.modelName).markRes,
                 meta = stringResource(
                     R.string.settings_card_meta_context,
                     preferences.maxContextTurns,

@@ -88,3 +88,6 @@ build_out.txt
 # 参考物料（APK 与资源转储）只在本地留存，不入库
 docs/ref/*.apk
 docs/ref/*.txt
+
+# Local build logs (never commit)
+build-logs/

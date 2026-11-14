@@ -10,6 +10,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.brand.BrandId
 import com.example.myapplication.agent.ProviderProfileBook
 
 /**
@@ -46,6 +47,8 @@ fun ProviderProfilesContent(
                 label = stringResource(R.string.settings_provider_profiles),
                 value = active ?: stringResource(R.string.settings_providers_none_active),
                 accent = Wear.CardTools,
+                // 当前这套配置走的是哪家端点，一眼看出来：徽标位放品牌矢量
+                badgeMark = BrandId.fromEndpoint(preferences.baseUrl, preferences.modelName).markRes,
                 meta = stringResource(R.string.settings_card_meta_profiles, book.profiles.size)
             )
         }
