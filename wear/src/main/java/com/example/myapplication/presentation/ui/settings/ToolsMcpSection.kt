@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.mcp.McpClient
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.SandboxLevel
 import com.example.myapplication.agent.ShellPolicy
@@ -62,6 +63,8 @@ fun ToolsMcpContent(
     // 命令超时与审批放行阈值：两条都是"数值可调"，落盘前按 1000ms / 0.01 台阶量化
     var shellTimeoutMs by remember { mutableIntStateOf(preferences.shellCommandTimeoutMs.toInt()) }
     var toolChars by remember { mutableIntStateOf(preferences.toolResultMaxChars) }
+    var mcpPages by remember { mutableIntStateOf(preferences.mcpMaxToolPages) }
+    var subagentTimeoutMs by remember { mutableFloatStateOf(preferences.subagentReadTimeoutMs.toFloat()) }
     var allowThreshold by remember { mutableFloatStateOf(preferences.approvalAllowThreshold) }
     // 审批放行清单：条数必须可见（上限满了新的"记住"会被静默拒绝），撤销必须是显式二次确认
     var rememberedCount by remember { mutableIntStateOf(preferences.rememberedShellCommandCount) }
@@ -190,6 +193,44 @@ fun ToolsMcpContent(
                     subtitleBelowRow = true
                 )
             }
+        }
+
+        // ===== MCP 分页与子代理读超时：远端慢的时候先丢子代理，不拖住主循环 =====
+        section(stringResource(R.string.settings_mcp_limits))
+
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_mcp_max_pages),
+                value = mcpPages.toFloat(),
+                valueRange = McpClient.MIN_TOOL_PAGES.toFloat()..McpClient.MAX_TOOL_PAGE_LIMIT.toFloat(),
+                steps = 8,
+                valueText = mcpPages.toString(),
+                onValueChange = { raw ->
+                    val snapped = raw.roundToInt()
+                    if (snapped != mcpPages) {
+                        mcpPages = snapped
+                        preferences.mcpMaxToolPages = snapped
+                    }
+                }
+            )
+        }
+
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_subagent_read_timeout),
+                value = subagentTimeoutMs,
+                valueRange = AgentPreferences.MIN_SUBAGENT_READ_TIMEOUT_MS.toFloat()..
+                    AgentPreferences.MAX_SUBAGENT_READ_TIMEOUT_MS.toFloat(),
+                steps = 10,
+                valueText = Math.round(subagentTimeoutMs / 1000f).toString() + "s",
+                onValueChange = { raw ->
+                    val snapped = (raw / 15000f).roundToInt() * 15000f
+                    if (snapped != subagentTimeoutMs) {
+                        subagentTimeoutMs = snapped
+                        preferences.subagentReadTimeoutMs = snapped.toLong()
+                    }
+                }
+            )
         }
 
         // ===== 工具结果上限：一次工具输出能占多少上下文 =====

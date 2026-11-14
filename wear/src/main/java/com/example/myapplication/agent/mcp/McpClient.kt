@@ -41,8 +41,12 @@ data class McpCallResult(
 class McpClient(
     val endpoint: McpEndpoint,
     private val timeouts: McpTimeouts = McpTimeouts(),
-    private val transport: McpHttpTransport = McpHttpTransport(timeouts)
+    private val transport: McpHttpTransport = McpHttpTransport(timeouts),
+    /** tools/list 分页上限，来自设置项 mcp_max_tool_pages；越界在构造时就夹好。 */
+    maxToolPages: Int = MAX_TOOL_PAGES
 ) : Closeable {
+
+    private val toolPageLimit: Int = maxToolPages.coerceIn(MIN_TOOL_PAGES, MAX_TOOL_PAGE_LIMIT)
 
     private val idSequence = AtomicLong(0)
 
@@ -90,7 +94,7 @@ class McpClient(
         val tools = mutableListOf<McpRemoteTool>()
         var cursor: String? = null
         var page = 0
-        while (page < MAX_TOOL_PAGES) {
+        while (page < toolPageLimit) {
             val currentCursor = cursor
             val params = if (currentCursor == null) null else McpJson.obj("cursor" to McpJson.Str(currentCursor))
             val result = rpc("tools/list", params, timeouts.requestMs)
@@ -208,7 +212,11 @@ class McpClient(
 
         const val CLIENT_VERSION = "0.0.2"
 
-        /** tools/list 分页上限：远端用游标无限翻页时不能把工具循环拖住。 */
+        /** tools/list 分页上限的出厂值：远端用游标无限翻页时不能把工具循环拖住。 */
         const val MAX_TOOL_PAGES = 5
+
+        /** 设置项可调范围：1 页（只拉第一屏）到 10 页。 */
+        const val MIN_TOOL_PAGES = 1
+        const val MAX_TOOL_PAGE_LIMIT = 10
     }
 }

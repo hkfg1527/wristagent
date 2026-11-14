@@ -491,6 +491,9 @@
     <string name="settings_stream_emit_chars">Chars per frame burst</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>
     <string name="settings_stream_emit_interval_value">%1$d ms</string>
+    <string name="settings_mcp_limits">MCP pages &amp; sub-agent timeout</string>
+    <string name="settings_mcp_max_pages">MCP tool list pages</string>
+    <string name="settings_subagent_read_timeout">Sub-agent read timeout</string>
     <string name="settings_tool_result_chars">Tool output limit</string>
     <string name="settings_shell_timeout">Command timeout</string>
     <string name="settings_shell_timeout_value">%1$d ms</string>

@@ -30,6 +30,8 @@ class SettingsPersistenceTest {
         p.toolResultMaxChars = 12_000
         p.bottomBarAutoHideMs = 5_000L
         p.samplingTopP = 0.8f
+        p.mcpMaxToolPages = 8
+        p.subagentReadTimeoutMs = 90_000L
 
         // 逐个回读：写进去的值必须原样读得出来（夹取范围内）
         assertEquals(48, p.streamEmitIntervalMs)
@@ -44,6 +46,8 @@ class SettingsPersistenceTest {
         assertEquals(12_000, p.toolResultMaxChars)
         assertEquals(5_000L, p.bottomBarAutoHideMs)
         assertEquals(0.8f, p.samplingTopP, 0.0001f)
+        assertEquals(8, p.mcpMaxToolPages)
+        assertEquals(90_000L, p.subagentReadTimeoutMs)
     }
 
     @Test
@@ -60,6 +64,8 @@ class SettingsPersistenceTest {
         assertEquals("tool_result_max_chars", AgentPreferences.KEY_TOOL_RESULT_MAX_CHARS)
         assertEquals("bottom_bar_auto_hide_ms", AgentPreferences.KEY_BOTTOM_BAR_AUTO_HIDE_MS)
         assertEquals("sampling_top_p", AgentPreferences.KEY_SAMPLING_TOP_P)
+        assertEquals("mcp_max_tool_pages", AgentPreferences.KEY_MCP_MAX_TOOL_PAGES)
+        assertEquals("subagent_read_timeout_ms", AgentPreferences.KEY_SUBAGENT_READ_TIMEOUT_MS)
     }
 
     @Test

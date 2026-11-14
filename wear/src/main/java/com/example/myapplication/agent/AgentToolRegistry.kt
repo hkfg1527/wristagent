@@ -1,5 +1,6 @@
 package com.example.myapplication.agent
 
+import com.example.myapplication.agent.mcp.McpClient
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -69,7 +70,8 @@ class AgentToolRegistry(
     internal val mcpTools: McpToolBinding by lazy {
         McpToolBinding(
             endpointSource = { preferences?.mcpEndpoint ?: "" },
-            enabledSource = { preferences?.isMcpEnabled ?: false }
+            enabledSource = { preferences?.isMcpEnabled ?: false },
+            maxToolPages = preferences?.mcpMaxToolPages ?: McpClient.MAX_TOOL_PAGES
         )
     }
 

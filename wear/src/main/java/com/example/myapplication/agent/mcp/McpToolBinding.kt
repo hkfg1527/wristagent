@@ -55,7 +55,11 @@ class McpToolBinding(
     private val failureBackoffMs: Long = DEFAULT_BACKOFF_MS,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val now: () -> Long = { System.currentTimeMillis() },
-    private val clientFactory: (McpEndpoint) -> McpClient = { endpoint -> McpClient(endpoint, timeouts) }
+    /** tasks/list 分页上限，来自设置项 mcp_max_tool_pages。 */
+    private val maxToolPages: Int = McpClient.MAX_TOOL_PAGES,
+    private val clientFactory: (McpEndpoint) -> McpClient = { endpoint ->
+        McpClient(endpoint, timeouts, maxToolPages = maxToolPages)
+    }
 ) : Closeable {
 
     @Volatile

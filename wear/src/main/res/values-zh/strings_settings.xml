@@ -491,6 +491,9 @@
     <string name="settings_stream_emit_chars">突发判定字数</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
     <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
+    <string name="settings_mcp_limits">MCP 分页与子代理超时</string>
+    <string name="settings_mcp_max_pages">MCP 工具清单页数</string>
+    <string name="settings_subagent_read_timeout">子代理读取超时</string>
     <string name="settings_tool_result_chars">工具结果上限</string>
     <string name="settings_shell_timeout">命令超时</string>
     <string name="settings_shell_timeout_value">%1$d 毫秒</string>

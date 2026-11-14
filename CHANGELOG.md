@@ -11,6 +11,20 @@
 
 ---
 
+## [0.0.0.18] - 2026-11-15（内部版，不对外发布）
+
+### 新增第 13、14 个真实设置（都在「工具与 MCP」页）
+| 键 | 范围 | 默认 | 消费点 |
+|---|---|---|---|
+| `mcp_max_tool_pages` | 1..10 页 | 5 | `McpClient` 的 tools/list 分页循环（构造时夹取，循环用 `toolPageLimit`） |
+| `subagent_read_timeout_ms` | 15s..180s | 60s | `AgentDispatcher` 子代理请求的 `readTimeout` |
+
+- 分页上限一路透传：偏好 → `AgentToolRegistry` → `McpToolBinding` → `McpClient` 构造参数，每层都有守卫断言。
+- 子代理超时直接把写死的常量换成 `preferences.subagentReadTimeoutMs.toInt()`。
+- UI：工具与 MCP 页新增「MCP 分页与子代理超时」组两行；真机看到 `MCP 工具清单页数 → 5`。
+- `SettingsPersistenceTest` 覆盖数从 12 扩到 **14**。
+- 新增 `McpAndSubAgentLimitsTest` 5 个；合计 **1248 全绿**。
+
 ## [0.0.0.17] - 2026-11-15（内部版，不对外发布）
 
 ### 新增第 12 个真实设置：突发判定字数（`stream_emit_chars`）

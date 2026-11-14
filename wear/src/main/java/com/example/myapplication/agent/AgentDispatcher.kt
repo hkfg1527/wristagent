@@ -1194,7 +1194,7 @@ class AgentDispatcher(
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Authorization", "Bearer " + preferences.apiKey.trim())
                 connectTimeout = SUB_AGENT_CONNECT_TIMEOUT_MS
-                readTimeout = SUB_AGENT_READ_TIMEOUT_MS
+                readTimeout = preferences.subagentReadTimeoutMs.toInt()
                 doOutput = true
             }
             val body = buildSubAgentRequestBody(preferences, history, tools)

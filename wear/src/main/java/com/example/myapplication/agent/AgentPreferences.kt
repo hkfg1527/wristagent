@@ -2,6 +2,7 @@ package com.example.myapplication.agent
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.myapplication.agent.mcp.McpClient
 import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.presentation.ui.settings.HapticAmplitude
 import com.example.myapplication.agent.contract.SecurityMode
@@ -266,6 +267,28 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         )
         set(value) = prefs.edit()
             .putInt(KEY_TOOL_RESULT_MAX_CHARS, ToolOutputPolicy.clampMaxChars(value))
+            .apply()
+
+    /** MCP tools/list 分页上限（1..10）：远端游标无限翻页时不能把工具循环拖住。 */
+    var mcpMaxToolPages: Int
+        get() = prefs.getInt(KEY_MCP_MAX_TOOL_PAGES, McpClient.MAX_TOOL_PAGES)
+            .coerceIn(McpClient.MIN_TOOL_PAGES, McpClient.MAX_TOOL_PAGE_LIMIT)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_MCP_MAX_TOOL_PAGES,
+                value.coerceIn(McpClient.MIN_TOOL_PAGES, McpClient.MAX_TOOL_PAGE_LIMIT)
+            )
+            .apply()
+
+    /** 子代理读取超时（15000..180000 毫秒）：远端慢时先丢子代理，不拖住主循环。 */
+    var subagentReadTimeoutMs: Long
+        get() = prefs.getLong(KEY_SUBAGENT_READ_TIMEOUT_MS, DEFAULT_SUBAGENT_READ_TIMEOUT_MS)
+            .coerceIn(MIN_SUBAGENT_READ_TIMEOUT_MS, MAX_SUBAGENT_READ_TIMEOUT_MS)
+        set(value) = prefs.edit()
+            .putLong(
+                KEY_SUBAGENT_READ_TIMEOUT_MS,
+                value.coerceIn(MIN_SUBAGENT_READ_TIMEOUT_MS, MAX_SUBAGENT_READ_TIMEOUT_MS)
+            )
             .apply()
 
     var streamMode: Boolean
@@ -559,6 +582,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
         const val KEY_TOOL_RESULT_MAX_CHARS = "tool_result_max_chars"
+        const val KEY_MCP_MAX_TOOL_PAGES = "mcp_max_tool_pages"
+        const val KEY_SUBAGENT_READ_TIMEOUT_MS = "subagent_read_timeout_ms"
+        const val DEFAULT_SUBAGENT_READ_TIMEOUT_MS = 60_000L
+        const val MIN_SUBAGENT_READ_TIMEOUT_MS = 15_000L
+        const val MAX_SUBAGENT_READ_TIMEOUT_MS = 180_000L
         const val DEFAULT_TOOL_RESULT_MAX_CHARS = 8000
         const val MIN_TOOL_RESULT_CHARS = 500
         const val MAX_TOOL_RESULT_CHARS = 50000
