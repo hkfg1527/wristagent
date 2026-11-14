@@ -46,6 +46,13 @@ import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.presentation.ui.components.WearBanner
 import com.example.myapplication.presentation.ui.theme.Wear
 
+/** 连续列表：同说话者相邻两条的相接缝。
+ *  不是 0：完全贴合会看起来像一张卡被切成两半，2dp 保留"这是两条消息"的暗示。 */
+private val GroupSeamDp = 2.dp
+
+/** 跨组的常规间距（与原先的 Space.Sm 一致：2dp + 10dp = 12dp）。 */
+private val GroupGapDp = 10.dp
+
 /**
  * 对话卡片宽度上限：184dp（见 [ChatVisualMetrics]）。
  *
@@ -168,7 +175,8 @@ internal fun ConversationList(
                 focusRequester = focusRequester
             ),
         horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(Wear.Space.Sm)
+        // 连续列表：项间距收到 2dp，组间呼吸由每项自己的 bottom padding 补足（见下）
+        verticalArrangement = Arrangement.spacedBy(GroupSeamDp)
     ) {
         // 顶部不再保留大留白：正文允许与弧形时钟重叠，只由列表自身的边缘缩放淡出收敛
         // 依次渲染对话结构流 (用户右对齐气泡 vs Assistant 纯正方形框，工具调用完整内嵌)
@@ -181,7 +189,13 @@ internal fun ConversationList(
         ) { index ->
             val item = items[index]
             val itemKey = itemKeyOf(item)
-            AnimatedMessageCard(key = itemKey) {
+            // 组内相接 2dp；跨组补到常规 12dp。两条规则只在这里生效，别处不用知道分组细节。
+            val continuesGroup = item is RenderableConversationItem.AssistantTurn &&
+                items.getOrNull(index + 1) is RenderableConversationItem.AssistantTurn
+            AnimatedMessageCard(
+                key = itemKey,
+                modifier = Modifier.padding(bottom = if (continuesGroup) 0.dp else GroupGapDp)
+            ) {
                 when (item) {
                     is RenderableConversationItem.UserPrompt -> {
                         // 用户指令：允许右对齐聊天气泡样式，随手势一体滚动
@@ -213,6 +227,9 @@ internal fun ConversationList(
                         ) {
                             AgentSquareBlurBox(
                                 modifier = Modifier.widthIn(max = ConversationCardMaxWidth),
+                                // 连续列表：上/下一条也是助手回复时，相接那一侧收口并贴紧
+                                groupedWithPrevious = items.getOrNull(index - 1) is RenderableConversationItem.AssistantTurn,
+                                groupedWithNext = items.getOrNull(index + 1) is RenderableConversationItem.AssistantTurn,
                                 approvalVisualState = approvalVisualState,
                                 isTaskCompletedTrigger = isTaskCompleted,
                                 thinkingIntensity = thinkingIntensity,

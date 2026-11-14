@@ -465,6 +465,10 @@ private val AnswerEdgeBarWidth = 2.dp
 fun AgentSquareBlurBox(
     modifier: Modifier = Modifier,
     borderColor: Color = Wear.Palette.Border,
+    /** 上一条也是助手回复：本卡上缘不再独立收口，两块合成一个"连续的面"。 */
+    groupedWithPrevious: Boolean = false,
+    /** 下一条也是助手回复：本卡下缘改成同样的 4dp，留出可见缝但不成断点。 */
+    groupedWithNext: Boolean = false,
     approvalVisualState: ApprovalVisualState = ApprovalVisualState.NONE,
     isTaskCompletedTrigger: Boolean = false,
     thinkingIntensity: Float = 0f,
@@ -479,11 +483,14 @@ fun AgentSquareBlurBox(
     // 曾经为了"去装饰"把面和边一起删掉，结果文字直接浮在纯黑上 —— 没有前后关系，也就没有空间感。
     // 强调色是 @Composable getter，必须先在组合上下文里取出来，不能进绘制 lambda
     val edgeAccent = Wear.Accent
+    // 连续列表：同一位说话者的相邻两条共享一个面 —— 相接的那一侧收成 4dp，
+    // 外侧保持完整卡片圆角。这样一屏里读到的是一段"回答"，而不是一堆各自为政的盒子。
+    val seam = 4.dp
     val shape = RoundedCornerShape(
-        topStart = Wear.Radius.Card,
-        topEnd = Wear.Radius.Card,
-        bottomStart = Wear.Radius.Control / 2,
-        bottomEnd = Wear.Radius.Card
+        topStart = if (groupedWithPrevious) seam else Wear.Radius.Card,
+        topEnd = if (groupedWithPrevious) seam else Wear.Radius.Card,
+        bottomStart = if (groupedWithNext) seam else Wear.Radius.Control / 2,
+        bottomEnd = if (groupedWithNext) seam else Wear.Radius.Card
     )
     val approvalBorder = if (approvalVisualState == ApprovalVisualState.NONE) {
         Modifier
