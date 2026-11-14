@@ -38,10 +38,10 @@ import kotlin.math.abs
  */
 internal object CardEdgeZoom {
     /** 官方 `ScalingLazyColumnDefaults.scalingParams` 的默认 edgeScale：最靠边缩到 70%。 */
-    const val MinScale = 0.70f
+    const val MinScale = 0.94f
 
     /** 官方默认 edgeAlpha：最靠边时透明度 50%。 */
-    const val MinAlpha = 0.50f
+    const val MinAlpha = 0.45f
 
     /**
      * 进度起点：卡中心离屏心不足这个比例时完全不缩放。

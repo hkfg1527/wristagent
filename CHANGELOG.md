@@ -11,6 +11,24 @@
 
 ---
 
+## [0.0.0.4] - 2026-11-15（内部版，不对外发布）
+
+### 官方图替代自绘角色
+- 品牌卡里的点阵角色全部撤掉，换成**官方品牌标识**（10 家）：DeepSeek / OpenAI / Anthropic / Gemini /
+  Kimi / Qwen / Ollama / Mistral / Grok / Meta Llama。
+  来源：simple-icons CDN 与 Wikimedia Commons 的公开 SVG，转成 Android VectorDrawable（保留官方品牌色，不 tint）。
+  没有官方图的那一家（自建端点）继续用自绘兜底标识。
+- 用户原话：`我让你放官方图片，你就别让那个自己画那个点真图了，丑死了`。
+
+### 指示器换成官方组件
+- hero 卡的环改用 `androidx.wear.compose.material3.CircularProgressIndicator`（Wear M3 1.7.1 自带），
+  轨道色 `#48556A`（Pixel Watch 2 上 Google Health 实测），指示色取该卡强调色；没数据也画轨道。
+
+### 卡片宽度
+- 所有卡的布局宽度本来就是同一个常量（`SettingsContentWidth` = 176dp）；唯一的宽度差来自边缘缩放。
+  按`所有卡片限制在统一宽度里`把最靠边从 0.70 收到 **0.94**：实测量到 322…352px（差 ≤8%），
+  边缘感主要交给透明度（0.45）。守着"只缩不放"不变。
+
 ## [0.0.0.3] - 2026-11-15（内部版，不对外发布）
 
 ### P0：返回控件跟着列表滚（用户拍板选 ②）

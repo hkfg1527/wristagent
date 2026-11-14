@@ -17,51 +17,67 @@ internal enum class BrandId(
     val accent: Color,
     /** 徽标矢量：[brand_*_mark] 一律单色白路径，使用时按 [accent] 上色。 */
     val markRes: Int,
+    /**
+     * **官方**品牌标识（自带上色，不要再 tint）；`0` 表示这家没有官方图，退回 [markRes]。 
+     * 来源：simple-icons CDN 与 Wikimedia Commons 的公开 SVG，已转成 Android VectorDrawable。 
+     */
+    val officialRes: Int,
     private val hosts: List<String>,
     private val models: List<String>
 ) {
     DEEPSEEK(
         accent = Color(0xFF4D6BFE), markRes = R.drawable.brand_deepseek_mark,
+        officialRes = R.drawable.brand_official_deepseek,
         hosts = listOf("deepseek"), models = listOf("deepseek")
     ),
     OPENAI(
         accent = Color(0xFF10A37F), markRes = R.drawable.brand_openai_mark,
+        officialRes = R.drawable.brand_official_openai,
         hosts = listOf("openai", "azure.com"), models = listOf("gpt", "o1-", "o3-", "o4-")
     ),
     ANTHROPIC(
         accent = Color(0xFFD97757), markRes = R.drawable.brand_anthropic_mark,
+        officialRes = R.drawable.brand_official_anthropic,
         hosts = listOf("anthropic", "claude"), models = listOf("claude")
     ),
     GEMINI(
         accent = Color(0xFF8AB4F8), markRes = R.drawable.brand_gemini_mark,
+        officialRes = R.drawable.brand_official_gemini,
         hosts = listOf("generativelanguage", "gemini", "googleapis", "google"), models = listOf("gemini", "gemma")
     ),
     KIMI(
         accent = Color(0xFF8E7CFF), markRes = R.drawable.brand_kimi_mark,
+        officialRes = R.drawable.brand_official_kimi,
         hosts = listOf("moonshot", "kimi"), models = listOf("moonshot", "kimi")
     ),
     QWEN(
         accent = Color(0xFF33B1FF), markRes = R.drawable.brand_qwen_mark,
+        officialRes = R.drawable.brand_official_qwen,
         hosts = listOf("dashscope", "aliyuncs", "qwen"), models = listOf("qwen", "qwq")
     ),
     OLLAMA(
         accent = Color(0xFFB9C2CF), markRes = R.drawable.brand_ollama_mark,
+        officialRes = R.drawable.brand_official_ollama,
         hosts = listOf("ollama", "11434"), models = listOf("ollama")
     ),
     MISTRAL(
         accent = Color(0xFFFF7000), markRes = R.drawable.brand_mistral_mark,
+        officialRes = R.drawable.brand_official_mistral,
         hosts = listOf("mistral"), models = listOf("mistral", "codestral", "mixtral")
     ),
     GROK(
         accent = Color(0xFFE8ECF2), markRes = R.drawable.brand_grok_mark,
+        officialRes = R.drawable.brand_official_grok,
         hosts = listOf("x.ai", "xai"), models = listOf("grok")
     ),
     LLAMA(
         accent = Color(0xFF0866FF), markRes = R.drawable.brand_llama_mark,
+        officialRes = R.drawable.brand_official_llama,
         hosts = listOf("llama", "meta.ai"), models = listOf("llama", "codellama")
     ),
     UNKNOWN(
         accent = Color(0xFF7E8899), markRes = R.drawable.brand_unknown_mark,
+        officialRes = 0,
         hosts = emptyList(), models = emptyList()
     );
 

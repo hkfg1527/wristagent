@@ -204,10 +204,14 @@ internal fun SettingsBrandCard(
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
                 SettingsHeroRing(progress = ring, accent = accent)
             }
-            BrandCharacter(
-                brand = brand,
-                eyeColor = SettingsCardSurface,
-                modifier = Modifier.size(BrandCharacterSize.Inline)
+            // 用户原话："我让你放官方图片，就别自己画那个点真图了" —— 有官方标识就放官方图，
+            // 官方图自带品牌色，不要再 tint；没有官方图的那一家才退回自绘兜底标识。
+            val markRes = if (brand.officialRes != 0) brand.officialRes else brand.markRes
+            Icon(
+                painter = painterResource(markRes),
+                contentDescription = null,
+                tint = if (brand.officialRes != 0) Color.Unspecified else accent,
+                modifier = Modifier.size(44.dp)
             )
             Spacer(Modifier.height(Wear.Space.Sm))
             // 品牌标识与角色是两套资产，页面上各就各位：角色在上，标识贴在标签左侧
