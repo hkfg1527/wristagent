@@ -60,7 +60,9 @@ class SubAgentRunner(
     private val availableTools: () -> List<ToolDefinition>,
     private val isCancelled: () -> Boolean = { false },
     private val clock: () -> Long = { System.currentTimeMillis() },
-    private val timeoutMs: Long = DEFAULT_TIMEOUT_MS
+    private val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+    /** 空转收口阈值，来自设置项 idle_spin_stop_after；子代理与主循环共用同一份判据。 */
+    private val idleSpinStopAfter: Int = AgentLoopPolicy.IDLE_SPIN_STOP_AFTER
 ) {
     suspend fun run(
         parentDepth: Int,
@@ -111,7 +113,7 @@ class SubAgentRunner(
         var executed = 0
         var consecutiveToolTurns = 0
         var energyHinted = false
-        val spinDetector = IdleSpinDetector()
+        val spinDetector = IdleSpinDetector(idleSpinStopAfter)
 
         // 无轮数上限：退出只看取消 / 无工具 / 异常 / 提示后空转 / 超时
         while (true) {

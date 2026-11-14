@@ -85,7 +85,8 @@ class AgentDispatcher(
         requestTurn = { history, tools -> requestSubAgentTurn(history, tools) },
         executeTool = { call -> executeSubAgentTool(call) },
         availableTools = { toolRegistry.getToolDefinitions() },
-        isCancelled = { isCancelled }
+        isCancelled = { isCancelled },
+        idleSpinStopAfter = preferences.idleSpinStopAfter
     )
 
     init {
@@ -272,7 +273,7 @@ class AgentDispatcher(
         var consecutiveToolTurns = 0
         var energyHintInjected = false
         var spinNudgeInjected = false
-        val spinDetector = IdleSpinDetector()
+        val spinDetector = IdleSpinDetector(preferences.idleSpinStopAfter)
 
         while (!isCancelled) {
             turn += 1

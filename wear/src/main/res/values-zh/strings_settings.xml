@@ -490,6 +490,7 @@
     <string name="settings_haptic_strong">强</string>
     <string name="settings_haptics">触觉反馈</string>
     <string name="settings_haptics_secondary">点按与确认时震动</string>
+    <string name="settings_idle_spin_stop">空转收口轮次</string>
     <string name="settings_stream_emit_chars">突发判定字数</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
     <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>

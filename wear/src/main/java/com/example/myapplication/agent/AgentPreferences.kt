@@ -107,6 +107,17 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             )
             .apply()
 
+    /** 空转收口轮次（2..8）：同一份调用连续重复到第几轮停手。 */
+    var idleSpinStopAfter: Int
+        get() = prefs.getInt(KEY_IDLE_SPIN_STOP_AFTER, AgentLoopPolicy.IDLE_SPIN_STOP_AFTER)
+            .coerceIn(AgentLoopPolicy.MIN_IDLE_SPIN_STOP, AgentLoopPolicy.MAX_IDLE_SPIN_STOP)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_IDLE_SPIN_STOP_AFTER,
+                value.coerceIn(AgentLoopPolicy.MIN_IDLE_SPIN_STOP, AgentLoopPolicy.MAX_IDLE_SPIN_STOP)
+            )
+            .apply()
+
     /** run_shell 的默认执行上限（毫秒）：默认 15000，夹在 [ShellPolicy] 已有的 MIN/MAX 上。 */
     var shellCommandTimeoutMs: Long
         get() = prefs.getLong(KEY_SHELL_COMMAND_TIMEOUT_MS, DEFAULT_SHELL_COMMAND_TIMEOUT_MS)
@@ -667,6 +678,7 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         /** 本轮四个数值项的键：与偏好字段同名；不进可移植键白名单，也不进网页控制台字段表。 */
         const val KEY_STREAM_EMIT_INTERVAL_MS = "stream_emit_interval_ms"
         const val KEY_STREAM_EMIT_CHARS = "stream_emit_chars"
+        const val KEY_IDLE_SPIN_STOP_AFTER = "idle_spin_stop_after"
         const val KEY_SHELL_COMMAND_TIMEOUT_MS = "shell_command_timeout_ms"
         const val KEY_APPROVAL_ALLOW_THRESHOLD = "approval_allow_threshold"
         const val KEY_TTS_SPEECH_RATE = "tts_speech_rate"

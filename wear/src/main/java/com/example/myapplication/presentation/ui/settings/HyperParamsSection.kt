@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
+import com.example.myapplication.agent.AgentLoopPolicy
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.agent.ReasoningEffort
@@ -40,6 +41,7 @@ fun HyperParamsContent(
     // 流式合帧间隔：32ms 出厂值，滑杆按 8ms 台阶落在 8..200
     var streamIntervalMs by remember { mutableIntStateOf(preferences.streamEmitIntervalMs) }
     var streamChars by remember { mutableIntStateOf(preferences.streamEmitChars) }
+    var idleSpinStop by remember { mutableIntStateOf(preferences.idleSpinStopAfter) }
     // 自定义 Token 输入框的开合：与阶梯滑轨并存，阶梯给常用值，输入框管任意值
     var editingTokens by remember { mutableStateOf(false) }
 
@@ -238,6 +240,25 @@ fun HyperParamsContent(
                     if (snapped != streamChars) {
                         streamChars = snapped
                         preferences.streamEmitChars = snapped
+                    }
+                }
+            )
+        }
+
+        // 空转收口：同一份调用连续重复到第几轮停手（提示固定在它前 2 轮）
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_idle_spin_stop),
+                value = idleSpinStop.toFloat(),
+                valueRange = AgentLoopPolicy.MIN_IDLE_SPIN_STOP.toFloat()..
+                    AgentLoopPolicy.MAX_IDLE_SPIN_STOP.toFloat(),
+                steps = 4,
+                valueText = idleSpinStop.toString(),
+                onValueChange = { raw ->
+                    val snapped = raw.roundToInt()
+                    if (snapped != idleSpinStop) {
+                        idleSpinStop = snapped
+                        preferences.idleSpinStopAfter = snapped
                     }
                 }
             )

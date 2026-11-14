@@ -19,16 +19,37 @@ object AgentLoopPolicy {
     /** 提示之后仍然重复到这一轮才收口：这是空转，不是轮数上限。 */
     const val IDLE_SPIN_STOP_AFTER = 5
 
+    /** 设置项可调范围：2（激进）到 8（宽容）。 */
+    const val MIN_IDLE_SPIN_STOP = 2
+    const val MAX_IDLE_SPIN_STOP = 8
+
     fun shouldInjectEnergyHint(consecutiveToolTurns: Int, alreadyInjected: Boolean): Boolean =
         !alreadyInjected && consecutiveToolTurns >= ENERGY_HINT_AFTER_TURNS
 
     fun energyHintText(turns: Int): String =
         "已连续执行 " + turns + " 轮工具，请立即总结当前结果并结束。"
 
-    fun idleSpinDecision(consecutiveSameCall: Int): IdleSpinDecision = when {
-        consecutiveSameCall >= IDLE_SPIN_STOP_AFTER -> IdleSpinDecision.STOP
-        consecutiveSameCall >= IDLE_SPIN_NUDGE_AFTER -> IdleSpinDecision.NUDGE
-        else -> IdleSpinDecision.CONTINUE
+    /**
+     * 空转判定。[stopAfter] 来自设置项 idle_spin_stop_after，夹在 2..8：
+     * 小于 2 会在第二次相同调用就收口（正常重试也被打断），大于 8 等于放任死循环。
+     */
+    fun idleSpinDecision(
+        consecutiveSameCall: Int,
+        stopAfter: Int = IDLE_SPIN_STOP_AFTER,
+        nudgeAfter: Int = IDLE_SPIN_NUDGE_AFTER
+    ): IdleSpinDecision {
+        val stop = stopAfter.coerceIn(MIN_IDLE_SPIN_STOP, MAX_IDLE_SPIN_STOP)
+        // 提示永远落在停手前两轮：用户把收口调早/调晚时，提示跟着一起移动
+        val nudge = if (stopAfter == IDLE_SPIN_STOP_AFTER) {
+            nudgeAfter.coerceIn(2, stop)
+        } else {
+            (stop - (IDLE_SPIN_STOP_AFTER - IDLE_SPIN_NUDGE_AFTER)).coerceIn(2, stop)
+        }
+        return when {
+            consecutiveSameCall >= stop -> IdleSpinDecision.STOP
+            consecutiveSameCall >= nudge -> IdleSpinDecision.NUDGE
+            else -> IdleSpinDecision.CONTINUE
+        }
     }
 
     fun idleSpinText(toolName: String, repeats: Int): String =
@@ -41,7 +62,10 @@ object AgentLoopPolicy {
 }
 
 /** 空转检测器：只追踪"连续同一份调用"，一旦换了调用立即归零。 */
-class IdleSpinDetector {
+class IdleSpinDetector(
+    /** 空转收口阈值，来自设置项 idle_spin_stop_after。 */
+    private val stopAfter: Int = AgentLoopPolicy.IDLE_SPIN_STOP_AFTER
+) {
     private var lastSignature: String? = null
     private var repeats = 0
 
@@ -52,7 +76,7 @@ class IdleSpinDetector {
             lastSignature = signature
             repeats = 1
         }
-        return AgentLoopPolicy.idleSpinDecision(repeats)
+        return AgentLoopPolicy.idleSpinDecision(repeats, stopAfter = stopAfter)
     }
 
     fun reset() {

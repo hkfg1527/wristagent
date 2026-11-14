@@ -490,6 +490,7 @@
     <string name="settings_haptic_strong">Strong</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
+    <string name="settings_idle_spin_stop">Stop repeating after</string>
     <string name="settings_stream_emit_chars">Chars per frame burst</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>
     <string name="settings_stream_emit_interval_value">%1$d ms</string>
