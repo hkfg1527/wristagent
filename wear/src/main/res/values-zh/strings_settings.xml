@@ -464,7 +464,9 @@
     <string name="settings_style_card_summary">官方 M3E 卡片：一行一张，滚到边缘会缩小</string>
     <string name="settings_style_terminal">终端</string>
     <string name="settings_style_terminal_summary">等宽字体、无底色、按键像控制台</string>
-    <string name="settings_section_network">网络与交互</string>
+        <string name="settings_sub_network_request">网络与请求</string>
+    <string name="settings_card_meta_network">重试 %1$d 次 · 退避 %2$d ms</string>
+<string name="settings_section_network">网络与交互</string>
     <string name="settings_net_timeout">请求超时</string>
     <string name="settings_net_timeout_secondary">单次请求超过这个时长就放弃</string>
     <string name="settings_net_retries">自动重试</string>

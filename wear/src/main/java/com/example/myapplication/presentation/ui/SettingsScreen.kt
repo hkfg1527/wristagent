@@ -94,6 +94,7 @@ import com.example.myapplication.presentation.ui.settings.settingsScalingParams
 import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.brand.BrandId
+import com.example.myapplication.presentation.ui.settings.NetworkRequestContent
 import com.example.myapplication.presentation.ui.settings.SettingsBrandCard
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
 import com.example.myapplication.presentation.ui.settings.GestureBindingsContent
@@ -544,78 +545,16 @@ fun SettingsScreen(
                                 }
                                 SettingsSectionHeader(text = stringResource(R.string.settings_section_network))
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
-                                    SettingsSliderRow(
-                                        label = stringResource(R.string.settings_net_timeout),
-                                        value = requestTimeout.toFloat(),
-                                        valueRange = 10f..180f,
-                                        steps = 16,
-                                        valueText = requestTimeout.toString() + "s",
-                                        onValueChange = { raw ->
-                                            val snapped = raw.roundToInt()
-                                            if (snapped != requestTimeout) {
-                                                requestTimeout = snapped
-                                                preferences.requestTimeoutSeconds = snapped
-                                                context.vibrateTick()
-                                            }
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_sub_network_request),
+                                        value = requestTimeout.toString() + "s",
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.NETWORK_REQUEST
                                         }
                                     )
                                 }
-                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
-                                    SettingsSliderRow(
-                                        label = stringResource(R.string.settings_net_retries),
-                                        value = requestRetries.toFloat(),
-                                        valueRange = 0f..3f,
-                                        steps = 2,
-                                        valueText = requestRetries.toString() + "×",
-                                        onValueChange = { raw ->
-                                            val snapped = raw.roundToInt()
-                                            if (snapped != requestRetries) {
-                                                requestRetries = snapped
-                                                preferences.requestRetries = snapped
-                                                context.vibrateTick()
-                                            }
-                                        }
-                                    )
-                                }
-                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
-                                    SettingsSliderRow(
-                                        label = stringResource(R.string.settings_net_backoff),
-                                        value = retryBackoff.toFloat(),
-                                        valueRange = 0f..5000f,
-                                        steps = 24,
-                                        valueText = retryBackoff.toString() + "ms",
-                                        onValueChange = { raw ->
-                                            val snapped = (raw / 200f).roundToInt() * 200
-                                            if (snapped != retryBackoff) {
-                                                retryBackoff = snapped
-                                                preferences.retryBackoffMs = snapped
-                                                context.vibrateTick()
-                                            }
-                                        }
-                                    )
-                                }
-                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
-                                    SettingsSwitchRow(
-                                        label = stringResource(R.string.settings_wifi_only),
-                                        secondary = stringResource(R.string.settings_wifi_only_secondary),
-                                        checked = wifiOnly,
-                                        onCheckedChange = { enabled ->
-                                            wifiOnly = enabled
-                                            preferences.wifiOnlyRequests = enabled
-                                        }
-                                    )
-                                }
-                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
-                                    SettingsSwitchRow(
-                                        label = stringResource(R.string.settings_haptics),
-                                        secondary = stringResource(R.string.settings_haptics_secondary),
-                                        checked = hapticsOn,
-                                        onCheckedChange = { enabled ->
-                                            hapticsOn = enabled
-                                            preferences.hapticsEnabled = enabled
-                                        }
-                                    )
-                                }
+
                                 SettingsSectionHeader(text = stringResource(R.string.settings_section_system))
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     SettingsNavRow(
@@ -866,6 +805,10 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        SettingsSubDialog.NETWORK_REQUEST -> NetworkRequestContent(
+                            preferences = preferences,
+                            onBack = { activeDialog = null }
+                        )
                         SettingsSubDialog.SECURITY_GUARDRAIL -> SecurityGuardrailContent(
                             currentMode = currentSecurityMode,
                             onBack = { activeDialog = null },

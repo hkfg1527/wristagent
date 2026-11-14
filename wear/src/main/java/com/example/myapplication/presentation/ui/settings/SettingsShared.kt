@@ -245,7 +245,8 @@ enum class SettingsSubDialog {
     ABOUT,
 
     /** 配置导入导出：整份可移植设置的 JSON 快照，可复制也可粘贴回来。 */
-    TRANSFER
+    TRANSFER,
+    NETWORK_REQUEST;
 }
 
 /**

@@ -464,7 +464,9 @@
     <string name="settings_style_card_summary">Official M3E cards, one per row, shrinking at the edges</string>
     <string name="settings_style_terminal">Terminal</string>
     <string name="settings_style_terminal_summary">Monospace list, no surfaces, keys read like a console</string>
-    <string name="settings_section_network">Network &amp; feedback</string>
+        <string name="settings_sub_network_request">Network &amp; requests</string>
+    <string name="settings_card_meta_network">retries %1$d · backoff %2$d ms</string>
+<string name="settings_section_network">Network &amp; feedback</string>
     <string name="settings_net_timeout">Request timeout</string>
     <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
     <string name="settings_net_retries">Auto retry</string>
