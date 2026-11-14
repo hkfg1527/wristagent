@@ -1331,6 +1331,7 @@ internal fun buildMainRequestBody(
     put("model", requestModelName(preferences))
     put("temperature", preferences.temperature)
     put("max_tokens", preferences.maxOutputTokens)
+    put("top_p", preferences.samplingTopP)
     if (preferences.streamMode) {
         put("stream", true)
     }
@@ -1365,6 +1366,7 @@ internal fun buildSubAgentRequestBody(
     put("model", requestModelName(preferences))
     put("temperature", preferences.temperature)
     put("max_tokens", preferences.maxOutputTokens)
+    put("top_p", preferences.samplingTopP)
     put("stream", false)
     requestReasoningEffort(preferences)?.let { put("reasoning_effort", it) }
     put("messages", JSONArray().apply { history.forEach { put(it.toJson()) } })

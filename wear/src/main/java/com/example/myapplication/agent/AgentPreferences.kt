@@ -196,6 +196,17 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getFloat("temperature", 0.7f)
         set(value) = prefs.edit().putFloat("temperature", value).apply()
 
+    /**
+     * 核采样 top_p（0.05..1.0）。0.9 以下会明显收窄候选词，答得更稳但更死板。
+     *
+     * 默认 1.0 = 不裁剪候选集（与 temperature 正交：温度改形状，top_p 改范围）。
+     */
+    var samplingTopP: Float
+        get() = SamplingPolicy.clampTopP(prefs.getFloat(KEY_SAMPLING_TOP_P, DEFAULT_SAMPLING_TOP_P))
+        set(value) = prefs.edit()
+            .putFloat(KEY_SAMPLING_TOP_P, SamplingPolicy.clampTopP(value))
+            .apply()
+
     var mcpEndpoint: String
         get() = prefs.getString("mcp_endpoint", "http://127.0.0.1:8000/sse") ?: "http://127.0.0.1:8000/sse"
         set(value) = prefs.edit().putString("mcp_endpoint", value).apply()
@@ -507,7 +518,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
 
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
-
+        const val KEY_SAMPLING_TOP_P = "sampling_top_p"
+        const val DEFAULT_SAMPLING_TOP_P = 1.0f
+        const val MIN_SAMPLING_TOP_P = 0.05f
+        const val MAX_SAMPLING_TOP_P = 1.0f
         /**
          * 长期记忆条目的硬上限。
          *

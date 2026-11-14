@@ -57,6 +57,7 @@
     <string name="settings_temp_fast">Fast 0.2</string>
     <string name="settings_temp_balanced">Balanced 0.7</string>
     <string name="settings_temp_creative">Creative 1.2</string>
+    <string name="settings_top_p">Nucleus sampling top_p</string>
     <string name="settings_max_tokens">Max output tokens</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <string name="settings_max_tokens_custom">Max output tokens · Custom</string>

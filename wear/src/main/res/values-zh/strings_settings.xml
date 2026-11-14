@@ -57,6 +57,7 @@
     <string name="settings_temp_fast">极速 0.2</string>
     <string name="settings_temp_balanced">平衡 0.7</string>
     <string name="settings_temp_creative">发散 1.2</string>
+    <string name="settings_top_p">核采样 top_p</string>
     <string name="settings_max_tokens">最大输出 Token</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <string name="settings_max_tokens_custom">最大输出 Token · 自定义</string>

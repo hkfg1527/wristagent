@@ -30,6 +30,7 @@ fun HyperParamsContent(
 ) {
     var temp by remember { mutableFloatStateOf(preferences.temperature) }
     var maxTokens by remember { mutableIntStateOf(preferences.maxOutputTokens) }
+    var topP by remember { mutableFloatStateOf(preferences.samplingTopP) }
     var isStream by remember { mutableStateOf(preferences.streamMode) }
     var showReasoning by remember { mutableStateOf(preferences.showThoughtChain) }
     var defaultThinking by remember { mutableStateOf(preferences.defaultThinkingEnabled) }
@@ -155,6 +156,24 @@ fun HyperParamsContent(
                 valueText = maxTokens.toString(),
                 onValueChange = { raw ->
                     applyMaxTokens(SettingsValueMath.tokenAt(raw.roundToInt()))
+                }
+            )
+        }
+
+        // 核采样：与温度正交 —— 温度改分布形状，top_p 改候选范围
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_top_p),
+                value = topP,
+                valueRange = AgentPreferences.MIN_SAMPLING_TOP_P..AgentPreferences.MAX_SAMPLING_TOP_P,
+                steps = 18,
+                valueText = String.format("%.2f", topP),
+                onValueChange = { raw ->
+                    val snapped = (raw * 20f).roundToInt() / 20f
+                    if (snapped != topP) {
+                        topP = snapped
+                        preferences.samplingTopP = snapped
+                    }
                 }
             )
         }
