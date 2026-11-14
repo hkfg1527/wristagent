@@ -19,17 +19,19 @@ class SettingsCardEdgeZoomTest {
      * 改成"宽度几乎不变、淡出承担边缘感"：收缩不超过 6%，透明度必须明显下降。
      * 这不是放宽断言：原来钉的是一个具体数字，现在钉的是两条产品约束。
      */
+    /**
+     * 用户 02:20 的原话是"所有卡片限制在统一宽度里"。等比缩放必然改宽度，所以唯一自洽的解是：
+     * 缩放恒为 1.0，边缘只淡出。这条测试钉住这个解，防止以后又把它改回"缩一点"。
+     */
     @Test
-    fun theEdgeEffectBarelyChangesWidthAndMostlyFades() {
-        assertTrue(
-            "最靠边的宽度差不许超过 6%，否则卡片看起来就不是同一宽度了",
-            CardEdgeZoom.MinScale >= 0.94f
-        )
-        assertTrue("只缩不放：上限必须仍是 1.0", CardEdgeZoom.MinScale <= 1f)
-        assertTrue(
-            "边缘主要靠淡出表达，透明度必须明显低于 1",
-            CardEdgeZoom.MinAlpha <= 0.5f
-        )
+    fun cardsKeepOneWidthSoTheEdgeEffectIsFadeOnly() {
+        assertEquals("缩放必须恒为 1.0：任何等比缩放都会改变卡片宽度", 1f, CardEdgeZoom.MinScale, 0.0001f)
+        assertTrue("边缘必须仍然淡出", CardEdgeZoom.MinAlpha <= 0.5f)
+        var d = 0f
+        while (d <= 2f) {
+            assertEquals("任何距离下缩放都必须是 1", 1f, CardEdgeZoom.scaleFor(CardEdgeZoom.progress(d)), 0.0001f)
+            d += 0.05f
+        }
     }
 
     @Test
