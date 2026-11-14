@@ -11,6 +11,27 @@
 
 ---
 
+## [0.0.0.31] - 2026-11-15（内部版，不对外发布）
+
+### 网页控制台三档皮肤：第一次用真浏览器渲染验证
+工具链：headless Edge 157 + CDP（`setDeviceMetricsOverride` + `captureScreenshot`），
+页面经 `adb forward` 指向手表，令牌注入 `localStorage`。
+
+| 档位 | 视口 | 骨架 | body | 横向溢出 |
+|---|---|---|---|---|
+| 手表 | 400×780 | 底部标签栏 | 400×1935 | 无 |
+| 手机 | 700×900 | 顶部标签 | 685×1576 | 无 |
+| 电脑 | 1280×900 | 左侧栏 + 10 项导航 | 1265×1542 | 无 |
+
+- **三档都带真实设备状态**：顶栏 `当前设备 ROOT · 端口 8080 · 令牌 有效`，表单里是手表上真实的
+  `https://api.deepseek.com` / `deepseek-v4-pro` —— 网页 → 手表的读取链是通的。
+- 截图存 `docs/device/v11/console-{watch,phone,desktop}.png`，结论写入 `docs/ACCEPTANCE-MATRIX.md` §2.7。
+
+### 一个工具链坑（两次踩同一处）
+- `.mjs` 里不能用 `require`（Node 24 严格 ESM）；headless Edge 用 `start /B` 拉起的进程
+  会在本次 `run_code` 结束后被杀 —— **必须"启动浏览器 + 截图"在同一个进程里做完**。
+  这两条都写进本文，下一轮直接用脚本 `build-logs/console-shot.mjs`。
+
 ## [0.0.0.30] - 2026-11-15 · **第 3 个对外发布点**（内部版 0.0.0.21–0.0.0.30 汇总）
 
 ### 这十个内部版做了什么
