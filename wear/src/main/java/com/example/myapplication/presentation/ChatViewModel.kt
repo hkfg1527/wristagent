@@ -225,6 +225,7 @@ class ChatViewModel(
         // 合帧窗口来自设置项 stream_emit_interval_ms：每轮开场重读一次，
         // 于是设置页调完不必杀进程，下一轮就按新窗口合帧
         throttle.updateInterval(gateway.displayPreferences().streamEmitIntervalMs.toLong())
+        throttle.updateCharsPerEmitThreshold(gateway.displayPreferences().streamEmitChars)
         // 新一轮从空基线起算：首帧立即可见，突发判定不看上一轮的残留文本
         throttle.reset()
         _uiState.update { it.copy(isStreamingBurst = false) }

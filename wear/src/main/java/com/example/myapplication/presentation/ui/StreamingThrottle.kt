@@ -22,6 +22,10 @@ object StreamingThrottle {
     /** 单次刷新增量超过该字数即视为"突发"（模型一次吐出很大一段），此时不做逐字动画。 */
     const val DEFAULT_CHARS_PER_EMIT_THRESHOLD = 12
 
+    /** 突发阈值的可调范围：低于 4 会把正常逐字判成突发，高于 40 等于永不判突发。 */
+    const val MIN_STREAM_EMIT_CHARS = 4
+    const val MAX_STREAM_EMIT_CHARS = 40
+
     /**
      * 距上次提交是否已满 [intervalMs]。
      * [lastEmitMs] <= 0 表示还没有提交过：首帧必须立刻可见，否则开屏会空等一个窗口。
@@ -52,7 +56,7 @@ object StreamingThrottle {
  */
 class StreamingThrottleState(
     private var intervalMs: Long = StreamingThrottle.DEFAULT_INTERVAL_MS,
-    private val charsPerEmitThreshold: Int = StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD
+    private var charsPerEmitThreshold: Int = StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD
 ) {
     var lastEmitMs: Long = 0L
         private set
@@ -73,6 +77,19 @@ class StreamingThrottleState(
      */
     fun updateInterval(intervalMs: Long) {
         this.intervalMs = intervalMs
+    }
+
+    /** 当前生效的突发阈值：设置项 stream_emit_chars 的唯一落点。 */
+    val currentCharsPerEmitThreshold: Int get() = charsPerEmitThreshold
+
+    /**
+     * 换一个突发阈值（字数）：只换判据、不动基线，改完下一条增量就按新阈值判定。
+     */
+    fun updateCharsPerEmitThreshold(chars: Int) {
+        charsPerEmitThreshold = chars.coerceIn(
+            StreamingThrottle.MIN_STREAM_EMIT_CHARS,
+            StreamingThrottle.MAX_STREAM_EMIT_CHARS
+        )
     }
 
     /**

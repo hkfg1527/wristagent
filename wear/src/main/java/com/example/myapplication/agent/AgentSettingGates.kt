@@ -14,6 +14,8 @@ data class AgentDisplayPreferences(
     val asrLiveTranscript: Boolean = false,
     /** 流式合帧间隔（毫秒）：ChatViewModel 每轮开场套到节流器上（StreamingThrottleState.updateInterval）。 */
     val streamEmitIntervalMs: Int = AgentPreferences.DEFAULT_STREAM_EMIT_INTERVAL_MS,
+    /** 突发判定字数：与合帧间隔一起决定流式手感。 */
+    val streamEmitChars: Int = com.example.myapplication.presentation.ui.StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD,
     /** 播报语速：每次合成前交给 TextToSpeech.setSpeechRate。 */
     val ttsSpeechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE,
     /** 播报音量（0..1）：与语速一样，每次合成前都要重设。 */

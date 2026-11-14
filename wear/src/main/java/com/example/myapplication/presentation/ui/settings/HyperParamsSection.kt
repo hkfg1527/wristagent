@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.myapplication.presentation.ui.theme.Wear
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.agent.ReasoningEffort
 import com.example.myapplication.agent.ReasoningEffortPolicy
 import com.example.myapplication.agent.ReplyStyle
@@ -38,6 +39,7 @@ fun HyperParamsContent(
     var replyStyle by remember { mutableStateOf(ReplyStyle.fromStored(preferences.replyStyle)) }
     // 流式合帧间隔：32ms 出厂值，滑杆按 8ms 台阶落在 8..200
     var streamIntervalMs by remember { mutableIntStateOf(preferences.streamEmitIntervalMs) }
+    var streamChars by remember { mutableIntStateOf(preferences.streamEmitChars) }
     // 自定义 Token 输入框的开合：与阶梯滑轨并存，阶梯给常用值，输入框管任意值
     var editingTokens by remember { mutableStateOf(false) }
 
@@ -217,6 +219,26 @@ fun HyperParamsContent(
                     applyStreamInterval(
                         (raw / StreamIntervalStepMs).roundToInt() * StreamIntervalStepMs
                     )
+                }
+            )
+        }
+
+        // 突发阈值：一次涨多少字算"模型吐了一大段"，此时不做逐字动画
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_stream_emit_chars),
+                value = streamChars.toFloat(),
+                valueRange = StreamingThrottle.MIN_STREAM_EMIT_CHARS.toFloat()..
+                    StreamingThrottle.MAX_STREAM_EMIT_CHARS.toFloat(),
+                steps = 8,
+                valueText = streamChars.toString(),
+                onValueChange = { raw ->
+                    val snapped = ((raw / 4f).roundToInt() * 4)
+                        .coerceIn(StreamingThrottle.MIN_STREAM_EMIT_CHARS, StreamingThrottle.MAX_STREAM_EMIT_CHARS)
+                    if (snapped != streamChars) {
+                        streamChars = snapped
+                        preferences.streamEmitChars = snapped
+                    }
                 }
             )
         }

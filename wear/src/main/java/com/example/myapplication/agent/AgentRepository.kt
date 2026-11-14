@@ -99,6 +99,7 @@ class AgentRepository(
         autoSpeakReplies = preferences.autoSpeakReplies,
         asrLiveTranscript = preferences.asrLiveTranscript,
         streamEmitIntervalMs = preferences.streamEmitIntervalMs,
+            streamEmitChars = preferences.streamEmitChars,
         ttsSpeechRate = preferences.ttsSpeechRate,
             ttsVolume = preferences.ttsVolume,
             ttsQueueMode = preferences.ttsQueueMode

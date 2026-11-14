@@ -2,6 +2,7 @@ package com.example.myapplication.agent
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.presentation.ui.settings.HapticAmplitude
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.appearance.SettingsStyle
@@ -88,6 +89,17 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             .putInt(
                 KEY_STREAM_EMIT_INTERVAL_MS,
                 value.coerceIn(MinStreamEmitIntervalMs, MaxStreamEmitIntervalMs)
+            )
+            .apply()
+
+    /** 攒够几个字才提交一帧（4..40），与合帧间隔一起决定流式手感。 */
+    var streamEmitChars: Int
+        get() = prefs.getInt(KEY_STREAM_EMIT_CHARS, StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD)
+            .coerceIn(StreamingThrottle.MIN_STREAM_EMIT_CHARS, StreamingThrottle.MAX_STREAM_EMIT_CHARS)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_STREAM_EMIT_CHARS,
+                value.coerceIn(StreamingThrottle.MIN_STREAM_EMIT_CHARS, StreamingThrottle.MAX_STREAM_EMIT_CHARS)
             )
             .apply()
 
@@ -603,6 +615,7 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
 
         /** 本轮四个数值项的键：与偏好字段同名；不进可移植键白名单，也不进网页控制台字段表。 */
         const val KEY_STREAM_EMIT_INTERVAL_MS = "stream_emit_interval_ms"
+        const val KEY_STREAM_EMIT_CHARS = "stream_emit_chars"
         const val KEY_SHELL_COMMAND_TIMEOUT_MS = "shell_command_timeout_ms"
         const val KEY_APPROVAL_ALLOW_THRESHOLD = "approval_allow_threshold"
         const val KEY_TTS_SPEECH_RATE = "tts_speech_rate"
