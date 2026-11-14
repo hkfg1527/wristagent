@@ -77,12 +77,11 @@ fun PromptContextContent(
 fun AboutContent(
     sideKeyValue: String,
     privilegeValue: String,
-    netDiagValue: String,
+    versionValue: String,
     onBack: () -> Unit,
     onReplayOnboarding: () -> Unit,
     sideKeyPage: @Composable (onDismiss: () -> Unit) -> Unit,
     privilegePage: @Composable (onDismiss: () -> Unit) -> Unit,
-    netDiagPage: @Composable (onDismiss: () -> Unit) -> Unit,
 ) {
     var inner by remember { mutableIntStateOf(NoInnerPage) }
     BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
@@ -95,7 +94,7 @@ fun AboutContent(
                 label = stringResource(R.string.settings_about),
                 value = privilegeValue,
                 accent = Wear.CardSystem,
-                meta = netDiagValue,
+                meta = versionValue,
                 badge = "APP"
             )
         },
@@ -103,7 +102,6 @@ fun AboutContent(
             when (inner) {
                 0 -> sideKeyPage { inner = NoInnerPage }
                 1 -> privilegePage { inner = NoInnerPage }
-                2 -> netDiagPage { inner = NoInnerPage }
             }
         }
     ) {
@@ -125,13 +123,6 @@ fun AboutContent(
                 title = stringResource(R.string.settings_privilege_title),
                 value = privilegeValue,
                 onClick = { inner = 1 }
-            )
-        }
-        row {
-            SettingsNavRow(
-                title = stringResource(R.string.settings_netdiag_title),
-                value = netDiagValue,
-                onClick = { inner = 2 }
             )
         }
     }

@@ -765,23 +765,10 @@ fun SettingsScreen(
                             onBack = { activeDialog = null }
                         )
                         SettingsSubDialog.ABOUT -> {
-                            // 网络体检结论与根页同源：进来时读一次最近结果，子页里再重新体检
-                            val netDiagSummary = remember(activeDialog) {
-                                NetworkDiagnosisStore(context.applicationContext).lastSummary()
-                            }
                             AboutContent(
                                 sideKeyValue = gestureSummary(currentGestures),
                                 privilegeValue = privilegeStatus.activeBackend.name,
-                                netDiagValue = when {
-                                    netDiagSummary == null ->
-                                        stringResource(R.string.settings_netdiag_value_never)
-                                    netDiagSummary.issues == 0 ->
-                                        stringResource(R.string.settings_netdiag_value_ok)
-                                    else -> stringResource(
-                                        R.string.settings_netdiag_value_issues,
-                                        netDiagSummary.issues
-                                    )
-                                },
+                                versionValue = BuildConfig.VERSION_NAME,
                                 onBack = { activeDialog = null },
                                 onReplayOnboarding = { requestExit(onRestartOnboarding) },
                                 sideKeyPage = { dismiss ->
@@ -795,18 +782,13 @@ fun SettingsScreen(
                                 },
                                 privilegePage = { dismiss ->
                                     AdvancedPermissionContent(manager = privilegeManager, onBack = dismiss)
-                                },
-                                netDiagPage = { dismiss ->
-                                    NetworkDiagnosticsContent(
-                                        privilegeManager = privilegeManager,
-                                        baseUrl = { currentBaseUrl },
-                                        onBack = dismiss
-                                    )
                                 }
                             )
                         }
                         SettingsSubDialog.NETWORK_REQUEST -> NetworkRequestContent(
                             preferences = preferences,
+                            privilegeManager = privilegeManager,
+                            baseUrl = { currentBaseUrl },
                             onBack = { activeDialog = null }
                         )
                         SettingsSubDialog.SECURITY_GUARDRAIL -> SecurityGuardrailContent(

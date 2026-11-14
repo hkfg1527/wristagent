@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
+import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlin.math.roundToInt
@@ -21,6 +22,8 @@ import kotlin.math.roundToInt
 @Composable
 fun NetworkRequestContent(
     preferences: AgentPreferences,
+    privilegeManager: com.example.myapplication.agent.privilege.PrivilegeManager,
+    baseUrl: () -> String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -29,11 +32,28 @@ fun NetworkRequestContent(
     var retryBackoff by remember { mutableStateOf(preferences.retryBackoffMs) }
     var wifiOnly by remember { mutableStateOf(preferences.wifiOnlyRequests) }
     var hapticsOn by remember { mutableStateOf(preferences.hapticsEnabled) }
+    var inner by remember { mutableStateOf(false) }
+    // 体检结论与根页同源：进来读一次最近结果，体检页里再重新跑
+    val netDiagSummary = remember { NetworkDiagnosisStore(context.applicationContext).lastSummary() }
+    val netDiagValue = when {
+        netDiagSummary == null -> stringResource(R.string.settings_netdiag_value_never)
+        netDiagSummary.issues == 0 -> stringResource(R.string.settings_netdiag_value_ok)
+        else -> stringResource(R.string.settings_netdiag_value_issues, netDiagSummary.issues)
+    }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_network_request),
         heroLabel = stringResource(R.string.settings_sub_network_request),
-        onBack = onBack,
+        onBack = { if (inner) inner = false else onBack() },
+        overlay = {
+            if (inner) {
+                NetworkDiagnosticsContent(
+                    privilegeManager = privilegeManager,
+                    baseUrl = baseUrl,
+                    onBack = { inner = false }
+                )
+            }
+        },
         hero = {
             SettingsHeroCard(
                 label = stringResource(R.string.settings_section_network),
@@ -49,6 +69,14 @@ fun NetworkRequestContent(
         }
     ) {
         section(stringResource(R.string.settings_section_network))
+        row {
+            SettingsNavRow(
+                title = stringResource(R.string.settings_netdiag_title),
+                value = netDiagValue,
+                onClick = { inner = true }
+            )
+        }
+
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_net_timeout),
