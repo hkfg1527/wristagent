@@ -38,6 +38,12 @@
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
     <string name="settings_side_key">Bottom Bar Side Key</string>
+    <string name="settings_lux_entry_value">命令面板</string>
+    <string name="settings_lux_terminal">Lux terminal</string>
+    <string name="settings_lux_quick">Quick commands</string>
+    <string name="settings_lux_output">Transcript</string>
+    <string name="settings_lux_empty">No commands run yet.</string>
+    <string name="settings_lux_meta">timeout %1$d s</string>
     <string name="settings_security_policy">Security Policy</string>
     <string name="settings_mode_strict">Strict confirm</string>
     <string name="settings_mode_standard">Standard prompt</string>

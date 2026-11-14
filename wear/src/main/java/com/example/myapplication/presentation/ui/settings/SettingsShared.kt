@@ -260,6 +260,11 @@ enum class SettingsSubDialog {
 
     /** 配置导入导出：整份可移植设置的 JSON 快照，可复制也可粘贴回来。 */
     TRANSFER,
+
+    /** Lux 终端：极轻量的命令面板（一条命令、一次输出、一份转录）。 */
+    LUX_TERMINAL,
+
+    /** 网络与请求：连接参数与体检。 */
     NETWORK_REQUEST;
 }
 

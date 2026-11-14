@@ -38,6 +38,12 @@
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
     <string name="settings_side_key">底栏副键</string>
+    <string name="settings_lux_entry_value">命令面板</string>
+    <string name="settings_lux_terminal">Lux 终端</string>
+    <string name="settings_lux_quick">快捷命令</string>
+    <string name="settings_lux_output">转录</string>
+    <string name="settings_lux_empty">还没有运行过命令。</string>
+    <string name="settings_lux_meta">上限 %1$d 秒</string>
     <string name="settings_security_policy">安全策略</string>
     <string name="settings_mode_strict">严格确认</string>
     <string name="settings_mode_standard">标准提示</string>

@@ -95,6 +95,7 @@ import com.example.myapplication.presentation.ui.settings.SettingsStaggeredRow
 import com.example.myapplication.presentation.ui.settings.SettingsSubDialog
 import com.example.myapplication.presentation.ui.brand.BrandId
 import com.example.myapplication.presentation.ui.settings.NetworkRequestContent
+import com.example.myapplication.presentation.ui.settings.LuxTerminalContent
 import com.example.myapplication.presentation.ui.settings.SettingsBrandCard
 import com.example.myapplication.presentation.ui.settings.rotaryDeltaFor
 import com.example.myapplication.presentation.ui.settings.SettingsTopAnchorProbe
@@ -568,7 +569,7 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_security_policy),
                                         value = when (currentSecurityMode) {
@@ -579,6 +580,16 @@ fun SettingsScreen(
                                         onClick = {
                                             context.vibrateTick()
                                             activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_lux_terminal),
+                                        value = stringResource(R.string.settings_lux_entry_value),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.LUX_TERMINAL
                                         }
                                     )
                                 }
@@ -789,6 +800,10 @@ fun SettingsScreen(
                             preferences = preferences,
                             privilegeManager = privilegeManager,
                             baseUrl = { currentBaseUrl },
+                            onBack = { activeDialog = null }
+                        )
+                        SettingsSubDialog.LUX_TERMINAL -> LuxTerminalContent(
+                            preferences = preferences,
                             onBack = { activeDialog = null }
                         )
                         SettingsSubDialog.SECURITY_GUARDRAIL -> SecurityGuardrailContent(
