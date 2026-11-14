@@ -442,10 +442,16 @@ fun SettingsSubPage(
             if (showHero) {
                 item(key = "page-hero") {
                     SettingsStaggeredRow(index = 1, rowCount = rowCount, stagger = stagger, exit = exit) {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        // 间距写在外层 Box 的 padding 上：SettingStaggeredRow 内部也是 Box，
+                        // 兄弟 Spacer 不会产生竖向间距（hero 卡会贴住下面第一张卡）。
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = SettingsCardStyle.Gap),
+                            contentAlignment = Alignment.Center
+                        ) {
                             hero?.invoke()
                         }
-                        Spacer(Modifier.height(SettingsCardStyle.Gap))
                     }
                 }
             }

@@ -361,9 +361,12 @@ fun SettingsScreen(
                     // 官方的居中吸附与边缘缩放都以 item 为单位：整页塞进一个 item 时，首卡永远贴不到屏心，
                     // 滚动也只剩一整块位移 —— 这正是没有惯性、也没有上下缩小的成因。
                     if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                        // 卡片之间的 8dp 写进卡自己的 padding：RootContentRow 内层是 Box，子元素会叠放，
+                        // 兄弟 Spacer 不产生竖向间距（这正是之前 hero 卡贴在一起的原因）。
                         item(key = "card-brand") {
                             RootContentRow(index = 1, stagger = rowStagger, exit = exit) {
                                 SettingsBrandCard(
+                                    modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
                                     brand = currentBrand,
                                     label = stringResource(R.string.settings_section_models),
                                     value = currentModel,
@@ -374,7 +377,6 @@ fun SettingsScreen(
                                         currentTemp
                                     )
                                 )
-                                Spacer(Modifier.height(SettingsCardStyle.Gap))
                             }
                         }
                         item(key = "card-tools") {
@@ -382,6 +384,7 @@ fun SettingsScreen(
                                 val calledTools = preferences.calledToolNames.size
                                 val registeredTools = preferences.registeredToolCount
                                 SettingsHeroCard(
+                                    modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
                                     label = stringResource(R.string.settings_card_tools),
                                     value = if (registeredTools > 0) {
                                         calledTools.toString() + " / " + registeredTools
@@ -395,7 +398,6 @@ fun SettingsScreen(
                                         stringResource(R.string.settings_card_tools_pending)
                                     }
                                 )
-                                Spacer(Modifier.height(SettingsCardStyle.Gap))
                             }
                         }
                         item(key = "card-voice") {
@@ -403,6 +405,7 @@ fun SettingsScreen(
                                 val voiceProvider = AsrProviderId.fromStorage(asrProviderKey)
                                 val voiceReady = asrEnabled && (voiceProvider != AsrProviderId.BAIDU || asrKeyReady)
                                 SettingsHeroCard(
+                                    modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
                                     label = stringResource(R.string.settings_voice_entry),
                                     value = when {
                                         !asrEnabled -> stringResource(R.string.settings_asr_off)
@@ -418,12 +421,12 @@ fun SettingsScreen(
                                         else -> null
                                     }
                                 )
-                                Spacer(Modifier.height(SettingsCardStyle.Gap))
                             }
                         }
                         item(key = "card-system") {
                             RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
                                 SettingsHeroCard(
+                                    modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
                                     label = stringResource(R.string.settings_section_system),
                                     // 系统卡报版本号：这是内测版最有用的一条系统信息；
                                     // 提示词状态在「提示词」子页的 hero 里已经说了，根页不重复。
@@ -435,7 +438,6 @@ fun SettingsScreen(
                                         null
                                     }
                                 )
-                                Spacer(Modifier.height(SettingsCardStyle.Gap))
                             }
                         }
                     }
