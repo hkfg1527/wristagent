@@ -455,12 +455,13 @@
     <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
     <string name="settings_card_tools">工具与 MCP</string>
     <string name="settings_style_header">页面风格</string>
+    <string name="settings_style_options">可选风格</string>
     <string name="settings_style_balloon">气泡</string>
     <string name="settings_style_balloon_summary">整页一个气球，宽度随圆屏收缩</string>
     <string name="settings_style_square">方角</string>
     <string name="settings_style_square_summary">文字居中，横线分隔，方形按键</string>
     <string name="settings_style_card">大卡片</string>
-    <string name="settings_style_card_summary">谷歌风格卡片，右侧圆环指示器</string>
+    <string name="settings_style_card_summary">官方 M3E 卡片：一行一张，滚到边缘会缩小</string>
     <string name="settings_style_terminal">终端</string>
     <string name="settings_style_terminal_summary">等宽字体、无底色、按键像控制台</string>
     <string name="settings_section_network">网络与交互</string>

@@ -455,12 +455,13 @@
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
     <string name="settings_card_tools">Tools &amp; MCP</string>
     <string name="settings_style_header">Page style</string>
+    <string name="settings_style_options">Available styles</string>
     <string name="settings_style_balloon">Balloon</string>
     <string name="settings_style_balloon_summary">One balloon per page, width follows the round screen</string>
     <string name="settings_style_square">Square</string>
     <string name="settings_style_square_summary">Centered text, hairline dividers, square keys</string>
     <string name="settings_style_card">Big cards</string>
-    <string name="settings_style_card_summary">Google-style cards with a ring indicator on the right</string>
+    <string name="settings_style_card_summary">Official M3E cards, one per row, shrinking at the edges</string>
     <string name="settings_style_terminal">Terminal</string>
     <string name="settings_style_terminal_summary">Monospace list, no surfaces, keys read like a console</string>
     <string name="settings_section_network">Network &amp; feedback</string>

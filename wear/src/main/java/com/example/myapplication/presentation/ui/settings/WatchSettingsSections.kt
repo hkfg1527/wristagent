@@ -166,7 +166,8 @@ fun AppearanceContent(
         }
     ) {
         // 页面风格：整页外壳换装，不换数据、不换行的语义。
-        section(stringResource(R.string.settings_style_header))
+        // 页首 hero 已经把「页面风格 + 当前值」说了，这里换一个不重复的组标题
+        section(stringResource(R.string.settings_style_options))
 
         SettingsStyle.values().forEach { style ->
             row(subItem = true) {
