@@ -98,8 +98,14 @@ object Wear {
      * 却让「关动画」「统一手感」都无从下手。
      */
     object Motion {
-        /** 小元素：按钮、图标、副键、行内状态切换。约 120ms 落定，带一次轻微过冲。 */
-        fun <T> micro(): SpringSpec<T> = spring(dampingRatio = 0.85f, stiffness = 700f)
+        /**
+         * 小元素：按钮、图标、副键、行内状态切换。约 120ms 落定。
+         *
+         * **阻尼固定 1.0（不过冲）**：这个令牌也被缩放动画用（见 AnimatedMessageCard 的入场收缩），
+         * 而"凡是改变 scale 的动画必须不过冲"是用户定的硬约束 —— 与其每个调用点自己记得换参数，
+         * 不如让令牌本身就不带过冲。
+         */
+        fun <T> micro(): SpringSpec<T> = spring(dampingRatio = 1f, stiffness = 700f)
 
         /** 微交互：按下反馈、行内淡入淡出、遮罩显隐的快速档。140ms。 */
         fun <T> quick(): TweenSpec<T> = tween(durationMillis = 140, easing = FastOutSlowInEasing)

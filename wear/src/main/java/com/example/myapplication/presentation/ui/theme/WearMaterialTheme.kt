@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.MotionScheme
 import androidx.wear.compose.material3.Shapes
 import androidx.wear.compose.material3.Typography
 import androidx.compose.ui.unit.sp
@@ -126,6 +127,14 @@ fun WearMaterialTheme(content: @Composable () -> Unit) {
             colorScheme = remember(accent) { WearMaterialColorScheme.withAccent(accent) },
             typography = WearTypography,
             shapes = WearShapes,
+            //
+            // 官方动效体系（Wear M3 自带 MotionScheme）：组件内部（SwitchButton、Slider、Picker…）
+            // 的时间曲线从此由这套令牌统一决定，而不是各组件自己拍脑袋。
+            //
+            // 选 standard 而不是 expressive：expressive 的 spatial 档带过冲（阻尼 < 1），
+            // 而"凡是改变 scale 的动画必须不过冲"是用户定的硬约束 —— 组件内部谁在用 scale 我们控制不了，
+            // 所以整棵树的默认动效必须是不过冲的那一套。我们自己需要弹性时按组件单独传 spec。
+            motionScheme = MotionScheme.standard(),
             content = content
         )
     }

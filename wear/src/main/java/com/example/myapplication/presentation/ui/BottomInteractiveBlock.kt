@@ -206,9 +206,9 @@ fun BottomInteractiveBlock(
             mode == BottomBlockMode.RECORDING -> 1.08f
             else -> 1.0f
         },
-        // 弹性手感：阻尼 0.62 保留一次轻微过冲，抬手时是"弹回来"而不是生硬复位；
-        // 旧值 1.25 倍在 52dp 键上等于放大 13dp，视觉上像整颗键"炸开"，改成 1.08 只做呼吸式起伏。
-        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 0.62f, stiffness = 420f)),
+        // 这条动画改的是 scale：硬约束要求"凡是改变 scale 的动画必须不过冲"，所以阻尼固定 1.0。
+        // 原来的 0.62 会过冲一下（按下时鼓过头再回弹），在 52dp 的键上能看出来 —— 已按要求改掉。
+        animationSpec = motionSpec(animationsEnabled, spring(dampingRatio = 1f, stiffness = 420f)),
         label = "orbRecordScale"
     )
 

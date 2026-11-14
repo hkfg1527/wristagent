@@ -11,6 +11,29 @@
 
 ---
 
+## [0.0.0.24] - 2026-11-15（内部版，不对外发布）
+
+### P2：接入官方 `MotionScheme`（Wear M3 1.7.1 自带）
+- `WearMaterialTheme` 的 `MaterialTheme(...)` 现在显式传 `motionScheme = MotionScheme.standard()`。
+  SwitchButton / Slider / Picker 等官方组件内部的时间曲线从此由这套令牌统一决定。
+- **为什么选 standard 不选 expressive**：expressive 的 spatial 档带过冲，而"改 scale 不许过冲"是硬约束；
+  组件内部谁在用 scale 我控制不了，所以整棵树默认必须是不过冲的那套。
+
+### 顺手抓到两处硬约束违规（都是真机看不出来的那种）
+| 位置 | 原来 | 问题 | 现在 |
+|---|---|---|---|
+| `Wear.Motion.micro()` | 阻尼 **0.85** | 被 `AnimatedMessageCard` 的**入场收缩 scale** 复用 → 卡片放大一下再缩回 | 阻尼 **1.0** |
+| `BottomInteractiveBlock` 主键按压 | 阻尼 **0.62** | 直接动画 **scale**，按下时鼓过头再回弹 | 阻尼 **1.0** |
+
+### 把硬约束变成 CI：`ScaleAnimationOvershootGuardTest`（4 个测试）
+1. 动画热点文件里**不允许**出现 `dampingRatio = 0.x`，除非命中白名单且理由与 scale 无关
+   （目前白名单只有两条：箭头旋转 ×2、点阵位移幅度 ×1）；
+2. `Wear.Motion.micro()` 必须是 1.0；
+3. 消息卡入场必须走不过冲令牌；
+4. 主题必须用 `MotionScheme.standard()`。
+
+合计 **1270 全绿**；真机冒烟：聊天页与设置页均正常，无 FATAL。
+
 ## [0.0.0.23] - 2026-11-15（内部版，不对外发布）
 
 ### P1 表冠 × 页面：三条滚动路径全部实测
