@@ -485,6 +485,7 @@
     <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>
     <string name="settings_stream_emit_interval_value">%1$d ms</string>
+    <string name="settings_tool_result_chars">Tool output limit</string>
     <string name="settings_shell_timeout">Command timeout</string>
     <string name="settings_shell_timeout_value">%1$d ms</string>
     <string name="settings_approval_threshold">Allow threshold</string>

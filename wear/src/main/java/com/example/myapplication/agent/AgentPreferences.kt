@@ -228,6 +228,15 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getInt("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
         set(value) = prefs.edit().putInt("max_output_tokens", value).apply()
 
+    /** 工具结果回灌给模型前的字符上限（500..50000），默认 8000 ≈ 一张长截图 OCR 的量。 */
+    var toolResultMaxChars: Int
+        get() = ToolOutputPolicy.clampMaxChars(
+            prefs.getInt(KEY_TOOL_RESULT_MAX_CHARS, DEFAULT_TOOL_RESULT_MAX_CHARS)
+        )
+        set(value) = prefs.edit()
+            .putInt(KEY_TOOL_RESULT_MAX_CHARS, ToolOutputPolicy.clampMaxChars(value))
+            .apply()
+
     var streamMode: Boolean
         get() = prefs.getBoolean("stream_mode", true)
         set(value) = prefs.edit().putBoolean("stream_mode", value).apply()
@@ -518,6 +527,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
 
     companion object {
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
+        const val KEY_TOOL_RESULT_MAX_CHARS = "tool_result_max_chars"
+        const val DEFAULT_TOOL_RESULT_MAX_CHARS = 8000
+        const val MIN_TOOL_RESULT_CHARS = 500
+        const val MAX_TOOL_RESULT_CHARS = 50000
         const val KEY_SAMPLING_TOP_P = "sampling_top_p"
         const val DEFAULT_SAMPLING_TOP_P = 1.0f
         const val MIN_SAMPLING_TOP_P = 0.05f

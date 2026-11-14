@@ -485,6 +485,7 @@
     <string name="settings_haptics_secondary">点按与确认时震动</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
     <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
+    <string name="settings_tool_result_chars">工具结果上限</string>
     <string name="settings_shell_timeout">命令超时</string>
     <string name="settings_shell_timeout_value">%1$d 毫秒</string>
     <string name="settings_approval_threshold">放行阈值</string>

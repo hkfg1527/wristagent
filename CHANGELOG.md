@@ -11,6 +11,18 @@
 
 ---
 
+## [0.0.0.12] - 2026-11-15（内部版，不对外发布）
+
+### 新增第 8 个真实设置：工具结果上限（`tool_result_max_chars`）
+- 偏好默认 **8000** 字符，夹取 500..50000；夹取规则抽到 `ToolOutputPolicy.clampMaxChars`。
+- 消费点在**请求体构造**这一处（`buildMainRequestBody` 与 `buildSubAgentRequestBody` 都过一遍
+  `ChatMessage.forPayload(...)`）—— 不在工具里裁，因为历史必须留原文：用户把上限调大时，
+  上一轮的完整输出还得取回来。
+- 只裁 `role == TOOL` 的消息；用户说的话、助手的话、系统提示词一律不动（有测试钉住）。
+- 截断处给出代价：`……[truncated N chars]`，让模型知道后面还有内容。
+- UI：工具与 MCP 页新增「工具结果上限」滑杆，真机显示 `8000`。
+- 新增 `ToolOutputLimitTest` 6 个；合计 **1223 全绿**。
+
 ## [0.0.0.11] - 2026-11-15（内部版，不对外发布）
 
 ### 新增第 7 个真实设置：核采样 top_p（`sampling_top_p`）

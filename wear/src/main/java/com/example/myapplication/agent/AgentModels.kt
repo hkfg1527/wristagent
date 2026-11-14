@@ -103,6 +103,17 @@ data class ChatMessage(
     val toolCallId: String? = null,
     val name: String? = null
 ) {
+    /**
+     * 送进请求体之前的视图：只按上限裁剪工具结果，其余角色不动。
+     *
+     * 历史本身保持原文（用户调大上限后还能找回上一轮的完整输出），裁剪只影响这一次序列化。
+     */
+    fun forPayload(toolResultMaxChars: Int): ChatMessage =
+        if (role == AgentRole.TOOL) {
+            copy(content = ToolOutputPolicy.truncate(content, role, toolResultMaxChars))
+        } else {
+            this
+        }
     fun toJson(): JSONObject {
         val obj = JSONObject()
         obj.put("role", role)

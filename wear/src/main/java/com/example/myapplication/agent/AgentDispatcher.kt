@@ -1341,7 +1341,7 @@ internal fun buildMainRequestBody(
     val systemMsg = history.firstOrNull { it.role == AgentRole.SYSTEM }
     val dialogMsgs = history.filter { it.role != AgentRole.SYSTEM }.takeLast(turnsLimit * 2)
     if (systemMsg != null) msgs.put(systemMsg.toJson())
-    dialogMsgs.forEach { msgs.put(it.toJson()) }
+    dialogMsgs.forEach { msgs.put(it.forPayload(preferences.toolResultMaxChars).toJson()) }
     put("messages", msgs)
 
     if (toolDefinitions.isNotEmpty()) {
@@ -1369,7 +1369,7 @@ internal fun buildSubAgentRequestBody(
     put("top_p", preferences.samplingTopP)
     put("stream", false)
     requestReasoningEffort(preferences)?.let { put("reasoning_effort", it) }
-    put("messages", JSONArray().apply { history.forEach { put(it.toJson()) } })
+    put("messages", JSONArray().apply { history.forEach { put(it.forPayload(preferences.toolResultMaxChars).toJson()) } })
     if (toolDefinitions.isNotEmpty()) {
         put("tools", JSONArray().apply { toolDefinitions.forEach { put(it.toJson()) } })
         put("tool_choice", "auto")

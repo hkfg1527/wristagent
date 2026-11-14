@@ -61,6 +61,7 @@ fun ToolsMcpContent(
     var sandboxLevel by remember { mutableStateOf(preferences.sandboxLevel) }
     // 命令超时与审批放行阈值：两条都是"数值可调"，落盘前按 1000ms / 0.01 台阶量化
     var shellTimeoutMs by remember { mutableIntStateOf(preferences.shellCommandTimeoutMs.toInt()) }
+    var toolChars by remember { mutableIntStateOf(preferences.toolResultMaxChars) }
     var allowThreshold by remember { mutableFloatStateOf(preferences.approvalAllowThreshold) }
     // 审批放行清单：条数必须可见（上限满了新的"记住"会被静默拒绝），撤销必须是显式二次确认
     var rememberedCount by remember { mutableIntStateOf(preferences.rememberedShellCommandCount) }
@@ -189,6 +190,26 @@ fun ToolsMcpContent(
                     subtitleBelowRow = true
                 )
             }
+        }
+
+        // ===== 工具结果上限：一次工具输出能占多少上下文 =====
+        section(stringResource(R.string.settings_tool_result_chars))
+
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_tool_result_chars),
+                value = toolChars.toFloat(),
+                valueRange = AgentPreferences.MIN_TOOL_RESULT_CHARS.toFloat()..AgentPreferences.MAX_TOOL_RESULT_CHARS.toFloat(),
+                steps = 18,
+                valueText = toolChars.toString(),
+                onValueChange = { raw ->
+                    val snapped = (raw / 500f).roundToInt() * 500
+                    if (snapped != toolChars) {
+                        toolChars = snapped
+                        preferences.toolResultMaxChars = snapped
+                    }
+                }
+            )
         }
 
         // ===== 命令执行上限：长命令挂死时唯一能改的量 =====
