@@ -645,19 +645,21 @@ fun ChatScreen(
             }
     }
 
-    // 新回合到达后 3 秒内无人滚动 → 自动收起（每个回合只计时一次，返回设置页不会重开）
+    // 新回合到达后静默一段时间无人滚动 → 自动收起（时长来自设置项 bottom_bar_auto_hide_ms）
     LaunchedEffect(readingTurnKey) {
         val key = readingTurnKey ?: return@LaunchedEffect
         if (!viewModel.claimAutoCollapseTurn(key)) return@LaunchedEffect
         val turnStart = SystemClock.uptimeMillis()
-        delay(AUTO_COLLAPSE_DELAY_MS)
+        val autoHideMs = AgentPreferences(context).bottomBarAutoHideMs
+        delay(autoHideMs)
         val now = SystemClock.uptimeMillis()
         val shouldCollapse = BottomBarVisibility.shouldAutoCollapseAfterTurn(
             nowMs = now,
             turnStartMs = turnStart,
             wakeLatchUntilMs = wakeLatchUntil,
             lastUserScrollMs = lastUserScrollAt,
-            forceExpanded = state.isBottomBarForceExpanded
+            forceExpanded = state.isBottomBarForceExpanded,
+            delayMs = autoHideMs
         )
         if (shouldCollapse) {
             applyBarMode(

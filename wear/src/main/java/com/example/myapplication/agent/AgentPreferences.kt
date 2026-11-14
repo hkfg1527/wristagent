@@ -153,6 +153,14 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = HapticAmplitude.fromStorage(prefs.getString(KEY_HAPTIC_AMPLITUDE, null))
         set(value) = prefs.edit().putString(KEY_HAPTIC_AMPLITUDE, value.name).apply()
 
+    /** 底栏自动收起前的静默时长（毫秒），夹 1000..8000。 */
+    var bottomBarAutoHideMs: Long
+        get() = prefs.getLong(KEY_BOTTOM_BAR_AUTO_HIDE_MS, DEFAULT_BOTTOM_BAR_AUTO_HIDE_MS)
+            .coerceIn(MIN_BOTTOM_BAR_AUTO_HIDE_MS, MAX_BOTTOM_BAR_AUTO_HIDE_MS)
+        set(value) = prefs.edit()
+            .putLong(KEY_BOTTOM_BAR_AUTO_HIDE_MS, value.coerceIn(MIN_BOTTOM_BAR_AUTO_HIDE_MS, MAX_BOTTOM_BAR_AUTO_HIDE_MS))
+            .apply()
+
     /**
      * 表冠滚动增益：一格刻度换算成多少像素位移的倍数。
      *
@@ -575,6 +583,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val KEY_WIFI_ONLY = "wifiOnlyRequests"
         const val KEY_HAPTICS = "hapticsEnabled"
         const val KEY_HAPTIC_AMPLITUDE = "haptic_amplitude"
+        const val KEY_BOTTOM_BAR_AUTO_HIDE_MS = "bottom_bar_auto_hide_ms"
+        const val DEFAULT_BOTTOM_BAR_AUTO_HIDE_MS = 3000L
+        const val MIN_BOTTOM_BAR_AUTO_HIDE_MS = 1000L
+        const val MAX_BOTTOM_BAR_AUTO_HIDE_MS = 8000L
         const val KEY_ROTARY_SCROLL_GAIN = "rotary_scroll_gain"
         const val DEFAULT_ROTARY_SCROLL_GAIN = 1f
         const val MIN_ROTARY_SCROLL_GAIN = 0.5f

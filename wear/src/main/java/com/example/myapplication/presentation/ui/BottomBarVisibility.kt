@@ -21,6 +21,10 @@ enum class BottomBarEvent {
 /** 新回合进来后，多久没人动就自动收起底栏。 */
 const val AUTO_COLLAPSE_DELAY_MS = 3000L
 
+/** 设置项可调范围：1 秒（手快）到 8 秒（慢慢读）。 */
+const val MIN_AUTO_COLLAPSE_MS = 1000L
+const val MAX_AUTO_COLLAPSE_MS = 8000L
+
 /** 用户点弧条唤醒按钮后的"挂起期"：这段时间内滚动/静默都不能再把它收起来。 */
 const val WAKE_LATCH_MS = 3000L
 
@@ -55,11 +59,13 @@ object BottomBarVisibility {
         turnStartMs: Long,
         wakeLatchUntilMs: Long,
         lastUserScrollMs: Long,
-        forceExpanded: Boolean
+        forceExpanded: Boolean,
+        /** 静默多久算"没人动"，来自设置项 bottom_bar_auto_hide_ms。 */
+        delayMs: Long = AUTO_COLLAPSE_DELAY_MS
     ): Boolean {
         if (forceExpanded) return false
         if (!collapseAllowed(nowMs, wakeLatchUntilMs)) return false
-        if (nowMs - turnStartMs < AUTO_COLLAPSE_DELAY_MS) return false
+        if (nowMs - turnStartMs < delayMs.coerceIn(MIN_AUTO_COLLAPSE_MS, MAX_AUTO_COLLAPSE_MS)) return false
         return lastUserScrollMs < turnStartMs
     }
 

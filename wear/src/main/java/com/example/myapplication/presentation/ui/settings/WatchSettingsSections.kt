@@ -213,6 +213,7 @@ fun AppearanceContent(
     var compactMode by remember { mutableStateOf(preferences.compactMode) }
     var spacing by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
     var rotaryGain by remember { mutableFloatStateOf(preferences.rotaryScrollGain) }
+    var autoHideMs by remember { mutableFloatStateOf(preferences.bottomBarAutoHideMs.toFloat()) }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_appearance),
@@ -273,6 +274,25 @@ fun AppearanceContent(
                     }
                 )
             }
+        }
+
+        // 底栏自动收起：静默多久后把按钮收成小白条（1.0..8.0 秒，步进 0.5）
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_bottom_bar_auto_hide),
+                value = autoHideMs,
+                valueRange = AgentPreferences.MIN_BOTTOM_BAR_AUTO_HIDE_MS.toFloat()..AgentPreferences.MAX_BOTTOM_BAR_AUTO_HIDE_MS.toFloat(),
+                steps = 13,
+                valueText = String.format("%.1fs", autoHideMs / 1000f),
+                onValueChange = { raw ->
+                    val snapped = (raw / 500f).roundToInt() * 500f
+                    if (snapped != autoHideMs) {
+                        autoHideMs = snapped
+                        preferences.bottomBarAutoHideMs = snapped.toLong()
+                        context.vibrateTick()
+                    }
+                }
+            )
         }
 
         // 表冠增益：一格刻度走多远。真实的消费者是根页与全部子页的 onRotaryScrollEvent。
