@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -262,6 +265,24 @@ fun SettingsScreen(
                     .background(Wear.Palette.Bg)
             ) {
                 val settingsFocusRequester = remember { FocusRequester() }
+                // 着色器预热：滑块与开关的把手是圆角矩形（圆形），第一次绘制时驱动会在帧内现编译
+                // 着色器 —— atrace 里那一帧的 shader_compile 是 29ms。这里在首帧先画两个 1dp 的圆
+                // 形（一个实心、一个裁剪出来的），颜色与页面背景相同、位置落在圆屏切角之外，
+                // 肉眼不可见，但把同一批着色器提前编好。
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    drawCircle(color = Wear.Palette.Bg, radius = size.minDimension / 2f)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .align(Alignment.TopStart)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Wear.Palette.Bg)
+                )
 
                 // 表冠只把事件送给持有焦点的节点，必须显式 requestFocus() 一次。
                 // 根页在整个开关过程中一直留在树里：LaunchedEffect(Unit) 只跑一次，从子页返回后
