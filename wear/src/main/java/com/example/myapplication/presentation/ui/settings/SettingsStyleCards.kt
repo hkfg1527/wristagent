@@ -199,13 +199,23 @@ internal fun SettingsBrandCard(
                 modifier = Modifier.size(BrandCharacterSize.Inline)
             )
             Spacer(Modifier.height(Wear.Space.Sm))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // 品牌标识与角色是两套资产，页面上各就各位：角色在上，标识贴在标签左侧
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(brand.markRes),
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(Wear.Space.Xs))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = value,
                 style = if (brandTitleIsCompact(value)) {
