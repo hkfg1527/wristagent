@@ -44,6 +44,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -454,6 +455,9 @@ fun UserChatBubble(
     }
 }
 
+/** 回答左侧的品牌竖线宽度：注释里承诺过的 2dp 竖线标记这是回答，现在真的画出来了。 */
+private val AnswerEdgeBarWidth = 2.dp
+
 /**
  * Agent 回复卡片：Surface 实底 + 1dp 描边 + Group 圆角，无 RenderEffect 模糊层。
  */
@@ -473,6 +477,8 @@ fun AgentSquareBlurBox(
     // 还让"用户靠右 / 助手靠左"彻底看不出来。左侧一条 2dp 竖线就够标记"这是回答"。
     // 回答是一层"面"：实心 Surface + 发丝描边，把正文从背景里托起来。
     // 曾经为了"去装饰"把面和边一起删掉，结果文字直接浮在纯黑上 —— 没有前后关系，也就没有空间感。
+    // 强调色是 @Composable getter，必须先在组合上下文里取出来，不能进绘制 lambda
+    val edgeAccent = Wear.Accent
     val shape = RoundedCornerShape(
         topStart = Wear.Radius.Card,
         topEnd = Wear.Radius.Card,
@@ -496,7 +502,23 @@ fun AgentSquareBlurBox(
                 shape = shape
             )
             .then(approvalBorder)
-            .padding(horizontal = Wear.Space.Md, vertical = Wear.Space.Md + 2.dp)
+            // 品牌重心：回答的左缘一条 2dp 强调色竖线。它是整页唯一"属于品牌"的视觉锚点，
+            // 也是"这是回答、不是你说的"的最便宜标记（比整卡染色省、比图标不抢字）。
+            .drawBehind {
+                val barWidth = AnswerEdgeBarWidth.toPx()
+                drawRoundRect(
+                    color = edgeAccent,
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    size = androidx.compose.ui.geometry.Size(barWidth, size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
+                )
+            }
+            .padding(
+                start = Wear.Space.Md + AnswerEdgeBarWidth + 4.dp,
+                end = Wear.Space.Md,
+                top = Wear.Space.Md + 2.dp,
+                bottom = Wear.Space.Md + 2.dp
+            )
     ) {
         content()
     }
