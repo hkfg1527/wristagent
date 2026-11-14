@@ -148,9 +148,21 @@ fun SettingsStaggeredRow(
     stagger: SettingsRowStaggerState,
     exit: SettingsExitController,
     rowCount: Int = SettingsStaggeredRowCount,
+    /**
+     * 是否给这一行挂逐行浮动/淡入的图层。
+     *
+     * 卡片档里「分区行」那一整块高 3000+ px：给它挂 graphicsLayer 意味着每次入场动画
+     * 都要绘制一块 432×3113 的位图（atrace 里实测到 `drawLayer [graphicsLayer] 432.0 x 3113.0`），
+     * 这是目前定位到的最大离群帧来源。这一块因此不参与逐行动画，只在需要时关掉。
+     */
+    animate: Boolean = true,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    if (!animate) {
+        Box(modifier = modifier) { content() }
+        return
+    }
     val playsEnter = remember(index) { stagger.claimEnter(index) }
     val enter = remember(index) { Animatable(if (playsEnter) 0f else 1f) }
 

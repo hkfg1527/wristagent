@@ -423,7 +423,14 @@ fun SettingsScreen(
                     // 分区行仍然拼成一片连续曲面：气球必须整组一起画，切开就不再是一个连续的气球。
                     // 卡片档里这张曲面只承载分区行，四张 hero 卡在它上面各占一个独立 item。
                     item(key = "root-sections") {
-                        SettingsStaggeredRow(index = 5, rowCount = RootRowCount, stagger = rowStagger, exit = exit) {
+                        SettingsStaggeredRow(
+                            index = 5,
+                            rowCount = RootRowCount,
+                            stagger = rowStagger,
+                            exit = exit,
+                            // 卡片档这 3000+ px 的整块不参与逐行动画：它的图层会变成一块 432×3113 的位图
+                            animate = WearAppearance.style != SettingsStyle.GOOGLE_CARD
+                        ) {
                             SettingsBalloonGroup {
                                 // 气球两端的收口留白只属于曲面：卡片档每行自带 8dp 间隙，再留 56dp 就是一块空屏
                                 if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) {

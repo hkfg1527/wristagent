@@ -31,12 +31,19 @@ class SettingsScalingMathTest {
     }
 
     @Test
-    fun theCardStyleUsesOfficialEdgeScalingWhileTheOthersStayFlat() {
+    fun theCardStyleKeepsTheLibraryFlatBecauseTheZoomOwnsTheGeometry() {
         val source = readProjectFile(
             "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsScaling.kt"
         )
-        assertTrue("大卡片档必须真的缩放", source.contains("edgeScale = 0.84f"))
-        assertTrue("大卡片档必须跟着淡出", source.contains("edgeAlpha = 0.55f"))
+        // 两套风格现在共用同一份平坦参数：缩放不再交给库（库会给 3113px 的整块挂图层，实测每帧 10.7ms）
+        assertTrue("必须保留 cardStyleScalingParams 这个入口", source.contains("fun cardStyleScalingParams"))
+        assertTrue("两套必须走同一份平坦参数", source.contains("private fun flatScalingParams"))
+        assertFalse(
+            "不得再把缩放交给库：那会给 432×3113 的整块挂图层",
+            source.contains("edgeScale = 0.84f")
+        )
+        // 边缘几何的所有权在 CardEdgeZoom，它的常量由 SettingsCardEdgeZoomTest 钉住
+        assertTrue("文件里必须写明所有权归属", source.contains("CardEdgeZoom"))
     }
 
     @Test
