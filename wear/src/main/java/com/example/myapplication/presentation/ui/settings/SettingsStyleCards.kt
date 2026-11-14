@@ -95,6 +95,8 @@ internal fun SettingsHeroCard(
     badge: String? = null,
     /** 品牌徽标矢量；给了它就代替 [badge] 里那串缩写。 */
     badgeMark: Int? = null,
+    /** 右槽环形指示器进度（0..1）；null 也画轨道 —— 每张卡右边都得有东西压住重心。 */
+    ring: Float? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -161,6 +163,8 @@ internal fun SettingsHeroCard(
                     )
                 }
             }
+            Spacer(Modifier.width(Wear.Space.Sm))
+            SettingsHeroRing(progress = ring, accent = accent)
         }
     }
 }
@@ -185,6 +189,8 @@ internal fun SettingsBrandCard(
     value: String,
     accent: Color,
     meta: String? = null,
+    /** 右上角环形指示器进度（0..1）；null 也画轨道。 */
+    ring: Float? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -193,6 +199,10 @@ internal fun SettingsBrandCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // 圆环贴右上角：角色与文字仍居中，环只压住那一角的空白（用户要的重心）
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                SettingsHeroRing(progress = ring, accent = accent)
+            }
             BrandCharacter(
                 brand = brand,
                 eyeColor = SettingsCardSurface,

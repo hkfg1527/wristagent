@@ -367,6 +367,7 @@ fun SettingsScreen(
                             RootContentRow(index = 1, stagger = rowStagger, exit = exit) {
                                 SettingsBrandCard(
                                     modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
+                                    ring = currentTemp.coerceIn(0f, 1f),
                                     brand = currentBrand,
                                     label = stringResource(R.string.settings_section_models),
                                     value = currentModel,
@@ -385,6 +386,7 @@ fun SettingsScreen(
                                 val registeredTools = preferences.registeredToolCount
                                 SettingsHeroCard(
                                     modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
+                                    ring = if (registeredTools > 0) calledTools.toFloat() / registeredTools else null,
                                     label = stringResource(R.string.settings_card_tools),
                                     value = if (registeredTools > 0) {
                                         calledTools.toString() + " / " + registeredTools
@@ -406,6 +408,7 @@ fun SettingsScreen(
                                 val voiceReady = asrEnabled && (voiceProvider != AsrProviderId.BAIDU || asrKeyReady)
                                 SettingsHeroCard(
                                     modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
+                                    ring = if (asrEnabled && voiceReady) 1f else 0f,
                                     label = stringResource(R.string.settings_voice_entry),
                                     value = when {
                                         !asrEnabled -> stringResource(R.string.settings_asr_off)
@@ -427,6 +430,7 @@ fun SettingsScreen(
                             RootContentRow(index = 4, stagger = rowStagger, exit = exit) {
                                 SettingsHeroCard(
                                     modifier = Modifier.padding(bottom = SettingsCardStyle.Gap),
+                                    ring = null,
                                     label = stringResource(R.string.settings_section_system),
                                     // 系统卡报版本号：这是内测版最有用的一条系统信息；
                                     // 提示词状态在「提示词」子页的 hero 里已经说了，根页不重复。
