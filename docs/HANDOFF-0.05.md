@@ -1,26 +1,29 @@
-# 交接（状态更新 2026-11-14 21:20，硬截止 11-15 05:00）
+# 交接（状态更新 2026-11-14 20:15，硬截止 11-15 05:00）
 
-## 0.05 / 0.06 已经落地的（都有实机截图与测试）
+## 已发布（都可下载，APK 均在 GitHub release 里）
 
-- **0.05-beta 已发布**（GitHub release `v0.05-beta`，asset `wear-release.apk`，versionCode 32）。
-- **0.06-beta**：卡片档结构修正 + 排版修正（见 CHANGELOG），versionCode 33。
-- 大卡片档：官方 M3E `Card` 一行一张；根页每张卡一个 lazy item；关掉 autoCentering（首项曾贴屏心）；
-  品牌身份卡（点阵角色 + 模型名 + 上下文/温度）取代原焦点文字块。
-- 边缘空间缩放 `CardEdgeZoom`：只缩不放、等比、屏心 1.0、贴边 0.70/0.50（官方常量与官方缓动曲线）。
-- 品牌识别：`BrandId.fromEndpoint` 认 11 家（host 优先、模型名兜底），`brand_*_mark` 11 个矢量 +
-  `BrandCharacters` 11 个 12×12 点阵角色，两套资产互不复用。
-- 17 个二级页全部有 hero 卡（真实状态做 value，无占位符）。
-- 单测 1179 通过。
-- 性能实测见 `docs/PERF-0.05.md`（含两次拆件实验与被推翻的假设）。
+| 版本 | versionCode | 内容 |
+|---|---|---|
+| `v0.05-beta` | 32 | 官方 M3E Card + 边缘缩放 + 品牌识别/角色 + 17/17 二级页 hero |
+| `v0.06-beta` | 33 | 卡片档改成一卡一个 lazy item、关掉 autoCentering、去掉重复的焦点块 |
+| `v0.07-beta` | 34 | 性能：干掉每帧重画的 432×3113 图层（doFrame p90 52.7→20.8ms） |
 
-## 还没做完的（下一轮从这里接）
+## 这一段的硬证据
 
-1. **默认气泡档的性能**：`gfxinfo` 实测 70~85% 掉帧（聊天页只有 2.5%）。拆件实验定位到整页气球轮廓
-   每帧重建 + 重填约占一半，剩下在行内容绘制。需要 Perfetto 火焰图再动手，别盲试（已试反过一次）。
-2. 卡片档 35% 掉帧，同样待 Perfetto。
-3. 网页控制台「鉴权后的真实数据态」截图仍未拿到（API 与页面都通，缺一张图）。
-4. 剩余可打磨：`ollama`/`llama` 两个角色 48dp 下辨识度接近；`docs/brand/marks/vector/` 与
-   `res/drawable/` 是两份拷贝，改动要同步。
+- 单测 **1186 条全绿**（`./gradlew :wear:testDebugUnitTest`）。
+- 性能：`docs/PERF-0.05.md` —— 直方图 + `framestats` 相位拆解 + `atrace` 切片 + 修完复测，
+  含 4 条**被实验推翻的推断**（谁写谁知道，别重蹈）。
+- 视觉：`docs/device/v11/` 下 `percard-*`、`flatcard-zoom`、`walk-1..4`、`mark-02-modelconfig` 等实机截图。
+
+## 下一步最值得做的三件
+
+1. **预热着色器 / 量化图层 alpha**：剩下 >64ms 的帧被 `shader_compile`(29ms)、`cache_miss`(28ms)、
+   `postAndWait`(88ms) 占掉，是图形管线一次性成本。要么启动时预热，要么把每帧变化的 alpha 步进量化。
+2. **网页控制台鉴权后截图**：GUI 被别的窗口盖住、Edge headless 在这台机不产出文件（4 种调用都试过）。
+   换一台机或用 `--remote-debugging-port` + CDP 截图应该能解。
+3. **brand art 的 48dp 打磨**：`CHARACTERS.md` 第 4 节列了每个角色在 48dp 的风险点与改法
+   （deepseek 喷水点太小、openai 叶尖缺口只有 1 格、qwen 问号杆太细、ollama/llama 太像）。
+   注意当前点阵渲染器所有点同半径，要做"小点"得先给渲染器加一种符号。
 
 ---
 
