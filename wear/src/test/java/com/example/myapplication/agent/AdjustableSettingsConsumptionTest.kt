@@ -247,7 +247,16 @@ class AdjustableSettingsConsumptionTest {
         assertTrue(
             "ChatViewModel 必须把 tts_speech_rate 交给播报器",
             viewModel.contains("val display = gateway.displayPreferences()") &&
-                viewModel.contains("speaker.speak(text, display.ttsSpeechRate)")
+                viewModel.contains("speaker.speak(text, display.ttsSpeechRate, display.ttsVolume)")
+        )
+        assertTrue(
+            "ChatViewModel 必须把 tts_volume 一起交给播报器（同一个调用点）",
+            viewModel.contains("display.ttsVolume")
+        )
+        assertTrue(
+            "ReplySpeaker 必须用官方 per-utterance 参数传音量",
+            readProjectFile("src/main/java/com/example/myapplication/agent/ReplySpeaker.kt")
+                .contains("TextToSpeech.Engine.KEY_PARAM_VOLUME")
         )
 
         val registry = readProjectFile(

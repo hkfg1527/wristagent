@@ -120,6 +120,18 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
             .putFloat(KEY_TTS_SPEECH_RATE, value.coerceIn(MinTtsSpeechRate, MaxTtsSpeechRate))
             .apply()
 
+    /**
+     * 播报音量（0..1）：每次合成前交给 TextToSpeech.setVolume。
+     *
+     * 手表外放还要再乘系统媒体音量；这里的偏好是给这一条播报再压一层 —— 夜里降到 0.3 不会吵到人。
+     */
+    var ttsVolume: Float
+        get() = prefs.getFloat(KEY_TTS_VOLUME, DEFAULT_TTS_VOLUME)
+            .coerceIn(MIN_TTS_VOLUME, MAX_TTS_VOLUME)
+        set(value) = prefs.edit()
+            .putFloat(KEY_TTS_VOLUME, value.coerceIn(MIN_TTS_VOLUME, MAX_TTS_VOLUME))
+            .apply()
+
     /** 仅 WiFi 下发起请求：默认关。开着时蜂窝网络会直接给出可读回执。 */
     var wifiOnlyRequests: Boolean
         get() = prefs.getBoolean(KEY_WIFI_ONLY, DEFAULT_WIFI_ONLY)
@@ -548,7 +560,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val DEFAULT_SHELL_COMMAND_TIMEOUT_MS = ShellPolicy.DEFAULT_TIMEOUT_MS
         const val DEFAULT_APPROVAL_ALLOW_THRESHOLD = 0.85f
         const val DEFAULT_TTS_SPEECH_RATE = 1.0f
-
+        const val KEY_TTS_VOLUME = "tts_volume"
+        const val DEFAULT_TTS_VOLUME = 0.8f
+        const val MIN_TTS_VOLUME = 0.1f
+        const val MAX_TTS_VOLUME = 1f
         const val MinStreamEmitIntervalMs = 8
         const val MaxStreamEmitIntervalMs = 200
         const val MinApprovalAllowThreshold = 0.5f

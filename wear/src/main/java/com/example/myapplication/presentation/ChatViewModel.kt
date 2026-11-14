@@ -322,7 +322,7 @@ class ChatViewModel(
         val display = gateway.displayPreferences()
         val text = ReplySpeech.spokenText(display.autoSpeakReplies, blocks) ?: return
         val speaker = replySpeaker ?: ReplySpeaker(getApplication<Application>()).also { replySpeaker = it }
-        speaker.speak(text, display.ttsSpeechRate)
+        speaker.speak(text, display.ttsSpeechRate, display.ttsVolume)
     }
 
     // ======================== 胶囊展开态 ========================

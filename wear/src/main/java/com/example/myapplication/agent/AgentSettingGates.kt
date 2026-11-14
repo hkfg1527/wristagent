@@ -15,7 +15,9 @@ data class AgentDisplayPreferences(
     /** 流式合帧间隔（毫秒）：ChatViewModel 每轮开场套到节流器上（StreamingThrottleState.updateInterval）。 */
     val streamEmitIntervalMs: Int = AgentPreferences.DEFAULT_STREAM_EMIT_INTERVAL_MS,
     /** 播报语速：每次合成前交给 TextToSpeech.setSpeechRate。 */
-    val ttsSpeechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE
+    val ttsSpeechRate: Float = AgentPreferences.DEFAULT_TTS_SPEECH_RATE,
+    /** 播报音量（0..1）：与语速一样，每次合成前都要重设。 */
+    val ttsVolume: Float = AgentPreferences.DEFAULT_TTS_VOLUME
 )
 
 /**

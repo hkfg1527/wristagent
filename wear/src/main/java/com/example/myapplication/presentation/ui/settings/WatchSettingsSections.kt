@@ -43,6 +43,7 @@ fun VoiceEntryContent(
     var liveTranscript by remember { mutableStateOf(preferences.asrLiveTranscript) }
     // 播报语速：出向语音唯一的可调量，0.5..2.0 按 0.1 一格
     var speechRate by remember { mutableFloatStateOf(preferences.ttsSpeechRate) }
+    var volume by remember { mutableFloatStateOf(preferences.ttsVolume) }
     val asr = remember { preferences.asrSettings() }
 
     SettingsSubPage(
@@ -121,6 +122,24 @@ fun VoiceEntryContent(
                     if (snapped != speechRate) {
                         speechRate = snapped
                         preferences.ttsSpeechRate = snapped
+                    }
+                }
+            )
+        }
+
+        // 播报音量：和语速一样是引擎级状态，改完下一条播报就生效
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_tts_volume),
+                value = volume,
+                valueRange = AgentPreferences.MIN_TTS_VOLUME..AgentPreferences.MAX_TTS_VOLUME,
+                steps = 8,
+                valueText = Math.round(volume * 100).toString() + "%",
+                onValueChange = { raw ->
+                    val snapped = (raw * 10f).roundToInt() / 10f
+                    if (snapped != volume) {
+                        volume = snapped
+                        preferences.ttsVolume = snapped
                     }
                 }
             )

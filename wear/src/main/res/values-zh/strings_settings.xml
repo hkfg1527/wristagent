@@ -18,7 +18,7 @@
     <string name="settings_tools_and_mcp">工具与 MCP</string>
     <string name="settings_tools_all_enabled">全部启用</string>
     <string name="settings_tools_enabled_count">%1$d 项启用</string>
-    <string name="settings_prompt_context">提示词</string>
+    <string name="settings_prompt_context">提示词与记忆</string>
     <string name="settings_about">关于</string>
     <string name="settings_system_prompt">系统提示词</string>
     <string name="settings_prompt_default">预置默认</string>
@@ -353,8 +353,8 @@
     <string name="settings_voice_power_value">需系统按键自定义映射</string>
     <string name="settings_voice_power_hint">应用收不到 KEYCODE_POWER，需在系统设置里把长按电源键映射为本应用</string>
 
-    <string name="settings_appearance">外观与点阵</string>
-    <string name="settings_sub_appearance">外观与点阵</string>
+    <string name="settings_appearance">外观与动效</string>
+    <string name="settings_sub_appearance">外观与动效</string>
     <string name="settings_appearance_compact">简洁模式</string>
     <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
     <string name="settings_appearance_matrix_header">点阵</string>
@@ -488,6 +488,7 @@
     <string name="settings_shell_timeout_value">%1$d 毫秒</string>
     <string name="settings_approval_threshold">放行阈值</string>
     <string name="settings_approval_threshold_value">%1$.2f</string>
+    <string name="settings_tts_volume">播报音量</string>
     <string name="settings_tts_speech_rate">播报语速</string>
     <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>
 </resources>
