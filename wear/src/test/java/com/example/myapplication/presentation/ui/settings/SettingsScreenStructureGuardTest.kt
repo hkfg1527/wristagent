@@ -71,14 +71,14 @@ class SettingsScreenStructureGuardTest {
     private companion object {
         const val SettingsScreenPath = "src/main/java/com/example/myapplication/presentation/ui/SettingsScreen.kt"
 
-        val groupHeaderCall = Regex("SettingsSectionHeader\\(\\s*text\\s*=\\s*stringResource\\(R\\.string\\.(settings_section_[a-z_]+)\\)")
+        val groupHeaderCall = Regex("SettingsSectionHeader\\(\\s*text\\s*=\\s*stringResource\\(R\\.string\\.(settings_zone_[a-z_]+)\\)")
         val branchLabel = Regex("SettingsSubDialog\\.([A-Z_]+)\\s*->")
 
         val expectedSections = listOf(
-                "settings_section_models",
-                "settings_section_voice_tools",
-                "settings_section_network",
-                "settings_section_system"
+            "settings_zone_answer",
+            "settings_zone_voice",
+            "settings_zone_act",
+            "settings_zone_connect",
         )
     }
 }

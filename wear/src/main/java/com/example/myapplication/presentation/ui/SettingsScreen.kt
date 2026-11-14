@@ -464,7 +464,7 @@ fun SettingsScreen(
                                     Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                                 }
                                 SettingsSectionHeader(
-                                    text = stringResource(R.string.settings_section_models),
+                                    text = stringResource(R.string.settings_zone_answer),
                                     isFirstSection = true
                                 )
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
@@ -492,7 +492,7 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_model_params),
                                         value = stringResource(R.string.settings_temperature_value, currentTemp),
@@ -502,7 +502,21 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                SettingsSectionHeader(text = stringResource(R.string.settings_section_voice_tools))
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_prompt_context),
+                                        value = if (customPrompt.isBlank()) {
+                                            stringResource(R.string.settings_prompt_default)
+                                        } else {
+                                            stringResource(R.string.settings_prompt_custom)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.PROMPT_CONTEXT
+                                        }
+                                    )
+                                }
+                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_voice))
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                                     SettingsNavRow(
@@ -522,6 +536,16 @@ fun SettingsScreen(
                                     )
                                 }
                                 RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_appearance),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.APPEARANCE
+                                        }
+                                    )
+                                }
+                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_act))
+                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     val enabledCount = listOf(
                                         preferences.toolDeviceStatusEnabled,
                                         preferences.toolVibrateEnabled,
@@ -543,7 +567,21 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                SettingsSectionHeader(text = stringResource(R.string.settings_section_network))
+                                RootGroupedRow(slot = SettingsRowSlot.LAST) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_security_policy),
+                                        value = when (currentSecurityMode) {
+                                            SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
+                                            SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
+                                            SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
+                                        },
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                                        }
+                                    )
+                                }
+                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_connect))
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_sub_network_request),
@@ -551,22 +589,6 @@ fun SettingsScreen(
                                         onClick = {
                                             context.vibrateTick()
                                             activeDialog = SettingsSubDialog.NETWORK_REQUEST
-                                        }
-                                    )
-                                }
-
-                                SettingsSectionHeader(text = stringResource(R.string.settings_section_system))
-                                RootGroupedRow(slot = SettingsRowSlot.FIRST) {
-                                    SettingsNavRow(
-                                        title = stringResource(R.string.settings_prompt_context),
-                                        value = if (customPrompt.isBlank()) {
-                                            stringResource(R.string.settings_prompt_default)
-                                        } else {
-                                            stringResource(R.string.settings_prompt_custom)
-                                        },
-                                        onClick = {
-                                            context.vibrateTick()
-                                            activeDialog = SettingsSubDialog.PROMPT_CONTEXT
                                         }
                                     )
                                 }
@@ -596,42 +618,19 @@ fun SettingsScreen(
                                 }
                                 RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
                                     SettingsNavRow(
-                                        title = stringResource(R.string.settings_security_policy),
-                                        value = when (currentSecurityMode) {
-                                            SecurityMode.NOVICE -> stringResource(R.string.settings_mode_strict)
-                                            SecurityMode.STANDARD -> stringResource(R.string.settings_mode_standard)
-                                            SecurityMode.EXPERT -> stringResource(R.string.settings_mode_auto)
-                                        },
+                                        title = stringResource(R.string.settings_sub_transfer),
                                         onClick = {
                                             context.vibrateTick()
-                                            activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
-                                        }
-                                    )
-                                }
-                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
-                                    SettingsNavRow(
-                                        title = stringResource(R.string.settings_appearance),
-                                        onClick = {
-                                            context.vibrateTick()
-                                            activeDialog = SettingsSubDialog.APPEARANCE
-                                        }
-                                    )
-                                }
-                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
-                                    SettingsNavRow(
-                                        title = stringResource(R.string.settings_about),
-                                        onClick = {
-                                            context.vibrateTick()
-                                            activeDialog = SettingsSubDialog.ABOUT
+                                            activeDialog = SettingsSubDialog.TRANSFER
                                         }
                                     )
                                 }
                                 RootGroupedRow(slot = SettingsRowSlot.LAST) {
                                     SettingsNavRow(
-                                        title = stringResource(R.string.settings_sub_transfer),
+                                        title = stringResource(R.string.settings_about),
                                         onClick = {
                                             context.vibrateTick()
-                                            activeDialog = SettingsSubDialog.TRANSFER
+                                            activeDialog = SettingsSubDialog.ABOUT
                                         }
                                     )
                                 }

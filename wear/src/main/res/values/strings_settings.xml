@@ -4,6 +4,10 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
+    <string name="settings_zone_answer">Make it answer well</string>
+    <string name="settings_zone_voice">Make it hear me</string>
+    <string name="settings_zone_act">Make it act</string>
+    <string name="settings_zone_connect">Stay connected</string>
     <string name="settings_section_models">Models</string>
     <string name="settings_section_voice_tools">Voice &amp; tools</string>
     <string name="settings_section_system">System</string>
@@ -466,7 +470,7 @@
     <string name="settings_style_terminal_summary">Monospace list, no surfaces, keys read like a console</string>
         <string name="settings_sub_network_request">Network &amp; requests</string>
     <string name="settings_card_meta_network">retries %1$d · backoff %2$d ms</string>
-<string name="settings_section_network">Network &amp; feedback</string>
+<string name="settings_section_network">Network &amp; interaction</string>
     <string name="settings_net_timeout">Request timeout</string>
     <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
     <string name="settings_net_retries">Auto retry</string>
