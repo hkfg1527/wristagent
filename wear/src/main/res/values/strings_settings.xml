@@ -179,6 +179,7 @@
     <string name="settings_baidu_api_key">API Key (AK)</string>
     <string name="settings_baidu_secret_key">Secret Key (SK)</string>
     <string name="settings_temp_presets">Quick presets</string>
+    <string name="settings_console_max_failures">Lock after wrong tokens</string>
     <string name="settings_remote_console_title">Web Console</string>
     <string name="settings_remote_console_running">Running on port %1$d</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
@@ -474,6 +475,7 @@
         <string name="settings_sub_network_request">Network &amp; requests</string>
     <string name="settings_card_meta_network">retries %1$d · backoff %2$d ms</string>
 <string name="settings_section_network">Network &amp; interaction</string>
+    <string name="settings_net_diag_timeout">Diagnostics probe timeout</string>
     <string name="settings_net_timeout">Request timeout</string>
     <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
     <string name="settings_net_retries">Auto retry</string>

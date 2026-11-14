@@ -2,12 +2,14 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.myapplication.R
+import com.example.myapplication.agent.net.DiagnosticTimeouts
 import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.presentation.ui.theme.Wear
@@ -32,6 +34,7 @@ fun NetworkRequestContent(
     var retryBackoff by remember { mutableStateOf(preferences.retryBackoffMs) }
     var wifiOnly by remember { mutableStateOf(preferences.wifiOnlyRequests) }
     var hapticsOn by remember { mutableStateOf(preferences.hapticsEnabled) }
+    var diagTimeoutMs by remember { mutableFloatStateOf(preferences.netDiagTimeoutMs.toFloat()) }
     var inner by remember { mutableStateOf(false) }
     // 体检结论与根页同源：进来读一次最近结果，体检页里再重新跑
     val netDiagSummary = remember { NetworkDiagnosisStore(context.applicationContext).lastSummary() }
@@ -69,6 +72,25 @@ fun NetworkRequestContent(
         }
     ) {
         section(stringResource(R.string.settings_section_network))
+        // 体检探测超时：网络慢的时候体检不该自己先超时
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_net_diag_timeout),
+                value = diagTimeoutMs,
+                valueRange = DiagnosticTimeouts.MIN_MS.toFloat()..DiagnosticTimeouts.MAX_MS.toFloat(),
+                steps = 8,
+                valueText = String.format("%.1fs", diagTimeoutMs / 1000f),
+                onValueChange = { raw ->
+                    val snapped = (raw / 500f).roundToInt() * 500f
+                    if (snapped != diagTimeoutMs) {
+                        diagTimeoutMs = snapped
+                        preferences.netDiagTimeoutMs = snapped.toInt()
+                        context.vibrateTick()
+                    }
+                }
+            )
+        }
+
         row {
             SettingsNavRow(
                 title = stringResource(R.string.settings_netdiag_title),

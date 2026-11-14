@@ -256,6 +256,7 @@ internal object ConsoleBridge {
             token = { tokens.getOrCreate() },
             serverPort = serverPort,
             uptime = { SystemClock.elapsedRealtime() - startedAtMs },
+            throttle = ConsoleAuthThrottle(maxFailures = preferences.consoleMaxFailures),
         )
     }
 

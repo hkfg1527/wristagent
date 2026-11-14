@@ -181,10 +181,32 @@ internal data class HttpAttempt(
  * 全部走系统默认网络栈（HttpURLConnection / Socket / InetAddress），不引入新依赖；
  * 每种失败都收敛成 [Diagnostic]，绝不把异常抛给界面。
  */
+/**
+ * 体检的两档探测超时（毫秒）。
+ *
+ * 用户只调一个旋钮（net_diag_timeout_ms），这里把它摊成两档：TCP 用旋钮本身，
+ * 双栈探测比单栈快一档（−500ms，下限 500），因为两条连接是并发发起的。
+ */
+data class DiagnosticTimeouts(
+    val tcpMs: Int = NetworkDiagnostics.TCP_TIMEOUT_MS,
+    val stackMs: Int = NetworkDiagnostics.STACK_TIMEOUT_MS,
+) {
+    companion object {
+        const val MIN_MS = 1_000
+        const val MAX_MS = 10_000
+
+        fun of(preferenceMs: Int): DiagnosticTimeouts {
+            val tcp = preferenceMs.coerceIn(MIN_MS, MAX_MS)
+            return DiagnosticTimeouts(tcpMs = tcp, stackMs = (tcp - 500).coerceAtLeast(500))
+        }
+    }
+}
+
 class NetworkDiagnostics(
     private val context: Context,
     private val baseUrl: () -> String,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val timeouts: DiagnosticTimeouts = DiagnosticTimeouts(),
 ) {
 
     suspend fun run(): List<Diagnostic> = withContext(Dispatchers.IO) {
@@ -288,7 +310,7 @@ class NetworkDiagnostics(
         if (host == null) {
             return skipped(DiagnosticId.TCP, R.string.settings_netdiag_tcp_fail, "no-base-url")
         }
-        val attempt = connectTcp(host, HTTPS_PORT, TCP_TIMEOUT_MS)
+        val attempt = connectTcp(host, HTTPS_PORT, timeouts.tcpMs)
         val detail = "tcp ${attempt.elapsedMs}ms ${attempt.failure?.simpleName() ?: "ok"}"
         return when {
             attempt.ok -> Diagnostic(
@@ -505,8 +527,8 @@ class NetworkDiagnostics(
         if (host == null || (ipv4 == null && ipv6 == null)) {
             return skipped(DiagnosticId.DUAL_STACK, R.string.settings_netdiag_dual_both_fail, "no-address")
         }
-        val v4 = ipv4?.let { connectTcp(host, HTTPS_PORT, STACK_TIMEOUT_MS, address = it) }
-        val v6 = ipv6?.let { connectTcp(host, HTTPS_PORT, STACK_TIMEOUT_MS, address = it) }
+        val v4 = ipv4?.let { connectTcp(host, HTTPS_PORT, timeouts.stackMs, address = it) }
+        val v6 = ipv6?.let { connectTcp(host, HTTPS_PORT, timeouts.stackMs, address = it) }
         val detail = "dual v4=${v4?.ok ?: "none"} v6=${v6?.ok ?: "none"}"
         return when {
             ipv4 != null && ipv6 != null && v4?.ok == true && v6?.ok == true -> Diagnostic(

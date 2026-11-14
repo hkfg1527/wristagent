@@ -32,6 +32,8 @@ class SettingsPersistenceTest {
         p.samplingTopP = 0.8f
         p.mcpMaxToolPages = 8
         p.subagentReadTimeoutMs = 90_000L
+        p.netDiagTimeoutMs = 5_000
+        p.consoleMaxFailures = 7
 
         // 逐个回读：写进去的值必须原样读得出来（夹取范围内）
         assertEquals(48, p.streamEmitIntervalMs)
@@ -48,6 +50,8 @@ class SettingsPersistenceTest {
         assertEquals(0.8f, p.samplingTopP, 0.0001f)
         assertEquals(8, p.mcpMaxToolPages)
         assertEquals(90_000L, p.subagentReadTimeoutMs)
+        assertEquals(5_000, p.netDiagTimeoutMs)
+        assertEquals(7, p.consoleMaxFailures)
     }
 
     @Test
@@ -66,6 +70,8 @@ class SettingsPersistenceTest {
         assertEquals("sampling_top_p", AgentPreferences.KEY_SAMPLING_TOP_P)
         assertEquals("mcp_max_tool_pages", AgentPreferences.KEY_MCP_MAX_TOOL_PAGES)
         assertEquals("subagent_read_timeout_ms", AgentPreferences.KEY_SUBAGENT_READ_TIMEOUT_MS)
+        assertEquals("net_diag_timeout_ms", AgentPreferences.KEY_NET_DIAG_TIMEOUT_MS)
+        assertEquals("console_max_failures", AgentPreferences.KEY_CONSOLE_MAX_FAILURES)
     }
 
     @Test

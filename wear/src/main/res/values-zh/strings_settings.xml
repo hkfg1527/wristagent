@@ -169,6 +169,7 @@
     <string name="settings_baidu_api_key">百度 API Key（AK）</string>
     <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
     <string name="settings_temp_presets">快捷预设</string>
+    <string name="settings_console_max_failures">令牌错误几次后锁定</string>
     <string name="settings_remote_console_title">网页控制台</string>
     <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
@@ -474,6 +475,7 @@
         <string name="settings_sub_network_request">网络与请求</string>
     <string name="settings_card_meta_network">重试 %1$d 次 · 退避 %2$d ms</string>
 <string name="settings_section_network">网络与交互</string>
+    <string name="settings_net_diag_timeout">体检探测超时</string>
     <string name="settings_net_timeout">请求超时</string>
     <string name="settings_net_timeout_secondary">单次请求超过这个时长就放弃</string>
     <string name="settings_net_retries">自动重试</string>

@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.agent.AgentPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +19,7 @@ import com.example.myapplication.agent.remote.ConsoleTokenStore
 import com.example.myapplication.presentation.ui.theme.Wear
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import kotlin.math.roundToInt
 
 /**
  * 网页控制台入口：把「服务在跑 / 端口几 / 完整地址（含令牌）」摊开给用户，
@@ -36,6 +38,8 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
     val tokenStore = remember { ConsoleTokenStore(context.applicationContext) }
     // 端口/运行态不是 Compose 状态，进入本页时读一次快照；点按钮后再刷新一次。
     var refreshTick by remember { mutableIntStateOf(0) }
+    val preferences = remember { AgentPreferences(context.applicationContext) }
+    var maxFailures by remember { mutableIntStateOf(preferences.consoleMaxFailures) }
     val token = remember(refreshTick) { tokenStore.getOrCreate() }
     // 端口读的是真正绑上的那个（8080 被占用时会是 8081 / 8082），不是配置里的首选端口
     val port = remember(refreshTick) { server.port }
@@ -75,6 +79,25 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
         }
     ) {
         section(stringResource(R.string.settings_remote_console_title))
+
+        // 防爆破：连续错几次就锁这个来源。改完下一次错误就按新上限计数。
+        row {
+            SettingsSliderRow(
+                label = stringResource(R.string.settings_console_max_failures),
+                value = maxFailures.toFloat(),
+                valueRange = AgentPreferences.MIN_CONSOLE_MAX_FAILURES.toFloat()..
+                    AgentPreferences.MAX_CONSOLE_MAX_FAILURES.toFloat(),
+                steps = 6,
+                valueText = maxFailures.toString(),
+                onValueChange = { raw ->
+                    val snapped = raw.roundToInt()
+                    if (snapped != maxFailures) {
+                        maxFailures = snapped
+                        preferences.consoleMaxFailures = snapped
+                    }
+                }
+            )
+        }
 
         row {
             SettingsStatusRow(

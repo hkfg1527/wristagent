@@ -16,6 +16,8 @@ import com.example.myapplication.R
 import com.example.myapplication.agent.net.Diagnostic
 import com.example.myapplication.agent.net.DiagnosticId
 import com.example.myapplication.agent.net.DiagnosticStatus
+import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.agent.net.DiagnosticTimeouts
 import com.example.myapplication.agent.net.NetworkDiagnosisStore
 import com.example.myapplication.agent.net.NetworkDiagnostics
 import com.example.myapplication.agent.net.NetworkRepairPlan
@@ -50,7 +52,14 @@ fun NetworkDiagnosticsContent(
     val privilegeStatus by privilegeManager.status.collectAsState()
 
     val target = remember { baseUrl().trim() }
-    val diagnostics = remember { NetworkDiagnostics(context.applicationContext, baseUrl) }
+    val preferences = remember { AgentPreferences(context.applicationContext) }
+    val diagnostics = remember {
+        NetworkDiagnostics(
+            context.applicationContext,
+            baseUrl,
+            timeouts = DiagnosticTimeouts.of(preferences.netDiagTimeoutMs)
+        )
+    }
     val store = remember { NetworkDiagnosisStore(context.applicationContext) }
 
     var checks by remember { mutableStateOf<List<Diagnostic>>(emptyList()) }

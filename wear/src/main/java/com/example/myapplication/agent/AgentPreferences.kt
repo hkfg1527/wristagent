@@ -3,6 +3,9 @@ package com.example.myapplication.agent
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.myapplication.agent.mcp.McpClient
+import com.example.myapplication.agent.net.DiagnosticTimeouts
+import com.example.myapplication.agent.remote.ConsoleAuthThrottle
+import com.example.myapplication.agent.net.NetworkDiagnostics
 import com.example.myapplication.presentation.ui.StreamingThrottle
 import com.example.myapplication.presentation.ui.settings.HapticAmplitude
 import com.example.myapplication.agent.contract.SecurityMode
@@ -278,6 +281,22 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
                 KEY_MCP_MAX_TOOL_PAGES,
                 value.coerceIn(McpClient.MIN_TOOL_PAGES, McpClient.MAX_TOOL_PAGE_LIMIT)
             )
+            .apply()
+
+    /** 网络体检探测超时（1000..10000 毫秒），见 DiagnosticTimeouts。 */
+    var netDiagTimeoutMs: Int
+        get() = prefs.getInt(KEY_NET_DIAG_TIMEOUT_MS, NetworkDiagnostics.TCP_TIMEOUT_MS)
+            .coerceIn(DiagnosticTimeouts.MIN_MS, DiagnosticTimeouts.MAX_MS)
+        set(value) = prefs.edit()
+            .putInt(KEY_NET_DIAG_TIMEOUT_MS, value.coerceIn(DiagnosticTimeouts.MIN_MS, DiagnosticTimeouts.MAX_MS))
+            .apply()
+
+    /** 控制台令牌连续错误上限（3..10 次），达到后按 ConsoleAuthThrottle 的锁定窗口封禁该来源。 */
+    var consoleMaxFailures: Int
+        get() = prefs.getInt(KEY_CONSOLE_MAX_FAILURES, ConsoleAuthThrottle.MAX_FAILURES)
+            .coerceIn(MIN_CONSOLE_MAX_FAILURES, MAX_CONSOLE_MAX_FAILURES)
+        set(value) = prefs.edit()
+            .putInt(KEY_CONSOLE_MAX_FAILURES, value.coerceIn(MIN_CONSOLE_MAX_FAILURES, MAX_CONSOLE_MAX_FAILURES))
             .apply()
 
     /** 子代理读取超时（15000..180000 毫秒）：远端慢时先丢子代理，不拖住主循环。 */
@@ -583,6 +602,10 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2048
         const val KEY_TOOL_RESULT_MAX_CHARS = "tool_result_max_chars"
         const val KEY_MCP_MAX_TOOL_PAGES = "mcp_max_tool_pages"
+        const val KEY_NET_DIAG_TIMEOUT_MS = "net_diag_timeout_ms"
+        const val KEY_CONSOLE_MAX_FAILURES = "console_max_failures"
+        const val MIN_CONSOLE_MAX_FAILURES = 3
+        const val MAX_CONSOLE_MAX_FAILURES = 10
         const val KEY_SUBAGENT_READ_TIMEOUT_MS = "subagent_read_timeout_ms"
         const val DEFAULT_SUBAGENT_READ_TIMEOUT_MS = 60_000L
         const val MIN_SUBAGENT_READ_TIMEOUT_MS = 15_000L
