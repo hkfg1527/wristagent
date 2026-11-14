@@ -97,3 +97,15 @@ internal const val TitleLargeLineEm = 7.2f
 
 /** 主数值是否要退一档字号（titleLarge → titleMedium）。 */
 internal fun brandTitleIsCompact(value: String): Boolean = titleEmUnits(value) > TitleLargeLineEm
+
+/**
+ * hero 卡主数值的宽度上限（em）。
+ *
+ * 比品牌卡的 7.2 小得多：hero 卡右侧要多放一个 28dp 的官方环形指示器（+8dp 间距），
+ * 文字可用宽度只剩 ~80dp —— 20sp 下只装得下 4 个单位。实测「密钥未填写」在 7.2 阈值下会折成两行，
+ * 就是这条约束没算环的宽度。
+ */
+internal const val HeroValueMaxEm = 4.0f
+
+/** hero 卡主数值是否要退一档字号。 */
+internal fun heroValueIsCompact(value: String): Boolean = titleEmUnits(value) > HeroValueMaxEm

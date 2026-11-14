@@ -144,7 +144,7 @@ internal fun SettingsHeroCard(
                     text = value,
                     // 与品牌身份卡同一条尺子：超过 12 个单位就退一档字号，宁可小一点，
                     // 也不要在型号中间按连字符折成两行。
-                    style = if (brandTitleIsCompact(value)) {
+                    style = if (heroValueIsCompact(value)) {
                         MaterialTheme.typography.titleMedium
                     } else {
                         MaterialTheme.typography.titleLarge
