@@ -41,6 +41,11 @@
     <string name="settings_lux_free_input">Type a command…</string>
     <string name="settings_lux_input_title">Command</string>
     <string name="settings_lux_input_placeholder">echo lux</string>
+    <string name="settings_lux_saved">My slots</string>
+    <string name="settings_lux_saved_hint">Run a command first</string>
+    <string name="settings_lux_save_last">Save: %1$s</string>
+    <string name="settings_lux_save_action">Save</string>
+    <string name="settings_lux_delete">Delete</string>
     <string name="settings_lux_quick">Quick commands</string>
     <string name="settings_lux_history_empty">No commands yet</string>
     <string name="settings_lux_rerun">Run again</string>

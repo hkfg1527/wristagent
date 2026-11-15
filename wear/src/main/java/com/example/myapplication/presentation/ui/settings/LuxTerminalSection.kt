@@ -48,6 +48,7 @@ fun LuxTerminalContent(
     var editing by remember { mutableStateOf(false) }
     var lastCommand by remember { mutableStateOf("") }
     var history by remember { mutableStateOf<List<String>>(emptyList()) }
+    var saved by remember { mutableStateOf(LuxTerminalPolicy.savedOf(preferences.luxSavedCommands)) }
 
     fun run(command: String) {
         if (running) return
@@ -112,6 +113,42 @@ fun LuxTerminalContent(
                 value = lastCommand,
                 onClick = { editing = true }
             )
+        }
+
+        // 我的快捷位：用户自己攒的常用命令。行永远注册，内容在渲染时读状态（DSL 的收集期规则）。
+        section(stringResource(R.string.settings_lux_saved))
+        row {
+            val current = saved
+            val lastRun = history.lastOrNull()
+            SettingsNavRow(
+                title = if (lastRun == null) {
+                    stringResource(R.string.settings_lux_saved_hint)
+                } else {
+                    stringResource(R.string.settings_lux_save_last, lastRun)
+                },
+                value = if (lastRun == null) null else stringResource(R.string.settings_lux_save_action),
+                onClick = {
+                    val command = history.lastOrNull() ?: return@SettingsNavRow
+                    val next = LuxTerminalPolicy.withSaved(preferences.luxSavedCommands, command)
+                    preferences.luxSavedCommands = next
+                    saved = LuxTerminalPolicy.savedOf(next)
+                    context.vibrateConfirm()
+                }
+            )
+        }
+        saved.forEach { command ->
+            row {
+                SettingsNavRow(
+                    title = command,
+                    value = stringResource(R.string.settings_lux_delete),
+                    onClick = {
+                        val next = LuxTerminalPolicy.withoutSaved(preferences.luxSavedCommands, command)
+                        preferences.luxSavedCommands = next
+                        saved = LuxTerminalPolicy.savedOf(next)
+                        context.vibrateTick()
+                    }
+                )
+            }
         }
 
         section(stringResource(R.string.settings_lux_quick))

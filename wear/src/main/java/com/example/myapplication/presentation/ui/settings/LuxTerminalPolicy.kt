@@ -63,6 +63,29 @@ object LuxTerminalPolicy {
         return (history + trimmed).takeLast(max.coerceAtLeast(1))
     }
 
+    /** 快捷位上限：太多会把这页变成第二个设置页。 */
+    const val MAX_SAVED = 6
+
+    /** 落盘的快捷位是"换行分隔的命令"：可读、可手改、天然去重。 */
+    fun savedOf(raw: String): List<String> =
+        raw.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+    /**
+     * 添加一个快捷位。已存在就不重复加（顺序保持用户添加顺序），超上限丢最旧的。
+     * 与 [appendHistory] 同一套"重复不算数"的直觉，避免同一个命令在界面上出现两次。
+     */
+    fun withSaved(raw: String, command: String, max: Int = MAX_SAVED): String {
+        val trimmed = command.trim()
+        if (trimmed.isEmpty()) return raw
+        val list = savedOf(raw)
+        if (list.contains(trimmed)) return raw
+        return (list + trimmed).takeLast(max.coerceAtLeast(1)).joinToString("\n")
+    }
+
+    /** 删除一个快捷位；不存在时原样返回。 */
+    fun withoutSaved(raw: String, command: String): String =
+        savedOf(raw).filterNot { it == command.trim() }.joinToString("\n")
+
     /** 只留最近 [max] 条。 */
     fun trimEntries(entries: List<String>, max: Int = MAX_ENTRIES): List<String> =
         if (entries.size <= max) entries else entries.takeLast(max)

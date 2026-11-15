@@ -83,6 +83,41 @@ class LuxTerminalPolicyTest {
     }
 
     @Test
+    fun savedSlotsRoundTripThroughAString() {
+        var raw = LuxTerminalPolicy.withSaved("", "echo a")
+        raw = LuxTerminalPolicy.withSaved(raw, "uptime")
+        assertEquals(listOf("echo a", "uptime"), LuxTerminalPolicy.savedOf(raw))
+    }
+
+    @Test
+    fun savingTheSameCommandTwiceIsANoOp() {
+        val once = LuxTerminalPolicy.withSaved("", "echo a")
+        val twice = LuxTerminalPolicy.withSaved(once, "echo a")
+        assertEquals(once, twice)
+        assertEquals(listOf("echo a"), LuxTerminalPolicy.savedOf(twice))
+    }
+
+    @Test
+    fun savedSlotsAreCappedAndBlanksAreIgnored() {
+        assertEquals("", LuxTerminalPolicy.withSaved("", "   "))
+        var raw = ""
+        for (i in 1..10) raw = LuxTerminalPolicy.withSaved(raw, "cmd" + i)
+        val list = LuxTerminalPolicy.savedOf(raw)
+        assertEquals(LuxTerminalPolicy.MAX_SAVED, list.size)
+        assertEquals("cmd10", list.last())
+    }
+
+    @Test
+    fun deletingASlotLeavesTheOthersInOrder() {
+        var raw = LuxTerminalPolicy.withSaved("", "a")
+        raw = LuxTerminalPolicy.withSaved(raw, "b")
+        raw = LuxTerminalPolicy.withSaved(raw, "c")
+        val after = LuxTerminalPolicy.withoutSaved(raw, "b")
+        assertEquals(listOf("a", "c"), LuxTerminalPolicy.savedOf(after))
+        assertEquals(after, LuxTerminalPolicy.withoutSaved(after, "zzz"))
+    }
+
+    @Test
     fun theTranscriptKeepsOnlyTheMostRecentEntries() {
         val entries = (1..20).map { "entry-" + it }
         val trimmed = LuxTerminalPolicy.trimEntries(entries)

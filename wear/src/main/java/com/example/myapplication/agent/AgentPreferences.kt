@@ -398,6 +398,11 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getString(KEY_SELF_DEFINED_TOOLS, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SELF_DEFINED_TOOLS, value).apply()
 
+    /** Lux 终端的快捷位：换行分隔的命令清单，用户自己攒的常用命令。 */
+    var luxSavedCommands: String
+        get() = prefs.getString(KEY_LUX_SAVED_COMMANDS, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_LUX_SAVED_COMMANDS, value).apply()
+
     /** 会话级"记住此命令"清单：整块 JSON 落盘，命中即跳过审批；破坏性命令永不写入。 */
     var rememberedShellCommands: String
         get() = prefs.getString(KEY_REMEMBERED_SHELL_COMMANDS, "") ?: ""
@@ -778,6 +783,8 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
 
         /** 控制台字段名与网页端一致，改名前先对 console 侧同步。 */
         const val KEY_SELF_DEFINED_TOOLS = "self_defined_tools"
+        const val KEY_LUX_SAVED_COMMANDS = "lux_saved_commands"
+
         const val KEY_REMEMBERED_SHELL_COMMANDS = "remembered_shell_commands"
 
         /** 记住清单上限：手表上不宜无限膨胀，满额后新的"记住"直接不生效。 */
