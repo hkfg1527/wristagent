@@ -64,11 +64,14 @@
     <string name="settings_sub_hyper_params">推理参数</string>
 
     <!-- 推理参数。 -->
+    <string name="settings_temperature_secondary">越高越发散，越低越稳</string>
     <string name="settings_temperature">采样温度</string>
     <string name="settings_temp_fast">极速 0.2</string>
     <string name="settings_temp_balanced">平衡 0.7</string>
     <string name="settings_temp_creative">发散 1.2</string>
+    <string name="settings_top_p_secondary">候选词范围，越低越保守</string>
     <string name="settings_top_p">核采样 top_p</string>
+    <string name="settings_max_tokens_secondary">单次回复的字数上限</string>
     <string name="settings_max_tokens">最大输出 Token</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <string name="settings_max_tokens_custom">最大输出 Token · 自定义</string>
@@ -180,6 +183,7 @@
     <string name="settings_baidu_api_key">百度 API Key（AK）</string>
     <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
     <string name="settings_temp_presets">快捷预设</string>
+    <string name="settings_console_max_failures_secondary">令牌错几次就锁住这个来源</string>
     <string name="settings_console_max_failures">令牌错误几次后锁定</string>
     <string name="settings_remote_console_title">网页控制台</string>
     <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
@@ -371,6 +375,7 @@
     <string name="settings_appearance_compact">简洁模式</string>
     <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
     <string name="settings_appearance_matrix_header">点阵</string>
+    <string name="settings_appearance_matrix_spacing_secondary">点阵的间距</string>
     <string name="settings_appearance_matrix_spacing">点阵间距</string>
     <string name="settings_appearance_web_only">请在手机网页修改</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
@@ -390,6 +395,7 @@
 
     <string name="settings_memory_max_fact_length">单条记忆长度上限</string>
     <string name="settings_console_lockout_minutes">锁定窗口</string>
+    <string name="settings_subagent_max_depth_secondary">0 表示彻底关闭子代理</string>
     <string name="settings_subagent_max_depth">子代理层数</string>
     <string name="settings_subagent_depth_off">关闭</string>
     <string name="settings_memory_enabled">启用记忆</string>
@@ -429,7 +435,9 @@
     <string name="settings_model_source_builtin">内置默认</string>
     <string name="settings_model_not_in_list">当前模型 %1$s 不在此列表内</string>
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
+    <string name="settings_context_turns_secondary">每次请求带多少轮上下文</string>
     <string name="settings_context_turns">上下文轮数</string>
+    <string name="settings_compress_threshold_secondary">历史超过多少轮开始压缩</string>
     <string name="settings_compress_threshold">压缩阈值</string>
     <string name="settings_context_budget">上下文预算</string>
     <string name="settings_context_budget_value">满 %2$d 条中的 %1$d 条后开始压缩</string>
@@ -476,6 +484,7 @@
     <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
     <string name="settings_card_tools">工具与 MCP</string>
     <string name="settings_bottom_bar_auto_hide">底栏自动收起延时</string>
+    <string name="settings_rotary_gain_secondary">表冠转一格走多远</string>
     <string name="settings_rotary_gain">表冠滚动增益</string>
     <string name="settings_style_header">页面风格</string>
     <string name="settings_style_options">可选风格</string>
@@ -490,6 +499,7 @@
         <string name="settings_sub_network_request">网络与请求</string>
     <string name="settings_card_meta_network">重试 %1$d 次 · 退避 %2$d ms</string>
 <string name="settings_section_network">网络与交互</string>
+    <string name="settings_net_diag_timeout_secondary">每次探测最多等多久</string>
     <string name="settings_net_diag_timeout">体检探测超时</string>
     <string name="settings_net_timeout">请求超时</string>
     <string name="settings_net_timeout_secondary">单次请求超过这个时长就放弃</string>
@@ -505,21 +515,27 @@
     <string name="settings_haptic_strong">强</string>
     <string name="settings_haptics">触觉反馈</string>
     <string name="settings_haptics_secondary">点按与确认时震动</string>
+    <string name="settings_idle_spin_stop_secondary">同一份调用重复几次就停手</string>
     <string name="settings_idle_spin_stop">空转收口轮次</string>
     <string name="settings_stream_emit_chars">突发判定字数</string>
+    <string name="settings_stream_emit_interval_secondary">越长越平滑，也越滞后</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
     <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
     <string name="settings_mcp_limits">MCP 分页与子代理超时</string>
+    <string name="settings_mcp_max_pages_secondary">工具清单最多翻几页</string>
     <string name="settings_mcp_max_pages">MCP 工具清单页数</string>
     <string name="settings_subagent_read_timeout">子代理读取超时</string>
+    <string name="settings_tool_result_chars_secondary">单次工具结果回灌给模型的上限</string>
     <string name="settings_tool_result_chars">工具结果上限</string>
     <string name="settings_shell_timeout">命令超时</string>
     <string name="settings_shell_timeout_value">%1$d 毫秒</string>
+    <string name="settings_approval_threshold_secondary">滑到多远才算放行</string>
     <string name="settings_approval_threshold">放行阈值</string>
     <string name="settings_approval_threshold_value">%1$.2f</string>
     <string name="settings_tts_queue_mode">播报队列</string>
     <string name="settings_tts_queue_interrupt">打断上一句</string>
     <string name="settings_tts_queue_append">排在上一句之后</string>
+    <string name="settings_tts_volume_secondary">播报的音量</string>
     <string name="settings_tts_volume">播报音量</string>
     <string name="settings_tts_speech_rate">播报语速</string>
     <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>

@@ -70,6 +70,7 @@ fun MemoryManagerContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_context_turns),
+                secondary = stringResource(R.string.settings_context_turns_secondary),
                 value = turns.toFloat(),
                 valueRange = ContextTurnsMin..ContextTurnsMax,
                 steps = (ContextTurnsMax - ContextTurnsMin).toInt() - 1,
@@ -87,6 +88,7 @@ fun MemoryManagerContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_compress_threshold),
+                secondary = stringResource(R.string.settings_compress_threshold_secondary),
                 value = compressThreshold,
                 valueRange = CompressPolicy.MinThreshold..CompressPolicy.MaxThreshold,
                 steps = 12,

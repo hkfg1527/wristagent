@@ -132,6 +132,7 @@ fun VoiceEntryContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_tts_volume),
+                secondary = stringResource(R.string.settings_tts_volume_secondary),
                 value = volume,
                 valueRange = AgentPreferences.MIN_TTS_VOLUME..AgentPreferences.MAX_TTS_VOLUME,
                 steps = 8,
@@ -299,6 +300,7 @@ fun AppearanceContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_rotary_gain),
+                secondary = stringResource(R.string.settings_rotary_gain_secondary),
                 value = rotaryGain,
                 valueRange = 0.5f..3f,
                 steps = 9,
@@ -353,6 +355,7 @@ fun AppearanceContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_appearance_matrix_spacing),
+                secondary = stringResource(R.string.settings_appearance_matrix_spacing_secondary),
                 value = spacing,
                 valueRange = MatrixSpacingMinDp..MatrixSpacingMaxDp,
                 steps = MatrixSpacingSteps,

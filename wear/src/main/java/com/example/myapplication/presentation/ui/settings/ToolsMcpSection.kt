@@ -200,6 +200,7 @@ fun ToolsMcpContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_subagent_max_depth),
+                secondary = stringResource(R.string.settings_subagent_max_depth_secondary),
                 value = subagentDepth.toFloat(),
                 valueRange = 0f..SubAgentPolicy.MAX_DEPTH.toFloat(),
                 steps = 0,
@@ -220,6 +221,7 @@ fun ToolsMcpContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_mcp_max_pages),
+                secondary = stringResource(R.string.settings_mcp_max_pages_secondary),
                 value = mcpPages.toFloat(),
                 valueRange = McpClient.MIN_TOOL_PAGES.toFloat()..McpClient.MAX_TOOL_PAGE_LIMIT.toFloat(),
                 steps = 8,
@@ -258,6 +260,7 @@ fun ToolsMcpContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_tool_result_chars),
+                secondary = stringResource(R.string.settings_tool_result_chars_secondary),
                 value = toolChars.toFloat(),
                 valueRange = AgentPreferences.MIN_TOOL_RESULT_CHARS.toFloat()..AgentPreferences.MAX_TOOL_RESULT_CHARS.toFloat(),
                 steps = 18,
@@ -323,6 +326,7 @@ fun ToolsMcpContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_approval_threshold),
+                secondary = stringResource(R.string.settings_approval_threshold_secondary),
                 value = allowThreshold,
                 valueRange = AgentPreferences.MinApprovalAllowThreshold..
                     AgentPreferences.MaxApprovalAllowThreshold,

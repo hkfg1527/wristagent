@@ -108,6 +108,7 @@ fun HyperParamsContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_temperature),
+                secondary = stringResource(R.string.settings_temperature_secondary),
                 value = temp,
                 valueRange = SettingsValueMath.TemperatureMin..SettingsValueMath.TemperatureMax,
                 steps = SettingsValueMath.TemperatureSteps,
@@ -154,6 +155,7 @@ fun HyperParamsContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_max_tokens),
+                secondary = stringResource(R.string.settings_max_tokens_secondary),
                 value = SettingsValueMath.tokenIndex(maxTokens).toFloat(),
                 valueRange = 0f..SettingsValueMath.TokenLadder.lastIndex.toFloat(),
                 steps = SettingsValueMath.TokenSteps,
@@ -168,6 +170,7 @@ fun HyperParamsContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_top_p),
+                secondary = stringResource(R.string.settings_top_p_secondary),
                 value = topP,
                 valueRange = AgentPreferences.MIN_SAMPLING_TOP_P..AgentPreferences.MAX_SAMPLING_TOP_P,
                 steps = 18,
@@ -209,6 +212,7 @@ fun HyperParamsContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_stream_emit_interval),
+                secondary = stringResource(R.string.settings_stream_emit_interval_secondary),
                 value = streamIntervalMs.toFloat(),
                 valueRange = AgentPreferences.MinStreamEmitIntervalMs.toFloat()..
                     AgentPreferences.MaxStreamEmitIntervalMs.toFloat(),
@@ -249,6 +253,7 @@ fun HyperParamsContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_idle_spin_stop),
+                secondary = stringResource(R.string.settings_idle_spin_stop_secondary),
                 value = idleSpinStop.toFloat(),
                 valueRange = AgentLoopPolicy.MIN_IDLE_SPIN_STOP.toFloat()..
                     AgentLoopPolicy.MAX_IDLE_SPIN_STOP.toFloat(),

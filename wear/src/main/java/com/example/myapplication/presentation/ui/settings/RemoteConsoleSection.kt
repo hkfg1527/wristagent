@@ -104,6 +104,7 @@ fun RemoteConsoleContent(onBack: () -> Unit) {
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_console_max_failures),
+                secondary = stringResource(R.string.settings_console_max_failures_secondary),
                 value = maxFailures.toFloat(),
                 valueRange = AgentPreferences.MIN_CONSOLE_MAX_FAILURES.toFloat()..
                     AgentPreferences.MAX_CONSOLE_MAX_FAILURES.toFloat(),

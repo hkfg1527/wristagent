@@ -64,11 +64,14 @@
     <string name="settings_sub_hyper_params">Inference</string>
 
     <!-- Hyper parameters. -->
+    <string name="settings_temperature_secondary">Higher = wilder; lower = steadier</string>
     <string name="settings_temperature">Sampling temperature</string>
     <string name="settings_temp_fast">Fast 0.2</string>
     <string name="settings_temp_balanced">Balanced 0.7</string>
     <string name="settings_temp_creative">Creative 1.2</string>
+    <string name="settings_top_p_secondary">Narrower candidate pool; lower = safer</string>
     <string name="settings_top_p">Nucleus sampling top_p</string>
+    <string name="settings_max_tokens_secondary">Upper bound for one reply</string>
     <string name="settings_max_tokens">Max output tokens</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <string name="settings_max_tokens_custom">Max output tokens · Custom</string>
@@ -190,6 +193,7 @@
     <string name="settings_baidu_api_key">API Key (AK)</string>
     <string name="settings_baidu_secret_key">Secret Key (SK)</string>
     <string name="settings_temp_presets">Quick presets</string>
+    <string name="settings_console_max_failures_secondary">Lock the source after this many wrong tokens</string>
     <string name="settings_console_max_failures">Lock after wrong tokens</string>
     <string name="settings_remote_console_title">Web Console</string>
     <string name="settings_remote_console_running">Running on port %1$d</string>
@@ -381,6 +385,7 @@
     <string name="settings_appearance_compact">Compact mode</string>
     <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
     <string name="settings_appearance_matrix_header">Dot matrix</string>
+    <string name="settings_appearance_matrix_spacing_secondary">Spacing of the dot lattice</string>
     <string name="settings_appearance_matrix_spacing">Matrix spacing</string>
     <string name="settings_appearance_web_only">Change this on the web console</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
@@ -400,6 +405,7 @@
 
     <string name="settings_memory_max_fact_length">Max length per memory</string>
     <string name="settings_console_lockout_minutes">Lockout window</string>
+    <string name="settings_subagent_max_depth_secondary">Zero turns sub-agents off entirely</string>
     <string name="settings_subagent_max_depth">Sub-agent depth</string>
     <string name="settings_subagent_depth_off">Off</string>
     <string name="settings_memory_enabled">Long-term memory</string>
@@ -429,7 +435,9 @@
     <string name="settings_sub_agent_secondary">Effective in expert mode only</string>
     <string name="settings_sub_agent_requires_expert">Expert mode only</string>
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
+    <string name="settings_context_turns_secondary">How many turns ride along in each request</string>
     <string name="settings_context_turns">Context turns</string>
+    <string name="settings_compress_threshold_secondary">Compress history after this many turns</string>
     <string name="settings_compress_threshold">Compress threshold</string>
     <string name="settings_context_budget">Context budget</string>
     <string name="settings_context_budget_value">Compress after %1$d of %2$d messages</string>
@@ -476,6 +484,7 @@
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
     <string name="settings_card_tools">Tools &amp; MCP</string>
     <string name="settings_bottom_bar_auto_hide">Auto-hide bottom bar after</string>
+    <string name="settings_rotary_gain_secondary">How far one crown click travels</string>
     <string name="settings_rotary_gain">Crown scroll gain</string>
     <string name="settings_style_header">Page style</string>
     <string name="settings_style_options">Available styles</string>
@@ -490,6 +499,7 @@
         <string name="settings_sub_network_request">Network &amp; requests</string>
     <string name="settings_card_meta_network">retries %1$d · backoff %2$d ms</string>
 <string name="settings_section_network">Network &amp; interaction</string>
+    <string name="settings_net_diag_timeout_secondary">How long each probe waits</string>
     <string name="settings_net_diag_timeout">Diagnostics probe timeout</string>
     <string name="settings_net_timeout">Request timeout</string>
     <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
@@ -505,21 +515,27 @@
     <string name="settings_haptic_strong">Strong</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
+    <string name="settings_idle_spin_stop_secondary">Stop after this many identical calls</string>
     <string name="settings_idle_spin_stop">Stop repeating after</string>
     <string name="settings_stream_emit_chars">Chars per frame burst</string>
+    <string name="settings_stream_emit_interval_secondary">Longer = smoother but laggier</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>
     <string name="settings_stream_emit_interval_value">%1$d ms</string>
     <string name="settings_mcp_limits">MCP pages &amp; sub-agent timeout</string>
+    <string name="settings_mcp_max_pages_secondary">Cap on tools/list paging</string>
     <string name="settings_mcp_max_pages">MCP tool list pages</string>
     <string name="settings_subagent_read_timeout">Sub-agent read timeout</string>
+    <string name="settings_tool_result_chars_secondary">How much of a tool result reaches the model</string>
     <string name="settings_tool_result_chars">Tool output limit</string>
     <string name="settings_shell_timeout">Command timeout</string>
     <string name="settings_shell_timeout_value">%1$d ms</string>
+    <string name="settings_approval_threshold_secondary">How far you must slide to allow</string>
     <string name="settings_approval_threshold">Allow threshold</string>
     <string name="settings_approval_threshold_value">%1$.2f</string>
     <string name="settings_tts_queue_mode">Reply queue</string>
     <string name="settings_tts_queue_interrupt">Interrupt the previous reply</string>
     <string name="settings_tts_queue_append">Queue after the previous reply</string>
+    <string name="settings_tts_volume_secondary">Volume of the spoken reply</string>
     <string name="settings_tts_volume">Reply volume</string>
     <string name="settings_tts_speech_rate">Speech rate</string>
     <string name="settings_tts_speech_rate_value">%1$.1f×</string>

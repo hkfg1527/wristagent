@@ -76,6 +76,7 @@ fun NetworkRequestContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_net_diag_timeout),
+                secondary = stringResource(R.string.settings_net_diag_timeout_secondary),
                 value = diagTimeoutMs,
                 valueRange = DiagnosticTimeouts.MIN_MS.toFloat()..DiagnosticTimeouts.MAX_MS.toFloat(),
                 steps = 8,
