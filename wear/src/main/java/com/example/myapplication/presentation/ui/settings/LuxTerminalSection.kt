@@ -136,6 +136,10 @@ fun LuxTerminalContent(
                 }
             )
         }
+        // 已保存的各占一行。注意：这一段用的是 list.forEach，在**收集期**求值 ——
+        // 因此"刚保存的那一条"要等下次进入本页才会出现在列表里（偏好已经落盘，不影响数据正确性）。
+        // 试过"固定登记 6 个位置 + 渲染时读状态"，但空位会各占一张卡的高度（约 240dp 空白），
+        // 比"晚一次刷新"更糟，所以退回这一版并在 CHANGELOG 里记明这个已知限制。
         saved.forEach { command ->
             row {
                 SettingsNavRow(
@@ -150,7 +154,6 @@ fun LuxTerminalContent(
                 )
             }
         }
-
         section(stringResource(R.string.settings_lux_quick))
         LuxTerminalPolicy.QuickCommands.forEach { command ->
             row {
