@@ -1504,6 +1504,8 @@ fun SettingsSliderRow(
     steps: Int,
     valueText: String,
     onValueChange: (Float) -> Unit,
+    /** 可选的第二行说明：滑杆最需要的恰恰是"这个数字到底改变什么"。 */
+    secondary: String? = null,
     modifier: Modifier = Modifier
 ) {
     SettingsCardRow(modifier = modifier) {
@@ -1530,6 +1532,16 @@ fun SettingsSliderRow(
                     style = SettingsRowValueStyle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (secondary != null) {
+                // 与开关行/导航行同一条副标题渲染路径：位置规则（同行 or 换行）由它统一决定
+                SettingsSubtitleLine(
+                    subtitle = secondary,
+                    subtitleMaxLines = 2,
+                    subtitleStatus = null,
+                    belowRow = false,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
             SettingsThinSlider(

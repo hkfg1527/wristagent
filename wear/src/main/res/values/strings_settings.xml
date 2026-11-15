@@ -9,7 +9,6 @@
     <string name="settings_zone_act">Make it act</string>
     <string name="settings_zone_connect">Stay connected</string>
     <string name="settings_section_models">Models</string>
-    <string name="settings_section_voice_tools">Voice &amp; tools</string>
     <string name="settings_section_system">System</string>
     <string name="settings_status_configured">Configured</string>
     <string name="settings_status_unconfigured">Not configured</string>
@@ -22,8 +21,6 @@
     <string name="settings_about">About</string>
     <string name="settings_system_prompt">System Prompt</string>
     <string name="settings_prompt_default">Built-in default</string>
-    <string name="settings_prompt_custom_value">Custom</string>
-    <string name="settings_card_console_port">:%1$d</string>
     <string name="settings_card_meta_context">%1$d turns · %2$.1f</string>
     <string name="settings_card_meta_profiles">%1$d saved</string>
     <string name="settings_card_meta_tokens">max %1$d tokens</string>

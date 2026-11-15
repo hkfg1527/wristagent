@@ -102,6 +102,7 @@ fun NetworkRequestContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_net_timeout),
+                secondary = stringResource(R.string.settings_net_timeout_secondary),
                 value = requestTimeout.toFloat(),
                 valueRange = 10f..180f,
                 steps = 16,
@@ -119,6 +120,7 @@ fun NetworkRequestContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_net_retries),
+                secondary = stringResource(R.string.settings_net_retries_secondary),
                 value = requestRetries.toFloat(),
                 valueRange = 0f..3f,
                 steps = 2,
@@ -136,6 +138,7 @@ fun NetworkRequestContent(
         row {
             SettingsSliderRow(
                 label = stringResource(R.string.settings_net_backoff),
+                secondary = stringResource(R.string.settings_net_backoff_secondary),
                 value = retryBackoff.toFloat(),
                 valueRange = 0f..5000f,
                 steps = 24,
