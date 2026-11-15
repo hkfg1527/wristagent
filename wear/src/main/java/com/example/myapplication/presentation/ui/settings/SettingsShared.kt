@@ -264,6 +264,12 @@ enum class SettingsSubDialog {
     /** Lux 终端：极轻量的命令面板（一条命令、一次输出、一份转录）。 */
     LUX_TERMINAL,
 
+    /** 手势与侧键：从「关于」内层提升到一级（IA §5.1）。 */
+    GESTURES,
+
+    /** 权限：从「关于」内层提升到一级（IA §5.1）。 */
+    PRIVILEGE,
+
     /** 网络与请求：连接参数与体检。 */
     NETWORK_REQUEST;
 }

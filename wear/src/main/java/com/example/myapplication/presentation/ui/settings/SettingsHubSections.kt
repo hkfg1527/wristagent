@@ -34,7 +34,7 @@ fun PromptContextContent(
     SettingsSubPage(
         title = stringResource(R.string.settings_prompt_context),
         heroLabel = stringResource(R.string.settings_prompt_context),
-        onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
+        onBack = onBack,
         hero = {
             SettingsHeroCard(
                 label = stringResource(R.string.settings_prompt_context),
@@ -74,55 +74,34 @@ fun PromptContextContent(
  * 这四条在根页占 4 × 49dp 却几乎不被改动；根页因此从 14 行收到 9 行。
  */
 @Composable
+/**
+ * 关于：**单页**。侧键与权限已按 IA §5.1 提升为一级行，这里只留"版本 + 重看引导"。
+ */
 fun AboutContent(
-    sideKeyValue: String,
-    privilegeValue: String,
     versionValue: String,
     onBack: () -> Unit,
     onReplayOnboarding: () -> Unit,
-    sideKeyPage: @Composable (onDismiss: () -> Unit) -> Unit,
-    privilegePage: @Composable (onDismiss: () -> Unit) -> Unit,
 ) {
-    var inner by remember { mutableIntStateOf(NoInnerPage) }
-    BackHandler(enabled = inner != NoInnerPage) { inner = NoInnerPage }
+
     SettingsSubPage(
         title = stringResource(R.string.settings_about),
         heroLabel = stringResource(R.string.settings_about),
-        onBack = { if (inner != NoInnerPage) inner = NoInnerPage else onBack() },
+        onBack = onBack,
         hero = {
             SettingsHeroCard(
                 label = stringResource(R.string.settings_about),
-                value = privilegeValue,
+                value = versionValue,
                 accent = Wear.CardSystem,
                 meta = versionValue,
                 badge = "APP"
             )
         },
-        overlay = {
-            when (inner) {
-                0 -> sideKeyPage { inner = NoInnerPage }
-                1 -> privilegePage { inner = NoInnerPage }
-            }
-        }
+
     ) {
-        row {
-            SettingsNavRow(
-                title = stringResource(R.string.settings_side_key),
-                value = sideKeyValue,
-                onClick = { inner = 0 }
-            )
-        }
         row {
             SettingsNavRow(
                 title = stringResource(R.string.settings_replay_onboarding),
                 onClick = onReplayOnboarding
-            )
-        }
-        row {
-            SettingsNavRow(
-                title = stringResource(R.string.settings_privilege_title),
-                value = privilegeValue,
-                onClick = { inner = 1 }
             )
         }
     }

@@ -537,6 +537,16 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_side_key),
+                                        value = gestureSummary(currentGestures),
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.GESTURES
+                                        }
+                                    )
+                                }
                                 RootGroupedRow(slot = SettingsRowSlot.LAST) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_appearance),
@@ -580,6 +590,16 @@ fun SettingsScreen(
                                         onClick = {
                                             context.vibrateTick()
                                             activeDialog = SettingsSubDialog.SECURITY_GUARDRAIL
+                                        }
+                                    )
+                                }
+                                RootGroupedRow(slot = SettingsRowSlot.MIDDLE) {
+                                    SettingsNavRow(
+                                        title = stringResource(R.string.settings_privilege_title),
+                                        value = privilegeStatus.activeBackend.name,
+                                        onClick = {
+                                            context.vibrateTick()
+                                            activeDialog = SettingsSubDialog.PRIVILEGE
                                         }
                                     )
                                 }
@@ -737,6 +757,17 @@ fun SettingsScreen(
                             preferences = preferences,
                             onBack = { activeDialog = null }
                         )
+                        SettingsSubDialog.GESTURES -> GestureBindingsContent(
+                            preferences = preferences,
+                            onBack = {
+                                currentGestures = preferences.gestureBindings()
+                                activeDialog = null
+                            }
+                        )
+                        SettingsSubDialog.PRIVILEGE -> AdvancedPermissionContent(
+                            manager = privilegeManager,
+                            onBack = { activeDialog = null }
+                        )
                         SettingsSubDialog.PROMPT_CONTEXT -> PromptContextContent(
                             promptValue = if (customPrompt.isBlank()) {
                                 stringResource(R.string.settings_prompt_default)
@@ -777,23 +808,9 @@ fun SettingsScreen(
                         )
                         SettingsSubDialog.ABOUT -> {
                             AboutContent(
-                                sideKeyValue = gestureSummary(currentGestures),
-                                privilegeValue = privilegeStatus.activeBackend.name,
                                 versionValue = BuildConfig.VERSION_NAME,
                                 onBack = { activeDialog = null },
                                 onReplayOnboarding = { requestExit(onRestartOnboarding) },
-                                sideKeyPage = { dismiss ->
-                                    GestureBindingsContent(
-                                        preferences = preferences,
-                                        onBack = {
-                                            currentGestures = preferences.gestureBindings()
-                                            dismiss()
-                                        }
-                                    )
-                                },
-                                privilegePage = { dismiss ->
-                                    AdvancedPermissionContent(manager = privilegeManager, onBack = dismiss)
-                                }
                             )
                         }
                         SettingsSubDialog.NETWORK_REQUEST -> NetworkRequestContent(
