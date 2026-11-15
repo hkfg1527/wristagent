@@ -11,6 +11,37 @@
 
 ---
 
+## [0.0.0.40] - 2026-11-15 · **第 4 个对外发布点**（内部版 0.0.0.31–0.0.0.40 汇总）
+
+### 这十个内部版做了什么
+- **设置页从"能用"做到"会解释自己"**：20 个滑杆全部带第二行说明（这个数字改变什么）；
+  清除 3 条死文案；`SettingsSliderRow` 新增 `secondary`。
+- **信息架构收口到底**：底栏副键与特权执行从「关于」内层提升为一级，「关于」变成单页；
+  根页 15 行（4/3/4/4）。`docs/SETTINGS-IA.md` 全部改用界面真实文案。
+- **Lux 终端 v1→v3**：快捷命令 → 自由输入 → 历史 + 清屏，真机跑通 `echo lux`。
+- **网页控制台首次真正验收**：接口 200/401/POST 写入、10 页 63 行、三档皮肤真浏览器截图。
+- **验收矩阵补齐两条**：表冠 × 三条滚动实现、触摸拖拽/fling/下拉退出。
+- **发布流程固化**：`docs/tools/release-check.mjs` 一条命令跑 7 项判据。
+
+### 新增的四条结构性守卫（累计 17 条）
+1. `ScaleAnimationOvershootGuardTest` —— scale 动画不许过冲（硬约束变成 CI）
+2. `ConsoleKeyDriftGuardTest` —— 网页键表不许与服务端漂移
+3. `SettingsStringUsageGuardTest` + `SettingsRowExplanationGuardTest` —— 死文案 / 说明行
+4. `SettingsIaDocNamingGuardTest` + `ContextDocFreshnessGuardTest` —— 文档名=界面名、记忆源不许过期
+
+### 发布点回归（**第一次用一条命令完成**，2026-11-15 09:08–09:14）
+`node docs/tools/release-check.mjs` → **7/7 通过，337 秒**
+| 判据 | 结果 |
+|---|---|
+| clean 构建 | BUILD SUCCESSFUL in 2m46s |
+| 全量单测 | **1285 条 / 187 套件 / 0 失败** |
+| APK | 3.58 MB |
+| 真机安装 | versionCode 78 / versionName **0.0.0.40** |
+| 四分区按序 | 让它答得好 → 让它听懂我 → 让它能做事 → 连得上 |
+| 卡片几何 | `14..341` / `358..430` —— 不重叠，间隙 17px ≈ 8dp |
+
+**未覆盖**：完整对话流（需外网模型）、语音识别端到端（需麦克风）、网页三档皮肤之外的交互路径。
+
 ## [0.0.0.39] - 2026-11-15（内部版，不对外发布）
 
 ### 发布前自检固化成一条命令：`docs/tools/release-check.mjs`
