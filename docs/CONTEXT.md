@@ -32,6 +32,12 @@
 
 **命名对照**：界面「网页控制台」= 枚举 `REMOTE_CONSOLE`；文档与提交一律用界面名。
 
+**设置页 DSL 的两条硬规则（第 41 轮踩出来的）**
+- 行在**收集期**注册（`SettingsSubPage` 调一次 `registry.rows()`）：**不能用 `if (状态) { row {} }` 增删行**，
+  首帧读到的状态会被永久固化。要让行"跟着状态变"，必须**总是注册行**，把状态读取放进行内容的 lambda
+  （`title = history.lastOrNull() ?: …` 这样），或改用 `enabled = …` 而不是把行拿掉。
+- 同理：`section()` 与 `row()` 都在收集期被调用，条件性地少登记一行，UI 上就是永久少一行。
+
 **环境坑（每次都会踩）**
 - 无 shell 工具：一切经 `run_code` + `node:child_process`；gradle 必须给全 env（`JAVA_HOME=…\jbr`、`GRADLE_USER_HOME=D:\gradle-home`）。
 - 表冠注入走 `su`，每次都弹 Magisk toast：**把连续滚动合并成一次 `su` 调用，等 6 秒再截图**。

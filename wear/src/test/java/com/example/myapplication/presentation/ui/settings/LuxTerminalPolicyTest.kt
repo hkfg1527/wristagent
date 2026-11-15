@@ -62,6 +62,27 @@ class LuxTerminalPolicyTest {
     }
 
     @Test
+    fun historySkipsConsecutiveDuplicates() {
+        var history = LuxTerminalPolicy.appendHistory(emptyList(), "echo a")
+        history = LuxTerminalPolicy.appendHistory(history, "echo a")
+        assertEquals("连按两次同一条不该堆两条", listOf("echo a"), history)
+        history = LuxTerminalPolicy.appendHistory(history, "echo b")
+        assertEquals(listOf("echo a", "echo b"), history)
+        // 非相邻的重复要保留：那条命令确实是又跑了一次
+        history = LuxTerminalPolicy.appendHistory(history, "echo a")
+        assertEquals(listOf("echo a", "echo b", "echo a"), history)
+    }
+
+    @Test
+    fun historyIgnoresBlanksAndIsCapped() {
+        assertEquals(emptyList<String>(), LuxTerminalPolicy.appendHistory(emptyList(), "   "))
+        var history = emptyList<String>()
+        for (i in 1..30) history = LuxTerminalPolicy.appendHistory(history, "cmd" + i)
+        assertEquals(LuxTerminalPolicy.MAX_HISTORY, history.size)
+        assertEquals("cmd30", history.last())
+    }
+
+    @Test
     fun theTranscriptKeepsOnlyTheMostRecentEntries() {
         val entries = (1..20).map { "entry-" + it }
         val trimmed = LuxTerminalPolicy.trimEntries(entries)

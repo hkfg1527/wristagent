@@ -22,6 +22,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
+import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.agent.ShellPolicy
 import com.example.myapplication.agent.privilege.DirectShell
 import com.example.myapplication.agent.privilege.ShellResult
@@ -46,9 +47,11 @@ fun LuxTerminalContent(
     var running by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var lastCommand by remember { mutableStateOf("") }
+    var history by remember { mutableStateOf<List<String>>(emptyList()) }
 
     fun run(command: String) {
         if (running) return
+        history = LuxTerminalPolicy.appendHistory(history, command)
         val rejection = ShellPolicy.validate(command)
         if (rejection != null) {
             entries = LuxTerminalPolicy.trimEntries(entries + "❯ " + command + "\n被拒：" + rejection)
@@ -122,7 +125,34 @@ fun LuxTerminalContent(
             }
         }
 
+        // 历史：点一条就再跑一次；与快捷命令分开，因为这是"你自己敲过的"。
+        //
+        // 注意：**不能用 if 把行整个拿掉**。设置页的行在"收集期"注册（SettingsSubPage 调 registry.rows()），
+        // 那里读到的状态是首帧的；后续状态变化只会让已注册的行重绘，不会补注册新行。
+        // 所以这里永远注册一整组：有历史就列出来，没有就给一行说明。
+        section(stringResource(R.string.settings_lux_history))
+        // 行必须"总是注册"，而**行里的文字要在渲染时读状态**：
+        // 设置页的行在收集期注册，收集期读到的 history 是首帧的值；
+        // 只有把读取放进行内容的 lambda，它才会随状态重绘。所以这里只登记一行，
+        // 文案由 lastOrNull() 在渲染时决定（空态给提示文字）。
+        row {
+            val lastRun = history.lastOrNull()
+            SettingsNavRow(
+                title = lastRun ?: stringResource(R.string.settings_lux_history_empty),
+                value = if (lastRun == null) null else stringResource(R.string.settings_lux_rerun),
+                onClick = { lastRun?.let { lastCommand = it; run(it) } }
+            )
+        }
         section(stringResource(R.string.settings_lux_output))
+        // 同上：按钮永远注册，用 enabled 表达"能不能点"，而不是把按钮拿掉。
+        standaloneRow {
+            SettingsActionButton(
+                label = stringResource(R.string.settings_lux_clear),
+                enabled = entries.isNotEmpty(),
+                onClick = { entries = emptyList(); context.vibrateConfirm() },
+                tone = Tone.DANGER
+            )
+        }
         row {
             val transcript = rememberScrollState()
             Column(

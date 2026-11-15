@@ -45,6 +45,10 @@
     <string name="settings_lux_input_title">Command</string>
     <string name="settings_lux_input_placeholder">echo lux</string>
     <string name="settings_lux_quick">Quick commands</string>
+    <string name="settings_lux_history_empty">No commands yet</string>
+    <string name="settings_lux_rerun">Run again</string>
+    <string name="settings_lux_history">History</string>
+    <string name="settings_lux_clear">Clear transcript</string>
     <string name="settings_lux_output">Transcript</string>
     <string name="settings_lux_empty">No commands run yet.</string>
     <string name="settings_lux_meta">timeout %1$d s</string>

@@ -45,6 +45,24 @@ object LuxTerminalPolicy {
      */
     fun parseCommand(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() }
 
+    /** 命令历史最多留几条（与转录分开计数：转录是输出，历史是输入）。 */
+    const val MAX_HISTORY = 20
+
+    /**
+     * 追加一条历史。**与最后一条相同则不重复记** ——
+     * 连点两次同一条命令是常见操作，历史里堆十条一样的没有信息量。
+     */
+    fun appendHistory(
+        history: List<String>,
+        command: String,
+        max: Int = MAX_HISTORY
+    ): List<String> {
+        val trimmed = command.trim()
+        if (trimmed.isEmpty()) return history
+        if (history.lastOrNull() == trimmed) return history
+        return (history + trimmed).takeLast(max.coerceAtLeast(1))
+    }
+
     /** 只留最近 [max] 条。 */
     fun trimEntries(entries: List<String>, max: Int = MAX_ENTRIES): List<String> =
         if (entries.size <= max) entries else entries.takeLast(max)
