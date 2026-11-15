@@ -1,7 +1,7 @@
 # 手表设置信息架构规范（SETTINGS-IA）
 
 > **命名对照（2026-11-15 统一）**：界面上这个入口叫「**网页控制台**」，代码枚举是 `SettingsSubDialog.REMOTE_CONSOLE`，
-> 文档与提交信息统一用界面名。此前文档写「远程控制台」、界面写「网页控制台」，找入口时白花了 15 分钟。
+> 文档与提交信息统一用界面名。此前文档写「网页控制台」、界面写「网页控制台」，找入口时白花了 15 分钟。
 
 > 适用对象：Wrist Agent，Wear OS，包名 dev.ghr.wristagent。
 > 本文只描述"信息架构 + 落位 + 迁移影响"，不含实现代码；实现顺序见第 6 节。
@@ -69,22 +69,22 @@
 [H4] 系统 hero        ← 控制台端口 或 体检结论
 ─────────────────────────────────────────
 S1 让它答得好
-   · 模型与端点          (值: 当前模型名)
+   · 模型与服务          (值: 当前模型名)
    · 供应商              (值: 当前档案名 / 未启用)
-   · 生成参数            (值: 温度)
+   · 模型参数            (值: 温度)
    · 提示词与记忆   ▸    (中转页, 值: 默认/自定义; 副值: 上下文轮数)
 S2 让它听懂我
    · 语音与唤醒          (值: 语音引擎状态)
-   · 手势与侧键          (值: 已绑定动作数)
+   · 底栏副键          (值: 已绑定动作数)
    · 外观与动效          (值: 风格名)
 S3 让它能做事
    · 工具与 MCP          (值: 已启用数 / 全开)
    · 安全策略            (值: 严格/标准/自动)
-   · 权限                (值: root / shizuku 后端)
+   · 特权执行                (值: root / shizuku 后端)
 S4 连得上
    · 网络与请求          (值: 超时秒数)
    · 网页控制台          (值: 端口 / 未运行)
-   · 导入导出            (值: —)
+   · 配置导入导出            (值: —)
    · 关于                (值: 体检结论)
 ```
 
@@ -96,7 +96,7 @@ hero 不是装饰，是**高频项的直通车道**：每张 hero 同时承担"�
 
 | hero | 显示 | 点击直达 | 为什么它值一张 hero |
 | --- | --- | --- | --- |
-| H1 模型 | `modelName`、是否已填 Key | 模型与端点 | 每次换模型/换端点都从这里进；不填 Key 时是首屏唯一红灯 |
+| H1 模型 | `modelName`、是否已填 Key | 模型与服务 | 每次换模型/换端点都从这里进；不填 Key 时是首屏唯一红灯 |
 | H2 语音 | `asrEnabled` 的真实三态 | 语音与唤醒 | 语音是最常用输入；密钥缺失必须首屏可见 |
 | H3 工具 | 已启用工具数 | 工具与 MCP | 工具开关是"要它做新事情"时的第一站 |
 | H4 系统 | 控制台端口 / 体检结论 | 网络与请求 | 连不上时第一个要看的地方 |
@@ -118,7 +118,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 | 二级页 | 设置项（KEY_* / 存储键） | 形态 | 现值 |
 | --- | --- | --- | --- |
-| **模型与端点** `MODEL_CONFIG` | `baseUrl` / `"baseUrl"` | 文本 | 默认常量 |
+| **模型与服务** `MODEL_CONFIG` | `baseUrl` / `"baseUrl"` | 文本 | 默认常量 |
 | | `apiKey` / `"apiKey"` | 文本(密钥) | 空 |
 | | `modelName` / `"modelName"` | 枚举(远端清单) | 默认常量 |
 | | `cachedRemoteModels` | 只读(清单缓存) | — |
@@ -126,7 +126,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 | | `maxContextTurns` / `"maxContextTurns"` | 滑杆 4..200 | 默认常量 |
 | **供应商** `PROVIDER_PROFILES` | `providerProfiles` / `"provider_profiles"` | 动作(增删改/套用) | 空 |
 | | 当前档案的 baseUrl/apiKey/modelName（复用上页三件套） | 文本 | — |
-| **生成参数** `HYPER_PARAMS` | `temperature` / `"temperature"` | 滑杆 0..2 | 默认常量 |
+| **模型参数** `HYPER_PARAMS` | `temperature` / `"temperature"` | 滑杆 0..2 | 默认常量 |
 | | `maxOutputTokens` / `"maxOutputTokens"` | 滑杆 | `DEFAULT_MAX_OUTPUT_TOKENS=2048` |
 | | `streamMode` / `"streamMode"` | 开关 | true |
 | | `reasoningEffort` / `"reasoningEffort"` | 枚举 | `ReasoningEffort.DEFAULT_STORAGE` |
@@ -155,7 +155,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 | | `baiduSecretKey` / `"asr_baidu_secret_key"` | 文本(密钥) | `DEFAULT_ASR_KEY=""` |
 | | `asrDevPid` / `"asr_dev_pid"` | 枚举/数字 | `1537` |
 | | `asrLiveTranscript` / `"asrLiveTranscript"` | 开关 | `DEFAULT_ASR_LIVE_TRANSCRIPT=true` |
-| **手势与侧键** `GESTURES`（本轮从「关于」中转页提升为一级） | `longPressAction` / `"longPressAction"` | 枚举 | `GestureAction.NONE` |
+| **底栏副键** `GESTURES`（本轮从「关于」中转页提升为一级） | `longPressAction` / `"longPressAction"` | 枚举 | `GestureAction.NONE` |
 | | `doubleTapAction` / `"doubleTapAction"` | 枚举 | `GestureAction.NONE` |
 | | `sideKeyShortAction` / `"sideKeyShortAction"` | 枚举 | `GestureAction.NONE` |
 | | `sideKeyLongAction` / `"sideKeyLongAction"` | 枚举 | `GestureAction.NONE` |
@@ -185,12 +185,13 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 | | `mcpEndpoint` / `"mcpEndpoint"` | 只读(网页可改) | 默认常量 |
 | | `selfDefinedTools` / `"self_defined_tools"` | 只读/动作 | 空 |
 | | `rememberedShellCommands` / `"remembered_shell_commands"` | 只读 + 清空动作 | 空 |
+| **Lux 终端** `LUX_TERMINAL` | 快捷命令、自由输入、命令历史、转录 | 动作（无持久化键；转录只活在内存） | 空 |
 | **安全策略** `SECURITY_GUARDRAIL` | `securityMode` / `"securityMode"` | 枚举(严格/标准/自动) | `SecurityMode.STANDARD` |
 | | `toolApprovalPolicy` / `"toolApprovalPolicy"` | 枚举 | `ToolApprovalPolicy.RISKY` |
 | | `sandboxLevel` / `"sandboxLevel"` | 枚举 | `SandboxLevel.FULL` |
-| **权限** `PRIVILEGE`（本轮从「关于」中转页提升为一级） | root 状态、shizuku 状态、shizuku 授权 | 只读 + 动作 | 无持久化键（读系统） |
+| **特权执行** `PRIVILEGE`（本轮从「关于」中转页提升为一级） | root 状态、shizuku 状态、shizuku 授权 | 只读 + 动作 | 无持久化键（读系统） |
 
-> 结构与"假开关"防线一致：**权限页整页没有 `preferenceKey`**，因为它的值来自系统而不来自偏好（`WatchSettingCatalog` 的头注释已把这条写成结构性约束）。
+> 结构与"假开关"防线一致：**特权执行页整页没有 `preferenceKey`**，因为它的值来自系统而不来自偏好（`WatchSettingCatalog` 的头注释已把这条写成结构性约束）。
 
 ### 2.5 S4 · 连得上
 
@@ -205,7 +206,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 | | 重新体检 | 动作 | — |
 | **网页控制台** `REMOTE_CONSOLE` | 运行状态、端口 | 只读 | `ConsolePortStatus` |
 | | `console_token`（`ConsoleBridge.KEY_TOKEN`） | 文本(密钥) | 生成 |
-| **导入导出** `TRANSFER` | 导出的 40 个可移植键（整份快照） | 文本(复制/粘贴) | `PortableKeys` |
+| **配置导入导出** `TRANSFER` | 导出的 40 个可移植键（整份快照） | 文本(复制/粘贴) | `PortableKeys` |
 | **关于** `ABOUT` | 版本、重看引导、体检结论摘要 | 只读 + 动作 | `hasCompletedOnboarding` |
 
 ### 2.6 归属自检（40+ 项一个不漏）
@@ -221,10 +222,10 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 | 分区 | 设置条数 | 构成 | 其中可移植键 |
 | --- | --- | --- | --- |
-| S1 让它答得好 | **17** | 模型与端点 5 + 供应商 1 + 生成参数 7 + 提示词 1 + 记忆与上下文 3（`maxContextTurns` 只在模型页计一次） | 11 |
-| S2 让它听懂我 | **18** | 语音与唤醒 2 + 语音引擎 5 + 手势与侧键 4 + 外观与动效 7（含 `font_scale`/`accent_argb`） | 14 |
-| S3 让它能做事 | **15** | 工具与 MCP 12 + 安全策略 3 + 权限 0（权限页无持久化键） | 11 |
-| S4 连得上 | **5** | 网络与请求 4 + 网页控制台 1（`console_token`）+ 导入导出 0（快照非设置）+ 关于 0 | 4 |
+| S1 让它答得好 | **17** | 模型与服务 5 + 供应商 1 + 模型参数 7 + 提示词 1 + 记忆与上下文 3（`maxContextTurns` 只在模型页计一次） | 11 |
+| S2 让它听懂我 | **18** | 语音与唤醒 2 + 语音引擎 5 + 底栏副键 4 + 外观与动效 7（含 `font_scale`/`accent_argb`） | 14 |
+| S3 让它能做事 | **15** | 工具与 MCP 12 + 安全策略 3 + 权限 0（特权执行页无持久化键） | 11 |
+| S4 连得上 | **5** | 网络与请求 4 + 网页控制台 1（`console_token`）+ 配置导入导出 0（快照非设置）+ 关于 0 | 4 |
 | **合计** | **55** | — | **40** |
 
 - **40 个可移植键的分布校验**：S1 = 11、S2 = 14、S3 = 11、S4 = 4，合计 40，与 `SettingsTransferCodec.PortableKeys` 的 `40` 断言吻合。S4 的 4 条可移植键是 `requestTimeoutSeconds`、`requestRetries`、`retryBackoffMs`、`wifiOnlyRequests`——连接参数可移植，而 `console_token` 这类密钥不可移植（密钥永不进快照，见该文件 L28–L29 的注释）。
@@ -244,7 +245,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 ### 3.1 六组提案（共 20 项）
 
-**组 A · 流式与循环节奏**（落 S1 生成参数页下半区，5 项）
+**组 A · 流式与循环节奏**（落 S1 模型参数页下半区，5 项）
 **组 B · 记忆预算**（落 S1 记忆与上下文页，1 项）
 **组 C · 播报输出**（落 S2 语音与唤醒页，2 项）
 **组 D · 手感与体感**（落 S2 外观与动效页，4 项）
@@ -253,11 +254,11 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 | # | 键名（snake_case） | 类型 / 范围 | 默认值 | 被谁消费（真实路径） | 所属子页 | 频率 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `stream_emit_interval_ms` | 滑杆 16..120 ms，步进 8 | 32 | `StreamingThrottle.DEFAULT_INTERVAL_MS`（=32L）被流式节流器读取，决定逐字渲染的合帧间隔；`ChatViewModel` 每帧调用 `shouldEmit` | 生成参数 | 高 |
-| 2 | `stream_emit_chars` | 滑杆 4..40 字 | 12 | `StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD`（=12），决定攒够几个字才提交一帧 | 生成参数 | 中 |
-| 3 | `idle_spin_stop_after` | 滑杆 2..8 轮 | 5 | `AgentLoopPolicy.IDLE_SPIN_STOP_AFTER`（=5），空转重复工具调用到第几轮强制停 | 生成参数 | 低 |
-| 4 | `energy_hint_after_turns` | 滑杆 10..100 轮 | 40 | `AgentLoopPolicy.ENERGY_HINT_AFTER_TURNS`（=40），超过该轮次开始提示电量与上下文成本 | 生成参数 | 低 |
-| 5 | `narration_timeout_ms` | 滑杆 1000..10000 ms | 4000 | `AgentDispatcher.NARRATION_TIMEOUT_MS`（=4000L），危险操作前的风险叙述超时；超时即放弃叙述继续执行 | 生成参数 | 低 |
+| 1 | `stream_emit_interval_ms` | 滑杆 16..120 ms，步进 8 | 32 | `StreamingThrottle.DEFAULT_INTERVAL_MS`（=32L）被流式节流器读取，决定逐字渲染的合帧间隔；`ChatViewModel` 每帧调用 `shouldEmit` | 模型参数 | 高 |
+| 2 | `stream_emit_chars` | 滑杆 4..40 字 | 12 | `StreamingThrottle.DEFAULT_CHARS_PER_EMIT_THRESHOLD`（=12），决定攒够几个字才提交一帧 | 模型参数 | 中 |
+| 3 | `idle_spin_stop_after` | 滑杆 2..8 轮 | 5 | `AgentLoopPolicy.IDLE_SPIN_STOP_AFTER`（=5），空转重复工具调用到第几轮强制停 | 模型参数 | 低 |
+| 4 | `energy_hint_after_turns` | 滑杆 10..100 轮 | 40 | `AgentLoopPolicy.ENERGY_HINT_AFTER_TURNS`（=40），超过该轮次开始提示电量与上下文成本 | 模型参数 | 低 |
+| 5 | `narration_timeout_ms` | 滑杆 1000..10000 ms | 4000 | `AgentDispatcher.NARRATION_TIMEOUT_MS`（=4000L），危险操作前的风险叙述超时；超时即放弃叙述继续执行 | 模型参数 | 低 |
 | 6 | `memory_max_fact_length` | 滑杆 40..240 字 | 120 | `AgentMemory.MAX_FACT_LENGTH`（=120），`remember_fact` 工具写入前截断长度 | 记忆与上下文 | 低 |
 | 7 | `tts_speech_rate` | 滑杆 0.5..2.0，步进 0.1 | 1.0 | `ReplySpeaker.speak` → 合成前 `TextToSpeech.setSpeechRate(rate)`（当前 `speak` 只有 QUEUE_FLUSH，未设语速） | 语音与唤醒 | 中 |
 | 8 | `tts_queue_mode` | 枚举：打断 / 排队 | 打断 | `ReplySpeaker.speak` 的队列参数：打断=`QUEUE_FLUSH`，排队=`QUEUE_ADD` | 语音与唤醒 | 中 |
@@ -323,8 +324,8 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 | S4 组标题 | `settings_section_connect` | Network & System | 连得上 |
 | 新页 | `settings_sub_network_request` | Network & Requests | 网络与请求 |
 | 新页 | `settings_sub_voice_engine` | Voice Engine | 语音引擎 |
-| 改名 | `settings_sub_gesture`（原「手势」） | Gestures & Side Key | 手势与侧键 |
-| 改名 | `settings_sub_appearance`（原「外观与点阵」） | Look & Feel | 外观与动效 |
+| 改名 | `settings_sub_gesture`（原「手势」） | Gestures & Side Key | 底栏副键 |
+| 改名 | `settings_sub_appearance`（原「外观与动效」） | Look & Feel | 外观与动效 |
 
 ### 4.3 返回语义
 
@@ -356,23 +357,23 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 | 现状页 | 现状挂载 | 处置 | 目标 | 理由 |
 | --- | --- | --- | --- | --- |
-| 模型与端点 | 一级 | **保留** | S1 第 1 行 | 最高频故障入口，位置不动 |
+| 模型与服务 | 一级 | **保留** | S1 第 1 行 | 最高频故障入口，位置不动 |
 | 供应商 | 一级 | **保留** | S1 第 2 行 | 和模型同属"换后端"，必须相邻 |
-| 生成参数 | 一级 | **保留 + 扩组** | S1 第 3 行，新增组 A(5 项) | 内容域唯一合法落点 |
-| 提示词上下文（中转） | 一级 | **改名** | S1 第 4 行「提示词与记忆」 | 名实一致：它下面就是提示词 + 记忆 |
+| 模型参数 | 一级 | **保留 + 扩组** | S1 第 3 行，新增组 A(5 项) | 内容域唯一合法落点 |
+| 提示词与记忆 | 一级 | **改名** | S1 第 4 行「提示词与记忆」 | 名实一致：它下面就是提示词 + 记忆 |
 | 提示词（内层） | 中转内层 | **保留** | 同上内层 | 文本编辑属低频，必须留在第 3 层 |
 | 记忆与上下文（内层） | 中转内层 | **保留 + 扩组** | 同上内层，新增 #6 | — |
-| 语音入口 | 一级 | **改名 + 扩组** | S2 第 1 行「语音与唤醒」，新增组 C(2 项) | "唤醒"已无实现（旧审计删除唤醒路径），但用户心智仍按"语音与唤醒"找 |
+| 语音与唤醒 | 一级 | **改名 + 扩组** | S2 第 1 行「语音与唤醒」，新增组 C(2 项) | "唤醒"已无实现（旧审计删除唤醒路径），但用户心智仍按"语音与唤醒"找 |
 | 语音引擎（ASR 详设） | **全局浮层**（`showVoiceAsr` 独立布尔） | **层级统一** | 收为「语音与唤醒」的内层 | 现状是绕过 `SettingsSubDialog` 的第二个全局浮层，返回语义与其余 16 页不一致，是新页最容易复制的错误样板 |
-| 手势（侧键绑定） | 「关于」内层 | **提升** | S2 第 2 行「手势与侧键」 | 命中 F3（调完立刻可感）；埋在"关于"里等于藏起来 |
-| 外观与点阵 | 一级 | **改名 + 扩组** | S2 第 3 行「外观与动效」，新增组 D(4 项) | 它现在实际承载风格/点阵/简洁，加入动效、触感、表冠后名字必须改 |
+| 手势（侧键绑定） | 「关于」内层 | **提升** | S2 第 2 行「底栏副键」 | 命中 F3（调完立刻可感）；埋在"关于"里等于藏起来 |
+| 外观与动效 | 一级 | **改名 + 扩组** | S2 第 3 行「外观与动效」，新增组 D(4 项) | 它现在实际承载风格/点阵/简洁，加入动效、触感、表冠后名字必须改 |
 | 工具与 MCP | 一级 | **保留 + 扩组** | S3 第 1 行，新增组 E 的 4 项 | 工具能力单一首页 |
 | 安全策略 | 一级 | **保留 + 扩组** | S3 第 2 行，新增 #13 | 审批阈值属于"放权"，不是"工具开关" |
-| 权限 | 「关于」内层 | **提升** | S3 第 3 行 | 命中 F4：拒绝 root 是高频首查项；且与安全同分区 |
+| 特权执行 | 「关于」内层 | **提升** | S3 第 3 行 | 命中 F4：拒绝 root 是高频首查项；且与安全同分区 |
 | **网络与请求（新）** | 根页 4 行内联 | **新增页** | S4 第 1 行 | 现状把 超时/重试/退避/WiFi 四行内联在根页，占 4×49dp；上收成页给新增组 F 腾出位置 |
 | 网络体检 | 「关于」内层 | **改挂** | 「网络与请求」内层 | 体检是"连不上时"的诊断，必须紧贴连接参数 |
 | 网页控制台 | 一级 | **保留 + 扩组** | S4 第 2 行，新增 #19/#20 | — |
-| 导入导出 | 一级 | **保留** | S4 第 3 行 | 40 键语义不变 |
+| 配置导入导出 | 一级 | **保留** | S4 第 3 行 | 40 键语义不变 |
 | 关于（中转） | 一级 | **拆解降级** | S4 第 4 行「关于」（单页） | 4 个子项各有更好去处后，中转页只剩"版本 + 重看引导"，中转形态不再成立 |
 
 **配套删除**：`showVoiceAsr` 这个绕过枚举的全局浮层布尔必须删除，改为 `SettingsSubDialog.VOICE_ASR` 的内层（否则 `SettingsScreenStructureGuardTest` 的"枚举 ↔ 分支 1:1"约束对它是盲区）。
@@ -391,7 +392,7 @@ hero 只允许**只读状态 + 跳转**，禁止在 hero 上直接放开关：�
 
 ### 5.3 一次性风险清单（实施时容易踩的 4 个坑）
 
-1. **`mainContextTurns` 类重复键**：`maxContextTurns` 同时出现在「模型与端点」和「记忆与上下文」两页，必须**同一个键、两处写同一属性**，不得再造第二个键（`SettingsFieldRegistryGuardTest` 的"一键一字段"会直接抓）。
+1. **`mainContextTurns` 类重复键**：`maxContextTurns` 同时出现在「模型与服务」和「记忆与上下文」两页，必须**同一个键、两处写同一属性**，不得再造第二个键（`SettingsFieldRegistryGuardTest` 的"一键一字段"会直接抓）。
 2. **父页回写旧值**：内层页返回时必须重读偏好（`syncFromPreferences()`），否则父页保存路径用旧快照覆盖刚改的值——`MemoryManagerContent` 的注释已记录过该 bug。
 3. **8dp 卡间距 vs 0dp 组内距**：两条并存不冲突，但必须分别落在 `CardStyleCardGapDp`（大卡片档）与 `CardRowGapDp`（气球/方角档），**不允许**用一个常量两头兼顾。
 4. **hero 不能放开关**：hero 只做"状态 + 跳转"。把手感类开关搬上 hero 会让误触改配置，且 hero 没有回滚面。
