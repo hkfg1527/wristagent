@@ -26,6 +26,23 @@
 已把 4 条项目不变量钉进工作上下文（硬约束 / 版本 / 单测基线 / 设置页 DSL 规则），
 用法写进 `docs/CONTEXT.md`，以后每轮开工顺手核对版本与基线两条是否还准。
 
+## [未发布] - 2026-11-15 · context-governor 插件排查
+
+用户装了 `@local/context-governor`，要求实测。结论：
+
+| 检查 | 结果 |
+|---|---|
+| 插件包 | ✅ `~/.dsh/profiles/desktop/node_modules/@local/context-governor`（index.js 20KB，README 说明齐全） |
+| bundle 注册 | ✅ 在 `profiles/desktop/package.json` 的 `dsh.profile.bundles` 里 |
+| 组合接线 | ✅ 插件自带 `cordis.patch.yml` 插入 `{ id: context-governor }`，用户 patch 未禁用 |
+| 它提供什么 | `manage_context` 工具，9 个 action（view/usage/compact/人设/片段/变量/rollback） |
+| **本会话可用性** | ❌ `tools.manage_context is not a function`；分页命名空间为空 |
+
+原因：工具面在会话启动时固定，本会话是**恢复**创建的，早于插件安装。**开新会话才会加载**。
+
+替代手段（已实测）：`fact_register` 钉事实（4 条已钉）；量上下文压力直接看
+`~/.dsh/sessions/<ws>/<sid>/session.v4.jsonl.zstd` —— 本会话 **38 MB / 163k 行**。
+
 ## [0.0.0.44] - 2026-11-15（内部版，不对外发布）
 
 ### 上一轮"验证失败"的真相：不是焦点丢失，是我点错了行

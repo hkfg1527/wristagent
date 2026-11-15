@@ -85,6 +85,23 @@
 
 ## 0.6 上下文自管理（怎么用、边界在哪）
 
+**已安装的插件：`@local/context-governor` v1.0.0**（2026-11-15 用户装）
+- 位置：`~/.dsh/profiles/desktop/node_modules/@local/context-governor`，已进 profile 的 `dsh.profile.bundles`，
+  自带 `cordis.patch.yml` 会把 `context-governor` 插进组合 —— 接线正确。
+- 它注册一个 **`manage_context`** 工具，9 个 action：`view` / `usage` / `compact` / `set_persona` /
+  `reset_persona` / `set_section` / `remove_section` / `set_variable` / `remove_variable` / `rollback`。
+- 守卫：不可变内核提示、命名空间隔离（只能改人设覆盖/`governor:custom:*`/`governor_*` 变量）、
+  作用域只在调用者 agent、输入限额、写前快照可回滚、**会话级不持久**。
+- **本会话拿不到它**：`tools.manage_context` 不存在，`tool_activate` 回 `paged namespaces: (none)`。
+  原因是工具面在会话启动时固定，而本会话是**恢复**出来的，早于插件安装。**需要开新会话**才会出现。
+- 新会话第一次用它时按这个顺序验：`usage`（看占用）→ `view`（看人设/片段/变量）→ `compact`（压缩历史）。
+
+**没有插件时也能做的两件事**（本会话实测）：
+- `fact_register`：钉 ≤160 字的事实，随每步工作上下文投影，压缩也吃不掉；`revoke` 按 tag 撤销。
+- 量自己的上下文压力：`~/.dsh/sessions/<workspace>/<session>/session.v4.jsonl.zstd` 的大小就是压力表 ——
+  2026-11-15 22:07 本会话是 **38 MB / 163k 行**，这就是压缩一直在触发的原因。
+
+
 **结论先说：我调不了压缩接口。** 本会话工具面里没有"压缩上下文"这类工具，自动压缩由 harness 在上下文将满时触发
 （本会话已经发生过一次）。所以我的职责不是"按下压缩键"，而是**让压缩无损**：
 
