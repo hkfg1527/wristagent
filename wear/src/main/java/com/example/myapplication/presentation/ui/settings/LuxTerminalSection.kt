@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -136,22 +137,27 @@ fun LuxTerminalContent(
                 }
             )
         }
-        // 已保存的各占一行。注意：这一段用的是 list.forEach，在**收集期**求值 ——
-        // 因此"刚保存的那一条"要等下次进入本页才会出现在列表里（偏好已经落盘，不影响数据正确性）。
-        // 试过"固定登记 6 个位置 + 渲染时读状态"，但空位会各占一张卡的高度（约 240dp 空白），
-        // 比"晚一次刷新"更糟，所以退回这一版并在 CHANGELOG 里记明这个已知限制。
-        saved.forEach { command ->
-            row {
-                SettingsNavRow(
-                    title = command,
-                    value = stringResource(R.string.settings_lux_delete),
-                    onClick = {
-                        val next = LuxTerminalPolicy.withoutSaved(preferences.luxSavedCommands, command)
-                        preferences.luxSavedCommands = next
-                        saved = LuxTerminalPolicy.savedOf(next)
-                        context.vibrateTick()
-                    }
-                )
+        // 已保存的快捷位：用**一个 standaloneRow 内部渲染整个列表**。
+        //
+        // 这样绕开了设置页 DSL 的"收集期"约束：standaloneRow 的内容在渲染时求值，
+        // 所以保存/删除后立刻反映到界面上，不需要重新进入本页。
+        standaloneRow {
+            // 读 Compose 状态而不是偏好本身：SharedPreferences 的写入不会触发重组，
+            // 只有状态变量才会。状态在进入页面时用偏好初始化，之后每次增删都同步更新。
+            val list = saved
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                list.forEach { command ->
+                    SettingsNavRow(
+                        title = command,
+                        value = stringResource(R.string.settings_lux_delete),
+                        onClick = {
+                            preferences.luxSavedCommands =
+                                LuxTerminalPolicy.withoutSaved(preferences.luxSavedCommands, command)
+                            saved = LuxTerminalPolicy.savedOf(preferences.luxSavedCommands)
+                            context.vibrateTick()
+                        }
+                    )
+                }
             }
         }
         section(stringResource(R.string.settings_lux_quick))
