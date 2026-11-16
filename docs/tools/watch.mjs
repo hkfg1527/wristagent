@@ -44,20 +44,30 @@ export const back = async (wait = 1200) => {
  * 这里先判断是否停在卡片子页（出现「完成返回」），是就先退出，再重新划进设置。
  */
 export const enterSettings = async ({ tries = 12 } = {}) => {
-  sh('shell', 'am', 'force-stop', PKG);
-  sh('shell', 'am', 'start', '-n', ACTIVITY);
-  await sleep(5000);
-  for (let i = 0; i < tries; i++) {
-    if (onRoot()) return true;
-    const t = texts();
-    if (t.includes('完成返回')) {
-      await back();
-      continue;
+  const launch = () => {
+    sh('shell', 'am', 'force-stop', PKG);
+    sh('shell', 'am', 'start', '-n', ACTIVITY);
+  };
+  const walk = async () => {
+    await sleep(5000);
+    for (let i = 0; i < tries; i++) {
+      if (onRoot()) return true;
+      // 恢复出来的若是卡片子页，先退出这一层；聊天页没有「完成返回」，直接划上去就是设置页
+      if (texts().includes('完成返回')) {
+        await back(1500);
+        continue;
+      }
+      swipeUp();
+      await sleep(900);
     }
-    swipeUp();
-    await sleep(900);
-  }
-  return onRoot();
+    return onRoot();
+  };
+  launch();
+  if (await walk()) return true;
+  // 一次不够：可能恢复到了一个既不是根页、也没有「完成返回」的浮层页 —— 划不动也退不出。
+  // 再冷启一次，从聊天页重进，比继续盲划靠得住。
+  launch();
+  return walk();
 };
 
 /** 截屏到 docs/device/<sub>/<name>.png，返回绝对路径。 */

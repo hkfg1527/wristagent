@@ -10,12 +10,12 @@
 **我是谁**：这台手表上 Wrist Agent 的常驻工程师。行事准则在 `docs/SELF.md`（用户可改），核心一句：
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
-**现在在哪**（截至 2026-11-17 03:30）：
-- 内部版 `0.0.0.46` / versionCode 84；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
+**现在在哪**（截至 2026-11-17 07:50）：
+- 内部版 `0.0.0.47` / versionCode 85；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
 - 单测基线 **1291 条 / 187 套件全绿**（跑 `./gradlew :wear:testDebugUnitTest` 确认这个数；
   旧文档写的"188 套件"是错的，实测 `build/test-results/testDebugUnitTest/*.xml` 只有 187 个文件）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行。
-- 当前这一轮：用户判定「假 M3E 设置页很丑」，按官方 Wear M3 Expressive 体系改造中（第 1、2 步已上真机）。
+- 当前主线：用户判定「假 M3E 设置页很丑」，按官方 Wear M3 Expressive 体系改造中（第 1、2 步已上真机）。
 
 **开工四步**（照做，不要凭印象）：
 1. `git log --oneline -5` + `git status --porcelain` —— 确认工作区干净、远端追上没有
@@ -37,9 +37,20 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-17 03:30
 
 **版本与基线**
-- 内部版 `0.0.0.46`（versionCode 84）；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
+- 内部版 `0.0.0.47`（versionCode 85）；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
 - 单测基线：**1291** 条 / **187** 套件全绿（第 0 步就用这个数确认；"188"是旧文档的错数）。
-- 下一个发布点：**0.0.0.50**（还剩 4 个内部版）。用 `ContextDocFreshnessGuardTest` 兜着。
+- 下一个发布点：**0.0.0.50**（还剩 3 个内部版）。用 `ContextDocFreshnessGuardTest` 兜着。
+
+**0.0.0.47 · 设置页 15 页全量巡检（真机已验证，报告 `docs/SETTINGS-SWEEP.md`）**
+- `docs/tools/sweep-pages.mjs`：每页判据 = **能打开 + 能返回根页**，结果落
+  `build-logs/sweep-0.0.0.47.jsonl`。**15 / 15 打开，15 / 15 返回。**
+- **查出真问题**：4 页子页标题 ≠ 根页行名（模型与服务→模型与端点、模型参数→推理参数、
+  语音与唤醒→语音输入、底栏副键→手势与侧键），破坏 `docs/SETTINGS-IA.md` §4 的
+  「页面标题 = 根页行标题」。修法是字符串成对改 + 同步 `SettingsIaDocNamingGuardTest`。
+- 自动化的四个坑（步长 1 格≈1/8 行、找不到≠在下面、别等坐标稳定、返回后要先回顶）
+  都写进脚本注释与 CHANGELOG，别再踩第二遍。
+- **未收口**：第 2 页「模型参数」在整套自动化里偶发点空（手动 probe 正常，标题 `推理参数`）——
+  脚本落点问题，不是页面问题；下轮改成"点完验证，没打开同坐标重试一次"。
 
 **0.0.0.46 · 设置页去「假 M3E」第 2 步（真机已验证）**
 - **整页手搓超椭圆 → 官方 `Card` 分组卡**。旧实现 `SettingsBalloonGroup` 用 `SettingsCurveGeometry`
@@ -54,10 +65,13 @@
 - 证据：`docs/device/v11/cardgroup-root-top.png`、`cardgroup-root-scrolled.png`、`cardgroup-subpage.png`。
 
 **下一步（下一轮直接从这里开始）**
-1. 去「假 M3E」第 3 步：`SettingsThinSlider` / `SettingsCompactSwitch` / 手绘 radio 换成官方
-   `Slider(segmented)` / `SwitchButton` / `RadioButton`。
-2. 第 4 步：分区标题那根手绘强调色短横（"沟里的短横"）与 `> ` 前缀，换成官方 `ListSubHeader` 语义。
-3. 密度：外观页每个风格选项占 145px（标签 + 两行说明），一屏只放 1.5 个 —— 说明压到一行。
+1. 修 4 页标题与行名不一致（字符串成对改 + `SettingsIaDocNamingGuardTest` 同步），把巡检脚本的
+   "点空重试"补上，让 15/15 稳定复现。
+2. 去「假 M3E」第 3 步：`SettingsThinSlider` / `SettingsCompactSwitch` / 手绘 radio 换成官方
+   `Slider(segmented)` / `SwitchButton` / `RadioButton` —— **注意**：上一任在代码注释里写了
+   "为什么不用官方 Slider（52dp 分段胶囊铺满强调色太重）"，这是审美取舍，动手前把两版截图摆给用户看。
+3. 第 4 步：分区标题那根手绘强调色短横（"沟里的短横"）与 `> ` 前缀，换成官方 `ListSubHeader` 语义。
+4. 密度：外观页每个风格选项占 145px（标签 + 两行说明），一屏只放 1.5 个 —— 说明压到一行。
 
 **已完成（别再重做）**
 - 卡片粘连：根因是 `RootContentRow`/`SettingsStaggeredRow` 内层为 **Box**，兄弟 `Spacer` 会叠放不产生间距；改为卡片自身 `padding(bottom)`。
