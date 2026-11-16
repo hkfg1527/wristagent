@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material3.ScrollIndicator
+import androidx.wear.compose.material3.TimeText
 import com.example.myapplication.BuildConfig
 import com.example.myapplication.R
 import com.example.myapplication.agent.AgentPreferences
@@ -285,6 +287,16 @@ fun SettingsScreen(
                         .align(Alignment.TopStart)
                         .clip(androidx.compose.foundation.shape.CircleShape)
                         .background(Wear.Palette.Bg)
+                )
+
+                // 曲面时钟 + 右缘滚动指示器：Wear 的两个强约定，缺了就不像一块真表。
+                // 根页没有走 ScreenScaffold（它把四个 hero 卡按 lazy item 逐个摆，还需要自定义遮罩），
+                // 所以这两个槽位在这里手工补上；位置与子页（ScreenScaffold 的 timeText/scrollIndicator 槽）
+                // 对齐到同一条 24dp 钟带，来回切页不会跳。
+                TimeText(modifier = Modifier.align(Alignment.TopCenter))
+                ScrollIndicator(
+                    state = listState,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                 )
 
                 // 表冠只把事件送给持有焦点的节点，必须显式 requestFocus() 一次。

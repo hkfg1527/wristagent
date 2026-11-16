@@ -112,9 +112,11 @@ import androidx.wear.compose.material3.EdgeButtonDefaults
 import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.SwitchButtonDefaults
 import androidx.wear.compose.material3.TextToggleButton
+import androidx.wear.compose.material3.TimeText
 import com.example.myapplication.R
 import com.example.myapplication.presentation.ui.components.Tone
 import com.example.myapplication.appearance.SettingsStyle
@@ -414,8 +416,17 @@ fun SettingsSubPage(
             contentPadding = PaddingValues(
                 start = settingsCardScreenInset(),
                 end = settingsCardScreenInset(),
-                top = Wear.Space.Xs
+                // 顶部让出曲面时钟带：官方 ScreenScaffoldDefaults 的垂直内容边距是屏高 10%
+                // （233dp 屏 = 24dp，即 SettingsLayoutMath.TopScrimDp）。以前这里只给 4dp，
+                // 页面标题因此挤进钟带、贴着圆周，加时钟后必然重叠。
+                top = RootContentTopPadding
             ),
+            // Wear 的两个强约定在这里**显式叠层**，而不是交给 ScreenScaffold 的槽位：
+            // 读了 material3 1.7.1 的源码（ScreenScaffold.kt L705–L769）才确认 ——
+            // ScreenScaffold 只是把 timeText 登记进 `LocalScaffoldState` 的 scoreContent，
+            // **真正绘制它的是 AppScaffold**。本项目没有 AppScaffold（聊天页是自绘壳），
+            // 于是传 timeText 的效果是"登记完没人画"，界面上什么都看不到。
+            // scrollIndicator 槽位同理：它要求 scrollInfoProvider 非空才进 AnimatedIndicator 分支。
             timeText = null,
             scrollIndicator = null,
             edgeButton = {
@@ -594,6 +605,14 @@ fun SettingsSubPage(
         }
 
         SettingsEdgeScrim()
+
+        // 曲面时钟 + 右缘滚动指示器：画在遮罩之上（内容淡出、时钟保持清晰）。
+        // 位置与根页一致 —— 两处都对齐 TopCenter / CenterEnd，来回切页不会跳。
+        TimeText(modifier = Modifier.align(Alignment.TopCenter))
+        ScrollIndicator(
+            state = listState,
+            modifier = Modifier.align(Alignment.CenterEnd)
+        )
 
         overlay()
     }

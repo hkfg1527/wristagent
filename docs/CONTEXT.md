@@ -10,11 +10,13 @@
 **我是谁**：这台手表上 Wrist Agent 的常驻工程师。行事准则在 `docs/SELF.md`（用户可改），核心一句：
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
-**现在在哪**（截至 2026-11-17 01:15）：
-- 内部版 `0.0.0.44` / versionCode 82；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
-- 单测基线 **1289 条 / 188 套件全绿**（跑 `./gradlew :wear:testDebugUnitTest` 确认这个数）。
+**现在在哪**（截至 2026-11-17 02:50）：
+- 内部版 `0.0.0.45` / versionCode 83；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
+- 单测基线 **1289 条 / 187 套件全绿**（跑 `./gradlew :wear:testDebugUnitTest` 确认这个数；
+  旧文档写的"188 套件"是错的，实测 `build/test-results/testDebugUnitTest/*.xml` 只有 187 个文件，
+  条数 1289 一条不差）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行。
-- 卡在哪儿：Lux「快捷位」保存链路已真机验证通过；**下一步是 0.0.0.50 发布点**（还差 6 个内部版）。
+- 当前这一轮：用户判定「假 M3E 设置页很丑」，开始按官方 Wear M3 Expressive 体系改造（第 1 步已上真机）。
 
 **开工四步**（照做，不要凭印象）：
 1. `git log --oneline -5` + `git status --porcelain` —— 确认工作区干净、远端追上没有
@@ -33,12 +35,30 @@
 3. 环境配方：`docs/HANDOFF-0.05.md`（无 shell 工具、gradle env、adb、GUI、git push 的坑）
 4. 跑一次 `./gradlew :wear:testDebugUnitTest` 确认基线（当前 **1189** 条）
 
-## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-15 08:51
+## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-17 02:50
 
 **版本与基线**
-- 内部版 `0.0.0.44`（versionCode 82）；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
-- 单测基线：**1289** 条 / 188 套件全绿（第 0 步就用这个数确认）。
-- 下一个发布点：**0.0.0.50**（还剩 9 个内部版）。写这份文档时不要只看数字 —— 用 `ContextDocFreshnessGuardTest` 兜着。
+- 内部版 `0.0.0.45`（versionCode 83）；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
+- 单测基线：**1289** 条 / **187** 套件全绿（第 0 步就用这个数确认；"188"是旧文档的错数）。
+- 下一个发布点：**0.0.0.50**（还剩 5 个内部版）。用 `ContextDocFreshnessGuardTest` 兜着。
+
+**0.0.0.45 · 设置页去「假 M3E」第 1 步（真机已验证）**
+- 用户判定：「假 M3E 设置页面就很丑」。诊断把"假"拆成可验证的六条，先修最硬的两条。
+- **补上 Wear 的两个强约定**：曲面 `TimeText` + 右缘 `ScrollIndicator`，根页与全部子页都在。
+- **踩到并查清一个真坑**：`ScreenScaffold` 的 `timeText` 槽**只登记不绘制**——
+  material3 1.7.1 源码 `ScreenScaffold.kt` L705–L769 把它写进 `LocalScaffoldState`，
+  真正画它的是 `AppScaffold`。本项目没有 `AppScaffold`，所以传进去等于没传。
+  现在两页都改成**显式叠层**，`timeText = null / scrollIndicator = null` 的槽位留了注释说明原因。
+- **顶部内容边距对齐官方值**：`ScreenScaffoldDefaults.contentPadding` 的垂直边距 = 屏高 10%
+  = 233dp 屏的 24dp，正好等于既有的 `SettingsLayoutMath.TopScrimDp`。子页原来只给 4dp，
+  标题挤在钟带里；现在统一 24dp。
+- 证据：`docs/device/v11/style-{balloon,square,google_card,terminal}.png`（改造前四套风格基线）、
+  `after-clock-root-balloon.png` / `after-clock-subpage.png`（改造后，时钟 `2:48` 与右缘指示器可见）。
+
+**下一步（下一轮直接从这里开始）**
+1. 去「假 M3E」第 2 步：`SettingsBalloonGroup` 那条手搓超椭圆 = 最不 M3 的一块，改成官方
+   `Card`/`TitleCard` 分组卡（同一组行共用一张圆角卡，组间 8dp），保留"每卡一个环"的既有决策。
+2. 第 3 步：把 `SettingsThinSlider` / `SettingsCompactSwitch` 换成官方 `Slider(segmented)` / `SwitchButton`。
 
 **已完成（别再重做）**
 - 卡片粘连：根因是 `RootContentRow`/`SettingsStaggeredRow` 内层为 **Box**，兄弟 `Spacer` 会叠放不产生间距；改为卡片自身 `padding(bottom)`。

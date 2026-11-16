@@ -11,6 +11,31 @@
 
 ---
 
+## [0.0.0.45] - 2026-11-17（内部版，不对外发布）
+
+### 设置页去「假 M3E」第 1 步：补上 Wear 的两个强约定
+用户判定「之前的那个假 M3E 设置页面就很丑」。先把"假"拆成可验证的条目，这一轮修最硬的两条。
+
+- **曲面时钟 `TimeText` + 右缘 `ScrollIndicator`**：根页与全部子页都加上了。此前两者都没有 ——
+  一块没有时钟、也没有滚动指示的表，圆角做得再像也不会像官方应用。
+- **查清一个真坑**：官方 `ScreenScaffold` 的 `timeText` 槽**只登记不绘制**。
+  material3 1.7.1 源码 `ScreenScaffold.kt` L705–L769 把它写进 `LocalScaffoldState`，
+  真正画它的是 `AppScaffold`；本项目没有 `AppScaffold`（聊天页是自绘壳），所以传进去等于没传。
+  改成显式叠层，槽位留注释说明原因 —— 这个坑下次谁再传一次都会踩。
+- **顶部内容边距对齐官方**：`ScreenScaffoldDefaults.contentPadding` 垂直方向 = 屏高 10%，
+  233dp 屏即 24dp，正好等于既有 `SettingsLayoutMath.TopScrimDp`。子页原来给 4dp，标题挤在钟带里。
+
+### 验证
+- 真机（TicWatch Pro 5 / 466×466 / density 320 / `0.0.0.45` versionCode 83）：
+  `docs/device/v11/after-clock-root-balloon.png` 有曲面时钟 `2:31` 与右缘指示器；
+  `after-clock-subpage.png` 有 `2:48` 与指示器。
+- 改造前四套风格基线一起留档：`style-{balloon,square,google_card,terminal}.png`。
+- 单测 **1289 条 / 187 套件 / 0 失败**（旧文档写的 188 套件是错的，实测 XML 只有 187 个）。
+
+### 新增工具
+- `docs/tools/watch.mjs`：`enterSettings()`（处理"应用会恢复上次停留页面"这个坑）、
+  `shot()`、`tapText()`（安全带内点击 + 自动滚动重试）、`dumpNodes()`。
+
 ## [未发布] - 2026-11-15 · 上下文插件实测
 
 用户装了"自己管上下文"的插件，本轮实测：
