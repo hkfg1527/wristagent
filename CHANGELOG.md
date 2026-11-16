@@ -11,6 +11,28 @@
 
 ---
 
+## [0.0.0.46] - 2026-11-17（内部版，不对外发布）
+
+### 设置页去「假 M3E」第 2 步：整页手搓超椭圆 → 官方 Card 分组卡
+旧实现把整页（连分区标题一起）裹进一张自绘的闭合超椭圆：圆角、色调、涟漪全是手搓的，
+`SettingsCurveGeometry` 自己算屏幕圆周弦长。这是"像 M3E 但就是不对"最大的一块。
+
+- `SettingsBalloonGroup` → **`SettingsGroupCard`**：外壳交给官方 `Card`
+  （`CardDefaults.cardColors` + 官方形状），只做"一组行一张卡"。
+- 分组规则改在 `SettingsPageChunking`：连续的 `CARD_ROW` 拼一张卡，分区标题与卡外行动各自断开。
+  旧的"一页只用一张主气球"连同它的守卫断言一起改掉。
+- 卡片宽度 = `SettingsContentWidth` **176dp = 实测 352px**：与卡片档 hero 卡同一把尺子，
+  也符合"所有卡片同一宽度"的硬约束。
+- 组内行不再各自按弦长缩放（那会让卡内文字左右不齐），缩放责任下沉给卡
+  （`CardEdgeZoom`，本项目 `MinScale = 1.00f`，即只淡出不缩放）。
+- 根页四个分区拆成四张卡 + 四个小标题；外层补水平居中，否则小标题被卡片圆角压住。
+
+### 验证
+- 真机（TicWatch Pro 5 / 466×466 / `0.0.0.46` versionCode 84）：
+  `docs/device/v11/cardgroup-root-top.png`（时钟 3:27 + 小标题 + 352px 圆角卡 + 右缘指示器）、
+  `cardgroup-root-scrolled.png`（卡尾与「完成返回」按钮）、`cardgroup-subpage.png`（外观页单选分组卡）。
+- 单测 **1291 条 / 187 套件 / 0 失败**（新增 2 条分组规则用例；改写 1 条缩放守卫）。
+
 ## [0.0.0.45] - 2026-11-17（内部版，不对外发布）
 
 ### 设置页去「假 M3E」第 1 步：补上 Wear 的两个强约定

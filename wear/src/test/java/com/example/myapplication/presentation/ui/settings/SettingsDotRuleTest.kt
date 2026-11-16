@@ -39,6 +39,10 @@ class SettingsGroupLineGuardTest {
         .substringAfter("internal fun SettingsCardRow(")
         .substringBefore("可点行的按下底色")
     private val pressHelper = shared.substringAfter("private fun pressedRowBackground(")
+    /** 卡片边缘缩放：等比缩小的新归属地（行不再缩放）。 */
+    private val cardZoom = readProjectFile(
+        "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsCardEdgeZoom.kt"
+    )
 
     @Test
     fun groupHairlineIsOneBorderStrokeAndNoLongerANoiseOfDots() {
@@ -81,9 +85,17 @@ class SettingsGroupLineGuardTest {
         assertTrue(cardRow.contains("indication = null"))
         assertTrue("按压只改曲面填充色", cardRow.contains("drawPath(path = path, color = rowBackground)"))
         assertFalse("按压不得加边框", cardRow.contains("border("))
-        assertTrue("组内行必须按屏幕弦长计算比例", cardRow.contains("SettingsCurveMath.halfWidthDp"))
-        assertTrue("横向与纵向必须使用同一个比例", cardRow.contains("scaleX = scale") && cardRow.contains("scaleY = scale"))
-        assertTrue("按压必须等比缩小而不是拉伸", cardRow.contains("pressScale"))
+        // 0.0.0.46：等比缩小的责任从"行"下沉到"卡"。
+        // 组内行已经在一张官方 Card 里，行再各自按屏幕弦长缩放，卡内文字就会左右不齐（真机可见）。
+        // 现在行这一层完全不缩放，只缩整张卡 —— 下面接着钉卡那一侧仍然等比、仍然只缩不放。
+        assertFalse("卡片内部的行不得再各自缩放", cardRow.contains("SettingsCurveMath.halfWidthDp"))
+        assertTrue(
+            "等比缩小改由卡片承担",
+            cardZoom.contains("scaleX = scale") && cardZoom.contains("scaleY = scale")
+        )
+        // 这条项目里是"只淡出不缩放"：MinScale 恒为 1.0（见 CONTEXT §1 与硬约束），
+        // 所以这里钉的是"卡不横向形变"，不是"缩到 70%"。
+        assertTrue("卡片边缘不得缩放（只淡出）", cardZoom.contains("const val MinScale = 1.00f"))
         assertFalse("禁止只做横向拉伸", cardRow.contains("scaleX = SettingsCurveMath.contentScaleX"))
         assertTrue(pressHelper.contains("Wear.Motion.quick()"))
         assertTrue(pressHelper.contains("lift.snapTo(1f)"))

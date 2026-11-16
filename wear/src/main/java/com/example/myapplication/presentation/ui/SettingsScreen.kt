@@ -78,7 +78,7 @@ import com.example.myapplication.presentation.ui.settings.NetworkDiagnosticsCont
 import com.example.myapplication.presentation.ui.settings.PromptViewerContent
 import com.example.myapplication.presentation.ui.settings.SecurityGuardrailContent
 import com.example.myapplication.presentation.ui.settings.SettingsActionButton
-import com.example.myapplication.presentation.ui.settings.SettingsBalloonGroup
+import com.example.myapplication.presentation.ui.settings.SettingsGroupCard
 import com.example.myapplication.presentation.ui.settings.SettingsContentWidth
 import com.example.myapplication.presentation.ui.settings.SettingsExitController
 import com.example.myapplication.presentation.ui.settings.SettingsFocusStyle
@@ -461,8 +461,8 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 分区行仍然拼成一片连续曲面：气球必须整组一起画，切开就不再是一个连续的气球。
-                    // 卡片档里这张曲面只承载分区行，四张 hero 卡在它上面各占一个独立 item。
+                    // 每个分区一张官方 Card：分区标题在外（列表小标题），行在内（卡片内容）。
+                    // 旧版把整页（含标题）裹进一张手搓超椭圆里 —— 一屏一坨，也是最不像 M3 的一块。
                     item(key = "root-sections") {
                         SettingsStaggeredRow(
                             index = 5,
@@ -472,15 +472,17 @@ fun SettingsScreen(
                             // 卡片档这 3000+ px 的整块不参与逐行动画：它的图层会变成一块 432×3113 的位图
                             animate = WearAppearance.style != SettingsStyle.GOOGLE_CARD
                         ) {
-                            SettingsBalloonGroup {
-                                // 气球两端的收口留白只属于曲面：卡片档每行自带 8dp 间隙，再留 56dp 就是一块空屏
-                                if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) {
-                                    Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
-                                }
-                                SettingsSectionHeader(
-                                    text = stringResource(R.string.settings_zone_answer),
-                                    isFirstSection = true
-                                )
+                            // 标题与卡片都靠 Column 的水平居中摆放：分区标题本身是"整条宽度"的，
+                            // 少了这层居中它会被顶到屏幕左边，正好被卡片圆角压住（真机截图为证）。
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                            SettingsSectionHeader(
+                                text = stringResource(R.string.settings_zone_answer),
+                                isFirstSection = true
+                            )
+                            SettingsGroupCard {
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_model_and_service),
@@ -530,7 +532,9 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_voice))
+                            }
+                            SettingsSectionHeader(text = stringResource(R.string.settings_zone_voice))
+                            SettingsGroupCard {
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     val asrProvider = AsrProviderId.fromStorage(asrProviderKey)
                                     SettingsNavRow(
@@ -568,7 +572,9 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_act))
+                            }
+                            SettingsSectionHeader(text = stringResource(R.string.settings_zone_act))
+                            SettingsGroupCard {
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     val enabledCount = listOf(
                                         preferences.toolDeviceStatusEnabled,
@@ -625,7 +631,9 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                SettingsSectionHeader(text = stringResource(R.string.settings_zone_connect))
+                            }
+                            SettingsSectionHeader(text = stringResource(R.string.settings_zone_connect))
+                            SettingsGroupCard {
                                 RootGroupedRow(slot = SettingsRowSlot.FIRST) {
                                     SettingsNavRow(
                                         title = stringResource(R.string.settings_sub_network_request),
@@ -678,7 +686,7 @@ fun SettingsScreen(
                                         }
                                     )
                                 }
-                                Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
+                            }
                             }
                         }
                     }

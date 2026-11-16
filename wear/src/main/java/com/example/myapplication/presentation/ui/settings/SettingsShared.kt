@@ -527,16 +527,14 @@ fun SettingsSubPage(
                 val chunk = chunks[chunkIndex]
                 val firstIndex = chunk.indices.first()
                 if (chunk.grouped) {
-                    // 一组只画一张气球：所有行共享同一条闭合超椭圆，组内不再各自裁背景。
+                    // 一组连续卡片行 = 一张官方 Card（分组规则见 SettingsPageChunking）。
                     SettingsStaggeredRow(
                         index = firstIndex + 1,
                         rowCount = rowCount,
                         stagger = stagger,
                         exit = exit
                     ) {
-                        SettingsBalloonGroup {
-                            // 主气球上下各留一段纯曲面，首尾标题不会贴在收口尖上。
-                            Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
+                        SettingsGroupCard {
                             chunk.indices.forEach { index ->
                                 val entry = content[index]
                                 val next = content.getOrNull(index + 1)
@@ -548,11 +546,10 @@ fun SettingsSubPage(
                                     LocalSettingsRowSlot provides rowSlots[index],
                                     LocalSettingsGroupHairlineStart provides hairlineStart.dp
                                 ) {
-                                    // 防止末端行的 hairline 判定跨出当前气球
+                                    // 防止末端行的 hairline 判定跨出当前卡片
                                     entry.content()
                                 }
                             }
-                            Spacer(Modifier.height(SettingsCurveGeometry.CapInsetDp.dp))
                         }
                     }
                 } else {
@@ -1000,18 +997,10 @@ internal fun SettingsCardRow(
     val screenHeightPx = with(density) { screenHeightDp.dp.toPx() }
     val screenMarginPx = with(density) { SettingsCurveMath.ScreenEdgeMarginDp.dp.toPx() }
     val baseHalfPx = with(density) { SettingsCurveMath.MinCardWidthDp.dp.toPx() / 2f }
-    val maxHalfPx = with(density) {
-        (SettingsCurveMath.cardWidthDp(screenWidthDp.toFloat()).dp.toPx() / 2f)
-    }
     val capHeightPx = with(density) { SettingsCurveGeometry.CapHeightDp.dp.toPx() }
     // y 只在绘制/图层阶段读；滚动时只失效绘制，不触发整行重组。
     val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }
     val groupChrome = LocalSettingsGroupChrome.current
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.985f else 1f,
-        animationSpec = Wear.Motion.micro(),
-        label = "settingsRowPressScale"
-    )
 
     if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
         // 大卡片档：一行一张独立圆角卡，行与行之间靠 8dp 间隙分开，不再共用一张曲面。
@@ -1067,51 +1056,31 @@ internal fun SettingsCardRow(
     }
 
     if (groupChrome) {
+        // 行已经在一张官方 Card 里：卡面与圆角由 Card 负责，行自己只做两件事 ——
+        // 排内容、在行与行之间画那根发丝线。
+        //
+        // 这里**不再**做"按屏幕弦长逐行等比缩放"：那是整页手搓超椭圆时代的东西，
+        // 放进固定宽度的卡片里会把靠边的行缩窄，卡内文字因此左右不齐。缩放改由卡本身承担
+        // （与卡片档同一个 `cardEdgeZoom`：屏心 1.0、贴边只缩不放）。
         Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .onGloballyPositioned { coordinates ->
-                    val newY = coordinates.positionInRoot().y
-                    // 阈值取 2px（约 1dp）：滚动时行内缩放层每帧都在算，收小写入频率只为减少失效，
-                    // 1dp 的缩放差肉眼不可见。
-                    if (kotlin.math.abs(newY - yInRootPx.value) > 2f) yInRootPx.value = newY
-                },
+            modifier = modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
+            Box(
                 modifier = Modifier
-                    .width(SettingsContentWidth)
-                    .graphicsLayer {
-                        val rowCenterY = yInRootPx.value + size.height / 2f
-                        val yFromCenterDp = (rowCenterY - screenHeightPx / 2f) / density.density
-                        val halfDp = SettingsCurveMath.halfWidthDp(
-                            yFromCenterDp = yFromCenterDp,
-                            screenHeightDp = screenHeightDp.toFloat(),
-                            maxHalfDp = maxHalfPx / density.density
-                        )
-                        // 只允许等比缩小；屏心 1.0，绝不做横向拉伸。
-                        val scale = (halfDp / (SettingsCurveMath.MinCardWidthDp / 2f))
-                            .coerceIn(0f, 1f) * pressScale
-                        scaleX = scale
-                        scaleY = scale
-                    }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minHeight)
-                        .then(clickModifier)
-                        .padding(
-                            start = SettingsRowSidePadding,
-                            end = SettingsRowSidePadding,
-                            top = RowVerticalPadding,
-                            bottom = RowVerticalPadding
-                        ),
-                    contentAlignment = Alignment.CenterStart
-                ) { content() }
-                if (SettingsRowComposition.drawsGroupHairline(slot)) {
-                    SettingsGroupHairline()
-                }
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .then(clickModifier)
+                    .padding(
+                        start = SettingsRowSidePadding,
+                        end = SettingsRowSidePadding,
+                        top = RowVerticalPadding,
+                        bottom = RowVerticalPadding
+                    ),
+                contentAlignment = Alignment.CenterStart
+            ) { content() }
+            if (SettingsRowComposition.drawsGroupHairline(slot)) {
+                SettingsGroupHairline()
             }
         }
         return

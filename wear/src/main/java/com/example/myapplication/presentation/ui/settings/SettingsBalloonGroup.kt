@@ -2,113 +2,88 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.appearance.SettingsStyle
+import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
 import com.example.myapplication.presentation.ui.theme.Wear
 
-/** 组内行：曲面背景由外层 [SettingsBalloonGroup] 统一绘制，本行不再画自己的卡。 */
+/** 组内行：卡面由外层 [SettingsGroupCard] 统一绘制，本行不再画自己的卡。 */
 internal val LocalSettingsGroupChrome = compositionLocalOf { false }
 
-/** 当前主气球在屏幕上的 y 与高度；背景路径只画一次。 */
-@Stable
-internal class SettingsGroupGeometryState(
-    topPx: Float,
-    heightPx: Float
-) {
-    var topPx by mutableFloatStateOf(topPx)
-    var heightPx by mutableFloatStateOf(heightPx)
-}
-
 /**
- * 一组卡片：只画一张闭合超椭圆气球。
+ * 一组设置行 = 一张官方 `Card`。
  *
- * 背景只画一次，宽度沿屏幕圆周的弦长连续变化；行内容只按所在高度等比缩小，绝不放大。
- * 因此不存在行间接缝，也没有“侧边一条曲线 + 封口另一条曲线”的双重轮廓。
+ * 这里原来是"整页一张手搓闭合超椭圆"（`SettingsBalloonGroup` + `SettingsCurveGeometry`）：
+ * 背景路径自己算屏幕圆周的弦长、按高度连续变化，看起来像一块有机的气球。
+ * 问题是它**不是任何 Material 组件** —— 圆角半径、描边、色调、涟漪全部是自绘的，
+ * 一屏里唯一的曲面又是最大的那块，于是整页读起来"像 M3E 但就是不对"。
+ *
+ * 现在：外壳交给官方 [Card]（形状 / 颜色 / 抬起态 / 涟漪都是库里的），
+ * 分组规则见 [SettingsPageChunking] —— 连续的卡片行拼一张卡，分区标题与卡外动作行各自断开。
+ * 这样页面上出现的是"标题 + 卡 + 标题 + 卡"，正是 Wear M3 设置页的骨架。
  */
 @Composable
-fun SettingsBalloonGroup(
+fun SettingsGroupCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val screenHeightDp = configuration.screenHeightDp
-    val screenHeightPx = with(density) { screenHeightDp.dp.toPx() }
-    val screenMarginPx = with(density) { SettingsCurveMath.ScreenEdgeMarginDp.dp.toPx() }
-    val capHeightPx = with(density) { SettingsCurveGeometry.CapHeightDp.dp.toPx() }
-    val state = remember(screenHeightPx) {
-        SettingsGroupGeometryState(
-            topPx = screenHeightPx / 2f,
-            heightPx = 0f
-        )
-    }
-    // 每帧重建轮廓时复用同一个 Path：滚动掉帧主要来自逐帧分配，不是 GPU
-    val reusablePath = remember { Path() }
-    val brush = remember {
-        Brush.verticalGradient(colors = listOf(Wear.Palette.SurfaceAlt, Wear.Palette.Surface))
-    }
-
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .onGloballyPositioned { coordinates ->
-                state.topPx = coordinates.positionInRoot().y
-                state.heightPx = coordinates.size.height.toFloat()
-            }
-            .drawWithContent {
-                if (WearAppearance.style != SettingsStyle.BALLOON) {
-                    // 方角与大卡片档自己画外壳，这里只放内容。
-                    drawContent()
-                    return@drawWithContent
-                }
-                val path = SettingsCurveGeometry.buildGroupPath(
-                    path = reusablePath,
-                    size = size,
-                    topInRootPx = state.topPx,
-                    screenHeightPx = screenHeightPx,
-                    screenMarginPx = screenMarginPx,
-                    capHeightPx = capHeightPx
-                )
-                val highlightEnd = if (size.height < 320.dp.toPx()) size.height else 320.dp.toPx()
-                drawPath(path = path, brush = brush)
-                drawContent()
-            },
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
-            content()
-        }
+        Card(
+            onClick = {},
+            // 宽度 = 内容基准 176dp = 实测 352px：与卡片档 hero 卡、与"所有卡片同一宽度"的硬约束一致。
+            // 行内部的 14dp 槽线因此逐像素对齐，两套风格互切不跳位。
+            modifier = Modifier.width(SettingsContentWidth),
+            colors = CardDefaults.cardColors(containerColor = SettingsCardSurface),
+            // 行的左右内边距由行自己带（[SettingsRowSidePadding]），这里不能再加一层，
+            // 否则卡内文字会被推进圆角里（176dp 卡上多 10dp 就是看得见的错位）。
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = Wear.Space.Xs),
+            content = {
+                CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
+                    content()
+                }
+            }
+        )
     }
 }
 
-/** 连续卡片行在列表里的分段：组标题与卡外行各自断开气球。 */
+/** 连续卡片行在列表里的分段：组标题与卡外行把卡片截断。 */
 internal data class SettingsPageChunk(
     val indices: List<Int>,
     val grouped: Boolean
 )
 
 internal object SettingsPageChunking {
+    /**
+     * 分段规则：**连续的 [SettingsRowEntryKind.CARD_ROW] 拼成一张卡**，
+     * 分区标题（`SECTION`）与卡外动作行（`STANDALONE`）各自占一个不分组的分段。
+     *
+     * 旧规则是"一页只用一张主气球"，把标题也塞进同一个曲面里 —— 那正是整页一大坨的成因。
+     */
     fun chunks(kinds: List<SettingsRowEntryKind>): List<SettingsPageChunk> {
-        // 一页只保留一个主气球：分区标题、卡片行与卡外动作块都装进同一个曲面。
         if (kinds.isEmpty()) return emptyList()
-        return listOf(SettingsPageChunk(kinds.indices.toList(), grouped = true))
+        val chunks = mutableListOf<SettingsPageChunk>()
+        var i = 0
+        while (i < kinds.size) {
+            if (kinds[i] == SettingsRowEntryKind.CARD_ROW) {
+                val start = i
+                while (i < kinds.size && kinds[i] == SettingsRowEntryKind.CARD_ROW) i++
+                chunks += SettingsPageChunk((start until i).toList(), grouped = true)
+            } else {
+                chunks += SettingsPageChunk(listOf(i), grouped = false)
+                i++
+            }
+        }
+        return chunks
     }
 }
