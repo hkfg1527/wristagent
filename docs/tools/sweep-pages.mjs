@@ -83,7 +83,7 @@ const tapScrolled = async (label, maxSteps = 20) => {
   await sleep(4500); // 回顶后等惯性/回弹彻底停：2.8s 时坐标还会在落指前漂一行
   for (let i = 0; i < maxSteps; i++) {
     const c = centerOf(label);
-    if (c && c.cy >= 110 && c.cy <= 370) {
+    if (c && c.cy >= 60 && c.cy <= 430) {
       sh('shell', 'input', 'tap', String(c.cx), String(c.cy));
       await sleep(2600);
       // 标题已经和行名统一，所以这里能**直接验证开的是不是这一页**：
@@ -92,7 +92,7 @@ const tapScrolled = async (label, maxSteps = 20) => {
       if (zonesVisible()) {
         // 点空（行在动画里挪了位）：同一处再补一次，别立刻放弃去找下一屏
         const again = centerOf(label);
-        if (again && again.cy >= 110 && again.cy <= 370) {
+        if (again && again.cy >= 60 && again.cy <= 430) {
           sh('shell', 'input', 'tap', String(again.cx), String(again.cy));
           await sleep(2600);
           if (await waitForTitle(label)) return true;
@@ -103,7 +103,7 @@ const tapScrolled = async (label, maxSteps = 20) => {
         await sleep(2200);
       }
     }
-    if (c && c.cy > 370) {
+    if (c && c.cy > 430) {
       crown(5, 6); // 贴底：往回抬半行
     } else {
       crown(-5, 10); // ≈ 1.2 行：20 格会从第 3 行头上跳过去（模型参数就栽在这）
