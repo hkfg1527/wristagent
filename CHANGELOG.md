@@ -11,6 +11,23 @@
 
 ---
 
+## [0.0.0.53] - 2026-11-18（内部版，不对外发布）
+
+### 拆上帝文件第三步：开关族搬出去
+`SettingsSwitchRow` / `SettingsCompactSwitch` / `SettingsSplitToggleRow` → 新文件 `SettingsSwitchRow.kt`（115 行）。
+`SettingsShared.kt` 从 **2043 → 1959 行**（三轮拆分累计 **2236 → 1959，−277 行**）。
+
+- `SettingsSlotRow` 从 `private` 放宽到 `internal`（行组件跨文件复用同一份两槽布局）。
+- 顺手删掉三个**只在注释里出现过**的 import：`SwitchButton`、`SwitchButtonDefaults`、`TextToggleButton`。
+- 守卫继续搬家不删：`SettingsVisualGuardTest` 的强调色守卫改成"允许三个文件、**总数仍是 6 处**"，
+  两槽布局与开关轨道的断言改读新文件；`substringAfter` 的锚点去掉了 `private` 前缀。
+
+### 真机冒烟（0.0.0.53 / versionCode 91）
+「工具与 MCP」页开关渲染正常（`docs/device/v11/switch-smoke.png`，时钟 1:12）。
+**顺带量出一个密度问题**（未修，留给用户拍板）：
+行内可写宽度 = 176dp − 14dp×2 = **148dp**，减去开关 44dp 与 10dp 间隙后左槽只剩 **94dp ≈ 188px**，
+7 个汉字（约 105dp）就会折行 —— 截图里「电量与温度感知」正是被拆成两行。
+
 ## [0.0.0.52] - 2026-11-18（内部版，不对外发布）
 
 ### 拆上帝文件第二步：滑杆整块搬出去
