@@ -11,6 +11,27 @@
 
 ---
 
+## [0.0.0.54] - 2026-11-18（内部版，不对外发布）
+
+### 拆上帝文件第四步 + 清冗余图标
+- `SettingsNavRow` + 四个排版令牌（组标题 / 行标签 / 行取值 / 焦点）+ `SettingsStatusBlock`
+  → `SettingsRowText.kt`（122 行）。`SettingsShared.kt` **1959 → 1866 行**，
+  四轮累计 **2236 → 1866（−370 行）**。
+- 删掉 10 个**永远不会被选中**的启动图标 webp（`mipmap-*/ic_launcher(.round).webp`，共 33 KB）：
+  `minSdk 33` 保证自适应图标可用，`mipmap-anydpi` 的 XML 优先级高于任何密度。
+  **APK 4.13 → 4.10 MB**。
+
+### 把一条"爱记仇"的守卫改成钉规则
+`SettingsVisualGuardTest` 的强调色守卫原来钉的是"哪几个文件里有 `Wear.Accent`"——
+拆一次文件就红一次（0.0.0.52 / .53 / .54 连红三次）。现在改成钉两件真规则：
+①**页面文件**（`*Section.kt` / `SettingsScreen.kt` / `SettingsStyleCards.kt`）里一处都不许有；
+②全站**总数固定 6 处**。以后随便怎么拆文件都不会误报，多涂一处照样红。
+
+### 验证
+- 单测 **1295 条 / 189 套件 / 0 失败**。
+- 真机（`0.0.0.54` / versionCode 92）：根页导航行、子页、时钟、卡片均正常
+  （`docs/device/v11/cardgroup-*.png`）。
+
 ## [0.0.0.53] - 2026-11-18（内部版，不对外发布）
 
 ### 拆上帝文件第三步：开关族搬出去

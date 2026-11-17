@@ -73,29 +73,22 @@ class SettingsVisualGuardTest {
         val usingAccent = settingsSources()
             .filter { (_, text) -> codeOnly(text).contains("Wear.Accent") }
             .keys
-        // 0.0.0.52/53：滑杆与开关族先后从 SettingsShared.kt 拆出去，允许出现的文件因此变成三处，
-        // **总数不变**（3 + 1 + 2 = 6）。拆文件不许顺手多涂一处强调色。
-        assertEquals(
-            "强调色只许出现在设计系统的这三个文件（选中态 / 滑轨 / 开关轨道）：",
-            setOf("SettingsShared.kt", "SettingsSliderRow.kt", "SettingsSwitchRow.kt"),
-            usingAccent
-        )
-
-        val shared = readSettings("SettingsShared.kt")
-        val accentTotal = Regex("Wear\\.Accent\\b").findAll(
-            codeOnly(shared) +
-                codeOnly(readSettings("SettingsSliderRow.kt")) +
-                codeOnly(readSettings("SettingsSwitchRow.kt"))
-        ).count()
-        assertEquals(
-            "全页强调色只允许：滑轨选中段 + 单选选中态 + 6dp 状态点 + 组标题短横 + 紧凑开关选中轨道",
-            6,
-            accentTotal
-        )
+        // 规则本身：强调色只能活在**设计系统文件**里，页面文件一律不许自己涂色；
+        // 全页总数固定 6 处（滑轨选中段 / 单选选中态 / 状态点 / 组标题短横 / 紧凑开关轨道 ×2）。
+        // 钉"哪些文件"会随每次拆文件误报（0.0.0.52/53/54 连红三次），改钉条数与"页面文件不许出现"。
+        val accentByFile = settingsSources()
+            .mapValues { (_, text) -> Regex("Wear\\.Accent\\b").findAll(codeOnly(text)).count() }
+            .filterValues { it > 0 }
+        val pageFiles = accentByFile.keys.filter {
+            it.endsWith("Section.kt") || it == "SettingsScreen.kt" || it == "SettingsStyleCards.kt"
+        }
+        assertEquals("页面文件不许直接涂强调色（必须经设计系统）：", emptySet<String>(), pageFiles.toSet())
+        assertEquals("全页强调色总数固定 6 处：" + accentByFile, 6, accentByFile.values.sum())
         assertTrue(
             "滑轨选中段必须跟随运行时强调色（0.0.0.52 起在 SettingsSliderRow.kt）",
             readSettings("SettingsSliderRow.kt").contains("selectedBarColor = Wear.Accent")
         )
+        val shared = readSettings("SettingsShared.kt")
         assertTrue("组标题短横必须在组合上下文读取运行时强调色", shared.contains("val accent = Wear.Accent"))
         assertTrue("组标题短横必须接收该运行时颜色", shared.contains("headerAccentMark(accent)"))
         assertTrue(
