@@ -24,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,6 +35,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
@@ -293,7 +295,20 @@ fun SettingsScreen(
                 // 根页没有走 ScreenScaffold（它把四个 hero 卡按 lazy item 逐个摆，还需要自定义遮罩），
                 // 所以这两个槽位在这里手工补上；位置与子页（ScreenScaffold 的 timeText/scrollIndicator 槽）
                 // 对齐到同一条 24dp 钟带，来回切页不会跳。
-                TimeText(modifier = Modifier.align(Alignment.TopCenter))
+                // 时钟随滚动淡出。
+                // 官方是 `AppScaffold` 托管这件事（滚动时把 TimeText 收走），本项目没有 AppScaffold，
+                // 只能自己按"列表是否离开顶部"给透明度 —— 否则内容会滑到时钟底下，
+                // 真机上表现为两者叠在 y≈10..30（六套风格都能复现）。
+                val clockAlpha by remember {
+                    // ScalingLazyListState 没有 firstVisibleItemIndex/ScrollOffset 这对属性，
+                    // 但项目里已有"是否停在顶部"的判据 isAtScrollTop()（子页下拉退出也用它）。
+                    derivedStateOf { if (listState.isAtScrollTop()) 1f else 0f }
+                }
+                TimeText(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .graphicsLayer { alpha = clockAlpha }
+                )
                 ScrollIndicator(
                     state = listState,
                     modifier = Modifier.align(Alignment.CenterEnd)
