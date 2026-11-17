@@ -1,7 +1,7 @@
 # 设置页风格重做计划（UI 第一优先）
 
 > 用户 2026-11-18 定：**UI 第一优先，核心功能往后放；风格不许大杂烩，每套要能单独讲清楚**。
-> 目标形态：4 套现有 + 1 套新增 = **5 套风格，每套内部自洽**；
+> 目标形态：4 套现有 + 2 套新增 = **6 套风格，每套内部自洽**；
 > 其中 M3E 那套全程只用官方组件，不掺手搓件。
 
 ## 1. 现状（2026-11-18 实测）
@@ -31,18 +31,27 @@
 实现方式：`SettingsStylePolicy` 一张表声明 8 个槽位，**渲染代码只读表，不许再写 `if (style == ...)`**。
 `SettingsStylePolicyGuardTest` 钉住：每套风格 8 个槽位都必须有值、且值互不矛盾。
 
-## 3. 五套风格的定义（第 5 套待命名）
+## 3. 六套风格的定义（用户 2026-11-18 定：扩到 6 套）
 
 | # | 风格 | 一句话定位 | 组件来源 | 状态 |
 |---|---|---|---|---|
 | 1 | 气泡 BALLOON | 整页一块连续曲面，行贴着屏幕圆弦走 | 手搓曲面 + 官方 Card（组） | 需收口 |
 | 2 | 方角 SQUARE | 全直角、横线分隔、文字居中 | 无壳 + 发丝线 | 需收口 |
-| 3 | 大卡片 GOOGLE_CARD | **100% 官方 Wear M3**：ScreenScaffold + TimeText + ScrollIndicator + Card + 官方控件 | 官方 | 本轮起作为基准档重做 |
+| 3 | 大卡片 GOOGLE_CARD | **官方 M3 卡片流**：一行一张 `Card`，卡内 label/value/meta | 官方 | 按官方样本重做 |
 | 4 | 终端 TERMINAL | 等宽、无壳、`> ` 前缀，抄端点用的极简档 | 无壳 + 等宽 | 需收口 |
-| 5 | 待定 | 建议：**M3 列表档**（官方 `TransformingLazyColumn` + 官方 `SwitchButton`/`Slider`/`RadioButton` 整行胶囊） | 官方 | 新增 |
+| 5 | 官方列表 M3_LIST（新） | **官方 M3E 列表**：`TransformingLazyColumn` + 整行胶囊控件（`Button` / `SplitToggleButton` / `Slider`） | 官方，100% | 新增 |
+| 6 | 官方转场 M3_TRANSFORM（新） | 同 5 的列表，但每行挂 `SurfaceTransformation` + `transformedHeight`：滚到边缘按官方曲线缩小淡出 | 官方，100% | 新增 |
 
-第 5 套的理由：大卡片档是"一行一张卡"，而官方 M3 还有另一种常态——**一行一个胶囊控件**。
-两者都用官方件，但密度完全不同，用户在表上会想要两种。
+**5 与 6 的区别**（不是换皮，是两种官方形态）：
+- 5 是"静态胶囊列表"——行高固定，只有滚动；
+- 6 加上官方 `rememberTransformationSpec()` 的行转场，滚动时边缘行按官方曲线缩放，视觉重心跟着屏幕中线走。
+两者共用同一套官方控件，差别只在是否有 `SurfaceTransformation`，所以实现上是"同一份列表 + 一个开关"。
+
+**依据**：官方样本 `ScaffoldSample.kt`（android/skills，Apache-2.0）确认了三件事：
+① `AppScaffold` 每个 app 只声明一次并托管 `TimeText` 进出场；② 官方 M3E 列表 =
+`TransformingLazyColumn` + `rememberTransformationSpec()` + `transformedHeight`；
+③ `EdgeButton` 要自己接 `Modifier.scrollable(...)`。
+（抓取记录与要点：`build-logs/reference/ScaffoldSample-NOTES.md`）
 
 ## 4. 迁移顺序（每轮一小步，每步真机截图）
 
