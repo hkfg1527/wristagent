@@ -349,3 +349,31 @@
 - 环：`SettingsStyleCards.kt` 的 `SettingsHeroCard`（右槽）与 `SettingsBrandCard`（右上角）都必须调 `SettingsHeroRing`，`ring = null` 时也要画轨道。
 - 不重叠：卡间距写在卡自己的 `padding` 上（`SettingsCardStyle.Gap` = 8dp），**不许用兄弟 `Spacer`** —— `SettingsStaggeredRow`/`RootContentRow` 内层是 `Box`，兄弟 `Spacer` 不产生间距（`docs/CONTEXT.md` §已完成第一条）。
 - 行高下限 48dp（`MinRowHeightDp`）、发丝线 1dp（`HairlineDp`）、行左右内边距 14dp（`RowSidePaddingDp`）、子项左移 12dp（`SubItemIndentDp`）、组间距 24dp（`SectionGapDp`）—— 六套风格共用，不随风格变。
+
+---
+
+## 7. 槽位声明 vs 真机实测（2026-11-18，0.0.0.70）
+
+| 风格 | 声明外壳 | 真机表现 | 结论 | 证据 |
+|---|---|---|---|---|
+| BALLOON | CARD_GROUP | 每组一张圆角卡 + 分区标题带强调色短横 | 一致 | `style-balloon-root.png` |
+| SQUARE | HAIRLINE_FLAT | 无卡、行间发丝线、标题居中 | 一致 | `style-square-hairline.png` |
+| GOOGLE_CARD | CARD_EACH | 一行一张 hero 卡（强调色标签 + 大数值 + 说明 + 圆环） | 一致 | `style-googlecard-root.png` |
+| M3_LIST | PLAIN | 官方胶囊列表 + 曲面时钟 + 右缘指示器 | 一致 | `m3list-tools-open.png` |
+| M3_TRANSFORM | PLAIN + 行转场 | 同上，滚动时顶部项被压扁 | 一致 | `m3transform-scrolled.png` |
+| TERMINAL | HAIRLINE_FLAT | 与 SQUARE 同外壳、等宽字 | **未单独截图** | — |
+
+### 实测发现的缺陷（未修，待定）
+
+**GOOGLE_CARD 根页：曲面时钟与首卡文字重叠。**
+截图 `style-googlecard-root.png` 里，时钟「2:25」压在首卡数值「deepseek-v4-pro」的同一段
+y≈10..30 区间上，肉眼可辨为两个字叠在一起。
+
+原因：根页的 `TimeText` 是**显式叠层**（本项目没有 `AppScaffold`，官方那套托管用不了），
+而列表 `contentPadding.top` 仍是 `RootContentTopPadding`（24dp）——只够让开遮罩，不够让开时钟带。
+其余风格首屏是普通行，被压的是空白，所以看不出来；大卡片档首屏就是一块大卡，问题才暴露。
+
+三个改法（都要用户拍板，因为它改的是首屏留白）：
+1. 根页 `contentPadding.top` 从 24dp 抬到 34dp（官方钟带高度）——所有风格首屏整体下移 10dp；
+2. 只在大卡片档抬到 34dp——风格间首屏位置会不一致；
+3. 时钟改画在内容之上并加一层渐隐底——不动布局，但要在时钟下面垫一条渐变。
