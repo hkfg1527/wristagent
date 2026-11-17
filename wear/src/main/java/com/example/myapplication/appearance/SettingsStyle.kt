@@ -28,7 +28,22 @@ enum class SettingsStyle(
      * 第四套是原创档：前三套都在给内容加壳（气球 / 方卡 / 大卡），这一套反过来把壳全部去掉，
      * 只留字与发丝线 —— 在表上抄端点、对参数时不需要装饰。
      */
-    TERMINAL(R.string.settings_style_terminal, R.string.settings_style_terminal_summary);
+    TERMINAL(R.string.settings_style_terminal, R.string.settings_style_terminal_summary),
+
+    /**
+     * 官方列表档：**100% 官方组件**的列表形态。
+     *
+     * 一行一个整宽胶囊控件（`SplitSwitchButton` / `SplitRadioButton` / `Slider`），
+     * 列表用官方 `TransformingLazyColumn`（见 `SettingsStyleM3List.kt`）。
+     * 与大卡片档的区别是形态而不是配色：那边一行一张卡，这边一行一个胶囊。
+     */
+    M3_LIST(R.string.settings_style_m3_list, R.string.settings_style_m3_list_summary),
+
+    /**
+     * 官方转场档：与 [M3_LIST] 同一份列表，但每行挂 `SurfaceTransformation` + `transformedHeight`，
+     * 滚到屏幕边缘时按官方曲线缩小淡出。实现上是"同一份列表 + 一个开关"，不是另一份代码。
+     */
+    M3_TRANSFORM(R.string.settings_style_m3_transform, R.string.settings_style_m3_transform_summary);
 
     companion object {
         val Default = BALLOON

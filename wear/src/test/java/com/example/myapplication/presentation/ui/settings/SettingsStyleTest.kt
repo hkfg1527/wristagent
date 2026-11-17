@@ -23,7 +23,7 @@ class SettingsStyleTest {
         SettingsStyle.values().forEach { style ->
             assertEquals(style, SettingsStyle.fromStorage(style.name))
         }
-        assertEquals(4, SettingsStyle.values().size)
+        assertEquals("六套风格：气泡/方角/大卡片/终端 + 官方列表 + 官方转场", 6, SettingsStyle.values().size)
     }
 
     @Test

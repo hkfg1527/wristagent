@@ -27,7 +27,7 @@ class SettingsStylePolicyTest {
             assertTrue("$style 的骨架槽位缺失", spec.shell != null)
             assertTrue("$style 的返回槽位缺失", spec.back != null)
         }
-        assertEquals("风格数量变了就要同步 UI-STYLE-PLAN.md", 4, all.size)
+        assertEquals("风格数量变了就要同步 UI-STYLE-PLAN.md", 6, all.size)
     }
 
     @Test
@@ -39,7 +39,12 @@ class SettingsStylePolicyTest {
     @Test
     fun theCardStyleIsTheOnlyOneOnTheOfficialScaffold() {
         val onScaffold = all.filter { SettingsStylePolicy.specOf(it).shell == SettingsPageShell.SCREEN_SCAFFOLD }
-        assertEquals("目前只有大卡片档走官方 ScreenScaffold", listOf(SettingsStyle.GOOGLE_CARD), onScaffold)
+        // 0.0.0.58 起官方两套也走 ScreenScaffold（它们的渲染实现见 SettingsStyleM3List.kt）
+        assertEquals(
+            "走官方 ScreenScaffold 的应当是大卡片 + 两套官方件",
+            listOf(SettingsStyle.GOOGLE_CARD, SettingsStyle.M3_LIST, SettingsStyle.M3_TRANSFORM),
+            onScaffold
+        )
         assertEquals(
             "大卡片档的返回必须进列表首项",
             SettingsBackControl.LIST_ROW,

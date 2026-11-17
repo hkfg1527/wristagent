@@ -544,4 +544,7 @@
     <string name="settings_tts_volume">Reply volume</string>
     <string name="settings_tts_speech_rate">Speech rate</string>
     <string name="settings_tts_speech_rate_value">%1$.1f×</string>
-</resources>
+    <string name="settings_style_m3_list">Official list</string>
+    <string name="settings_style_m3_list_summary">Official M3E list: one pill per row, official components only</string>
+    <string name="settings_style_m3_transform">Official transform</string>
+    <string name="settings_style_m3_transform_summary">Same list, rows scale and fade at the edges with the official curve</string></resources>

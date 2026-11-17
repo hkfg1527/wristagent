@@ -216,6 +216,42 @@ object SettingsStylePolicy {
             rowEnterSlide = true,
             cardEdgeZoom = false
         )
+        // 官方列表档：骨架 + 控件全部官方件（列表实现在 SettingsStyleM3List.kt，接线在下一轮）
+        SettingsStyle.M3_LIST -> SettingsStyleSpec(
+            shell = SettingsPageShell.SCREEN_SCAFFOLD,
+            header = SettingsGroupHeader.CENTERED,
+            rowShell = SettingsRowShell.PLAIN,
+            toggle = SettingsToggleControl.OFFICIAL_SWITCH_BUTTON,
+            slider = SettingsSliderControl.OFFICIAL_SEGMENTED,
+            radio = SettingsRadioControl.OFFICIAL_RADIO_BUTTON,
+            back = SettingsBackControl.LIST_ROW,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = false,
+            rootFocusBlock = false,
+            rootHeroCards = false,
+            subPageHero = false,
+            animateRootSections = false,
+            rowEnterSlide = false,
+            cardEdgeZoom = false
+        )
+        // 官方转场档：同一份官方列表 + 每行 SurfaceTransformation（差别只在行转场）
+        SettingsStyle.M3_TRANSFORM -> SettingsStyleSpec(
+            shell = SettingsPageShell.SCREEN_SCAFFOLD,
+            header = SettingsGroupHeader.CENTERED,
+            rowShell = SettingsRowShell.PLAIN,
+            toggle = SettingsToggleControl.OFFICIAL_SWITCH_BUTTON,
+            slider = SettingsSliderControl.OFFICIAL_SEGMENTED,
+            radio = SettingsRadioControl.OFFICIAL_RADIO_BUTTON,
+            back = SettingsBackControl.LIST_ROW,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = true,
+            rootFocusBlock = false,
+            rootHeroCards = false,
+            subPageHero = false,
+            animateRootSections = false,
+            rowEnterSlide = false,
+            cardEdgeZoom = true
+        )
     }
 
     /** 当前生效的风格声明。渲染侧只读它。 */

@@ -1,4 +1,4 @@
-﻿<resources>
+<resources>
     <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
         <string name="settings_model_and_service">模型与服务</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
@@ -544,7 +544,10 @@
     <string name="settings_tts_volume">播报音量</string>
     <string name="settings_tts_speech_rate">播报语速</string>
     <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>
-</resources>
+    <string name="settings_style_m3_list">官方列表</string>
+    <string name="settings_style_m3_list_summary">官方 M3E 列表：一行一个胶囊控件，全程官方件</string>
+    <string name="settings_style_m3_transform">官方转场</string>
+    <string name="settings_style_m3_transform_summary">同官方列表，滚动时边缘行按官方曲线缩小淡出</string></resources>
 
 
 
