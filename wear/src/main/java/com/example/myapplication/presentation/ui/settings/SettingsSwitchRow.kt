@@ -42,6 +42,17 @@ fun SettingsSwitchRow(
     /** 副标题行数上限：[SettingsSplitToggleRow] 用 2 行，其余行铺满（MAX_VALUE）。 */
     subtitleMaxLines: Int = Int.MAX_VALUE
 ) {
+    // 槽位表说"这套风格用官方开关"时，整行交给官方 SwitchButton；其余风格仍走行内手搓胶囊。
+    if (SettingsStylePolicy.current().toggle == SettingsToggleControl.OFFICIAL_SWITCH_BUTTON) {
+        OfficialSwitchRow(
+            label = label,
+            secondary = secondary,
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier
+        )
+        return
+    }
     SettingsSlotRow(
         title = label,
         subtitle = secondary,

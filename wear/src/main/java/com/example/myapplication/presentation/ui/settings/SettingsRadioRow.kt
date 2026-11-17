@@ -46,6 +46,17 @@ fun SettingsRadioRow(
     /** 子项：左槽线右移 12dp，字号与右槽线不变（[SettingsSubRadioRow] 就是它的一份薄封装）。 */
     subItem: Boolean = false
 ) {
+    // 官方档：整行交给官方 RadioButton（会丢掉 dangerSelected / dotColor，差异见 SettingsOfficialControls 注释）。
+    if (SettingsStylePolicy.current().radio == SettingsRadioControl.OFFICIAL_RADIO_BUTTON) {
+        OfficialRadioRow(
+            label = label,
+            secondary = subtitle,
+            selected = selected,
+            onSelect = onSelect,
+            modifier = modifier
+        )
+        return
+    }
     SettingsSlotRow(
         title = label,
         subtitle = subtitle,

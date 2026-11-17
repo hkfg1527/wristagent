@@ -79,44 +79,40 @@ class SettingsStyleConsistencyGuardTest {
      * 失败信息直接指出「哪套风格 / 哪个槽位 / 哪个文件 / 还有哪些手搓件」。
      */
     @Test
-    fun officialSlotStylesCarryNoHandRolledControls() {
-        // 0.0.0.58 起 M3_LIST / M3_TRANSFORM 已把槽位声明成官方件，但**渲染还没接线**
-        // （官方列表实现在 SettingsStyleM3List.kt，尚未被 SettingsSubPage 调用）。
-        // 所以这里显式列出"声明了官方件但还没接线"的风格；接线后必须把它从这里删掉，
-        // 让守卫自动生效 —— 这份清单只许变短，不许变长。
-        val notYetWired = setOf(SettingsStyle.M3_LIST, SettingsStyle.M3_TRANSFORM)
-        val official = officialSlotStyles().filterNot { it in notYetWired }
-        assumeTrue(
-            "TODO(等官方控件接线后再启用)：四套风格的 toggle/slider/radio 当前都是手搓件" +
-                "（COMPACT_SWITCH / THIN_TRACK / DOT），还没有官方控件档可查，这条守卫无事可做。" +
-                "某套风格的槽位改成 OFFICIAL_SWITCH_BUTTON / OFFICIAL_SEGMENTED / OFFICIAL_RADIO_BUTTON 之后，" +
-                "它会自动开始检查该风格的渲染文件里是否还留着 drawCircle( / SettingsCompactSwitch( / SettingsThinSlider(",
-            official.isNotEmpty()
-        )
+    fun officialSlotStylesGoThroughOfficialControls() {
+        // 0.0.0.59：官方档已接线 —— 三个行组件在自己入口处按槽位转发到
+        // SettingsOfficialControls.kt（OfficialSwitchRow / OfficialSliderRow / OfficialRadioRow）。
+        // 所以这条守卫改钉"**官方档的渲染文件里确实调了官方封装**"：
+        // 只钉"没有手搓件"是不够的（手搓件仍要服务其余四套风格，永远会在文件里）。
+        val official = officialSlotStyles()
+        assertTrue("没有任何风格声明官方控件，说明槽位表被改回去了", official.isNotEmpty())
         val offenders = mutableListOf<String>()
         for (style in official) {
             val spec = SettingsStylePolicy.specOf(style)
-            val officialSlots = mutableListOf<String>()
-            if (spec.toggle == SettingsToggleControl.OFFICIAL_SWITCH_BUTTON) officialSlots += "toggle"
-            if (spec.slider == SettingsSliderControl.OFFICIAL_SEGMENTED) officialSlots += "slider"
-            if (spec.radio == SettingsRadioControl.OFFICIAL_RADIO_BUTTON) officialSlots += "radio"
-            for (slot in officialSlots) {
-                for (fileName in renderFilesFor(slot)) {
-                    val hits = handRolledSymbols(codeOnly(readSettings(fileName)))
-                    if (hits.isNotEmpty()) {
-                        offenders += style.name + " 的 " + slot + " 槽位已声明官方控件，但 " + fileName +
-                            " 里还有 " + hits
-                    }
-                }
+            val needed = mutableListOf<Pair<String, String>>()
+            if (spec.toggle == SettingsToggleControl.OFFICIAL_SWITCH_BUTTON) needed += "toggle" to "OfficialSwitchRow("
+            if (spec.slider == SettingsSliderControl.OFFICIAL_SEGMENTED) needed += "slider" to "OfficialSliderRow("
+            if (spec.radio == SettingsRadioControl.OFFICIAL_RADIO_BUTTON) needed += "radio" to "OfficialRadioRow("
+            for ((slot, call) in needed) {
+                val files = renderFilesFor(slot)
+                val found = files.any { readSettings(it).let { s -> codeOnly(s).contains(call) } }
+                if (!found) offenders += style.name + " 的 " + slot + " 槽位声明了官方控件，但渲染文件里找不到 " + call
             }
         }
         assertTrue(
-            "官方控件档不许和手搓件共存（声明是官方、画的还是手搓 = 声明变成了摆设）：" +
-                offenders.joinToString("；"),
+            "官方档必须真的走官方封装（声明官方、画手搓 = 声明是摆设）：" + offenders.joinToString("；"),
             offenders.isEmpty()
         )
+        // 这条以后不许再出现"暂时放行"的名单：接线完成即视为永久生效。
+        assertTrue(
+            "notYetWired 名单必须为空（0.0.0.59 已接线）",
+            official.size == SettingsStyle.values().count {
+                SettingsStylePolicy.specOf(it).toggle == SettingsToggleControl.OFFICIAL_SWITCH_BUTTON ||
+                    SettingsStylePolicy.specOf(it).slider == SettingsSliderControl.OFFICIAL_SEGMENTED ||
+                    SettingsStylePolicy.specOf(it).radio == SettingsRadioControl.OFFICIAL_RADIO_BUTTON
+            }
+        )
     }
-
     /**
      * 上一条现在是 skipped，所以这里单独钉住「检测器真的会报」——否则那条守卫哪天醒过来也可能是个空壳。
      *

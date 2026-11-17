@@ -60,6 +60,19 @@ fun SettingsSliderRow(
     secondary: String? = null,
     modifier: Modifier = Modifier
 ) {
+    // 官方分段滑杆：没有文本槽，数值由调用点另画（本函数只负责控件本身）。
+    if (SettingsStylePolicy.current().slider == SettingsSliderControl.OFFICIAL_SEGMENTED) {
+        OfficialSliderRow(
+            label = label,
+            secondary = secondary,
+            value = value,
+            valueRange = valueRange,
+            steps = steps,
+            onValueChange = onValueChange,
+            modifier = modifier
+        )
+        return
+    }
     SettingsCardRow(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxWidth(),
