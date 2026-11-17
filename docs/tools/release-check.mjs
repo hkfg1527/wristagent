@@ -104,7 +104,10 @@ const device = () => {
   const found = [];
   for (let step = 0; step < 26 && found.length < 4; step++) {
     const t = dumpTexts();
-    for (const z of zones) if (t.includes(z) && !found.includes(z)) found.push(z);
+    for (const z of zones) {
+      // 用包含匹配：终端档的分区标题带 `> ` 前缀（`> 让它能做事`），全等匹配会漏。
+      if (t.some((x) => x.includes(z)) && !found.includes(z)) found.push(z);
+    }
     if (found.length === 4) break;
     crown(-5, 12);
     spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 2200']);
