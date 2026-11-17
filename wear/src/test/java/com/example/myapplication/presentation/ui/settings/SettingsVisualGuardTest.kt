@@ -73,15 +73,27 @@ class SettingsVisualGuardTest {
         val usingAccent = settingsSources()
             .filter { (_, text) -> codeOnly(text).contains("Wear.Accent") }
             .keys
-        assertEquals("强调色只许出现在设计系统（选中态 / 滑轨）：", setOf("SettingsShared.kt"), usingAccent)
+        // 0.0.0.52：滑杆（选中段那道强调色）连同几何常量一起从 SettingsShared.kt 拆到了
+        // SettingsSliderRow.kt。允许出现的文件因此是两处，**总数不变**（5 + 1 = 6）。
+        assertEquals(
+            "强调色只许出现在设计系统的这两个文件（选中态 / 滑轨）：",
+            setOf("SettingsShared.kt", "SettingsSliderRow.kt"),
+            usingAccent
+        )
 
         val shared = readSettings("SettingsShared.kt")
+        val accentTotal = Regex("Wear\\.Accent\\b").findAll(
+            codeOnly(shared) + codeOnly(readSettings("SettingsSliderRow.kt"))
+        ).count()
         assertEquals(
             "全页强调色只允许：滑轨选中段 + 单选选中态 + 6dp 状态点 + 组标题短横 + 紧凑开关选中轨道",
             6,
-            Regex("Wear\\.Accent\\b").findAll(codeOnly(shared)).count()
+            accentTotal
         )
-        assertTrue("滑轨选中段必须跟随运行时强调色", shared.contains("selectedBarColor = Wear.Accent"))
+        assertTrue(
+            "滑轨选中段必须跟随运行时强调色（0.0.0.52 起在 SettingsSliderRow.kt）",
+            readSettings("SettingsSliderRow.kt").contains("selectedBarColor = Wear.Accent")
+        )
         assertTrue("组标题短横必须在组合上下文读取运行时强调色", shared.contains("val accent = Wear.Accent"))
         assertTrue("组标题短横必须接收该运行时颜色", shared.contains("headerAccentMark(accent)"))
         assertTrue("紧凑开关选中轨道只染轨道", shared.contains("if (checked) Wear.Accent.copy(alpha = 0.82f)"))

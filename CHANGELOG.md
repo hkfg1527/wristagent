@@ -11,6 +11,23 @@
 
 ---
 
+## [0.0.0.52] - 2026-11-18（内部版，不对外发布）
+
+### 拆上帝文件第二步：滑杆整块搬出去
+`SettingsSliderRow` + `SettingsThinSlider` + 三条滑轨几何常量 → 新文件 `SettingsSliderRow.kt`（194 行）。
+`SettingsShared.kt` 从 **2203 → 2043 行**（两轮拆分累计 −193 行）。
+
+- 拆分时把三个被滑杆用到的辅助从 `private` 放宽到 `internal`：`SettingsLabelValueGap`、
+  `SettingsValueMaxWidth`、`SettingsSubtitleLine`。
+- **守卫跟着搬家，不是删掉**：`SettingsVisualGuardTest` 里"强调色只许出现在设计系统"从
+  "只许 SettingsShared.kt"改成"只许这两个文件、**总数仍是 6 处**"；"滑轨选中段必须跟随运行时强调色"
+  改读 `SettingsSliderRow.kt`。
+
+### 验证
+- 单测 **1295 条 / 189 套件 / 0 失败**。
+- 真机（`0.0.0.52` / versionCode 90）打开「网络与请求」：滑杆轨道、强调色选中段、白色拇指、
+  说明行全部正常（`docs/device/v11/slider-smoke.png`，时钟 12:56）。
+
 ## [0.0.0.51] - 2026-11-18（内部版，不对外发布）
 
 ### 拆上帝文件第一步 + 把两份复制粘贴的行组件收成一份
