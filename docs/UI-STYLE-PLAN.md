@@ -66,3 +66,13 @@
 - 同一风格内**槽位一致**：抽查任意两个页面，返回控件位置、组标题样式、行外壳三件事必须同源。
 - **不许混用**：M3E 档的 `SwitchButton`/`Slider`/`RadioButton` 必须是官方 import，守卫测试扫描源码断言。
 - 每套风格一张真机截图 + 一张"槽位表"，放进 `docs/device/v11/style-<name>-*`。
+
+## 6. 收口进度与卡点（2026-11-18 记）
+
+- **官方列表 / 官方转场**：已走 `TransformingLazyColumn` 宿主，行是官方胶囊，`rowShell=PLAIN` 生效。
+- **方角 / 终端（HAIRLINE_FLAT）**：`SettingsGroupCard` 里加了"非卡外壳就不套 Card"的分支，
+  编译与单测通过，但**真机截图仍显示圆角卡**（`docs/device/v11/cardgroup-root-scrolled.png`，
+  当时 prefs 已是 SQUARE）。说明这个分支没被走到，或者风格值没在重组时刷新——**未验证，改动已回滚**。
+  下轮先查两件事：①`SettingsStylePolicy.specOf(SQUARE).rowShell` 运行时到底是什么；
+  ②`SettingsGroupCard` 是否是根页唯一的卡壳来源（`SettingsStyleCards.kt` 里还有一层 `SettingsM3Card`）。
+- **气泡 / 大卡片**：未动。
