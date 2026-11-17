@@ -73,6 +73,21 @@
    滚动前后各取一次首条文本，若完全相同 → 判定"滚动无效"，此时主动点一下空白区域夺回焦点再滚。
 2. 或者绕开表冠：直接用 `uiautomator` 的节点点击（`UiDevice.findObject(By.text(...)).click()`），
    需要写一个 20 行的 instrumentation 或 appium 式脚本，成本高但一次解决。
+## 三·八 又试了两种改法，都没过（0.0.0.67，已回滚）
+
+1. **加"表冠是否生效"检测**：滚动一次看首条文本变不变，不变就标 BLOCKED。
+   实测 `crownDead=false`（表冠确实推动了列表），但仍 FAIL —— 说明问题不是焦点。
+2. **`toTop()` 滚动到顶**：反复 crown(30) 直到首条文本连续两次不变。
+   仍然 FAIL，而且第 4 页的"实际标题"变成了「模型与服务」，说明落点还是乱的。
+
+两次改动都**没有留在仓库**（`sweep-pages.mjs` 保持 0.0.0.65 版本）。
+结论：这套"数表冠格数 + 按坐标点"的方案在这台设备上不稳定（SQUARE/官方档下根页行高不同，
+滚动步长与行高不是线性关系）。**不要再微调参数**，直接换方案：
+
+- 方案 A（推荐）：写 instrumentation 测试，用 `UiDevice.findObject(By.text("模型参数")).click()`，
+  按节点点，完全不碰坐标。
+- 方案 B：用 `uiautomator dump` 拿到目标节点 bounds 后，**每次点击前重新 dump 一次**并立即点击
+  （中间不加任何 sleep），把坐标漂移窗口压到最小。
 ## 四、探针现状
 
 `build-logs/probe-settings-sweep.mjs`：能跑，判据是"prefs 有没有变"。
