@@ -39,6 +39,16 @@ fun SettingsGroupCard(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 槽位表说 rowShell = PLAIN 的风格（官方列表 / 官方转场）不套卡：
+        // 行直接躺在页面上，靠官方控件自己的胶囊轮廓分隔。这一处判断同时服务根页与全部子页。
+        if (SettingsStylePolicy.current().rowShell == SettingsRowShell.PLAIN) {
+            Column(modifier = Modifier.width(SettingsContentWidth)) {
+                CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
+                    content()
+                }
+            }
+            return@Column
+        }
         Card(
             onClick = {},
             // 宽度 = 内容基准 176dp = 实测 352px：与卡片档 hero 卡、与"所有卡片同一宽度"的硬约束一致。

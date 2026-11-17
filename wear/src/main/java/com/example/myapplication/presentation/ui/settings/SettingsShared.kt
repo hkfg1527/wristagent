@@ -504,13 +504,16 @@ fun SettingsSubPage(
                 val firstIndex = chunk.indices.first()
                 if (chunk.grouped) {
                     // 一组连续卡片行 = 一张官方 Card（分组规则见 SettingsPageChunking）。
+                    // 例外：槽位表声明 rowShell = PLAIN 的风格（官方列表 / 官方转场）**不套卡**，
+                    // 行直接躺在页面上，靠官方控件自己的胶囊轮廓分隔 —— 这就是"一行一个胶囊"的形态。
+                    val plainRows = SettingsStylePolicy.current().rowShell == SettingsRowShell.PLAIN
                     SettingsStaggeredRow(
                         index = firstIndex + 1,
                         rowCount = rowCount,
                         stagger = stagger,
                         exit = exit
                     ) {
-                        SettingsGroupCard {
+                        val emitRows: @Composable () -> Unit = {
                             chunk.indices.forEach { index ->
                                 val entry = content[index]
                                 val next = content.getOrNull(index + 1)
@@ -519,13 +522,23 @@ fun SettingsSubPage(
                                     previousIsSubItem = entry.isSubItem
                                 )
                                 CompositionLocalProvider(
-                                    LocalSettingsRowSlot provides rowSlots[index],
+                                    // PLAIN 档没有卡片，行槽位一律传 null，让行组件走"无壳"分支
+                                    LocalSettingsRowSlot provides if (plainRows) null else rowSlots[index],
                                     LocalSettingsGroupHairlineStart provides hairlineStart.dp
                                 ) {
                                     // 防止末端行的 hairline 判定跨出当前卡片
                                     entry.content()
                                 }
                             }
+                        }
+                        if (plainRows) {
+                            Column(
+                                modifier = Modifier
+                                    .width(settingsCardWidth())
+                                    .padding(vertical = SettingsRowGap)
+                            ) { emitRows() }
+                        } else {
+                            SettingsGroupCard { emitRows() }
                         }
                     }
                 } else {
