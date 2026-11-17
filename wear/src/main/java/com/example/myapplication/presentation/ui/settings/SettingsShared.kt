@@ -310,6 +310,107 @@ class SettingsRows internal constructor(
  * - 底部：44dp「完成返回」行，滚动区底部预留 [Wear.Size.BottomBarReserve]；
  * - 入场沿用 [SettingsStaggeredRow]（逐行浮动 24dp→0 + 淡入，step 40ms，cap 360ms）。
  */
+/**
+ * 官方列表档的子页宿主：TransformingLazyColumn + 每个 item 一个设置行。
+ *
+ * 为什么单独一份：官方 M3E 列表的行转场（`transformedHeight` / `SurfaceTransformation`）是
+ * **项作用域 API**，只有 `TransformingLazyColumn` 的 item lambda 里才拿得到 scope。
+ * 旧宿主是 `ScalingLazyColumn`，切不过去 —— 那套用的是 scalingParams，两种缩放机制不通用。
+ *
+ * 本文件不做逐行入场动画（官方转场本身就是入场），返回键走列表首项（槽位 back = LIST_ROW）。
+ */
+@Composable
+private fun OfficialListSubPage(
+    title: String,
+    onBack: () -> Unit,
+    rows: List<SettingsRowEntry>,
+    rowSlots: List<SettingsRowSlot?>,
+    transformRows: Boolean,
+    exit: SettingsExitController
+) {
+    val state = androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState()
+    val spec = androidx.wear.compose.material3.lazy.rememberTransformationSpec()
+    val focusRequester = remember { FocusRequester() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Wear.Palette.Bg)
+    ) {
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            runCatching { focusRequester.requestFocus() }
+        }
+
+        androidx.wear.compose.foundation.lazy.TransformingLazyColumn(
+            state = state,
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent {
+                    state.dispatchRawDelta(it.verticalScrollPixels)
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
+            contentPadding = PaddingValues(
+                start = settingsCardScreenInset(),
+                end = settingsCardScreenInset(),
+                top = RootContentTopPadding,
+                bottom = Wear.Size.SettingsBottomInset
+            )
+        ) {
+            // 返回：列表首项（与槽位表 back = LIST_ROW 对应）
+            item(key = "m3-back") {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.wear.compose.material3.Button(
+                        onClick = { exit.begin(onBack) },
+                        modifier = Modifier.width(SettingsContentWidth)
+                    ) {
+                        androidx.wear.compose.material3.Text(stringResource(R.string.settings_back))
+                    }
+                }
+            }
+            item(key = "m3-title") {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    androidx.wear.compose.material3.Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.width(SettingsContentWidth)
+                    )
+                }
+            }
+            items(
+                count = rows.size,
+                key = { index -> "m3-row-" + index }
+            ) { index ->
+                // TODO(0.0.0.62)：M3_TRANSFORM 的行转场还没接 —— 1.7.1 的 transformedHeight 是
+                // heightProvider 重载，不是我在 1.5.6 源码里看到的 (scope, spec) 形式，
+                // 需要按真实签名重写。在那之前两套官方风格视觉一致。
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.width(SettingsContentWidth)) {
+                        CompositionLocalProvider(
+                            LocalSettingsRowSlot provides null,
+                            LocalSettingsGroupHairlineStart provides SettingsRowSidePadding
+                        ) {
+                            rows[index].content()
+                        }
+                    }
+                }
+            }
+        }
+
+        // 曲面时钟 + 右缘滚动指示器：与其余风格同一位置（本项目没有 AppScaffold，只能显式叠层）
+        TimeText(modifier = Modifier.align(Alignment.TopCenter))
+        ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
+    }
+}
+
 @Composable
 fun SettingsSubPage(
     title: String,
@@ -347,6 +448,20 @@ fun SettingsSubPage(
     // 组 = 一张卡：每行落在组里的哪个位置（组首 / 组中 / 组尾 / 单行）由行序列本身算出；
     // 组标题与卡外行（动作按钮）把卡截断。组内分隔线的左端缩进按"下一行是不是子项组首"算。
     val rowSlots = SettingsRowComposition.rowSlots(content.map { it.kind })
+
+    // 官方列表档（槽位 rowShell = PLAIN）：整个子页换成官方 TransformingLazyColumn 宿主。
+    // M3_TRANSFORM 再给每个 item 挂官方 transformedHeight，滚到边缘按官方曲线压扁。
+    if (SettingsStylePolicy.current().rowShell == SettingsRowShell.PLAIN) {
+        OfficialListSubPage(
+            title = title,
+            onBack = onBack,
+            rows = content,
+            rowSlots = rowSlots,
+            transformRows = SettingsStylePolicy.current().cardScaling,
+            exit = exit
+        )
+        return
+    }
 
     val listState = rememberScalingLazyListState()
     val listFocusRequester = remember { FocusRequester() }
