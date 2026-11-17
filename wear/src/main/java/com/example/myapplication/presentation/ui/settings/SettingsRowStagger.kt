@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
-import com.example.myapplication.appearance.SettingsStyle
 
 /** 根设置列表参与逐行动画的内容行数：标题 + 3 个组标题 + 9 个分区入口 + 末尾"完成返回"。 */
 const val SettingsStaggeredRowCount = 14
@@ -187,7 +186,8 @@ fun SettingsStaggeredRow(
     // 卡片档只做淡入、不做位移：入场时每行先下移 24dp 再上浮，位移期间会压过上一张卡 ——
     // 实机连拍可见相邻两张卡的扫描行程连成一整段（h≈293 = 两张卡），静止时才分开。
     // 卡片之间的 8dp 间隙必须始终存在，所以位移在卡片档里恒为 0；其余三套保持原来的浮入。
-    val slideOnEnter = WearAppearance.style != SettingsStyle.GOOGLE_CARD
+    // 原来是 val slideOnEnter = WearAppearance.style != SettingsStyle.GOOGLE_CARD，现在读表
+    val slideOnEnter = SettingsStylePolicy.current().rowEnterSlide
     Box(
         modifier = modifier.graphicsLayer {
             val enterValue = enter.value

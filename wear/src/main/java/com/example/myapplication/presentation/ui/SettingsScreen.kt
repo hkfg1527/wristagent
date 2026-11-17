@@ -63,8 +63,7 @@ import com.example.myapplication.presentation.ui.settings.VoiceEntryContent
 import com.example.myapplication.presentation.ui.settings.SettingsCardStyle
 import com.example.myapplication.presentation.ui.settings.SettingsCurveGeometry
 import com.example.myapplication.presentation.ui.settings.SettingsHeroCard
-import com.example.myapplication.appearance.SettingsStyle
-import com.example.myapplication.presentation.ui.settings.WearAppearance
+import com.example.myapplication.presentation.ui.settings.SettingsStylePolicy
 import com.example.myapplication.presentation.ui.settings.SettingsRowGap
 import com.example.myapplication.presentation.ui.settings.SettingsRowSlot
 import com.example.myapplication.presentation.ui.settings.LocalSettingsRowSlot
@@ -142,7 +141,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     // 大卡片档走官方 M3E 的缩放与居中吸附，其余三套保持自绘几何那套参数
-    val cardStyle = WearAppearance.style == SettingsStyle.GOOGLE_CARD
+    // 原来是 val cardStyle = WearAppearance.style == SettingsStyle.GOOGLE_CARD，现在读表
+    val cardStyle = SettingsStylePolicy.current().cardScaling
 
     var currentModel by remember { mutableStateOf(preferences.modelName) }
     var currentBaseUrl by remember { mutableStateOf(preferences.baseUrl) }
@@ -360,7 +360,8 @@ fun SettingsScreen(
                     // 18sp / Medium 比任何一行都重，眯眼看时页面因此有唯一落点。
                     // 卡片档不画这块焦点文字：品牌身份卡已经把现在用的是哪个模型、挂在哪家端点说得更清楚，
                     // 两处并排只会把同一个模型名在 200px 内印两遍。
-                    if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) {
+                    // 原来是 if (WearAppearance.style != SettingsStyle.GOOGLE_CARD)，现在读表
+                    if (SettingsStylePolicy.current().rootFocusBlock) {
                         item {
                             RootContentRow(index = 0, stagger = rowStagger, exit = exit) {
                                 SettingsFocusBlock(
@@ -375,7 +376,8 @@ fun SettingsScreen(
                     // 卡片档：每张卡都是一个独立的 lazy item。
                     // 官方的居中吸附与边缘缩放都以 item 为单位：整页塞进一个 item 时，首卡永远贴不到屏心，
                     // 滚动也只剩一整块位移 —— 这正是没有惯性、也没有上下缩小的成因。
-                    if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+                    // 原来是 if (WearAppearance.style == SettingsStyle.GOOGLE_CARD)，现在读表
+                    if (SettingsStylePolicy.current().rootHeroCards) {
                         // 卡片之间的 8dp 写进卡自己的 padding：RootContentRow 内层是 Box，子元素会叠放，
                         // 兄弟 Spacer 不产生竖向间距（这正是之前 hero 卡贴在一起的原因）。
                         item(key = "card-brand") {
@@ -470,7 +472,8 @@ fun SettingsScreen(
                             stagger = rowStagger,
                             exit = exit,
                             // 卡片档这 3000+ px 的整块不参与逐行动画：它的图层会变成一块 432×3113 的位图
-                            animate = WearAppearance.style != SettingsStyle.GOOGLE_CARD
+                            // 原来是 WearAppearance.style != SettingsStyle.GOOGLE_CARD，现在读表
+                            animate = SettingsStylePolicy.current().animateRootSections
                         ) {
                             // 标题与卡片都靠 Column 的水平居中摆放：分区标题本身是"整条宽度"的，
                             // 少了这层居中它会被顶到屏幕左边，正好被卡片圆角压住（真机截图为证）。

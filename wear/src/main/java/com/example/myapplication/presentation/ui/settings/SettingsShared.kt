@@ -431,7 +431,8 @@ fun SettingsSubPage(
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
             // 关闭逐行等比缩放：曲面宽度与内容呼吸由卡片几何负责
-            scalingParams = if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+            // 原来是 if (WearAppearance.style == SettingsStyle.GOOGLE_CARD)，现在读表：cardScaling
+            scalingParams = if (SettingsStylePolicy.current().cardScaling) {
                 cardStyleScalingParams()
             } else {
                 settingsScalingParams()
@@ -445,7 +446,8 @@ fun SettingsSubPage(
             // 传 null 后顶部锚点就是 contentPadding.top，几何完全由常量决定（详见 SettingsTopAnchorMath）。
             autoCentering = null
         ) {
-            val showHero = hero != null && WearAppearance.style == SettingsStyle.GOOGLE_CARD
+            // 原来是 hero != null && WearAppearance.style == SettingsStyle.GOOGLE_CARD，现在读表：subPageHero
+            val showHero = hero != null && SettingsStylePolicy.current().subPageHero
             // hero 的标签就是这句话时不再画页标题：卡片档里标题与 hero 标签会紧挨着重两次
             val showPageHeader = SettingsTextLayout.shouldRenderPageHeader(showHero, heroLabel, title)
             val rowCount = content.size + 1 + if (showHero) 1 else 0
@@ -664,7 +666,8 @@ private fun BoxScope.SettingsEdgeBackButton(
     exit: SettingsExitController,
     scrollState: ScalingLazyListState
 ) {
-    if (WearAppearance.style == SettingsStyle.SQUARE) {
+    // 原来是 if (WearAppearance.style == SettingsStyle.SQUARE)，现在读表：back 槽位
+    if (SettingsStylePolicy.current().back == SettingsBackControl.SQUARE_EDGE_BUTTON) {
         SettingsSquareBackButton(onClick, exit, scrollState)
         return
     }
@@ -779,7 +782,8 @@ private fun BoxScope.SettingsSquareBackButton(
 @Composable
 fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
     val baseStyle = SettingsSectionStyle
-    if (WearAppearance.style == SettingsStyle.TERMINAL) {
+    // 原来是 if (WearAppearance.style == SettingsStyle.TERMINAL)，现在读表：header 槽位
+    if (SettingsStylePolicy.current().header == SettingsGroupHeader.CHEVRON_PREFIX) {
         BasicText(
             text = "> " + text,
             modifier = Modifier
@@ -795,7 +799,8 @@ fun SettingsSectionHeader(text: String, isFirstSection: Boolean = false) {
         )
         return
     }
-    if (WearAppearance.style == SettingsStyle.SQUARE) {
+    // 原来是 if (WearAppearance.style == SettingsStyle.SQUARE)，现在读表：header 槽位
+    if (SettingsStylePolicy.current().header == SettingsGroupHeader.CENTERED) {
         BasicText(
             text = text,
             modifier = Modifier
@@ -968,7 +973,8 @@ internal fun SettingsCardRow(
     // 这里不再需要按屏幕弦长算 y / 半宽 —— 那些量只服务已删除的不可达分支（见下方注释）。
     val groupChrome = LocalSettingsGroupChrome.current
 
-    if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
+    // 原来是 if (WearAppearance.style == SettingsStyle.GOOGLE_CARD)，现在读表：rowShell 槽位
+    if (SettingsStylePolicy.current().rowShell == SettingsRowShell.CARD_EACH) {
         // 大卡片档：一行一张独立圆角卡，行与行之间靠 8dp 间隙分开，不再共用一张曲面。
         Column(
             modifier = modifier.fillMaxWidth(),
@@ -991,7 +997,8 @@ internal fun SettingsCardRow(
         return
     }
 
-    if (WearAppearance.style == SettingsStyle.SQUARE || WearAppearance.style == SettingsStyle.TERMINAL) {
+    // 原来是 SQUARE 或 TERMINAL 两个 == 判断，现在读表：rowShell 槽位（两套共用发丝线外壳）
+    if (SettingsStylePolicy.current().rowShell == SettingsRowShell.HAIRLINE_FLAT) {
         // 方角档与终端档：不画曲面、不做等比缩放，行与行之间只留一根发丝线。
         // 两者的差别在排版层（终端档整页等宽），外壳共用同一份实现。
         Column(

@@ -22,7 +22,8 @@ class SettingsCardEntryMotionTest {
     fun theCardStyleEntersWithoutSliding() {
         assertTrue(
             "必须按风格区分入场位移",
-            source.contains("val slideOnEnter = WearAppearance.style != SettingsStyle.GOOGLE_CARD")
+            // 0.0.0.57：入场位移改由槽位表决定（原来钉的是被迁移掉的字面量，会变成"注释里也有所以恒绿"）
+            source.contains("val slideOnEnter = SettingsStylePolicy.current().rowEnterSlide")
         )
         assertTrue(
             "位移必须被 slideOnEnter 门控",

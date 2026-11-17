@@ -1,7 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.animation.core.CubicBezierEasing
-import com.example.myapplication.appearance.SettingsStyle
 import androidx.compose.animation.core.Easing
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -87,7 +86,8 @@ internal object CardEdgeZoom {
  */
 @Composable
 internal fun Modifier.cardEdgeZoom(): Modifier {
-    if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) return this
+    // 原来是 if (WearAppearance.style != SettingsStyle.GOOGLE_CARD) return this，现在读表
+    if (!SettingsStylePolicy.current().cardEdgeZoom) return this
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }

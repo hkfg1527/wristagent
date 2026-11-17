@@ -238,7 +238,8 @@ fun AppearanceContent(
                 SettingsSubRadioRow(
                     label = stringResource(style.labelRes),
                     subtitle = stringResource(style.summaryRes),
-                    selected = WearAppearance.style == style,
+                    // 原来是 WearAppearance.style == style，现在读表：哪套风格在生效由 policy 回答
+                    selected = SettingsStylePolicy.isActive(style),
                     onSelect = {
                         applySettingsStyle(context, style)
                         context.vibrateTick()
