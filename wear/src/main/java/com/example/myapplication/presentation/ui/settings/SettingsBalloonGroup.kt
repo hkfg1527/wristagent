@@ -49,6 +49,19 @@ fun SettingsGroupCard(
             }
             return@Column
         }
+        // 槽位表说 rowShell 不是"卡"的风格（PLAIN / HAIRLINE_FLAT）就不套 Card：
+        // - PLAIN（官方列表/官方转场）：行靠官方控件的胶囊轮廓分隔；
+        // - HAIRLINE_FLAT（方角/终端）：行靠行间发丝线分隔，再套卡就是"卡里画线"，两种外壳打架。
+        // 全项目只有这一个 SettingsGroupCard 定义（0.0.0.70 用 grep 确认过），根页与子页都走这里。
+        val rowShell = SettingsStylePolicy.current().rowShell
+        if (rowShell != SettingsRowShell.CARD_GROUP && rowShell != SettingsRowShell.CARD_EACH) {
+            Column(modifier = Modifier.width(SettingsContentWidth)) {
+                CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
+                    content()
+                }
+            }
+            return@Column
+        }
         Card(
             onClick = {},
             // 宽度 = 内容基准 176dp = 实测 352px：与卡片档 hero 卡、与"所有卡片同一宽度"的硬约束一致。
