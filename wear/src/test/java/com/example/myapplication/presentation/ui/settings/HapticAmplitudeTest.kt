@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settings
 
 import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,13 +41,22 @@ class HapticAmplitudeTest {
 
     @Test
     fun bothHapticHelpersReadTheConfiguredLevel() {
-        val shared = readProjectFile("src/main/java/com/example/myapplication/presentation/ui/settings/SettingsShared.kt")
-        val occurrences = Regex(Regex.escape("preferences.hapticAmplitude.scale")).findAll(shared).count()
+        // 0.0.0.50：三个触觉函数从 2081 行的 SettingsShared.kt 拆到 SettingsHaptics.kt
+        // （审查点名上帝文件），这条守卫跟着换文件读 —— 钉的规则一个字没变。
+        val haptics = readProjectFile(
+            "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsHaptics.kt"
+        )
+        val occurrences = Regex(Regex.escape("preferences.hapticAmplitude.scale")).findAll(haptics).count()
         assertTrue("刻度震动与确认震动都必须读档位，实际 " + occurrences + " 处", occurrences >= 2)
         assertTrue(
             "必须用官方 primitive 组合，而不是自造波形",
-            shared.contains("VibrationEffect.startComposition()") &&
-                shared.contains("addPrimitive(")
+            haptics.contains("VibrationEffect.startComposition()") &&
+                haptics.contains("addPrimitive(")
+        )
+        assertFalse(
+            "触觉实现不该再散落在 SettingsShared.kt 里",
+            readProjectFile("src/main/java/com/example/myapplication/presentation/ui/settings/SettingsShared.kt")
+                .contains("fun Context.vibrateTick()")
         )
     }
 }

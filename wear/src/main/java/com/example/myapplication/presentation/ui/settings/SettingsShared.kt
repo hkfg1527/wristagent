@@ -197,46 +197,6 @@ val SubPageHeaderTopPadding: Dp = SettingsTopAnchorMath.titleTopPaddingDp(
 /** 文本弹窗里输入框的最大高度：再高就会把按钮顶出圆屏。 */
 private val DialogFieldMaxHeight = 120.dp
 
-fun Context.vibrateTick() {
-    val preferences = AgentPreferences(this)
-    if (!preferences.hapticsEnabled) return
-    vibratePrimitive(
-        primitive = VibrationEffect.Composition.PRIMITIVE_TICK,
-        scale = preferences.hapticAmplitude.scale
-    )
-}
-
-/** 破坏性操作与真实提交的唯一确认震动：一次、短促，与滚动刻度震动彻底分开。 */
-fun Context.vibrateConfirm() {
-    val preferences = AgentPreferences(this)
-    if (!preferences.hapticsEnabled) return
-    vibratePrimitive(
-        primitive = VibrationEffect.Composition.PRIMITIVE_CLICK,
-        scale = preferences.hapticAmplitude.scale
-    )
-}
-
-/**
- * 按档位缩放一个官方 primitive。
- *
- * 用 Composition 而不是 createPredefined：后者不接受强度参数，想改强度只能换波形 ——
- * 那就把"滴"的系统语义丢了。scale 取值 (0,1]，越界一律夹到 [0.1, 1]。
- */
-private fun Context.vibratePrimitive(primitive: Int, scale: Float) {
-    try {
-        val vibrator = getSystemService(Vibrator::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val composed = VibrationEffect.startComposition()
-                .addPrimitive(primitive, scale.coerceIn(0.1f, 1f))
-                .compose()
-            vibrator.vibrate(composed)
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(15L)
-        }
-    } catch (_: Exception) {}
-}
-
 /**
  * 设置子弹窗类型
  */
@@ -1394,12 +1354,14 @@ fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     secondary: String? = null,
-    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
+    subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary),
+    /** 副标题行数上限：[SettingsSplitToggleRow] 用 2 行，其余行铺满（MAX_VALUE）。 */
+    subtitleMaxLines: Int = Int.MAX_VALUE
 ) {
     SettingsSlotRow(
         title = label,
         subtitle = secondary,
-        subtitleMaxLines = Int.MAX_VALUE,
+        subtitleMaxLines = subtitleMaxLines,
         subtitleBelowRow = subtitleBelowRow,
         modifier = modifier,
         onClick = { onCheckedChange(!checked) },
@@ -1442,10 +1404,11 @@ private fun SettingsCompactSwitch(checked: Boolean) {
 }
 
 /**
- * 二值枚举行：官方 M3E [TextToggleButton]。
+ * 二值枚举行（分段开关语义）：与 [SettingsSwitchRow] **同一份实现**，只把副标题行数收到 2 行。
  *
- * Wear M3 1.7.1 里没有 Chip / SplitToggleChip（那是 material2 的组件族），
- * 分段开关在 M3E 由 TextToggleButton 承担，因此枚举切换走这里。
+ * 历史注释说这里走的是官方 `TextToggleButton` —— 实际不是：Wear M3 1.7.1 的
+ * `TextToggleButton` 是整宽胶囊，会吞掉整行，右槽位置就没了。这里用的是行尾 44×26dp 的手搓开关，
+ * 与 [SettingsSwitchRow] 完全一致。2026-11-17 审查把这份复制出来的函数体收成一次委托。
  */
 @Composable
 fun SettingsSplitToggleRow(
@@ -1456,14 +1419,14 @@ fun SettingsSplitToggleRow(
     secondary: String? = null,
     subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(secondary)
 ) {
-    SettingsSlotRow(
-        title = label,
-        subtitle = secondary,
-        subtitleMaxLines = 2,
-        subtitleBelowRow = subtitleBelowRow,
+    SettingsSwitchRow(
+        label = label,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
         modifier = modifier,
-        onClick = { onCheckedChange(!checked) },
-        trailing = { SettingsCompactSwitch(checked = checked) }
+        secondary = secondary,
+        subtitleBelowRow = subtitleBelowRow,
+        subtitleMaxLines = 2
     )
 }
 
@@ -1650,7 +1613,9 @@ fun SettingsRadioRow(
     subtitleStatus: SettingsStatusTone? = null,
     subtitleBelowRow: Boolean = SettingsTextLayout.shouldPlaceSubtitleBelowRow(subtitle),
     dangerSelected: Boolean = false,
-    dotColor: Color? = null
+    dotColor: Color? = null,
+    /** 子项：左槽线右移 12dp，字号与右槽线不变（[SettingsSubRadioRow] 就是它的一份薄封装）。 */
+    subItem: Boolean = false
 ) {
     SettingsSlotRow(
         title = label,
@@ -1660,6 +1625,7 @@ fun SettingsRadioRow(
         subtitleBelowRow = subtitleBelowRow,
         modifier = modifier,
         onClick = onSelect,
+        subItem = subItem,
         trailing = {
             SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
         }
@@ -1722,17 +1688,18 @@ fun SettingsSubRadioRow(
     dangerSelected: Boolean = false,
     dotColor: Color? = null
 ) {
-    SettingsSlotRow(
-        title = label,
+    // 一份实现 + 一个参数，不再复制整段（2026-11-17 审查：这两行曾是逐字重复的两份）
+    SettingsRadioRow(
+        label = label,
+        selected = selected,
+        onSelect = onSelect,
+        modifier = modifier,
         subtitle = subtitle,
         subtitleMaxLines = subtitleMaxLines,
         subtitleBelowRow = subtitleBelowRow,
-        modifier = modifier,
-        onClick = onSelect,
-        subItem = true,
-        trailing = {
-            SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
-        }
+        dangerSelected = dangerSelected,
+        dotColor = dotColor,
+        subItem = true
     )
 }
 

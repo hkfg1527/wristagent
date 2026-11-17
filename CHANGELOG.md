@@ -11,6 +11,25 @@
 
 ---
 
+## [0.0.0.51] - 2026-11-18（内部版，不对外发布）
+
+### 拆上帝文件第一步 + 把两份复制粘贴的行组件收成一份
+用户新规「简洁优先：同一个控件被交接写成多份，就融成一份只留一份」。这一轮动的是审查报告 §2 的头两条。
+
+- **触觉三件套搬出 SettingsShared.kt** → 新建 `SettingsHaptics.kt`（56 行）：
+  `vibrateTick` / `vibrateConfirm` / `vibratePrimitive`。它们只依赖 `AgentPreferences` 与系统 Vibrator，
+  和排版、卡片、行组件毫无关系。`SettingsShared.kt` 因此从 2236 行降到 **2203 行**。
+- **`SettingsSplitToggleRow` 不再复制 `SettingsSwitchRow` 的函数体**：改成一次委托，
+  差别只剩副标题行数（2 行 vs 铺满）。顺手纠正了一处**假注释** —— 它原先写着"官方 TextToggleButton"，
+  实际用的是行尾手搓开关（官方那个是整宽胶囊，会吞掉右槽）。
+- **`SettingsSubRadioRow` 同理**：`SettingsRadioRow` 新增 `subItem` 参数，子项行改委托。
+
+### 验证
+- 单测 **1295 条 / 189 套件 / 0 失败**；其中 `HapticAmplitudeTest` 跟着改读新文件（规则一个字没变，
+  并加了一条"触觉实现不许再散落回 SettingsShared.kt"）。
+- 真机（`0.0.0.51` / versionCode 89）冒烟：设置根页与子页文本、卡片、时钟与改前一致
+  （`docs/device/v11/cardgroup-*.png`）。
+
 ## [0.0.0.50] - 2026-11-18（**第 5 个发布点**）
 
 内部版走到第 50 个，按节奏做一次对外发布前的完整回归。发布前自检 7 项全过才打 tag。
