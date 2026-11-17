@@ -65,8 +65,8 @@
     <string name="settings_asr_system">System recognizer</string>
     <string name="settings_replay_onboarding">Replay the guided tour</string>
     <string name="settings_done_back">Done</string>
-    <string name="settings_sub_model_config">Model &amp; Endpoint</string>
-    <string name="settings_sub_hyper_params">Inference</string>
+    <string name="settings_sub_model_config">Models &amp; Services</string>
+    <string name="settings_sub_hyper_params">Model Parameters</string>
 
     <!-- Hyper parameters. -->
     <string name="settings_temperature_secondary">Higher = wilder; lower = steadier</string>
@@ -365,7 +365,7 @@
     <string name="settings_netdiag_action_probe">Run one real request</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
     <string name="settings_voice_entry">Voice &amp; Wake</string>
-    <string name="settings_sub_voice_entry">Voice Input</string>
+    <string name="settings_sub_voice_entry">Voice &amp; Wake</string>
     <string name="settings_voice_switch_header">Voice</string>
     <string name="settings_voice_asr_enabled">Speech recognition</string>
     <string name="settings_voice_asr_enabled_secondary">Off: no recording, no network request</string>
@@ -457,7 +457,7 @@
     <string name="settings_sandbox_workspace">Workspace</string>
     <string name="settings_sandbox_full">Full access</string>
 
-    <string name="settings_sub_gesture">Gestures &amp; side key</string>
+    <string name="settings_sub_gesture">Bottom Bar Side Key</string>
     <string name="settings_gesture_long_press">Long press</string>
     <string name="settings_gesture_double_tap">Double tap</string>
     <string name="settings_gesture_side_short">Side key short</string>

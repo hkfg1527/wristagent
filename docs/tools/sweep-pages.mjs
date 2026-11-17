@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * 设置页 15 页巡检：每页判据只有两条 —— **能打开**、**能返回根页**。
  *
@@ -62,15 +62,38 @@ const centerOf = (label) => {
  *
  * 所以：先回顶，再用 20 格一步往下扫，扫到就点。每页最多 12 步，够覆盖整页。
  */
+/**
+ * 等页面标题出现。
+ *
+ * 为什么需要：点完 2.6s 就 dump，会读到**动画中间帧** —— 行已经排好、标题还没上屏，
+ * 于是 `texts()[0]` 是某一行而不是页标题（「语音与唤醒」被读成「启用语音识别」、
+ * 「特权执行」被读成「Root」）。判据本身没错，是取样太早。
+ */
+const waitForTitle = async (label, tries = 6) => {
+  for (let i = 0; i < tries; i++) {
+    const t = texts();
+    if (t[0] === label) return true;
+    await sleep(700);
+  }
+  return false;
+};
+
 const tapScrolled = async (label, maxSteps = 20) => {
   crown(5, 90);
-  await sleep(2800);
+  await sleep(4500); // 回顶后等惯性/回弹彻底停：2.8s 时坐标还会在落指前漂一行
   for (let i = 0; i < maxSteps; i++) {
     const c = centerOf(label);
     if (c && c.cy >= 110 && c.cy <= 370) {
       sh('shell', 'input', 'tap', String(c.cx), String(c.cy));
       await sleep(2600);
-      return true;
+      // 标题已经和行名统一，所以这里能**直接验证开的是不是这一页**：
+      // 点空 → 还停在根页；点在隔壁行 → 标题是隔壁页的名字。两种都认得出。
+      if (await waitForTitle(label)) return true;
+      const title = texts()[0] || '';
+      if (title && title !== label && !zonesVisible()) {
+        sh('shell', 'input', 'keyevent', '4'); // 点到隔壁了：退回去重来
+        await sleep(2200);
+      }
     }
     if (c && c.cy > 370) {
       crown(5, 6); // 贴底：往回抬半行
@@ -126,16 +149,17 @@ await sleep(4000);
 const results = [];
 for (let i = start; i < Math.min(start + count, PAGES.length); i++) {
   const label = PAGES[i];
+  // 标题与行名已统一（0.0.0.48），所以"打开"的判据收紧成 **标题必须等于行名**：
+  // 点在隔壁行、点空、打开后标题不对，三种情况都会被这条抓住。
   const tapped = await tapScrolled(label);
   const after = texts();
-  const stillRoot = ZONES.some((z) => after.some((t) => t.includes(z)));
-  const opened = tapped && !stillRoot && after.length > 1;
-  const title = opened ? after[0] : '';
+  const title = after[0] || '';
+  const opened = tapped && title === label;
   const back = await backToRoot();
   results.push({ index: i, label, title, titleMatchesRow: title === label, opened, back });
   console.log(
     `PAGE ${i} ${label}\topen=${opened ? 'ok' : 'FAIL'}\tback=${back ? 'ok' : 'FAIL'}` +
-      (opened ? `\ttitle=${title}${title === label ? '' : '  <- 与行名不一致'}` : '')
+      (title && title !== label ? `\t实际标题=${title}` : '')
   );
   if (!back) {
     shot('sweep-fail-' + i);

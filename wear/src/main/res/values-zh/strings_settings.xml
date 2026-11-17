@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
         <string name="settings_model_and_service">模型与服务</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
@@ -65,8 +65,8 @@
     <string name="settings_asr_system">系统识别</string>
     <string name="settings_replay_onboarding">重新观看操作引导</string>
     <string name="settings_done_back">完成返回</string>
-    <string name="settings_sub_model_config">模型与端点</string>
-    <string name="settings_sub_hyper_params">推理参数</string>
+    <string name="settings_sub_model_config">模型与服务</string>
+    <string name="settings_sub_hyper_params">模型参数</string>
 
     <!-- 推理参数。 -->
     <string name="settings_temperature_secondary">越高越发散，越低越稳</string>
@@ -355,7 +355,7 @@
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
     <string name="settings_voice_entry">语音与唤醒</string>
-    <string name="settings_sub_voice_entry">语音输入</string>
+    <string name="settings_sub_voice_entry">语音与唤醒</string>
     <string name="settings_voice_switch_header">语音</string>
     <string name="settings_voice_asr_enabled">启用语音识别</string>
     <string name="settings_voice_asr_enabled_secondary">关闭后不录音、不发起网络请求</string>
@@ -457,7 +457,7 @@
     <string name="settings_sandbox_workspace">工作区</string>
     <string name="settings_sandbox_full">全权限</string>
 
-    <string name="settings_sub_gesture">手势与侧键</string>
+    <string name="settings_sub_gesture">底栏副键</string>
     <string name="settings_gesture_long_press">长按</string>
     <string name="settings_gesture_double_tap">双击</string>
     <string name="settings_gesture_side_short">侧键短按</string>
@@ -545,3 +545,7 @@
     <string name="settings_tts_speech_rate">播报语速</string>
     <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>
 </resources>
+
+
+
+
