@@ -13,9 +13,14 @@
  *    结果全被记成 SKIP。折中：接受 110..370，滚不动就按当前坐标点，并**记录 INCONCLUSIVE**
  *    而不是直接判失败。
  *
- * 用法：node docs/tools/sweep-settings.mjs
+ * ⚠️ 当前状态（2026-11-18）：**这个工具还不能产出可信结论**。
+ * 最近一次全跑（语音与唤醒 / 网络与请求 / 模型参数）：OK=0 / INCONCLUSIVE=11 / SKIP=3。
+ * 原因不是解析，而是"点了没反应"——滑杆行点标签不改值、分区标题本来不可点、
+ * 部分行点开是弹层。要拿到真结论，必须换成按节点点击 + 读控件语义（instrumentation），
+ * 别再在这个脚本里调坐标了。
+ * * 用法：node docs/tools/sweep-settings.mjs
  * 输出：每行一条结论（OK / INCONCLUSIVE / SKIP）+ 末尾 JSON 汇总。
- */import { sh, sleep, texts, crown, dumpNodes, enterSettings, shot } from '../docs/tools/watch.mjs';
+ */import { sh, sleep, texts, crown, dumpNodes, enterSettings, shot } from './watch.mjs';
 
 const PKG = 'dev.ghr.wristagent';
 const PREFS = `/data/data/${PKG}/shared_prefs/agent_prefs.xml`;
@@ -50,7 +55,7 @@ const openPage = async (label) => {
   await sleep(4000);
   for (let i = 0; i < 22; i++) {
     const c = centerOf(label);
-    if (c && c.cy >= 110 && c.cy <= 370) {
+    if (c && c.cy >= 60 && c.cy <= 450) {
       sh('shell', 'input', 'tap', String(c.cx), String(c.cy));
       await sleep(2600);
       if (texts().slice(0, 3).some((x) => x === label)) return true;
@@ -65,12 +70,12 @@ const openPage = async (label) => {
 const bringToCenter = async (label) => {
   let c = centerOf(label);
   for (let k = 0; k < 10; k++) {
-    if (c && c.cy >= 110 && c.cy <= 370) return c;
-    crown(c && c.cy < 200 ? 5 : -5, 3);
+    if (c && c.cy >= 60 && c.cy <= 450) return c;
+    crown(c && c.cy < 250 ? 5 : -5, 3);
     await sleep(1500);
     c = centerOf(label);
   }
-  return c && c.cy >= 110 && c.cy <= 370 ? c : null;
+  return c && c.cy >= 60 && c.cy <= 450 ? c : null;
 };
 
 const rowLabels = (pageTitle) =>

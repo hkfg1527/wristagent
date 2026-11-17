@@ -139,3 +139,20 @@
 | **0.0.0.81** | **15/15** | —— |
 
 HANDOFF §0.5 第①条 **正式收口**，不再需要"自动化 + 手工"的混合结论。
+## 六、设置项实测：工具已判定"不可用于结论"（0.0.0.82）
+
+把点击安全带放宽到 60..450 后重跑三页（语音与唤醒 / 网络与请求 / 模型参数）：
+**OK=0 / INCONCLUSIVE=11 / SKIP=3**，仍然一条可信结论都没有。
+
+失败模式已经查清，不是坐标问题：
+- 滑杆行**点标签不改值**（要拖轨道或点加减号）；
+- 分区标题（`> 语音`、`> 网络与交互`）本来不可点，却被当成了"候选行"；
+- 部分行点开是弹层（`界面变了但键没变`）；
+- 值文本（`3.0s`、`0.8`）也被当成行去点。
+
+**结论**：这个脚本（`docs/tools/sweep-settings.mjs`）停在"能跑但不可信"的状态，
+文件头已写明警告。要拿到真结论只能换 instrumentation：
+`UiDevice.findObject(By.text(...)).click()` + 读 `UiObject2.isChecked/isSelected` 或
+`AccessibilityNodeInfo.stateDescription`，然后才断言 `agent_prefs.xml` 的变化。
+
+已通过的 6 个键（工具页三个开关 + security_mode + settings_style）仍是唯一可信数据。
