@@ -157,6 +157,11 @@ await sleep(4000);
 const results = [];
 for (let i = start; i < Math.min(start + count, PAGES.length); i++) {
   const label = PAGES[i];
+  // 每页都冷启重进设置：0.0.0.66 证实失败行是 tapped=false —— 表冠推动不了列表（焦点不在列表上）。
+  // 冷启后焦点是干净的，这也是最早两页能过、越往后越容易失败的原因。
+  await enterSettings();
+  crown(5, 90);
+  await sleep(3500);
   // 标题与行名已统一（0.0.0.48），所以"打开"的判据收紧成 **标题必须等于行名**：
   // 点在隔壁行、点空、打开后标题不对，三种情况都会被这条抓住。
   const tapped = await tapScrolled(label);
