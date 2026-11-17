@@ -11,6 +11,38 @@
 
 ---
 
+## [0.0.0.49] - 2026-11-17（内部版，不对外发布）
+
+### 全代码审查（用户新规的第一次）：5 个子智能体并行，报告 `docs/ARCH-AUDIT-0.0.0.49.md`
+基线：**153 文件 / ~30876 行 / 17 包**；测试 **1295 条 / 189 套件 / 17420 行**；
+`presentation.ui.settings` 一包 **9038 行（29%）**；**8 个上帝文件占了全项目 30%**。
+
+### 修掉一个 P0 真炸弹：R8 的 keep 规则从来没生效
+`release { isMinifyEnabled = true }` 但**从未调用 `proguardFiles(...)`** ——
+仓库里那份 1377 字节的 `proguard-rules.pro`（coroutines ServiceLoader / Shizuku / AIDL keep）
+完全没用上，release 只吃 AGP 默认规则。已接上默认规则 + 项目规则。
+
+### 驳回一条审查结论 + 实测撤回一条“优化”
+- 审查说 `libs.compose.ui.tooling` 与 `libs.androidx.compose.ui.tooling` 重复 —— 查版本目录后确认是
+  `androidx.wear.compose` 与 `androidx.compose.ui` 两件东西，**不动**。
+- `maxParallelForks = 4` 实测 **50.3s**，1 fork **51.3s**，差 2%（噪声内）：1295 条真跑只占约 10s，
+  瓶颈是编译（约 40s）。按“简洁优先”不引入这条配置，源码里留了注释记这个数。
+
+### 砍掉审查确认的死代码（净 −198 行）
+`git diff --stat`：**108 插入 / 306 删除**。删掉的是：
+- `SettingsCurveGeometry.cardPath`（81 行）——它唯一那条调用在一个**不可达分支**里；
+- `SettingsCardRow` 里那段 43 行的"按屏幕弦长自绘超椭圆"分支；
+- `groupPath` 转发函数、`RootSectionRow`、`SettingsPrimaryLabel` / `SettingsSecondaryLabel`、四个只用于那条分支的局部量。
+两条守卫测试同步改写（不是删掉）：曲线契约改钉 `buildGroupPath`，按压反馈改钉"行不自绘填充、卡面归官方 Card"。
+真机冒烟：设置根页与子页渲染与改前一致（`docs/device/v11/cardgroup-*.png`，时钟 11:48）。
+
+### 修掉一条导航缺陷（真机验证）
+`网络与请求 → 网络体检` 按系统返回会**直接跳回设置根页**，父页被跳过；而同层级的
+`系统提示词` 是正常回父页的。根因：内层页是 `overlay` + 页内 `inner` 状态，返回键走的是外层
+`BackHandler`（`activeDialog = null`），没人先关浮层。
+修法：`SettingsSubPage` 新增 `overlayBack`，浮层打开时注册更内层的 `BackHandler`。
+真机八次轮询全部 `page=网络与请求 / zones=false`。新增守卫 `SettingsInnerOverlayBackGuardTest`。
+
 ## [0.0.0.48] - 2026-11-17（内部版，不对外发布）
 
 ### 修 4 页「点进去看到的标题和点的那一行不一样」

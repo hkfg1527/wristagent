@@ -32,8 +32,8 @@ android {
         minSdk = compatMinSdk ?: 33
         targetSdk = 37
         manifestPlaceholders["wearableLibRequired"] = (compatMinSdk == null).toString()
-        versionCode = 86
-        versionName = "0.0.0.48"
+        versionCode = 87
+        versionName = "0.0.0.49"
         // 任何密钥都不参与构建：API key 只能由用户在应用设置里填，进 SharedPreferences。
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }
@@ -56,6 +56,13 @@ android {
                 signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
+            // 少了这一行，isMinifyEnabled = true 只会吃 AGP 默认规则 —— 仓库里那份
+            // proguard-rules.pro（coroutines ServiceLoader / Shizuku / AIDL 的 keep）**根本没生效**。
+            // 这是 2026-11-17 全量审查（tests-build）抓出来的：配置写了、文件在、就是没接上。
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
@@ -76,6 +83,9 @@ android {
     testOptions {
         // 单测直接构造 Application/AndroidViewModel：框架方法返回默认值而不是抛 Stub!
         unitTests.isReturnDefaultValues = true
+        // 实测过 maxParallelForks = 4：50.3s → 1 fork 51.3s，差 2%（噪声内）。
+        // 原因很朴素 —— 1295 条测试真正执行只占约 10s，剩下 40s 是编译。
+        // 既然零收益，按"简洁优先"不引入这条配置。
     }
 }
 

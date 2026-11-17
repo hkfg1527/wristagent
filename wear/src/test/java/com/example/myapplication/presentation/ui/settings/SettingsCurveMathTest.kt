@@ -72,11 +72,16 @@ class SettingsCurveMathTest {
         val source = com.example.myapplication.readProjectFile(
             "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsCurve.kt"
         )
-        val cardPath = source.substringAfter("fun cardPath(").substringBefore("private fun smoothClosedPath")
-        assertEquals("两条侧边各一段 + 上下封口各一段", 4, Regex("cubicTo\\s*\\(").findAll(cardPath).count())
+        // 0.0.0.49：`cardPath`（每行自绘一段弦长轮廓）连同它唯一那条不可达调用一起删掉了 ——
+        // 现在全项目只剩"整组一张卡"的 `buildGroupPath`，这条曲线契约就钉在它身上。
+        assertFalse("cardPath 已随不可达分支删除，别再加回来", source.contains("fun cardPath("))
+        val groupPath = source.substringAfter("fun buildGroupPath(").substringBefore("private fun wallSlice")
+        assertTrue("轮廓必须用三次曲线连成", groupPath.contains("cubicTo("))
+        assertFalse("轮廓不得退化成直线拼接", groupPath.contains("lineTo("))
+        val wall = source.substringAfter("private fun wallSlice(").substringBefore("fun ")
+        assertTrue("侧壁两端的切线控制点必须真的算出来", wall.contains("c1x =") && wall.contains("c2x ="))
         assertTrue("封口只保留 20dp 浅弧", source.contains("CapHeightDp = 20f"))
         assertFalse("封口不得再用第二个四分之一圆拼出圆拱", source.contains("BezierCircle"))
-        assertFalse("侧边不得用直线拼接", source.contains("lineTo(lTop"))
     }
 
     @Test

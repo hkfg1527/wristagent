@@ -48,6 +48,8 @@ fun NetworkRequestContent(
         title = stringResource(R.string.settings_sub_network_request),
         heroLabel = stringResource(R.string.settings_sub_network_request),
         onBack = { if (inner) inner = false else onBack() },
+        // 系统返回键也要先关内层体检页：以前它直接退到设置根页，父页被跳过（真机实测）
+        overlayBack = if (inner) ({ inner = false }) else null,
         overlay = {
             if (inner) {
                 NetworkDiagnosticsContent(

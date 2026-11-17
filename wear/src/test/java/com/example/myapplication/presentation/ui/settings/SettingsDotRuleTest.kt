@@ -43,6 +43,10 @@ class SettingsGroupLineGuardTest {
     private val cardZoom = readProjectFile(
         "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsCardEdgeZoom.kt"
     )
+    /** 组卡外壳：行所在的官方 Card 由它创建（文件名沿用历史名 SettingsBalloonGroup.kt）。 */
+    private val groupCardShell = readProjectFile(
+        "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsBalloonGroup.kt"
+    )
 
     @Test
     fun groupHairlineIsOneBorderStrokeAndNoLongerANoiseOfDots() {
@@ -83,8 +87,14 @@ class SettingsGroupLineGuardTest {
     fun pressFeedbackOnlyChangesTheCurvedSurfaceColor() {
         assertTrue(cardRow.contains("collectIsPressedAsState()"))
         assertTrue(cardRow.contains("indication = null"))
-        assertTrue("按压只改曲面填充色", cardRow.contains("drawPath(path = path, color = rowBackground)"))
+        // 0.0.0.49：行不再自绘任何填充 —— 卡面由 SettingsGroupCard 里的官方 Card 提供。
+        // 以前这里钉的是 `drawPath(path = path, color = rowBackground)`，那行代码随不可达分支一起删了。
+        assertFalse("行不得再自绘填充（卡面归官方 Card）", cardRow.contains("drawPath(path = path, color = rowBackground)"))
         assertFalse("按压不得加边框", cardRow.contains("border("))
+        assertTrue(
+            "卡面必须由官方 Card 提供（形状与配色都别手搓）",
+            groupCardShell.contains("CardDefaults.cardColors(containerColor = SettingsCardSurface)")
+        )
         // 0.0.0.46：等比缩小的责任从"行"下沉到"卡"。
         // 组内行已经在一张官方 Card 里，行再各自按屏幕弦长缩放，卡内文字就会左右不齐（真机可见）。
         // 现在行这一层完全不缩放，只缩整张卡 —— 下面接着钉卡那一侧仍然等比、仍然只缩不放。

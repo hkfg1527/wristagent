@@ -356,6 +356,14 @@ fun SettingsSubPage(
     onBack: () -> Unit,
     overlay: @Composable () -> Unit = {},
     /**
+     * 内层浮层的返回处理：**只在浮层打开时传非 null**。
+     *
+     * 不传的话，系统返回键会一路走到外层 `SettingsScreen` 的 `BackHandler`（`activeDialog = null`），
+     * 于是从「网络体检」返回会直接跳回设置根页，父页「网络与请求」被跳过。
+     * 真机实测过：另一个内层页「系统提示词」是回父页的，两个内层页行为不一致 —— 就是这一处缺的钩子。
+     */
+    overlayBack: (() -> Unit)? = null,
+    /**
      * 卡片档的页首大卡：与根页同一套 hero 卡，让"每个设置页的初始项都是大卡片"成立。
      *
      * 只有 [SettingsStyle.GOOGLE_CARD] 才渲染；其余风格传了也看不见，因此各子页可以放心传入。
@@ -396,6 +404,12 @@ fun SettingsSubPage(
             // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
             .pullDownToDismiss(canPullDown = { listState.isAtScrollTop() }, onDismiss = onBack)
     ) {
+        // 内层浮层优先吃掉系统返回：先关浮层，再退页面。
+        // 注册顺序上它比外层 SettingsScreen 的 BackHandler 晚，所以默认就能先收到事件。
+        if (overlayBack != null) {
+            BackHandler { overlayBack.invoke() }
+        }
+
         // 表冠要焦点：等节点真正挂上树的那一帧再请求，首帧直接请求会落到未初始化的 requester 上。
         // 子页每次进入都是全新组合，按 Unit 触发即可，不需要外层再喂变化量。
         LaunchedEffect(Unit) {
@@ -990,16 +1004,8 @@ internal fun SettingsCardRow(
         return
     }
 
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val screenHeightDp = configuration.screenHeightDp
-    val screenWidthDp = configuration.screenWidthDp
-    val screenHeightPx = with(density) { screenHeightDp.dp.toPx() }
-    val screenMarginPx = with(density) { SettingsCurveMath.ScreenEdgeMarginDp.dp.toPx() }
-    val baseHalfPx = with(density) { SettingsCurveMath.MinCardWidthDp.dp.toPx() / 2f }
-    val capHeightPx = with(density) { SettingsCurveGeometry.CapHeightDp.dp.toPx() }
-    // y 只在绘制/图层阶段读；滚动时只失效绘制，不触发整行重组。
-    val yInRootPx = remember { mutableStateOf(screenHeightPx / 2f) }
+    // 行内的所有几何都由 SettingsGroupCard 的卡壳与行内 padding 决定，
+    // 这里不再需要按屏幕弦长算 y / 半宽 —— 那些量只服务已删除的不可达分支（见下方注释）。
     val groupChrome = LocalSettingsGroupChrome.current
 
     if (WearAppearance.style == SettingsStyle.GOOGLE_CARD) {
@@ -1086,28 +1092,14 @@ internal fun SettingsCardRow(
         return
     }
 
+    // 兜底声明：走到这里的行只可能"在卡里 + 但组壳不是 SettingsGroupCard"。
+    // 0.0.0.46 起 BALLOON 的卡片一律由 SettingsGroupCard 提供（它会把 groupChrome 置 true），
+    // 所以上面 groupChrome 分支已经 return；这条末路**不可达**。
+    // 原来这里还有 290 行"按屏幕弦长自绘超椭圆"的代码（连同 SettingsCurveGeometry.cardPath），
+    // 2026-11-17 全量审查确认不可达后删除，真机回归见 docs/ARCH-AUDIT-0.0.0.49.md。
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .onGloballyPositioned { coordinates ->
-                val newY = coordinates.positionInRoot().y
-                // 阈值取 2px（约 1dp）：滚动时行内缩放层每帧都在算，收小写入频率只为减少失效，
-                    // 1dp 的缩放差肉眼不可见。
-                    if (kotlin.math.abs(newY - yInRootPx.value) > 2f) yInRootPx.value = newY
-            }
-            .drawWithContent {
-                val path = SettingsCurveGeometry.cardPath(
-                    size = size,
-                    topInRootPx = yInRootPx.value,
-                    screenHeightPx = screenHeightPx,
-                    screenMarginPx = screenMarginPx,
-                    capHeightPx = capHeightPx,
-                    roundTop = shape.roundedTop,
-                    roundBottom = shape.roundedBottom
-                )
-                drawPath(path = path, color = rowBackground)
-                drawContent()
-            },
+            .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Column(modifier = Modifier.width(SettingsContentWidth)) {
@@ -2023,30 +2015,6 @@ fun SettingsTextDialog(
             }
         }
     }
-}
-
-/** 主标签：1 行 + 省略号，官方组件内部的行内容统一走这里。 */
-@Composable
-private fun SettingsPrimaryLabel(text: String) {
-    BasicText(
-        text = text,
-        modifier = Modifier.fillMaxWidth(),
-        style = Wear.TextBody,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
-}
-
-/** 次标签：Caption 级，最多 2 行。 */
-@Composable
-private fun SettingsSecondaryLabel(text: String, maxLines: Int = 1) {
-    BasicText(
-        text = text,
-        modifier = Modifier.fillMaxWidth(),
-        style = Wear.TextCaption,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis
-    )
 }
 
 /** 下滑退出手势阈值：松手时位移超过该值即退场，否则回弹复位。 */

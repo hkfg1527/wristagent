@@ -89,9 +89,17 @@ const tapScrolled = async (label, maxSteps = 20) => {
       // 标题已经和行名统一，所以这里能**直接验证开的是不是这一页**：
       // 点空 → 还停在根页；点在隔壁行 → 标题是隔壁页的名字。两种都认得出。
       if (await waitForTitle(label)) return true;
-      const title = texts()[0] || '';
-      if (title && title !== label && !zonesVisible()) {
-        sh('shell', 'input', 'keyevent', '4'); // 点到隔壁了：退回去重来
+      if (zonesVisible()) {
+        // 点空（行在动画里挪了位）：同一处再补一次，别立刻放弃去找下一屏
+        const again = centerOf(label);
+        if (again && again.cy >= 110 && again.cy <= 370) {
+          sh('shell', 'input', 'tap', String(again.cx), String(again.cy));
+          await sleep(2600);
+          if (await waitForTitle(label)) return true;
+        }
+      } else {
+        // 开到了别的页：退回去重来
+        sh('shell', 'input', 'keyevent', '4');
         await sleep(2200);
       }
     }

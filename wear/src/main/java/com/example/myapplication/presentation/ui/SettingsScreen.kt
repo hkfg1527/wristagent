@@ -889,23 +889,6 @@ private fun gestureSummary(bindings: GestureBindings): String {
 }
 
 /**
- * 根页的组标题行：与子页 [SettingsSectionHeader] 完全同构（12sp / TextMuted / Medium，左对齐）。
- */
-@Composable
-private fun RootSectionRow(
-    index: Int,
-    stagger: SettingsRowStaggerState,
-    exit: SettingsExitController,
-    content: @Composable () -> Unit
-) {
-    SettingsStaggeredRow(index = index, rowCount = RootRowCount, stagger = stagger, exit = exit) {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            content()
-        }
-    }
-}
-
-/**
  * 根页的内容行：一块 176dp 宽的行内容，整行参与逐行浮动。
  *
  * [slot] 是这一行在所属卡片里的位置（组首 / 组中 / 组尾 / 单行），由调用点按字面顺序写死：
