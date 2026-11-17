@@ -11,6 +11,27 @@
 
 ---
 
+## [0.0.0.55] - 2026-11-18（内部版，不对外发布）
+
+### 拆上帝文件第五步：单选族搬出去
+`SettingsRadioRow` / `SettingsRadioDot` / `SettingsSubRadioRow` → `SettingsRadioRow.kt`（133 行）。
+`SettingsShared.kt` **1866 → 1754 行**，五轮累计 **2236 → 1754（−482 行）**。
+
+### 修了两条"已经变成摆设"的守卫
+`SettingsSubtitleLineGuardTest` 里的锚点还写着 `substringAfter("private fun SettingsSlotRow(")` ——
+但这两轮为了跨文件复用，`SettingsSlotRow` / `SettingsSubtitleLine` 已经改成 `internal`。
+`substringAfter` 找不到就返回**整个文件**，于是那两条断言变成了恒真（假绿）。
+现在锚点去掉 `private `，守卫重新有牙。
+
+### 顺手量了一下性能（结论：先不动）
+`dumpsys gfxinfo` 实测设置根页来回滚 8 趟：**1399 帧 / 11 卡顿（0.79%）/ p50 13ms / p90 18ms / p99 20ms**，
+slow bitmap 0。审查报告担心的"整页塞进一个 lazy item 导致每帧栅格化"在这个滚动强度下**没有出现**，
+所以这轮不做结构拆分 —— 没有数据支撑的改法不做。
+
+### 验证
+- 单测 **1295 条 / 189 套件 / 0 失败**。
+- 真机（`0.0.0.55` / versionCode 93）：根页、外观页单选行、时钟均正常。
+
 ## [0.0.0.54] - 2026-11-18（内部版，不对外发布）
 
 ### 拆上帝文件第四步 + 清冗余图标

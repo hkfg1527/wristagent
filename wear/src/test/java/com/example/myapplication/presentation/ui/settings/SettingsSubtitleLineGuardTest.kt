@@ -15,10 +15,10 @@ class SettingsSubtitleLineGuardTest {
     private val netDiag = readProjectFile(NetworkDiagnosticsPath)
     private val modelConfig = readProjectFile(ModelConfigSectionPath)
     private val slot = shared
-        .substringAfter("private fun SettingsSlotRow(")
-        .substringBefore("private fun SettingsSubtitleLine(")
+        .substringAfter("fun SettingsSlotRow(")
+        .substringBefore("fun SettingsSubtitleLine(")
     private val subtitleLine = shared
-        .substringAfter("private fun SettingsSubtitleLine(")
+        .substringAfter("fun SettingsSubtitleLine(")
         .substringBefore("可进入行")
     private val providerRow = providers
         .substringAfter("SettingsRadioRow(")

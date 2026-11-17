@@ -97,7 +97,7 @@ class SettingsVisualGuardTest {
         )
         assertTrue(
             "单选圆点只在选中态上用强调色",
-            shared.contains("val ring = if (selected) selectedColor else Wear.Palette.TextMuted")
+            readSettings("SettingsRadioRow.kt").contains("val ring = if (selected) selectedColor else Wear.Palette.TextMuted")
         )
     }
 
