@@ -39,7 +39,7 @@ class SettingsStylePolicyTest {
     @Test
     fun theCardStyleIsTheOnlyOneOnTheOfficialScaffold() {
         val onScaffold = all.filter { SettingsStylePolicy.specOf(it).shell == SettingsPageShell.SCREEN_SCAFFOLD }
-        // 0.0.0.58 起官方两套也走 ScreenScaffold（它们的渲染实现见 SettingsStyleM3List.kt）
+        // 0.0.0.58 起官方两套也走 ScreenScaffold（渲染宿主：OfficialListSubPage）
         assertEquals(
             "走官方 ScreenScaffold 的应当是大卡片 + 两套官方件",
             listOf(SettingsStyle.GOOGLE_CARD, SettingsStyle.M3_LIST, SettingsStyle.M3_TRANSFORM),

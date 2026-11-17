@@ -216,7 +216,7 @@ object SettingsStylePolicy {
             rowEnterSlide = true,
             cardEdgeZoom = false
         )
-        // 官方列表档：骨架 + 控件全部官方件（列表实现在 SettingsStyleM3List.kt，接线在下一轮）
+        // 官方列表档：骨架 + 控件全部官方件（宿主：SettingsShared.kt 的 OfficialListSubPage）
         SettingsStyle.M3_LIST -> SettingsStyleSpec(
             shell = SettingsPageShell.SCREEN_SCAFFOLD,
             header = SettingsGroupHeader.CENTERED,

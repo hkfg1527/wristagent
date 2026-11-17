@@ -34,7 +34,7 @@ enum class SettingsStyle(
      * 官方列表档：**100% 官方组件**的列表形态。
      *
      * 一行一个整宽胶囊控件（`SplitSwitchButton` / `SplitRadioButton` / `Slider`），
-     * 列表用官方 `TransformingLazyColumn`（见 `SettingsStyleM3List.kt`）。
+     * 列表用官方 `TransformingLazyColumn`（宿主见 `SettingsShared.kt` 的 `OfficialListSubPage`）。
      * 与大卡片档的区别是形态而不是配色：那边一行一张卡，这边一行一个胶囊。
      */
     M3_LIST(R.string.settings_style_m3_list, R.string.settings_style_m3_list_summary),
