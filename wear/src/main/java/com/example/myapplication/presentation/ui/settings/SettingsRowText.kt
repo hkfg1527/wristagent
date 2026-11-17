@@ -68,7 +68,7 @@ fun SettingsNavRow(
  */
 /** 终端档把三档正文全部换成等宽：这是它唯一的外壳，其余两套靠形状区分。 */
 private val terminalMono: FontFamily
-    @Composable get() = if (WearAppearance.style == SettingsStyle.TERMINAL) FontFamily.Monospace else FontFamily.Default
+    @Composable get() = if (SettingsStylePolicy.usesMonospace) FontFamily.Monospace else FontFamily.Default
 
 /** 组标题档：12sp / TextMuted / Medium / 字距 +0.5sp。 */
 internal val SettingsSectionStyle: TextStyle

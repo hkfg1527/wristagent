@@ -382,7 +382,7 @@ fun SettingsSubPage(
         val context = LocalContext.current
         val rotaryGain = remember(context) { AgentPreferences(context).rotaryScrollGain }
 
-        val backInList = WearAppearance.style == SettingsStyle.GOOGLE_CARD
+        val backInList = SettingsStylePolicy.backInList
 
         ScreenScaffold(
             scrollState = listState,
