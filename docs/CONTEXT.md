@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-17 23:30）：
-- 内部版 `0.0.0.68` / versionCode 106；第 5 个发布点 `0.0.0.50` 已自检 7/7（tag 已打，推送待网络）；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
+- 内部版 `0.0.0.69` / versionCode 107；第 5 个发布点 `0.0.0.50` 已自检 7/7（tag 已打，推送待网络）；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
 - 单测基线 **1305 条 / 191 套件全绿**（跑 `./gradlew :wear:testDebugUnitTest` 确认这个数；
   旧文档写的"188 套件"是错的，实测 `build/test-results/testDebugUnitTest/*.xml` 只有 187 个文件）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行。
@@ -37,7 +37,7 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-17 03:30
 
 **版本与基线**
-- 内部版 `0.0.0.68`（versionCode 106）；发布点 `v0.0.0.50` 已打 tag；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
+- 内部版 `0.0.0.69`（versionCode 107）；发布点 `v0.0.0.50` 已打 tag；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
 - 单测基线：**1305** 条 / **191** 套件全绿（0.0.0.49 新增 `SettingsInnerOverlayBackGuardTest` 2 条 / +1 套件）。
 - 上一个发布点：**0.0.0.50**（自检 7/7 通过，tag 已打）。下一个内部版节奏继续 +1。
 
@@ -324,3 +324,21 @@
 - 抓网页：`node docs/tools/read-url.mjs <url> [chars]`（headless Edge + CDP，JS 站也能读）；
   非 JS 站可直接 `curl --ssl-no-revoke`。**developer.android.com 与 *.appspot.com 在本机网络不可达**。
 - 批量脚本改代码后必须用**运行时值**验证；过滤行不要用会撞到合法标识符的子串（踩过：`SubPageHeader` 撞 `SubPageHeaderTopPadding`）。
+
+## 0.0.1 压缩后恢复卡（2026-11-18，写给下一个我）
+
+**当前状态**：内部版 `0.0.0.68`；测试 1305 条 / 191 套件 / 0 红。
+**主线**：设置页 6 套风格，其中官方两套（M3_LIST / M3_TRANSFORM）已经走 `TransformingLazyColumn`
++ 官方 `SplitSwitchButton` / `RadioButton` / `Slider`，其余四套仍是旧实现 + 槽位表声明。
+
+**三个已知卡点（别重复试错）**
+1. `HAIRLINE_FLAT` 不套卡的分支**没生效**：给 `SettingsGroupCard` 加了非卡外壳直通的判断，
+   编译过、装到表上，截图仍是圆角卡（当时 prefs 已是 SQUARE）。改动已回滚。
+   下轮先查：根页的卡壳是不是还有第二个来源（`SettingsStyleCards.kt` 的 `SettingsM3Card`），
+   以及 `SettingsStylePolicy.current()` 在 `SettingsGroupCard` 里读到的是不是最新风格值。
+2. 巡检/实测探针**依赖坐标点击，不可靠**：`tapped=false` 证明点击没发生；换触摸滑动更糟（已回滚）。
+   下轮改 instrumentation：`UiDevice.findObject(By.text("模型参数")).click()`。
+3. `stale 假绿` 教训：源码扫描型测试的锚点一改就失效（`substringAfter` 找不到会返回整个文件）。
+   改可见性或搬文件时，必须同步改锚点，否则断言恒真。
+
+**别做的事**：不要再用"数表冠格数"驱动滚动；不要再猜测坐标；不要在没真机验证前声称风格修好。
