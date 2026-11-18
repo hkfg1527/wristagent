@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-17 23:30）：
-- 内部版 `0.0.0.85` / versionCode 123；第 5 个发布点 `0.0.0.50` 已自检 7/7（tag 已打，推送待网络）；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
+- 内部版 `0.0.0.86` / versionCode 124；第 5 个发布点 `0.0.0.50` 已自检 7/7（tag 已打，推送待网络）；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag。
 - 单测基线 **1305 条 / 191 套件全绿**（跑 `./gradlew :wear:testDebugUnitTest` 确认这个数；
   旧文档写的"188 套件"是错的，实测 `build/test-results/testDebugUnitTest/*.xml` 只有 187 个文件）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行。
@@ -37,7 +37,7 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-17 03:30
 
 **版本与基线**
-- 内部版 `0.0.0.85`（versionCode 123）；发布点 `v0.0.0.50` 已打 tag；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
+- 内部版 `0.0.0.86`（versionCode 124）；发布点 `v0.0.0.50` 已打 tag；发布点 `v0.0.0.10` / `v0.0.0.20` / `v0.0.0.30` / `v0.0.0.40` 已打 tag 并推送。
 - 单测基线：**1305** 条 / **191** 套件全绿（0.0.0.49 新增 `SettingsInnerOverlayBackGuardTest` 2 条 / +1 套件）。
 - 上一个发布点：**0.0.0.50**（自检 7/7 通过，tag 已打）。下一个内部版节奏继续 +1。
 
@@ -381,3 +381,42 @@
   ④ 时钟重叠的另两个方案（抬边距 / 只抬大卡片档）——现在用的是"滚动淡出"。
 
 **下一轮第一件事**：`git push`（本地可能领先）；然后按上面"等用户拍板"清单去问，不要自己选。
+## 0.6.1 `manage_context compact` 为什么永远失败（2026-11-18 查明）
+
+**结论：不是插件配置错，是它要的那个服务在这个组合里根本不存在。**
+
+插件代码 `@local/context-governor/index.js`：
+
+```js
+function resolveService(agentCtx, name) {
+  for (const candidate of [agentCtx, pluginCtx]) {
+    const service = candidate?.get?.(name);   // 只查 agent 面 + 插件面
+    if (service) return service;
+  }
+  return undefined;
+}
+// compactAction 里：
+const compaction = resolveService(agentCtx, "compaction");
+if (!compaction) return bad("compaction backend is not mounted in this composition; use the /compact command instead.");
+// 用到的 API：compaction.compactRegion(start, end, agent, signal)
+```
+
+而梁神预设的 agent 组合（`@linxin666/dsh-liangshen/presets/liangshen/agent.cordis.yml`）里是：
+
+```yaml
+- id: compaction            # 一个开关型条目（compaction: true）
+- id: compaction-basic      # @deepseek-ai/dsh-compaction-basic
+- id: command-compact       # @deepseek-ai/dsh-command-compact   ← /compact 命令就是它
+- id: compaction-tool-result-pruner
+```
+
+也就是说：**命令路径存在（所以 `/compact` 能用），但插件要的 `compaction` 服务对象没有暴露在
+`agentCtx` / `pluginCtx` 这两层上**，`compactRegion` 这个 API 在本机安装包目录里也没搜到。
+所以那句报错是**事实陈述**，不是插件写错了。
+
+**两条修法（都需要动别人的东西，所以停在这里等你）**
+1. 改插件：把 `compact` 从"调服务"改成"调命令"（等价于替你发 `/compact`），或沿着 ctx 父链再找几层。
+   插件是本地链接（`D:\nfc isc\context-governor`），改完要重载。
+2. 改预设：让梁神预设把 `compaction` 服务暴露到 agent 面。风险更高（影响所有 agent 行为）。
+
+**现状**：压缩只能你发 `/compact`。我不会再反复试那个按钮。
