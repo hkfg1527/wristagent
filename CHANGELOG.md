@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 新增：网络/采样参数/模型端点三页进 JVM 功能回归
+- `SettingsNetworkAndHyperRobolectricTest`（6 条）：请求超时 55.4→55 秒、重试 2.4→2 次、
+  退避 3300→3400ms（200ms 一档）；top_p 0.63→0.65、最大 token 拨到第 3 级落在 `TokenLadder[3]`、
+  空转止损 5.6→6 轮。每条都断言"可调节区间必须是这一行自己的"。
+- `SettingsModelConfigRobolectricTest`（4 条）：Base URL 弹层确认落盘、**取消一个字都不写**；
+  API Key 弹层确认落盘；已有密钥时屏上**不出现原始密钥**（只出现掩码）。
+- 测试辅助收敛：三处重复的 `setSlider` 合进 `SettingsUi`。
+- 一处**只记录未改动**的发现写进 `docs/DECISIONS-PENDING.md` D5：Wear M3 1.7.1 的 `Card` 只有带
+  `onClick` 的重载（`javap` 实测），所以每张卡组在无障碍树里都是一个点了没反应的按钮。
+
 ### 修复：设置页两行滑杆被并成一个无障碍节点，第二个滑杆读屏拨不动
 卡组外层是 `Card(onClick = {})`（可点 → `mergeDescendants`），而自绘滑杆行本身不可点，
 于是被整张卡吸进同一个无障碍节点。Robolectric 打印出来的那个节点：

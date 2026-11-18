@@ -37,9 +37,15 @@
 | 同上 | 语音 | 播报音量（拨 0.44） | `ttsVolume = 0.4`（吸附 0.1） |
 | 同上 | 外观 · **官方档** | 点阵间距点三次加号 | `matrixSpacingDp = 4 → 7`（官方 Slider 一段一步） |
 | `SettingsLuxTerminalRobolectricTest` | Lux 终端 | 自由输入 2001 字符并确认 | 转录里留下「被拒」回显（进 shell 之前就被挡下） |
+| `SettingsNetworkAndHyperRobolectricTest` | 网络与请求 | 超时（拨 55.4）/ 重试（2.4）/ 退避（3300ms） | `requestTimeoutSeconds=55` / `requestRetries=2` / `retryBackoffMs=3400` |
+| 同上 | 模型参数 | top_p（拨 0.63）/ 最大 token 台阶（拨第 3 级）/ 空转止损（5.6） | `samplingTopP=0.65` / `maxOutputTokens=TokenLadder[3]` / `idleSpinStopAfter=6` |
+| `SettingsModelConfigRobolectricTest` | 模型与端点 | Base URL 弹层确认 / 取消 | 确认落盘 `baseUrl`；**取消一个字都不写** |
+| 同上 | 模型与端点 | API Key 弹层确认 | `apiKey` 落盘 |
+| 同上 | 模型与端点 | 已有密钥时看这一行 | 屏上**不出现原始密钥**，只出现 `maskSecret` 掩码 |
 
-合计 **26 个设置键 + 6 套风格 + 3 档安全模式 + 四条手势绑定 + 两套跨对象搬运 + 终端闸门**，从"只能真机手点"变成每次跑单测都验一遍。
-仍未覆盖：终端里"真跑一条命令"（要 Android 的 `sh`，JVM 上没有可信替身）、MCP 端点文本框（表端只读展示，写入在网页端）。
+合计 **35 个设置键 + 6 套风格 + 3 档安全模式 + 四条手势绑定 + 两套跨对象搬运 + 终端闸门**，从"只能真机手点"变成每次跑单测都验一遍。
+仍未覆盖：终端里"真跑一条命令"（要 Android 的 `sh`，JVM 上没有可信替身）、MCP 端点文本框（表端只读展示，写入在网页端）、
+体检页 `NetworkDiagnosticsContent`（要真发 HTTP，JVM 上没有可信替身）。
 
 > **踩到的坑（写在这里免得再踩）**：`WearAppearance.style` 是全局单例，测试类之间会互相污染 ——
 > 上一个用例切到 `M3_LIST`，下一个用例的滑杆就换成官方 `Slider`（没有 `contentDescription`），

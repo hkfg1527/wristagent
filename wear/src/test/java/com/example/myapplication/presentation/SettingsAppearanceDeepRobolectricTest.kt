@@ -73,20 +73,7 @@ class SettingsAppearanceDeepRobolectricTest {
      * 滑杆行若不自设语义边界，就会被整张卡吸成一个节点、区间取邻居的 —— 那样这里对不上。
      */
     private fun setSlider(label: String, target: Float, expectedRange: ClosedFloatingPointRange<Float>) {
-        SettingsUi.scrollTo(compose, label)
-        val node = compose.onAllNodesWithContentDescription(label)
-            .filterToOne(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
-            .assertIsDisplayed()
-            .fetchSemanticsNode()
-        assertEquals(
-            "「$label」的可调节区间必须是它自己的，不能是同一张卡里邻居的",
-            expectedRange,
-            node.config[SemanticsProperties.ProgressBarRangeInfo].range
-        )
-        compose.onAllNodesWithContentDescription(label)
-            .filterToOne(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
-            .performSemanticsAction(SemanticsActions.SetProgress) { it(target) }
-        compose.waitForIdle()
+        SettingsUi.setSlider(compose, label, target, expectedRange)
     }
 
     @Test

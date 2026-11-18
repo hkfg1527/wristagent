@@ -57,25 +57,8 @@ class SettingsSliderSweepRobolectricTest {
         applySettingsStyle(context, SettingsStyle.BALLOON)
     }
 
-    /**
-     * 滚到这一行并拨到目标值。
-     *
-     * 不断言"整行完全露出"：`performScrollToNode` 只保证进视口，常常只露一半，
-     * 而此时节点已经组合好、语义动作照常派发 —— 值有没有落盘才是判据，
-     * 露多少是取样位置的事（"看得见"另有像素测试管）。
-     */
-    private fun setSlider(label: String, target: Float, expectedRange: ClosedFloatingPointRange<Float>) {
-        SettingsUi.scrollTo(compose, label)
-        val node = compose.onAllNodesWithContentDescription(label)
-            .filterToOne(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
-        assertEquals(
-            "「$label」的可调节区间必须是它自己的",
-            expectedRange,
-            node.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].range
-        )
-        node.performSemanticsAction(SemanticsActions.SetProgress) { it(target) }
-        compose.waitForIdle()
-    }
+    private fun setSlider(label: String, target: Float, expectedRange: ClosedFloatingPointRange<Float>) =
+        SettingsUi.setSlider(compose, label, target, expectedRange)
 
     @Test
     fun contextTurnsSliderSnapsToWholeTurn() {

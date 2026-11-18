@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.filterToOne
@@ -7,10 +8,13 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import org.junit.Assert.assertEquals
 
 /**
  * 设置页 Robolectric 测试共用的两个动作：滚到某一行、点这一行。
@@ -33,6 +37,31 @@ internal object SettingsUi {
     fun clickRow(rule: ComposeContentTestRule, text: String, exact: Boolean = true) {
         scrollTo(rule, text)
         rule.onAllNodesWithText(text, substring = !exact).filterToOne(hasClickAction()).performClick()
+        rule.waitForIdle()
+    }
+
+    /**
+     * 用语义动作把某条滑杆拨到目标值（等价于读屏双击后上下滑）。
+     *
+     * 顺带钉死"这一行是不是独立的可调节节点"：卡组外层是可点的 Card（会 mergeDescendants），
+     * 滑杆行若不自设语义边界，就会被整张卡吸成一个节点、区间取邻居的 —— 那样这里对不上。
+     * 不断言"整行完全露出"：`performScrollToNode` 只保证进视口，露多少是取样位置的事。
+     */
+    fun setSlider(
+        rule: ComposeContentTestRule,
+        label: String,
+        target: Float,
+        expectedRange: ClosedFloatingPointRange<Float>
+    ) {
+        scrollTo(rule, label)
+        val node = rule.onAllNodesWithContentDescription(label)
+            .filterToOne(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress))
+        assertEquals(
+            "「$label」的可调节区间必须是它自己的",
+            expectedRange,
+            node.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].range
+        )
+        node.performSemanticsAction(SemanticsActions.SetProgress) { it(target) }
         rule.waitForIdle()
     }
 }
