@@ -13,6 +13,21 @@
 
 ## [未发布]
 
+### 修复：`PrivilegeManager.release()` 不回收 root 会话（每进一次设置页留一个常驻 `su`）
+以前 `release()` 只解绑 Shizuku 监听：`RootShell` 里那个常驻 `su` 进程与它的读线程**一次都不会关**
+（`RootShell.close()` 全仓没有调用点），自建的 `scope` 也从不 cancel。`SettingsScreen` / `ConsoleBridge` /
+`AgentDispatcher` 每次 new 一个 Manager 就留下一个常驻 su 进程 + 一条线程，反复进出设置页会累积授权弹窗。
+
+- 修法：`release()` 里补 `rootShell.close()`，并 cancel **自建**的 scope；
+  构造参数改成 `externalScope: CoroutineScope? = null`，外部传进来的 scope 归调用方管，不由这里 cancel。
+
+### 测试：版本行守卫收紧到「§0.0 + §0.5 的版本行」
+`ContextDocFreshnessGuardTest` 以前只在整篇 `docs/CONTEXT.md` 里 `contains(版本号)` ——
+§0.0 写对了、§0.5 还停在上一个版本时守卫照样绿（0.0.0.100 审查点名）。
+
+- 现在分别切 §0.0 与 §0.5 两段；§0.5 **只认「- 内部版」那一行**（那一段还含全部历史条目，放开会更松）。
+- **变异验证**：把 §0.5 的版本行改回 `0.0.0.104`，用例立刻红；改回即绿。
+
 ### 修复：子进程输出无上限（`logcat` 一次就能把进程 OOM 掉）
 `ProcessExec.drain()` 以前用 `reader.readText()` 无上限灌进 `StringBuilder` ——
 `logcat`、`dumpsys` 这类命令 15 秒能产出数十 MB，手表堆只有数百 MB。工具层虽然还会 `take(4000)`，

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,11 +20,15 @@ import rikka.shizuku.Shizuku
  */
 class PrivilegeManager(
     private val context: Context,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** 外部传入的 scope；不传就自建一个，[release] 时只 cancel 自建的那个。 */
+    externalScope: CoroutineScope? = null,
     private val directShell: PrivilegedShell = DirectShell(),
     private val rootShell: RootShell = RootShell(),
     private val shizukuShell: ShizukuShell = ShizukuShell(context),
 ) {
+    private val ownsScope: Boolean = externalScope == null
+    private val scope: CoroutineScope = externalScope ?: CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val _status = MutableStateFlow(PrivilegeStatus())
     val status: StateFlow<PrivilegeStatus> = _status.asStateFlow()
 
@@ -109,7 +114,14 @@ class PrivilegeManager(
         }
     }
 
-    /** 解绑全部监听，避免 Manager 比界面活得久时泄漏。 */
+    /**
+     * 解绑全部监听并**回收后端会话**。
+     *
+     * 以前只解 Shizuku 的监听：`RootShell` 里那个常驻 `su` 进程与它的读线程
+     * 一次都不会关（`RootShell.close()` 全仓没有调用点），自建的 `scope` 也从不 cancel ——
+     * `SettingsScreen` / `ConsoleBridge` / `AgentDispatcher` 每次 new 一个 Manager
+     * 就留下一个常驻 su 进程 + 一条线程，反复进出设置页会累积授权弹窗。
+     */
     fun release() {
         try {
             if (listenersRegistered) {
@@ -121,7 +133,10 @@ class PrivilegeManager(
         } finally {
             listenersRegistered = false
         }
-        shizukuShell.release()
+        runCatching { shizukuShell.release() }
+        runCatching { rootShell.close() }
+        // 只 cancel 自己建的那个 scope：调用方传进来的归调用方管
+        if (ownsScope) runCatching { scope.cancel() }
     }
 
     private fun registerShizukuListeners() {
