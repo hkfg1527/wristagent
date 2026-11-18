@@ -250,6 +250,38 @@ class ConsoleApiTest {
     }
 
     @Test
+    fun storageRejectionIsReportedSeparatelyFromIgnored() {
+        // 回归：存储层拒绝（如供应商档案超上限）曾被混进 ignored，
+        // 网页据此当成"后端还没这个字段"的草稿，随后被 pruneDrafts() 删掉 ——
+        // 用户改动静默回滚，界面还提示"已保存"。
+        val settings = object : ConsoleSettingsPort {
+            val values = LinkedHashMap<String, Any?>(fullSnapshot())
+            override fun snapshot(): Map<String, Any?> = LinkedHashMap(values)
+            override fun write(key: String, value: Any): ConsoleWriteResult = when (key) {
+                "providerProfiles" -> ConsoleWriteResult.REJECTED
+                "mcpEndpoint" -> ConsoleWriteResult.READ_ONLY
+                else -> {
+                    values[key] = value
+                    ConsoleWriteResult.OK
+                }
+            }
+        }
+        val body = json(
+            api(settings = settings).handle(
+                request(
+                    "POST",
+                    "/api/settings",
+                    body = """{"providerProfiles":[],"mcpEndpoint":"http://x/sse","streamMode":false}"""
+                )
+            )
+        )
+        assertEquals(true, body["ok"])
+        assertEquals("存储拒绝必须单独回一个数组", listOf("providerProfiles"), body["rejected"])
+        assertEquals("只读键仍走 ignored", listOf("mcpEndpoint"), body["ignored"])
+        assertEquals("OK 的键不该出现在任何一个失败数组里", false, (body["rejected"] as List<*>).contains("streamMode"))
+    }
+
+    @Test
     fun invalidJsonReturnsBadJson() {
         val response = api().handle(request("POST", "/api/settings", body = "{not json"))
         assertEquals(400, response.status)

@@ -30,7 +30,15 @@ data class ConsoleField(
     val max: Double? = null,
 )
 
-enum class ConsoleWriteResult { OK, READ_ONLY }
+/**
+ * 单键写入的结果。
+ *
+ * - [OK]：落盘了；
+ * - [READ_ONLY]：这个键在这里改不了（未知键 / 只读键 / 类型不符）—— 网页据此提示"只保存在本地"；
+ * - [REJECTED]：**存储层拒绝**（例如供应商档案超出 5 套上限）—— 网页必须报"保存失败"并保留用户输入，
+ *   不能混进 READ_ONLY 那条"后端还没这个字段"的通道，否则用户改动会被静默回滚、还提示"已保存"。
+ */
+enum class ConsoleWriteResult { OK, READ_ONLY, REJECTED }
 
 /** settings 读写出口：实现方必须落到现有 AgentPreferences，不允许第二份存储。 */
 interface ConsoleSettingsPort {

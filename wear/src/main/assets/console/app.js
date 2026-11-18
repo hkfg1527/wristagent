@@ -427,6 +427,13 @@
     return hit;
   }
 
+  /* 被存储层拒绝的键：与 ignored 分开 —— 这些字段后端有，只是这次写不进去（例如档案超上限）。
+     不能塞进 drafts（那里会被 pruneDrafts() 当成"后端已有此键"删掉），要原样留住并明确报失败。 */
+  function rejectedKeys(body, res) {
+    var list = res && Array.isArray(res.rejected) ? res.rejected : [];
+    return list.filter(function (k) { return has(body, k); });
+  }
+
   function coerce(row, value) {
     if (row.type === 'switch') return !!value;
     if (row.type === 'slider') {
@@ -487,10 +494,29 @@
         state.ready = true;
       }
       var ignoredHit = noteIgnored(body, res);
+      var rejectedHit = rejectedKeys(body, res);
       pruneDrafts();
       state.tokenStatus = 'ok';
       syncAll();
-      if (ignoredHit.length) {
+      if (rejectedHit.length) {
+        // 手表拒绝了这次写入（例如供应商档案超上限）：明确报失败并留住用户的输入
+        lastFailedBody = body;
+        setBanner('save', {
+          tone: 'error',
+          title: '保存失败：手表拒绝了 ' + rejectedHit.length + ' 项',
+          text: rejectedHit.join('、') + '　已保留你刚才的输入，改小一点再试。',
+          actions: [{
+            label: '重试保存',
+            run: function () {
+              if (!lastFailedBody) return;
+              Object.keys(lastFailedBody).forEach(function (k) { dirty[k] = lastFailedBody[k]; });
+              clearTimeout(dirtyTimer);
+              flush();
+            }
+          }]
+        });
+        showToast('未保存', 'bad');
+      } else if (ignoredHit.length) {
         draftBanner(ignoredHit);
         showToast('已保存 · ' + ignoredHit.length + ' 项待后端支持', 'warn');
       } else {

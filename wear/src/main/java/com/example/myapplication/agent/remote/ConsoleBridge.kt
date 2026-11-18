@@ -142,7 +142,9 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
             "isMcpEnabled" -> preferences.isMcpEnabled = value as? Boolean ?: return ConsoleWriteResult.READ_ONLY
             "mcpEndpoint" -> preferences.mcpEndpoint = value as? String ?: return ConsoleWriteResult.READ_ONLY
             "providerProfiles" -> if (!saveWebProviderProfiles(preferences, value)) {
-                return ConsoleWriteResult.READ_ONLY
+                // 存储层拒绝（例如第 6 套档案 / 重名）：走 REJECTED 而不是 READ_ONLY，
+                // 否则网页会把这次改动当成"后端还没有这个字段"的草稿，然后静默回滚
+                return ConsoleWriteResult.REJECTED
             }
             "matrixSpacingDp" -> preferences.matrixSpacingDp =
                 (value as? Number)?.toFloat() ?: return ConsoleWriteResult.READ_ONLY

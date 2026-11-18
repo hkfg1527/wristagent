@@ -41,6 +41,16 @@
 
 ## [未发布]
 
+### 修复：网页改不动的键会「静默回滚，还提示已保存」
+供应商档案写到第 6 套（上限 5）时，服务端把这次写入塞进 `ignored` —— 而 `ignored` 的语义是
+"后端还没有这个字段"。网页据此把值存成草稿，紧接着 `pruneDrafts()` 又把草稿删掉（因为服务端快照里
+本来就有这个键），于是：**用户的改动消失、界面回到旧值、toast 仍然写「已保存」**。
+
+- 服务端：`ConsoleWriteResult` 加 `REJECTED`；响应把"未知/只读"放 `ignored`、"存储拒绝"放 `rejected`。
+- 网页：对 `rejected` 报「保存失败：手表拒绝了 N 项」并**保留输入**（不写进草稿集合），给"重试保存"按钮。
+- 回归：`ConsoleApiTest.storageRejectionIsReportedSeparatelyFromIgnored` —— 一个键 REJECTED、
+  一个键 READ_ONLY、一个键 OK，断言三个数组各归各位；把 REJECTED 塞回 ignored 会立刻红（已实测）。
+
 ### 修复：控制台 stop() 会打断正在执行的 handler
 旧顺序是先 `shutdownNow()`（打断所有 worker）再关监听 —— 已经开始的 `clear-memory` 或一次 40 键批量写
 会被直接打断，prefs 停在一半已写、一半没写，而调用方看到的是断连而不是 500。

@@ -190,6 +190,7 @@ class ConsoleApi(
         val parsed = ConsoleJson.parseObject(body) ?: return errorJson(400, "bad_json")
 
         val ignored = ArrayList<String>()
+        val rejected = ArrayList<String>()
         val pending = ArrayList<Pair<String, Any>>()
         val live = runCatching { settings.snapshot() }.getOrNull().orEmpty()
         // 先全量校验再落库：任何一个字段类型不符都整单拒绝，避免半套设置生效
@@ -235,12 +236,19 @@ class ConsoleApi(
             }
         }
         for ((key, value) in pending) {
-            // 存储层拒绝必须回给网页：静默当成功就是「网页能改、手表没变」的老问题
-            if (settings.write(key, value) != ConsoleWriteResult.OK) ignored += key
+            // 存储层拒绝必须回给网页：静默当成功就是「网页能改、手表没变」的老问题。
+            // 但它与「后端没这个字段」是两件事，分成两个数组回 —— 合成一个的话，
+            // 网页会把用户的改动当成"待后端支持"的草稿，然后被 pruneDrafts() 立刻删掉。
+            when (settings.write(key, value)) {
+                ConsoleWriteResult.OK -> Unit
+                ConsoleWriteResult.READ_ONLY -> ignored += key
+                ConsoleWriteResult.REJECTED -> rejected += key
+            }
         }
 
         val payload = linkedMapOf<String, Any?>("ok" to true, "settings" to snapshotWithAliases())
         if (ignored.isNotEmpty()) payload["ignored"] = ignored
+        if (rejected.isNotEmpty()) payload["rejected"] = rejected
         return jsonResponse(200, payload)
     }
 
