@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.TestSlices
 import com.example.myapplication.readProjectFile
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -138,7 +139,12 @@ class SettingsVisualGuardTest {
     @Test
     fun sectionHeadersAreNeutralAndNeverAccented() {
         val shared = readSettings("SettingsShared.kt")
-        val header = shared.substringAfter("fun SettingsSectionHeader(").take(400)
+        val header = TestSlices.slice(
+            shared,
+            "fun SettingsSectionHeader(",
+            "fun SettingsGroupHairline(",
+            "sectionHeader"
+        )
         assertFalse("组标题不许再用强调色", header.contains("Palette.Accent"))
         assertTrue("组标题走中性档", header.contains("SettingsSectionStyle"))
         assertFalse("组标题不许再画装饰线", header.contains("SectionAccent"))

@@ -13,6 +13,22 @@
 
 ## [未发布]
 
+### 修复：子进程输出无上限（`logcat` 一次就能把进程 OOM 掉）
+`ProcessExec.drain()` 以前用 `reader.readText()` 无上限灌进 `StringBuilder` ——
+`logcat`、`dumpsys` 这类命令 15 秒能产出数十 MB，手表堆只有数百 MB。工具层虽然还会 `take(4000)`，
+但那是**读完之后**才截，救不了已经堆起来的内存。
+
+- 现在每路输出（stdout / stderr）按 **256K 字符**封顶；超出部分继续读干（不读干的话子进程会被写满的管道卡住），
+  但不再往内存里塞。
+- 回归：`ProcessExecTest` 2 条（大输出被截、小输出原样）。**变异验证**：换回 `readText()`，
+  用例报「实际 614699 字符」立刻红。
+
+### 测试：最后三处裸切片补锚点自证
+新增 `TestSlices.slice(source, start, end)`：先断言两个锚点存在、顺序正确、切片长度 < 全文一半，再切片。
+`SettingsDotRuleTest`（按下态底色助手）、`OnboardingPagerTest`（页脚 / 正文 / 页面 / 页码点四处）、
+`SettingsVisualGuardTest`（组标题）全部改走它 —— 这几处以前只要函数改名，切片就会静默变成「从锚点到文件尾」，
+负断言（`assertFalse`）反而更绿。
+
 ### 测试：给 root 会话补上"超时后还能继续用"的回归
 0.0.0.103 修了"一条超时命令把 root 线程池占死"这个高危险故障，但**没有测试** —— 要多线程 + 假进程才能复现。
 现在补上 `FakeSuProcess`（`java.lang.Process` 的假实现）与 `RootShellTimeoutTest` 2 条。

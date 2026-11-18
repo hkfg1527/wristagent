@@ -12,6 +12,17 @@ internal object ProcessExec {
     /** 读干剩余输出的等待上限，防止子进程异常时线程悬挂。 */
     private const val DrainJoinMs = 500L
 
+    /**
+     * 单路输出（stdout 或 stderr）的字符上限。
+     *
+     * 以前是 `reader.readText()` 无上限往 StringBuilder 里灌：`logcat`、`dumpsys` 这类命令
+     * 在 15s 内可以产出数十 MB —— 手表堆只有数百 MB，直接把进程 OOM 掉。
+     * 工具层还会再 `take(4000)` 一次，所以这里 256K 已经绰绰有余。
+     */
+    private const val MAX_STREAM_CHARS = 256 * 1024
+
+    private const val DRAIN_CHUNK = 8 * 1024
+
     fun exec(argv: List<String>, timeoutMs: Long): ShellResult = try {
         collect(ProcessBuilder(argv).start(), timeoutMs)
     } catch (t: Throwable) {
@@ -75,7 +86,16 @@ internal object ProcessExec {
     private fun drain(stream: InputStream, sink: StringBuilder): Thread =
         Thread {
             try {
-                stream.bufferedReader().use { reader -> sink.append(reader.readText()) }
+                stream.bufferedReader().use { reader ->
+                    val buffer = CharArray(DRAIN_CHUNK)
+                    while (true) {
+                        val read = reader.read(buffer)
+                        if (read <= 0) break
+                        // 只留前 MAX_STREAM_CHARS 个字符，其余继续读干（不读干的话子进程会被管道写满卡住）
+                        val room = MAX_STREAM_CHARS - sink.length
+                        if (room > 0) sink.appendRange(buffer, 0, minOf(read, room))
+                    }
+                }
             } catch (_: Throwable) {
             }
         }.apply {

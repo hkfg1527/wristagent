@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui
 
+import com.example.myapplication.TestSlices
 import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -338,9 +339,12 @@ class OnboardingSourceGuardTest {
 
     @Test
     fun pageDotsKeepTheirAccessibilityDescription() {
-        val dots = source
-            .substringAfter("private fun PageDots(")
-            .substringBefore("private fun GestureIllustration(")
+        val dots = TestSlices.slice(
+            source,
+            "private fun PageDots(",
+            "private fun GestureIllustration(",
+            "dots"
+        )
         assertTrue(
             "页码点那一行必须保留「第 N 页，共 5 页」的读屏描述",
             dots.contains("contentDescription")
@@ -350,9 +354,12 @@ class OnboardingSourceGuardTest {
 
     @Test
     fun theFooterOnlyKeepsSkipAndTheActionButton() {
-        val footer = source
-            .substringAfter("private fun OnboardingFooter(")
-            .substringBefore("private fun PageDots(")
+        val footer = TestSlices.slice(
+            source,
+            "private fun OnboardingFooter(",
+            "private fun PageDots(",
+            "footer"
+        )
         assertFalse("页码点必须已经搬出页脚", footer.contains("PageDots("))
         assertTrue(
             "页脚两件左右分置：跳过贴左、按钮贴右，中段留空",
@@ -362,9 +369,12 @@ class OnboardingSourceGuardTest {
 
     @Test
     fun titleAndDescriptionKeepTheirRequiredFontSizes() {
-        val body = source
-            .substringAfter("private fun PageBody(")
-            .substringBefore("private fun OnboardingFooter(")
+        val body = TestSlices.slice(
+            source,
+            "private fun PageBody(",
+            "private fun OnboardingFooter(",
+            "body"
+        )
         assertTrue(body.contains("Wear.TextTitle"))
         assertTrue(body.contains("Wear.TextBody"))
         assertTrue(body.contains("fontSize = 15.sp"))
@@ -374,9 +384,12 @@ class OnboardingSourceGuardTest {
 
     @Test
     fun pageTransitionUsesSharedMotionAndOnlyASmallEntryShift() {
-        val screen = source
-            .substringAfter("fun OnboardingScreen(")
-            .substringBefore("private fun PageBody(")
+        val screen = TestSlices.slice(
+            source,
+            "fun OnboardingScreen(",
+            "private fun PageBody(",
+            "screen"
+        )
         assertTrue(screen.contains("slideInVertically"))
         assertTrue(screen.contains("motionSpec(animationsEnabled, Wear.Motion.page())"))
         assertTrue(screen.contains("OnboardingGeometry.EntryShiftDp"))

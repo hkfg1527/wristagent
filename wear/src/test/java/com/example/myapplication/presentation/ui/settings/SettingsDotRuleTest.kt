@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.TestSlices
 import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,7 +39,13 @@ class SettingsGroupLineGuardTest {
     private val cardRow = shared
         .substringAfter("internal fun SettingsCardRow(")
         .substringBefore("可点行的按下底色")
-    private val pressHelper = shared.substringAfter("private fun pressedRowBackground(")
+    // 按下态底色助手：必须切到函数尾（下一个函数之前），否则切片会变成整段文件尾巴
+    private val pressHelper = TestSlices.slice(
+        shared,
+        "private fun pressedRowBackground(",
+        "internal fun SettingsSlotRow(",
+        "pressHelper"
+    )
     /** 卡片边缘缩放：等比缩小的新归属地（行不再缩放）。 */
     private val cardZoom = readProjectFile(
         "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsCardEdgeZoom.kt"
