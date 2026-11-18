@@ -41,6 +41,24 @@
 
 ## [未发布]
 
+### 修复：控制台 stop() 会打断正在执行的 handler
+旧顺序是先 `shutdownNow()`（打断所有 worker）再关监听 —— 已经开始的 `clear-memory` 或一次 40 键批量写
+会被直接打断，prefs 停在一半已写、一半没写，而调用方看到的是断连而不是 500。
+
+- 修法：先关监听（不再收新请求）→ `shutdown()` + 200ms 有界等待 → 才 `shutdownNow()`。
+- **保证的边界说清楚**：这条只保证 handler 跑完并落盘；响应能否送到客户端取决于 NanoHTTPD 关连接的时机，不承诺。
+- 回归：`stopDoesNotInterruptAHandlerThatIsAlreadyWriting`（用一个 120ms 的慢 handler + 中途 stop()，
+  断言 handler 跑完了）。换回旧顺序会立刻红（已实测）。
+
+### 测试：外观单例的用例隔离（防止"顺序变了就红/绿"）
+`WearAppearance` 是 Kotlin `object`，Robolectric 在同一个 sandbox 里跨测试类复用：
+一个用例把风格切到 `M3_LIST`，下一个用例渲染出来的就是官方件版本（行外壳、开关、滑杆全换一套），
+断言的失败表现是"找不到节点"，看起来像控件坏了。
+
+- 新增 `SettingsAppearanceResetRule`：before/after 都复位风格、字号、强调色；已接到 4 个会渲染设置页的测试类。
+- 规则自身的行为用 `ExternalResource.apply()` 包一层语句验证（2 条，**不依赖用例执行顺序**）：
+  断言"执行前已复位"与"执行后被复位"。
+
 ### 修复：网页「测试连接」按钮恒 404（网页与服务端 action 清单没对齐）
 供应商档案卡上的「测试连接」打的是 `connection-test`，而服务端 `ACTION_NAMES` 里没有这个名字，
 于是点一次红一次（`not_found`）。这类缺陷不会让任何单测变红 —— 网页以为自己发了个合法 action，

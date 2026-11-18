@@ -30,6 +30,9 @@ import org.robolectric.annotation.Config
 class SettingsProviderAndTransferRobolectricTest {
 
     @get:Rule
+    val appearanceIsolation = SettingsAppearanceResetRule()
+
+    @get:Rule
     val compose = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.app.Application>()

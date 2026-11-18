@@ -37,6 +37,10 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], qualifiers = "zh-rCN")
 class SettingsAppearanceAndToolsRobolectricTest {
 
+    /** 外观单例隔离：本类会把风格逐套点一遍，收尾必须复位，否则脏到后面的类。 */
+    @get:Rule
+    val appearanceIsolation = SettingsAppearanceResetRule()
+
     @get:Rule
     val compose = createComposeRule()
 

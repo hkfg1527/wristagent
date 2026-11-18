@@ -77,9 +77,17 @@ class ConsoleServer(
         val httpd = active
         active = null
         port = -1
-        pool?.let { executor -> runCatching { executor.shutdownNow() } }
-        pool = null
+        // 顺序很重要：先关监听（不再收新请求），再优雅关池子，最后才打断。
+        // 旧顺序是"先 shutdownNow 再关监听" —— 已经开始的 handler 会被直接打断，
+        // clear-memory 或一次 40 键批量写会停在一半，prefs 里"半套已写、半套没写"。
+        // 注意这套保证只覆盖"handler 跑完并落盘"：响应能否送到客户端取决于 NanoHTTPD 关连接的时机。
         if (httpd != null) closeListener(httpd)
+        pool?.let { executor ->
+            runCatching { executor.shutdown() }
+            runCatching { executor.awaitTermination(STOP_GRACE_MS, TimeUnit.MILLISECONDS) }
+            runCatching { executor.shutdownNow() }
+        }
+        pool = null
     }
 
     /** 本实例自己绑定时必须走 NanoHTTPD.stop()：再调一次本类重载只会原地空转，套接字关不掉。 */
@@ -274,6 +282,14 @@ class ConsoleServer(
 
         /** 空闲连接读超时：对端不发新请求就尽快把 worker 还回池子，别让空转连接继续占位。 */
         private const val IDLE_READ_TIMEOUT_MS = 2000
+
+        /**
+         * stop() 时给在跑的请求留多久收尾。
+         *
+         * 200ms 是"够写完一次 prefs.apply()"与"不把 onDestroy 卡住"之间的折中：
+         * 超过就 shutdownNow 打断，宁可丢这一笔，也不让主线程无限等。
+         */
+        private const val STOP_GRACE_MS = 200L
 
         /** 排队上界：32 个在跑 + 64 个排队，再多也只能证明有人在刷，不该进内存。 */
         const val QUEUE_CAPACITY = 64

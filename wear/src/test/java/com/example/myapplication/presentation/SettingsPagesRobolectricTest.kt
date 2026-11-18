@@ -1,4 +1,4 @@
-﻿package com.example.myapplication.presentation
+package com.example.myapplication.presentation
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -38,6 +38,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "zh-rCN")
 class SettingsPagesRobolectricTest {
+
+    @get:Rule
+    val appearanceIsolation = SettingsAppearanceResetRule()
 
     @get:Rule
     val compose = createComposeRule()

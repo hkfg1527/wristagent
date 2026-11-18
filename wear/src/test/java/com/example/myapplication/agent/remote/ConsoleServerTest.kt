@@ -15,13 +15,13 @@ class ConsoleServerTest {
 
     private val token = "0123456789abcdef0123456789abcdef"
 
-    private fun api(): ConsoleApi = ConsoleApi(
+    private fun api(actions: (String) -> String = { "done" }): ConsoleApi = ConsoleApi(
         settings = object : ConsoleSettingsPort {
             override fun snapshot(): Map<String, Any?> = linkedMapOf<String, Any?>("modelName" to "deepseek-chat")
             override fun write(key: String, value: Any): ConsoleWriteResult = ConsoleWriteResult.OK
         },
         capabilities = { emptyMap() },
-        actions = { "done" },
+        actions = actions,
         assets = { "<html>console</html>".toByteArray() },
         token = { token },
         serverPort = { -1 },
@@ -154,6 +154,32 @@ class ConsoleServerTest {
             server.stop()
             victim.delete()
         }
+    }
+
+    @Test
+    fun stopDoesNotInterruptAHandlerThatIsAlreadyWriting() {
+        // 回归：旧顺序是"先 shutdownNow 再关监听" —— 正在执行的 handler 被直接打断，
+        // clear-memory 或一次 40 键批量写会停在一半，prefs 里"半套已写、半套没写"。
+        // 现在的保证是：**handler 线程不被中断**（它跑完、写落盘）；
+        // 至于响应能不能送到客户端，取决于 NanoHTTPD 关连接的时刻，这里不承诺。
+        val port = freePort()
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        val slow = api(actions = { name ->
+            Thread.sleep(120)
+            finished.set(true)
+            "done:" + name
+        })
+        val server = ConsoleServer(slow, preferredPort = port)
+        server.start()
+        val worker = Thread { runCatching { post("/api/action/probe-privilege?t=" + token, "{}", port) } }
+        worker.start()
+        Thread.sleep(40)
+        server.stop()
+        worker.join(3000)
+        // 给 handler 一点余量收尾（它可能还在写响应）
+        val deadline = System.currentTimeMillis() + 2000
+        while (!finished.get() && System.currentTimeMillis() < deadline) Thread.sleep(20)
+        assertTrue("stop() 不该打断已经开始的 handler；它必须跑到自己结束", finished.get())
     }
 
     @Test
