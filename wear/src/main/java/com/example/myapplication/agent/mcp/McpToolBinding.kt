@@ -244,7 +244,10 @@ class McpToolBinding(
         } catch (error: Exception) {
             val kind = (error as? McpTransportException)?.kind ?: "unexpected"
             val detail = error.message ?: error.javaClass.simpleName
-            snapshotValue = snapshotValue.copy(tools = emptyList(), fetchedAtMs = 0L, lastError = detail)
+            // 一次**工具调用**失败不等于"列表失效"：以前这里连 tools 一起清空，
+            // 于是某条工具超时会把整份远端清单从模型视野里拿走 15 秒（retryAtMs 期间不刷新），
+            // 兄弟调用还可能在跑。清单保持可用，只记错误 + 安排一次刷新；会话仍丢弃（传输可能已坏）。
+            snapshotValue = snapshotValue.copy(lastError = detail)
             retryAtMs = now() + failureBackoffMs
             dropSession()
             failure(callId, localName, "mcp_" + kind, "MCP 调用失败（" + (now() - started) + "ms）：" + detail)
