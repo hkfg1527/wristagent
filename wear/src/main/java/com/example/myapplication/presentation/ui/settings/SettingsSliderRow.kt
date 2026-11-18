@@ -22,6 +22,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,7 +78,12 @@ fun SettingsSliderRow(
         )
         return
     }
-    SettingsCardRow(modifier = modifier) {
+    // 语义边界：卡组外层是 Card(onClick = {})（可点 → 会 mergeDescendants），
+    // 滑杆行本身不可点，不设边界就会被整张卡吸进同一个无障碍节点 ——
+    // 0.0.0.88 实测：外面那张卡把「底栏自动收起延时」与「表冠滚动增益」两行并成一个节点，
+    // 区间取前者的，第二个滑杆的 SetProgress 直接丢失，读屏拨不动它。
+    // 加一个空语义合并边界后，本行独立成节点，两行各读各的、各拨各的。
+    SettingsCardRow(modifier = modifier.semantics(mergeDescendants = true) {}) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(Wear.Space.Xs)
@@ -110,6 +120,7 @@ fun SettingsSliderRow(
                 )
             }
             SettingsThinSlider(
+                label = label,
                 value = value,
                 valueRange = valueRange,
                 steps = steps,
@@ -126,9 +137,14 @@ fun SettingsSliderRow(
  *
  * 为什么不用官方 Slider：Wear M3 的 Slider 是"52dp 分段胶囊 + 两端 ± 图标"，整块铺满强调色，
  * 眯眼看是页面上最大的一块实色 —— 强调色在这里是重音，不该铺面积。轨道因此自己画、拖拽自己接。
+ *
+ * 无障碍：自绘不挂语义的后果是"读屏读不到、也拨不动"，所以这里补三件
+ * （[contentDescription] 给名字、[ProgressBarRangeInfo] 给区间、[SemanticsActions.SetProgress] 让读屏能拨），
+ * 与官方 Slider 的 rangeSemantics 同义。视觉一分不改。
  */
 @Composable
 private fun SettingsThinSlider(
+    label: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
@@ -144,6 +160,14 @@ private fun SettingsThinSlider(
         modifier = modifier
             .fillMaxWidth()
             .height(SliderTouchHeight)
+            .semantics {
+                contentDescription = label
+                progressBarRangeInfo = ProgressBarRangeInfo(value, valueRange, steps)
+                setProgress { target ->
+                    onValueChange(target)
+                    true
+                }
+            }
             .pointerInput(valueRange, steps) {
                 detectTapGestures { offset ->
                     onValueChange(
