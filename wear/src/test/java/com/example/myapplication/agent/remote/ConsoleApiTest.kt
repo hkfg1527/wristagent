@@ -58,16 +58,19 @@ class ConsoleApiTest {
         currentToken: String = token,
         port: Int = 8080,
         uptimeMs: Long = 1234L,
+        deviceName: String? = "TicWatch Pro 5",
     ): ConsoleApi = ConsoleApi(
         settings = settings,
         capabilities = {
-            mapOf(
+            val caps = linkedMapOf<String, Any?>(
                 "root" to true,
                 "shizukuInstalled" to true,
                 "shizukuReady" to false,
                 "activeBackend" to "ROOT",
                 "internet" to true,
             )
+            if (deviceName != null) caps["deviceName"] = deviceName
+            caps
         },
         actions = actions,
         assets = assets,
@@ -148,11 +151,27 @@ class ConsoleApiTest {
         assertEquals(false, capabilities["shizukuReady"])
         assertEquals("ROOT", capabilities["activeBackend"])
         assertEquals(true, capabilities["internet"])
+        assertEquals("TicWatch Pro 5", capabilities["deviceName"])
         assertEquals("ab12…cd56", capabilities["tokenMasked"])
         assertFalse("不得回传完整 token", capabilities["tokenMasked"] == token)
         val runtime = map(body["runtime"])
         assertEquals(8081, runtime["serverPort"])
         assertEquals(4321, runtime["uptimeMs"])
+    }
+
+    /** 顶栏设备名是可选能力：拿不到时必须给空串（网页据此回退到「当前设备」），不能是 null。 */
+    @Test
+    fun stateDeviceNameFallsBackToEmptyString() {
+        val response = api(deviceName = null).handle(request("GET", "/api/state"))
+        val capabilities = map(json(response)["capabilities"])
+        assertTrue("键必须存在", capabilities.containsKey("deviceName"))
+        assertEquals("", capabilities["deviceName"])
+    }
+
+    @Test
+    fun stateDeviceNameIsTrimmed() {
+        val response = api(deviceName = "  TicWatch Pro 5  ").handle(request("GET", "/api/state"))
+        assertEquals("TicWatch Pro 5", map(json(response)["capabilities"])["deviceName"])
     }
 
     @Test

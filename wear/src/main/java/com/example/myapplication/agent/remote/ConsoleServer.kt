@@ -125,6 +125,7 @@ class ConsoleServer(
             tooLarge = true
         } else if (method == "POST" || method == "PUT" || method == "PATCH") {
             val files = HashMap<String, String>()
+            val restoreHeaders = forceUtf8Charset(session)
             try {
                 session.parseBody(files)
             } catch (e: NanoHTTPD.ResponseException) {
@@ -132,6 +133,8 @@ class ConsoleServer(
                 tooLarge = true
             } catch (_: IOException) {
                 return errorResponse(400, "bad_request")
+            } finally {
+                restoreHeaders()
             }
             val raw = files["postData"]
             if (raw != null) {
@@ -167,6 +170,24 @@ class ConsoleServer(
         // 对端 IP 只用于失败限流分桶，不写进任何响应
         val client = runCatching { session.remoteIpAddress }.getOrNull().orEmpty()
         return api.handle(ConsoleRequest(method, uri, query, headers, body, bodyBytes, tooLarge, client))
+    }
+
+    /**
+     * NanoHTTPD 按 Content-Type 里的 charset 解 body，缺省 US-ASCII —— 中文会被换成 U+FFFD 再落库，不可逆。
+     * 提交前补 charset=utf-8，解析完立刻还原，避免下游读到的请求头被改动。
+     */
+    private fun forceUtf8Charset(session: NanoHTTPD.IHTTPSession): () -> Unit {
+        val headers = runCatching { session.headers }.getOrNull() ?: return {}
+        val original = headers["content-type"] ?: return {}
+        val patched = ConsoleCharset.withUtf8(original) ?: return {}
+        if (patched == original) return {}
+        val mutable = headers as? MutableMap<String, String> ?: return {}
+        return try {
+            mutable["content-type"] = patched
+            { mutable["content-type"] = original }
+        } catch (_: RuntimeException) {
+            {}
+        }
     }
 
     private fun errorResponse(status: Int, error: String): ConsoleResponse =

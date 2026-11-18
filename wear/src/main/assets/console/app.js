@@ -188,7 +188,7 @@
     if (state.token) headers['X-Console-Token'] = state.token;
     var body;
     if (opts.json !== undefined) {
-      headers['Content-Type'] = 'application/json';
+      headers['Content-Type'] = 'application/json; charset=utf-8';
       body = JSON.stringify(opts.json);
     }
     var controller = typeof AbortController === 'function' ? new AbortController() : null;

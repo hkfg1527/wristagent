@@ -178,6 +178,7 @@ class ConsoleApi(
             "shizukuReady" to (live["shizukuReady"] as? Boolean ?: false),
             "activeBackend" to backend,
             "internet" to (live["internet"] as? Boolean ?: false),
+            "deviceName" to ((live["deviceName"] as? String)?.trim().orEmpty()),
             "tokenMasked" to ConsoleToken.mask(token()),
         )
     }

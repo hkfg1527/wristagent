@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import com.example.myapplication.agent.AgentDispatcher
@@ -271,6 +272,7 @@ internal object ConsoleBridge {
             "shizukuReady" to status.shizukuReady,
             "activeBackend" to status.activeBackend.name,
             "internet" to hasInternet(context),
+            "deviceName" to (Build.MODEL ?: ""),
         )
     }
 
