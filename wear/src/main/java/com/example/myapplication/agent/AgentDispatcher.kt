@@ -500,7 +500,10 @@ class AgentDispatcher(
                             pendingRiskAssessment = evaluatedRisk
                         )
                         onStateUpdate(currentState)
-                        val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: true
+                        // 审批回调缺失时**一律拒绝**：曾经默认放行（?: true），而 ChatViewModel
+                        // 在 onCleared 里会把它置空 —— 于是 ViewModel 被回收的瞬间，
+                        // 正在排队的审批点直接自动通过，含破坏性命令。安全闸门的默认值必须是"关"。
+                        val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: false
 
                         if (allowed) {
                             // 批准转绿
@@ -1154,7 +1157,8 @@ class AgentDispatcher(
 
         if (gate == ApprovalGate.Decision.REQUIRE_APPROVAL) {
             val evaluatedRisk = if (forcedApproval) forcedApprovalRisk(call.name) else risk
-            val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: true
+            // 同主循环：回调缺失 = 没人能批准 = 拒绝，不能默认放行
+            val allowed = onRequireConfirmation?.invoke(call.name, actionDesc, evaluatedRisk) ?: false
             if (!allowed) {
                 Log.i(TAG, "子代理工具被拒绝：tool=" + call.name)
                 return rejectedToolResult(call, "主人已在手腕端拒绝执行此操作")

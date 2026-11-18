@@ -11,17 +11,22 @@
 
 | 事实 | 取值 | 出处 |
 | --- | --- | --- |
-| 偏好属性总数 | 58 个可持久化属性 | `agent/AgentPreferences.kt` L19–L375 |
-| `KEY_*` / `DEFAULT_*` 常量 | 56 条（含 2 条内部键） | `AgentPreferences.kt` L454–L531 |
+| 偏好属性总数 | **64** 个可持久化属性（按 `get() = prefs.*` 计） | `agent/AgentPreferences.kt` |
+| `KEY_*` / `DEFAULT_*` 常量 | **88** 条（`KEY_*` 54 + `DEFAULT_*` 34） | `AgentPreferences.kt` |
 | 可移植快照键 | 恰好 40 条，被测试钉死 | `SettingsTransferCodec.PortableKeys`；`SettingsTransferCodecTest` 断言 `40` |
-| 关闭页风格 4 套 | BALLOON / SQUARE / GOOGLE_CARD / TERMINAL | `KEY_SETTINGS_STYLE="settings_style"`，`appearance/SettingsStyle.kt` |
-| 二级页总数 | 17 = 11 个一级 `SettingsSubDialog` + 6 个内层页 | `settings/SettingsShared.kt` L227–L249 + `SettingsScreen.kt` L722–L886 |
+| 关闭页风格 **6 套** | BALLOON / SQUARE / GOOGLE_CARD / TERMINAL / M3_LIST / M3_TRANSFORM | `KEY_SETTINGS_STYLE="settings_style"`，`appearance/SettingsStyle.kt` |
+| 一级子页总数 | **15**（= `SettingsSubDialog` 枚举值数 = 根页 `activeDialog` 赋值点数） | `settings/SettingsShared.kt` + `SettingsScreen.kt` |
+| 根页行数 | **15**：S1 4 行 / S2 3 行 / S3 4 行（含 Lux 终端）/ S4 4 行 | `SettingsScreen.kt`；`docs/CONTEXT.md` §0.5 同口径 |
 | 根页组标题 | 恰好 4 个，顺序被测试钉死 | `SettingsScreenStructureGuardTest.expectedSections` |
 | 行步进 | 49dp（行高下限 48 + 发丝线 1 + 卡内行距 0） | `SettingsUiMath.SettingsSpacingMath.RowStepDp` |
 | 组间留白 | 24dp；卡内行距 0 | `SectionGapDp=24f`、`CardRowGapDp=0f` |
 | 列表项间距 | 4dp（4dp 网格） | `ItemGapDp=4f`、`GridDp` |
 | 网页覆盖 | 10 页 / 63 行 / 55 带键行 | `SettingsCoverage.entries` + `ConsoleSettingsParityGuardTest` |
-| 双语 | 414 条 / 414 条 | `values/strings_settings.xml`、`values-zh/strings_settings.xml` |
+| 双语 | **487** 条 / **487** 条 | `values/strings_settings.xml`、`values-zh/strings_settings.xml` |
+
+> 2026-11-19 重算：本表原来写的是 58 / 56 / 4 套 / 17 个子页（11+6）/ 414 条双语，与源码不符。
+> 计数口径写在这里，改代码后请按同一口径重算，不要凭印象加一减一。
+
 
 ### 0.1 为什么顶层最多 5 个分区（并且本文只取 4）
 

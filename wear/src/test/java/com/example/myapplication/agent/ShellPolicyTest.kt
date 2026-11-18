@@ -4,6 +4,7 @@ import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.agent.contract.SecurityMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -132,6 +133,63 @@ class ShellPolicyTest {
         assertEquals(
             ApprovalGate.Decision.REQUIRE_APPROVAL,
             ShellPolicy.gate(ShellDanger.DESTRUCTIVE, remembered = true)
+        )
+    }
+
+    @Test
+    fun aNewlineCannotHideASecondCommandBehindAReadOnlyHead() {
+        // normalize 会把 \n 折成空格，于是 `ls\nreboot` 只剩首词 `ls` —— 只看首词就会判 SAFE，
+        // 而 sh -c 实际上会把两条都跑掉。这里钉住"第二条也参与判档"。
+        assertNotEquals(
+            "换行后的第二条命令不能被首词掩埋",
+            ShellDanger.SAFE,
+            ShellPolicy.dangerOf("ls\nreboot -p")
+        )
+        assertEquals(
+            "换行后的破坏性命令必须仍判破坏性",
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("id\nmkfs.ext4 /dev/block/sda")
+        )
+    }
+
+    @Test
+    fun chainedCommandsTakeTheWorstSeverity() {
+        assertEquals(
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("ls; rm -rf /data")
+        )
+        assertEquals(
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("echo hi && wipe data")
+        )
+        assertEquals(
+            "前半只读、后半改系统 = 可记住的风险档",
+            ShellDanger.RISKY,
+            ShellPolicy.dangerOf("ls; settings put system screen_brightness 10")
+        )
+    }
+
+    @Test
+    fun everyRmTargetIsCheckedNotJustTheFirst() {
+        assertEquals(
+            "多目标 rm 必须逐个检查：/data 排在第二个也不能漏",
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("rm -rf /sdcard/Download /data")
+        )
+        assertNotEquals(
+            "安全的多目标 rm 不该被误升成破坏性",
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("rm -rf /data/local/tmp/a /data/local/tmp/b")
+        )
+    }
+
+    @Test
+    fun harmlessChainsAreNotOverEscalated() {
+        assertEquals(ShellDanger.SAFE, ShellPolicy.dangerOf("ls -l /sdcard"))
+        assertNotEquals(
+            "只读管道不该被升成破坏性",
+            ShellDanger.DESTRUCTIVE,
+            ShellPolicy.dangerOf("dumpsys battery | head -4")
         )
     }
 

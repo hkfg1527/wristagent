@@ -11,28 +11,28 @@
 | 问题 | 答案 |
 |---|---|
 | 项目在哪 | `D:\AndroidProjects\MyApplication`（**不是** `C:\Users\GHR\AndroidStudioProjects\...`，那是搬走后留下的空壳） |
-| 现在什么版本 | `0.0.0.44` / versionCode 82；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` 已打 tag |
-| 单测基线 | **1289 条 / 188 套件全绿**（改任何东西前先跑一遍确认） |
-| 下一个里程碑 | `0.0.0.50` 发布点（还差 6 个内部版） |
-| 主线状态 | P0–P3 四条全部收口（细节在 `docs/CONTEXT.md` §0.5） |
+| 现在什么版本 | `0.0.0.90` / versionCode 128；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` 已打 tag |
+| 单测基线 | **1360 条 / 206 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测；改任何东西前先跑一遍确认） |
+| 下一个里程碑 | 内部版满 100 时的整十发布点；每个整十都要跑 `node docs/tools/release-check.mjs` |
+| 主线状态 | P0–P3 四条全部收口（细节在 `docs/CONTEXT.md` §0.5）；当前主线是"设置页功能回归搬进 JVM"（35 个键）+ 控制台页面级 E2E 已接进发布自检 |
 
 ---
 
 ## 0.5 前任留下的欠账（接手先看这里，别重新想"该干什么"）
 
-按"有多确定"排序，**每条都写了验证方式**，别猜。
+> 2026-11-19 按实测重写：旧版这张表里 5 条已经做完，留着只会误导下一个人。
 
 | # | 欠着什么 | 状态 / 该怎么接 |
 |---|---|---|
-| 1 | **设置页全量巡检** | 脚本已写好在 `build-logs/sweep2.mjs`（配 `docs/tools/nav.mjs`），但上次跑到中途超时，15 个页面只验了 7 个且没跑完。**接法**：把页数砍到每批 5 个分几次跑，判据是"每页能打开 + 能返回根页" |
-| 2 | **行高 1.42 的版式手术** | **没做，且在等用户点头**。现状主题行高 1.25–1.33，比 Material 自家 1.43 紧，这是用户最初抱怨"字体过扁"的可能来源。**顺序不能反**：先改 `ApprovalBandMetricsTest` 的几何推导 → 再上机重新量审批带/设置行/卡片间隙 → 最后才动 typography（写进 `docs/DESIGN-SPEC.md`） |
-| 3 | **P1 验收矩阵还剩三行** | ①磁滑（`RotaryScrollEvent` 之外的路径）未测；②内层页只抽了 1 个；③底栏自动收起的真实时序（需要一轮完整流式回复）。矩阵在 `docs/ACCEPTANCE-MATRIX.md` §2.5–2.7，照表格补行 |
-| 4 | **网页控制台只验到首屏** | 三档皮肤截图有了（`docs/device/v11/console-*.png`），但 10 页里还有几页是只读展示，交互路径没测。接口层已验证：`/` 200、无令牌 401、带令牌 POST 写入成功 |
-| 5 | **版本停在 `0.0.0.44`** | 之后三个提交都是 docs（`8f1423c` / `8292ed1` / `043aa01`）**没动代码**。下次动 `wear/src` 要 bump 到 `0.0.0.45`，并同步 `docs/CONTEXT.md`（有守卫测试钉着） |
-| 6 | **下一个发布点 `0.0.0.50`** | 还差 6 个内部版。到点就跑 `node docs/tools/release-check.mjs`，7/7 通过后打 tag |
-| 7 | **工作区路径还没修** | GUI 的工作区记录仍指向 `C:\Users\GHR\AndroidStudioProjects\MyApplication`（**空壳，0 个文件**）。真项目在 `D:\AndroidProjects\MyApplication`。**新会话前必须新建一个 D 盘工作区**，否则读不到 `docs/CONTEXT.md` |
-| 8 | **压缩只能用户发 `/compact`** | `manage_context` 的 9 个 action 里 8 个能用，只有 `compact` 报 `compaction backend is not mounted`——梁神预设把 `compaction` 隔离在自己的 realm。要压缩就请用户发命令，别反复试 |
-| 9 | **`@local/android-wear-toolbox` 没验过** | 用户装了这个插件（adb/Gradle 工具：列设备、截图、dump UI、logcat、构建、安装）。它**从未进过任何会话的工具面**。新会话第一件事：看工具面里有没有 `android_wear_*`，有就直接用，别再手搓 `spawnSync` |
+| 1 | ~~设置页 15 页巡检~~ | **已完成**：0.0.0.47 与 0.0.0.81 两次都是 **15/15 能打开 + 能返回根页**（证据 `build-logs/sweep-*.jsonl`、`docs/SETTINGS-SWEEP.md`） |
+| 2 | **行高 1.42 的版式手术** | **没做，且在等用户点头**（`docs/DECISIONS-PENDING.md` D2）。现状主题行高 1.25–1.33，比 Material 自家 1.43 紧。**顺序不能反**：先改 `ApprovalBandMetricsTest` 的几何推导 → 再上机重量 → 最后才动 typography |
+| 3 | **验收矩阵还剩三行** | ①磁滑（`RotaryScrollEvent` 之外的路径）②内层页（二级页里再进一层）③底栏自动收起的真实时序。矩阵在 `docs/ACCEPTANCE-MATRIX.md` §2.5–2.7，照表格补行 |
+| 4 | ~~网页控制台只验到首屏~~ | **已完成并超出**：`docs/tools/console-e2e.mjs` 用真浏览器 + CDP 跑 **69 条**页面级断言，且已接进 `release-check.mjs` 第 4 段（第 8 条判据） |
+| 5 | ~~版本停在 0.0.0.44~~ | 已过时：现在 `0.0.0.90`。升版本必须同步 `docs/CONTEXT.md`（`ContextDocFreshnessGuardTest` 钉着） |
+| 6 | **发布自检的判据数** | 现在是 **8 条**：构建成功 / 单测全绿 / APK 产出 / 安装成功 / 进入设置页 / 四分区按序 / 几何已采样 / 控制台页面 E2E。全部通过才打 tag |
+| 7 | **工作区路径** | 仍是新会话注意事项：GUI 里要选 D 盘工作区，否则读不到 `docs/CONTEXT.md` |
+| 8 | ~~压缩只能用户发 `/compact`~~ | **已解决**（2026-11-18 插件更新）：`manage_context({action:"compact"})` 现在会排队到本轮结束后执行 |
+| 9 | ~~`@local/android-wear-toolbox` 没验过~~ | **已可用**：当前工具面有 `android_devices` / `android_build` / `android_install` / `android_screenshot` / `android_ui_dump` / `android_logcat` |
 
 ---
 

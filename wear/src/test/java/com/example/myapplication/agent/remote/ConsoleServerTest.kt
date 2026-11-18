@@ -61,6 +61,24 @@ class ConsoleServerTest {
         }
     }
 
+    /** 发一笔纯文本 POST：body 逐字发出（不设 JSON Content-Type，模拟"正文就是个路径"那种请求）。 */
+    private fun post(path: String, body: String, port: Int): Pair<Int, String> {
+        val connection = URI("http://127.0.0.1:" + port + path).toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 5000
+        connection.readTimeout = 5000
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "text/plain")
+        return try {
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            code to (stream?.bufferedReader()?.use { it.readText() } ?: "")
+        } finally {
+            connection.disconnect()
+        }
+    }
+
 
     @Test
     fun servesJsonOverRealSocketAndReleasesPortOnStop() {
@@ -114,6 +132,28 @@ class ConsoleServerTest {
             server.stop()
         }
         assertEquals(-1, server.port)
+    }
+
+    @Test
+    fun aPostBodyThatLooksLikeAPathIsNeverTouchedOnDisk() {
+        // 回归：曾经把 NanoHTTPD 的 postData 当成"临时文件路径"读了一遍再删掉，
+        // 而那个字段其实是**正文文本** —— 于是任何无令牌客户端只要 POST 一个存在的路径，
+        // 就能让服务端把该文件读进内存并删除（未鉴权任意文件删除）。
+        val victim = java.io.File.createTempFile("console-victim", ".txt")
+        victim.writeText("不该被删除")
+        val port = freePort()
+        val server = ConsoleServer(api(), preferredPort = port)
+        try {
+            server.start()
+            assertEquals(port, server.port)
+            val (code, _) = post("/api/state", victim.absolutePath, port)
+            assertEquals("无令牌 POST 必须是 401", 401, code)
+            assertTrue("正文虽然是一个真实路径，服务端也不许碰它", victim.exists())
+            assertEquals("不该被删除", victim.readText())
+        } finally {
+            server.stop()
+            victim.delete()
+        }
     }
 
     @Test

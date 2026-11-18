@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
-import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.Collections
@@ -136,33 +135,18 @@ class ConsoleServer(
             } finally {
                 restoreHeaders()
             }
+            // NanoHTTPD 的 postData 是**正文文本**（只有 PUT 才落临时文件并给路径，而上游
+            // parseBody 的 saveTmpFile 分支我们不接受）。曾经这里把正文当路径去 File(raw).isFile
+            // 读一遍再 delete —— 于是任何无令牌客户端只要 POST 一个真实路径，就能让服务端
+            // 把该文件读进内存并删除：未鉴权任意文件删除，且发生在鉴权之前。
             val raw = files["postData"]
             if (raw != null) {
-                val file = File(raw)
-                if (file.isFile) {
-                    try {
-                        if (file.length() > ConsoleApi.MAX_BODY_BYTES) {
-                            tooLarge = true
-                        } else {
-                            val bytes = file.readBytes()
-                            if (bytes.size > ConsoleApi.MAX_BODY_BYTES) {
-                                tooLarge = true
-                            } else {
-                                bodyBytes = bytes.size
-                                body = String(bytes, StandardCharsets.UTF_8)
-                            }
-                        }
-                    } finally {
-                        runCatching { file.delete() }
-                    }
+                val bytes = raw.toByteArray(StandardCharsets.UTF_8)
+                if (bytes.size > ConsoleApi.MAX_BODY_BYTES) {
+                    tooLarge = true
                 } else {
-                    val bytes = raw.toByteArray(StandardCharsets.UTF_8)
-                    if (bytes.size > ConsoleApi.MAX_BODY_BYTES) {
-                        tooLarge = true
-                    } else {
-                        bodyBytes = bytes.size
-                        body = raw
-                    }
+                    bodyBytes = bytes.size
+                    body = raw
                 }
             }
         }

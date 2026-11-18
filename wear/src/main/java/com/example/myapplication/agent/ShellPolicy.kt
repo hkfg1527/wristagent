@@ -116,7 +116,7 @@ object ShellPolicy {
         "/data/system", "/data/adb"
     )
 
-    private val rmInvocation = Regex("""(?:^|[\s;&|(])rm\s+((?:-{1,2}[A-Za-z-]+\s+)*)([^\s;&|]+)""")
+    private val rmInvocation = Regex("""(?:^|[\s;&|(])rm\s+([^\n\r;&|]+)""")
 
     /** 只读命令白名单：命中且整条命令不含 shell 元字符才算 SAFE。 */
     private val readOnlyCommands = setOf(
@@ -132,9 +132,34 @@ object ShellPolicy {
     /** 归一化即"记住此命令"的键：折叠空白并去掉首尾空格，不做任何语义改写。 */
     fun normalize(command: String): String = command.trim().replace(Regex("\\s+"), " ")
 
+    /**
+     * 命令分隔符：分号 / 换行 / 管道 / 与或。
+     *
+     * 为什么需要它：`normalize` 会把 `\n` 折成空格，`ls\nreboot -p` 归一化后只剩 `ls reboot -p`
+     * —— 只看首词就判成"只读命令 SAFE"，而 `sh -c` 拿到的是**原始串**，两条命令都会真的执行。
+     * 所以判档必须按原始串拆开、逐条判、取最坏一档。
+     */
+    private val commandSeparators = Regex("[\\n\\r;|&]+")
+
     fun dangerOf(command: String): ShellDanger {
         val normalized = normalize(command)
         if (normalized.isEmpty()) return ShellDanger.SAFE
+        // 整串先过黑名单：`:(){ :|:& };:` 这类命令拆开就什么都不剩，必须整串匹配
+        if (matchedRule(normalized) != null) return ShellDanger.DESTRUCTIVE
+        val whole = classifySingle(normalized)
+        if (!commandSeparators.containsMatchIn(command)) return whole
+        var worst = whole
+        for (part in command.split(commandSeparators)) {
+            val trimmed = part.trim()
+            if (trimmed.isEmpty()) continue
+            val danger = classifySingle(normalize(trimmed))
+            if (danger.ordinal > worst.ordinal) worst = danger
+        }
+        return worst
+    }
+
+    /** 单条命令（无分隔符）的分档：黑名单 → rm 目标 → 只读白名单。 */
+    private fun classifySingle(normalized: String): ShellDanger {
         if (matchedRule(normalized) != null) return ShellDanger.DESTRUCTIVE
         if (classifyRmTarget(normalized) == ShellDanger.DESTRUCTIVE) return ShellDanger.DESTRUCTIVE
         return if (isReadOnly(normalized)) ShellDanger.SAFE else ShellDanger.RISKY
@@ -275,16 +300,26 @@ object ShellPolicy {
     private fun matchedRule(normalized: String): DangerRule? =
         DESTRUCTIVE_RULES.firstOrNull { it.pattern.containsMatchIn(normalized) }
 
+    /**
+     * `rm` 的每个目标都要查，不是只查第一个。
+     *
+     * 旧实现只捕获 `rm` 后的**一个**非选项词，`rm -rf /sdcard/Download /data` 里的 `/data`
+     * 从来没被检查过 —— 于是整条只判 RISKY（可被"记住此命令"永久放行），而实际执行会清掉 /data。
+     */
     private fun classifyRmTarget(normalized: String): ShellDanger {
         var destructive = false
         for (match in rmInvocation.findAll(normalized)) {
-            val flags = match.groupValues[1].lowercase()
-            val target = match.groupValues[2]
+            val args = match.groupValues[1].split(' ').filter { it.isNotEmpty() }
+            // 选项与目标可能任意排序（`rm /data -rf` 也合法），所以先整体扫一遍选项
+            val flags = args.filter { it.startsWith("-") }.joinToString("").lowercase()
             val recursive = flags.contains('r') || flags.contains('f')
-            if (!recursive && target !in wholeTreeTargets) continue
-            if (target in wholeTreeTargets) return ShellDanger.DESTRUCTIVE
-            if (systemTreePrefixes.any { target == it || target.startsWith(it + "/") }) {
-                destructive = true
+            for (arg in args) {
+                if (arg.startsWith("-")) continue
+                if (!recursive && arg !in wholeTreeTargets) continue
+                if (arg in wholeTreeTargets) return ShellDanger.DESTRUCTIVE
+                if (systemTreePrefixes.any { arg == it || arg.startsWith("$it/") }) {
+                    destructive = true
+                }
             }
         }
         return if (destructive) ShellDanger.DESTRUCTIVE else ShellDanger.RISKY
