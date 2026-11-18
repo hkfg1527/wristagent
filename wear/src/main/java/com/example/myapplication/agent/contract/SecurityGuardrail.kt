@@ -9,6 +9,26 @@ package com.example.myapplication.agent.contract
  */
 class SecurityGuardrail {
 
+    /**
+     * 只从参数里取 `command` 字段做危险判定。
+     *
+     * 为什么不能扫整个 argsJson：硬黑名单里有 `format ` / `wipe ` 这种短词，
+     * 而其它工具的普通文本参数完全可能自然包含它们 —— 「how to format a disk」的搜索词、
+     * 「wipe cache 的步骤」的记忆条目都会被判成致命指令硬拦，用户只看到
+     * "致命指令已被安全护栏拦截"，检索与记忆功能却什么也没做。
+     *
+     * 真正的命令只可能出现在 `command` 字段（run_shell 与自写工具都是这个键）。
+     */
+    private val commandField = Regex("\"command\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+
+    private fun shellCommandsIn(argsJson: String): List<String> =
+        commandField.findAll(argsJson).map { match ->
+            match.groupValues[1]
+                .replace("\\\"", "\"")
+                .replace("\\n", "\n")
+                .replace("\\\\", "\\")
+        }.toList()
+
     private fun isFatalCommand(command: String): Boolean {
         val lower = command.lowercase().replace("\\s+".toRegex(), " ")
         if (lower.contains("rm -rf") || lower.contains("rm -r") || lower.contains("rm -f")) {
@@ -65,8 +85,10 @@ class SecurityGuardrail {
      * 针对穿戴端标准 Tool Calling 的审查
      */
     fun assessTool(toolName: String, argsJson: String, mode: SecurityMode): RiskAssessment {
-        // 先检查参数里是否携带了致命注入
-        if (isFatalCommand(argsJson) || isFatalCommand(toolName)) {
+        // 只扫命令字段：扫整串会把「搜 how to format a disk」「记住 wipe cache 的步骤」这类
+        // 正常文本参数误判成致命指令（见 shellCommandsIn 的注释）。
+        val fatalCommand = shellCommandsIn(argsJson).firstOrNull { isFatalCommand(it) }
+        if (fatalCommand != null || isFatalCommand(toolName)) {
             return RiskAssessment(
                 isHardBlocked = true,
                 isHighRisk = true,

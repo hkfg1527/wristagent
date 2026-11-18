@@ -295,9 +295,18 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         get() = prefs.getString("custom_system_prompt", "") ?: ""
         set(value) = prefs.edit().putString("custom_system_prompt", value).apply()
 
+    /**
+     * 上下文轮数预算。夹在 [MIN_CONTEXT_TURNS]..[MAX_CONTEXT_TURNS]：
+     * 控制台把它的下限写在字段表里（min=0），而这里以前不夹取 ——
+     * `takeLast(0)` 会**静默丢掉全部历史**，负数/超大值则直接抛 `IllegalArgumentException`，
+     * 被上层吞成"网络异常"，用户完全看不出真正原因。
+     */
     var maxContextTurns: Int
-        get() = prefs.getInt("max_context_turns", 30)
-        set(value) = prefs.edit().putInt("max_context_turns", value).apply()
+        get() = prefs.getInt("max_context_turns", DEFAULT_CONTEXT_TURNS)
+            .coerceIn(MIN_CONTEXT_TURNS, MAX_CONTEXT_TURNS)
+        set(value) = prefs.edit()
+            .putInt("max_context_turns", value.coerceIn(MIN_CONTEXT_TURNS, MAX_CONTEXT_TURNS))
+            .apply()
 
     /** 默认 2048：300 会把正常长度的回复硬截断 */
     var maxOutputTokens: Int
@@ -696,6 +705,13 @@ class AgentPreferences internal constructor(private val prefs: SharedPreferences
         const val DEFAULT_BOTTOM_BAR_AUTO_HIDE_MS = 3000L
         const val MIN_BOTTOM_BAR_AUTO_HIDE_MS = 1000L
         const val MAX_BOTTOM_BAR_AUTO_HIDE_MS = 8000L
+
+        /** 上下文轮数预算的合法区间：控制台字段表的下限是 0，落到表端必须夹住（0 会丢光历史）。 */
+        const val DEFAULT_CONTEXT_TURNS = 30
+        const val MIN_CONTEXT_TURNS = 1
+
+        /** 上界给到 200 轮：再多也不该由手表进程去承载，压缩策略会在更早的位置触发。 */
+        const val MAX_CONTEXT_TURNS = 200
         const val KEY_ROTARY_SCROLL_GAIN = "rotary_scroll_gain"
         const val DEFAULT_ROTARY_SCROLL_GAIN = 1f
         const val MIN_ROTARY_SCROLL_GAIN = 0.5f

@@ -39,6 +39,26 @@ class AgentPreferencesWatchSettingsTest {
     }
 
     @Test
+    fun contextTurnsAreClampedOnBothWriteAndRead() {
+        // 回归：控制台字段表给 maxContextTurns 的下限是 0，而属性本身不夹取 ——
+        // 存进去 0 之后 takeLast(0) 会静默丢掉全部历史；负数/超大值则会抛 IllegalArgumentException，
+        // 被上层吞成"网络异常"，用户完全看不出真正原因。
+        val prefs = AgentPreferences(FakeSharedPreferences())
+
+        prefs.maxContextTurns = 0
+        assertEquals("0 轮必须夹到下限", AgentPreferences.MIN_CONTEXT_TURNS, prefs.maxContextTurns)
+
+        prefs.maxContextTurns = -7
+        assertEquals(AgentPreferences.MIN_CONTEXT_TURNS, prefs.maxContextTurns)
+
+        prefs.maxContextTurns = 9999
+        assertEquals("超大值必须夹到上限", AgentPreferences.MAX_CONTEXT_TURNS, prefs.maxContextTurns)
+
+        prefs.maxContextTurns = 42
+        assertEquals("合法值原样保留", 42, prefs.maxContextTurns)
+    }
+
+    @Test
     fun everySwitchStartsAtItsDocumentedDefault() {
         val prefs = AgentPreferences(FakeSharedPreferences())
         flagSpecs.forEach { spec ->

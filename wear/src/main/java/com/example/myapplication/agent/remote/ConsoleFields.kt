@@ -74,7 +74,13 @@ object ConsoleFields {
         ConsoleField("maxOutputTokens", ConsoleFieldType.INT, min = 16.0, max = 8192.0),
         ConsoleField("customSystemPrompt", ConsoleFieldType.STRING),
         ConsoleField("securityMode", ConsoleFieldType.ENUM, allowed = SecurityMode.values().map { it.name }),
-        ConsoleField("maxContextTurns", ConsoleFieldType.INT, min = 0.0, max = 200.0),
+        ConsoleField(
+            "maxContextTurns",
+            ConsoleFieldType.INT,
+            // 与表端 getter/setter 的夹取区间同源：下限 1 而不是 0（0 会丢光历史）
+            min = AgentPreferences.MIN_CONTEXT_TURNS.toDouble(),
+            max = AgentPreferences.MAX_CONTEXT_TURNS.toDouble()
+        ),
         ConsoleField(
             "requestTimeoutSeconds",
             ConsoleFieldType.INT,

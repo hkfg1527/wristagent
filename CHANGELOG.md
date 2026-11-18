@@ -41,6 +41,29 @@
 
 ## [未发布]
 
+### 修复：正常文本参数被当成致命指令（搜索与记忆被硬拦）
+`SecurityGuardrail.assessTool` 对**整个 argsJson** 做致命命令子串匹配，而黑名单里含 `format `、`wipe `
+这种短词。于是：
+
+- `web_search` 搜「how to format a disk on windows」→ 判致命 → 用户只看到"致命指令已被安全护栏拦截"，
+  检索什么都没做；
+- `remember_fact` 记「wipe cache 的步骤」→ 同样被硬拦。
+
+- 修法：只扫参数里的 `command` 字段（`run_shell` 与自写工具的命令都放这个键），
+  并按 JSON 转义还原后再判定。
+- 拦截力不变：`run_shell` 的 `rm -rf /`、自写工具的 `mkfs.ext4 /dev/block/sda`、
+  `dd ... of=/dev/block/...` 都仍被硬拦（各有用例钉住）。
+- 回归：`SecurityGuardrailTest` +2 条（"非 shell 工具的文本参数不被硬拦"先红后绿；
+  "shell 工具的命令字段仍被硬拦"守住反方向）。
+
+### 修复：上下文轮数预算可以存成 0，静默丢光历史
+控制台字段表把 `maxContextTurns` 的下限写成 0，而属性本身不夹取：存 0 之后 `takeLast(0)` 会
+**静默丢掉全部历史**；负数/超大值则抛 `IllegalArgumentException`，被上层吞成"网络异常"。
+
+- 修法：getter/setter 都夹到 `MIN_CONTEXT_TURNS(1)..MAX_CONTEXT_TURNS(200)`；
+  控制台字段表改成引用同一组常量（下限从 0 改成 1）。
+- 回归：`AgentPreferencesWatchSettingsTest.contextTurnsAreClampedOnBothWriteAndRead`（0 / −7 / 9999 / 42）。
+
 ### 测试：两处源码切片守卫补锚点自证
 `SettingsRootSnapshotTest` 与 `LongTermMemoryWriteTest` 都用 `substringAfter(...).substringBefore(...)` 取函数体，
 但没校验锚点：函数一改名，`substringBefore` 找不到分隔符就**原样返回整串** —— 后面的断言退化成
