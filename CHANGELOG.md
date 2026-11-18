@@ -13,6 +13,20 @@
 
 ## [未发布]
 
+### 修复：MCP 三处（响应体无上限 / 取消不断连接 / 远端工具不过审批）
+- **响应体无上限**：`McpHttpTransport.readBody` 原来 `reader.readText()` 读完整个体 —— 端点回几百 MB、
+  或每 5 秒吐一个字节（低于读超时，连接永不超时），就能把 IO 线程无限拖住并 OOM（手表堆仅数百 MB）。
+  现在按 64K 字符封顶，超限截断并标 `…[truncated]`。
+- **取消不断连接**：`cancelCurrentExecution()` 只置标志，而流式读阻塞在 socket 上不会醒 ——
+  点取消后请求仍跑满读超时（默认 40s、可设 180s），表继续耗电、请求继续计费。
+  现在持有 `activeConnection` 并在取消时 `disconnect()`；我们主动断开导致的 IOException 按正常收尾处理，
+  不会让用户看到"网络通信异常"。
+- **MCP 工具不过审批（高，安全）**：`requiresApprovalAlways` 现在把 `mcp_` 前缀的远端工具也纳入。
+  远端 server 暴露什么能力本地不可知（可能是 shell / 文件系统），而 `assessTool` 对这类名字一律判
+  "安全只读"，STANDARD/EXPERT 下会 AUTO_ALLOW —— 等于把远端能力接到无人值守通道上。
+- 回归：`AgentToolRegistryMcpTest.remoteToolsRequireApprovalLikeAnyPrivilegedTool`。
+  前两条没有单测（要真起 socket / 真取消流式请求），本轮由编译 + 全量单测兜底。
+
 ### 修复：供应商档案加到第 6 套仍"成功"，第 6 套静默消失
 红队在 0.0.0.100 用一条 POST 证伪了 0.0.0.95 那条修复：`ProviderProfileBook.add()` 在满 5 套或 id 重复时
 **原样返回**，而 `saveWebProviderProfiles` 把它当成功 —— 响应是 200 + `ok:true`，账本里却只有 5 套。

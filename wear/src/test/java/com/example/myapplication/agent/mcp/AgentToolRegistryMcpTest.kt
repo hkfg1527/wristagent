@@ -8,6 +8,7 @@ import com.example.myapplication.agent.ToolCall
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -47,6 +48,19 @@ class AgentToolRegistryMcpTest {
     }
 
     private fun field(json: McpJson, name: String): String? = json.field(name)?.stringValue()
+
+    @Test
+    fun remoteToolsRequireApprovalLikeAnyPrivilegedTool() = runBlocking {
+        // 回归：MCP 工具以前不过 requiresApprovalAlways，而 assessTool 对这类名字一律判"安全只读"
+        // → STANDARD/EXPERT 下 AUTO_ALLOW。远端 server 暴露什么能力本地不可知（可能是 shell/文件系统），
+        // 等于把远端能力接到无人值守通道上。
+        val registry = registryFor(server.endpointUrl, enabled = true)
+        registry.mcpTools.refresh()
+        assertTrue("MCP 远端工具必须强制审批", registry.requiresApprovalAlways("mcp_echo"))
+        assertTrue(registry.requiresApprovalAlways("mcp_add"))
+        assertFalse("普通元数据工具仍走通用分级闸门", registry.requiresApprovalAlways("get_device_status"))
+        assertTrue("run_shell 一如既往", registry.requiresApprovalAlways("run_shell"))
+    }
 
     @Test
     fun remoteToolsJoinTheToolCatalog() = runBlocking {

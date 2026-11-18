@@ -124,6 +124,13 @@ class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
         return connection
     }
 
+    /**
+     * 读响应体，**按字节封顶**。
+     *
+     * 原来直接用 `reader.readText()` 读完整个体：端点回一个几百 MB 的体、或者每 5 秒吐一个字节
+     * （低于读超时，连接永远不超时），就能把这个 IO 线程无限拖住并把缓冲堆到 OOM —— 手表堆只有数百 MB。
+     * MCP 的工具结果本来就会被工具层截断，读满上限就够了。
+     */
     private fun readBody(connection: HttpURLConnection, status: Int): String {
         val stream = if (status in 200..299) {
             try {
@@ -135,7 +142,21 @@ class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
             connection.errorStream
         }
         val source = stream ?: return ""
-        return source.bufferedReader(charsetOf(connection.contentType)).use { reader -> reader.readText() }
+        val charset = charsetOf(connection.contentType)
+        val buffer = CharArray(READ_CHUNK_CHARS)
+        val out = StringBuilder()
+        return source.bufferedReader(charset).use { reader ->
+            while (true) {
+                val read = reader.read(buffer)
+                if (read <= 0) break
+                out.appendRange(buffer, 0, read)
+                if (out.length >= MAX_BODY_CHARS) {
+                    // 超限就截断并标记：宁可少给模型一点上下文，也不要让进程死在这里
+                    return@use out.toString().take(MAX_BODY_CHARS) + "\n…[truncated]"
+                }
+            }
+            out.toString()
+        }
     }
 
     private fun charsetOf(contentType: String?): Charset {
@@ -160,6 +181,11 @@ class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
         const val SESSION_HEADER = "Mcp-Session-Id"
 
         private const val USER_AGENT = "WristAgent-MCP/1.0 (Android Wear OS)"
+
+        /** 单次读取上限：64K 字符足够装下任何正常的 MCP 响应（工具结果在工具层还会再截断一次）。 */
+        private const val MAX_BODY_CHARS = 64 * 1024
+
+        private const val READ_CHUNK_CHARS = 8 * 1024
 
         private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
     }

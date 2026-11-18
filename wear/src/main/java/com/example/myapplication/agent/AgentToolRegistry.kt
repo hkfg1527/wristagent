@@ -517,9 +517,16 @@ class AgentToolRegistry(
     fun isPrivilegedTool(toolName: String): Boolean =
         ShellPolicy.isPrivilegedTool(toolName, selfDefinedToolNames())
 
-    /** run_shell、自写工具与 define_tool 一律强制审批；元数据类工具回到通用分级闸门。 */
+    /**
+     * run_shell、自写工具、define_tool 与 **MCP 远端工具**一律强制审批；元数据类工具回到通用分级闸门。
+     *
+     * MCP 为什么也算特权：远端 server 暴露什么能力本地完全不可知 —— 它可以是 shell、文件系统、数据库。
+     * 而 `assessTool` 对这种名字一律判"安全只读"，STANDARD/EXPERT 下会 AUTO_ALLOW，
+     * 于是"接了个 MCP"就等于"把远端能力接到无人值守通道上"。审批是唯一能让人看见"这次要动远端什么"的地方。
+     */
     fun requiresApprovalAlways(toolName: String): Boolean =
-        ShellPolicy.requiresApprovalAlways(toolName, selfDefinedToolNames())
+        ShellPolicy.requiresApprovalAlways(toolName, selfDefinedToolNames()) ||
+            (mcpTools.isMcpToolName(toolName) && selfDefinedTool(toolName) == null)
 
     /** 真正要执行的命令原文：run_shell 取 command 参数，自写工具按 $1..$9 绑定；其余返回 null。 */
     fun shellCommandOf(call: ToolCall): String? {

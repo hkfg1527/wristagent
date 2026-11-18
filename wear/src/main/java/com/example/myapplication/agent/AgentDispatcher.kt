@@ -78,6 +78,15 @@ class AgentDispatcher(
     private var isCancelled = false
 
     /**
+     * 当前在途的流式连接。
+     *
+     * 取消时要靠它把阻塞的 `readLine()` 打断（见 [cancelCurrentExecution]）；
+     * 主链路每次开连接都会写这里、`finally` 里清空。
+     */
+    @Volatile
+    private var activeConnection: HttpURLConnection? = null
+
+    /**
      * 子代理执行器：请求轮与工具执行都复用本类既有链路，但上下文与 [conversationHistory] 完全隔离
      * （子代理在自己的 history 里跑），工具集由注册表按"去掉 run_subagent"给出。
      */
@@ -108,8 +117,17 @@ class AgentDispatcher(
         initSystemMessage()
     }
 
+    /**
+     * 取消当前一轮。
+     *
+     * 光置 `isCancelled` 不够：流式读是阻塞在 socket 上的，循环里那两处检查要等下一行到达才会跑到 ——
+     * 真表上就是"点了取消，请求仍跑满读超时（默认 40s，可设到 180s）"，表继续耗电、请求继续计费。
+     * 所以这里顺手把在途连接断掉，让 `readLine()` 立刻抛 IOException 退出。
+     */
     fun cancelCurrentExecution() {
         isCancelled = true
+        runCatching { activeConnection?.disconnect() }
+        activeConnection = null
     }
 
     fun resetConversation() {
@@ -919,6 +937,8 @@ class AgentDispatcher(
                 requestStartedAtMs = System.currentTimeMillis()
                 val activeConn = openConnection()
                 conn = activeConn
+                // 取消要能打断阻塞读：把在途连接挂到可被 cancelCurrentExecution() 找到的地方
+                activeConnection = activeConn
                 val responseCode = try {
                     OutputStreamWriter(activeConn.outputStream, "UTF-8")
                         .use { it.write(buildRequestBody().toString()) }
@@ -1012,24 +1032,31 @@ class AgentDispatcher(
                 // 真正的 SSE 实时流式读取 (零 delay 字节到达即刻上屏)
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
                 var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    if (isCancelled) break
-                    val currentLine = line?.trim() ?: continue
-                    if (currentLine.isEmpty()) continue
-                    // 一行 SSE -> 结构化事件：思考与正文各走各的通道，工具调用分片交给累加器拼接
-                    val events = accumulator.applyLine(currentLine)
-                    // 供应商的 [DONE] 是流结束标记：不等连接自然关闭，立刻去做收尾翻牌
-                    if (events.any { it === StreamDelta.Done }) break
-                    events.forEach { event ->
-                        when (event) {
-                            is StreamDelta.Reasoning -> publishReasoning()
-                            is StreamDelta.Content -> publishContent()
-                            is StreamDelta.ToolCall -> Unit
-                            StreamDelta.Done -> Unit
+                try {
+                    while (reader.readLine().also { line = it } != null) {
+                        if (isCancelled) break
+                        val currentLine = line?.trim() ?: continue
+                        if (currentLine.isEmpty()) continue
+                        // 一行 SSE -> 结构化事件：思考与正文各走各的通道，工具调用分片交给累加器拼接
+                        val events = accumulator.applyLine(currentLine)
+                        // 供应商的 [DONE] 是流结束标记：不等连接自然关闭，立刻去做收尾翻牌
+                        if (events.any { it === StreamDelta.Done }) break
+                        events.forEach { event ->
+                            when (event) {
+                                is StreamDelta.Reasoning -> publishReasoning()
+                                is StreamDelta.Content -> publishContent()
+                                is StreamDelta.ToolCall -> Unit
+                                StreamDelta.Done -> Unit
+                            }
                         }
                     }
+                } catch (e: IOException) {
+                    // 取消时是**我们主动 disconnect** 打断 readLine 的：这不是网络故障，
+                    // 当成正常收尾（继续走下面的翻牌），否则用户点了取消却看到"网络通信异常"
+                    if (!isCancelled) throw e
+                } finally {
+                    runCatching { reader.close() }
                 }
-                reader.close()
             } else {
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
                 val sb = java.lang.StringBuilder()
@@ -1093,6 +1120,8 @@ class AgentDispatcher(
             Result.failure(e)
         } finally {
             conn?.disconnect()
+            // 在途连接只在这一轮内有效：不清掉的话下一次取消会去断开一条已经关掉的连接
+            activeConnection = null
         }
     }
 
