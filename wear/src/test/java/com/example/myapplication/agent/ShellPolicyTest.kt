@@ -194,6 +194,34 @@ class ShellPolicyTest {
     }
 
     @Test
+    fun quotedOrWrappedCommandsCannotHideTheirRealTarget() {
+        // shell 执行前会吃掉引号：带引号的破坏性命令与不带引号的效果完全一样，
+        // 而黑名单是字符串正则 —— 不归一的话它们全被降级成 RISKY，
+        // 而 RISKY 可被「记住此命令」永久免审批，WORKSPACE 沙箱也只挡 DESTRUCTIVE。
+        val quoted = listOf(
+            "rm -rf \"/data\"",
+            "rm -rf '/system'",
+            "dd if=/dev/zero of=\"/dev/block/mmcblk0\"",
+            "pm uninstall \"com.android.systemui\"",
+            "sh -c 'rm -rf /data'",
+            "bash -c \"mkfs.ext4 /dev/block/sda\"",
+            // 路径写法与规范化：shell 眼里 /data/、//data、/./data、/system/bin/rm 都是同一件事
+            "rm -rf /data/",
+            "rm -rf /./data",
+            "/system/bin/rm -rf /data",
+            "rm --recursive --force /data"
+        )
+        for (command in quoted) {
+            assertEquals("引号/外层解释器不能掩盖破坏性：$command", ShellDanger.DESTRUCTIVE, ShellPolicy.dangerOf(command))
+        }
+        // 反方向：安全目标不能因为剥引号被误升级
+        assertEquals(
+            ShellDanger.RISKY,
+            ShellPolicy.dangerOf("rm -rf \"/data/local/tmp/scratch\"")
+        )
+    }
+
+    @Test
     fun impactTextIsAlwaysAvailableForApprovalPage() {
         assertTrue(ShellPolicy.impactOf("rm -rf /").isNotBlank())
         assertTrue(ShellPolicy.impactOf("settings put system x 1").isNotBlank())

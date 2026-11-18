@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -302,6 +303,8 @@ internal fun ApprovalFloatingLayer(
         modifier = modifier
             .fillMaxSize()
             .graphicsLayer { alpha = layerAlpha }
+            // 隐藏时清掉整棵语义树：alpha=0 不参与命中测试，但**读屏仍能读到**隐藏的审批文案
+            .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
     ) {
         Box(
             modifier = Modifier
@@ -424,8 +427,11 @@ internal fun ApprovalFloatingLayer(
                                     }
                                 }
                             }
-                            // 放不下就滚动，不裁字：滚动容器把内容夹在内容带里，越过底边的东西也画不出来
-                            .verticalScroll(contentScroll),
+                            // 放不下就滚动，不裁字：滚动容器把内容夹在内容带里，越过底边的东西也画不出来。
+                            // enabled = visible 是必须的：这一层为"预合成"常驻组合，靠 graphicsLayer(alpha)
+                            // 显隐，而 alpha=0 **不参与命中测试却不影响手势消费** —— 不加这个开关，
+                            // 屏幕中部一条 190dp 宽的带子会把手势全吃掉，正文列表在那一段竖划完全没反应。
+                            .verticalScroll(contentScroll, enabled = visible),
                         verticalArrangement = Arrangement.spacedBy(ApprovalTextBlockGap),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {

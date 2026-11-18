@@ -7,11 +7,11 @@
 - 内部版本号四位 `0.0.0.x`，每次内部更新**只递增最低位**。
 - **每累计 10 个内部版本**才做一次对外发布（GitHub release + 完整回归）；`0.0.0.10` 是第一次对外发布点。
 - 每 100 个内部版本做一次信息架构 / 视觉系统复审，之后继续，不停工。
-- `versionCode` 仍然单调递增（与内部版本号解耦），当前 **128**。
+- `versionCode` 仍然单调递增（与内部版本号解耦），当前 **138**。
 
 ---
 
-## [0.0.0.90] - 2026-11-19（整十发布点）
+## [0.0.0.90] - 2026-11-19（整十发布点 · 历史条目，下方 0.0.0.100 段是其后十个内部版）
 
 ### 安全：修掉三条高危缺陷（第五次整十审查发现）
 
@@ -39,7 +39,25 @@
 
 ---
 
-## [未发布]
+## [0.0.0.100] - 2026-11-19（整十发布点）
+
+> 本段覆盖 0.0.0.91 → 0.0.0.100 的全部改动（第五次整十审查在同一天完成，报告见 `docs/REVIEW-0.0.0.100.md`）。
+
+### 修复：审批浮层把正文列表的手指手势吃掉了（用户可感知）
+`ApprovalFloatingLayer` 为了"预合成"常驻组合、靠 `graphicsLayer(alpha)` 显隐 —— 而 **alpha=0 不影响手势消费**。
+后果：屏幕中部约 190dp 宽的一条带子把手势全吃掉，正文列表在那一段**竖划完全没反应**。
+
+- 修法：滚动容器改成 `verticalScroll(contentScroll, enabled = visible)`；隐藏时整棵语义树
+  `clearAndSetSemantics {}`（读屏也读不到隐藏的审批文案）。
+
+### 安全：引号与路径写法能绕过破坏性判定
+`rm -rf "/data"`、`rm -rf '/system'`、`sh -c 'rm -rf /data'`、`dd of="/dev/block/mmcblk0"`、
+`pm uninstall "com.android.systemui"` 全部落到 RISKY —— 而 RISKY 可被"记住此命令"**永久免审批**，
+`WORKSPACE` 沙箱也只挡 DESTRUCTIVE。路径写法 `rm -rf /data/`、`/./data`、`/system/bin/rm -rf /data` 同样漏判。
+
+- 修法：判档前做**词法归一**（去引号与反斜杠）；`rm` 前缀类补 `/`、`"`、`'` 等字符；
+  目标先 `canonicalPath()`（去重复斜杠、去 `/./`、去尾斜杠）再比。"记住此命令"的键仍用原文。
+- 回归：`ShellPolicyTest.quotedOrWrappedCommandsCannotHideTheirRealTarget`（10 个绕过样本 + 1 个反方向）。
 
 ### 安全：`/api/state` 的 `tokenMasked` 其实回的是明文访问码
 `tokenMasked` 用的是 `ConsoleToken.mask()`，而 `mask` 对 **≤4 位直接原样返回**

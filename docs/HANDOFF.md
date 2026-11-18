@@ -11,8 +11,8 @@
 | 问题 | 答案 |
 |---|---|
 | 项目在哪 | `D:\AndroidProjects\MyApplication`（**不是** `C:\Users\GHR\AndroidStudioProjects\...`，那是搬走后留下的空壳） |
-| 现在什么版本 | `0.0.0.90` / versionCode 128；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` 已打 tag |
-| 单测基线 | **1360 条 / 206 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测；改任何东西前先跑一遍确认） |
+| 现在什么版本 | `0.0.0.100` / versionCode 138；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` 已打 tag |
+| 单测基线 | **1377 条 / 209 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测；改任何东西前先跑一遍确认） |
 | 下一个里程碑 | 内部版满 100 时的整十发布点；每个整十都要跑 `node docs/tools/release-check.mjs` |
 | 主线状态 | P0–P3 四条全部收口（细节在 `docs/CONTEXT.md` §0.5）；当前主线是"设置页功能回归搬进 JVM"（35 个键）+ 控制台页面级 E2E 已接进发布自检 |
 
@@ -28,7 +28,7 @@
 | 2 | **行高 1.42 的版式手术** | **没做，且在等用户点头**（`docs/DECISIONS-PENDING.md` D2）。现状主题行高 1.25–1.33，比 Material 自家 1.43 紧。**顺序不能反**：先改 `ApprovalBandMetricsTest` 的几何推导 → 再上机重量 → 最后才动 typography |
 | 3 | **验收矩阵还剩三行** | ①磁滑（`RotaryScrollEvent` 之外的路径）②内层页（二级页里再进一层）③底栏自动收起的真实时序。矩阵在 `docs/ACCEPTANCE-MATRIX.md` §2.5–2.7，照表格补行 |
 | 4 | ~~网页控制台只验到首屏~~ | **已完成并超出**：`docs/tools/console-e2e.mjs` 用真浏览器 + CDP 跑 **69 条**页面级断言，且已接进 `release-check.mjs` 第 4 段（第 8 条判据） |
-| 5 | ~~版本停在 0.0.0.44~~ | 已过时：现在 `0.0.0.90`。升版本必须同步 `docs/CONTEXT.md`（`ContextDocFreshnessGuardTest` 钉着） |
+| 5 | ~~版本停在 0.0.0.44~~ | 已过时：现在 `0.0.0.100`。升版本必须同步 `docs/CONTEXT.md`（`ContextDocFreshnessGuardTest` 钉着） |
 | 6 | **发布自检的判据数** | 现在是 **8 条**：构建成功 / 单测全绿 / APK 产出 / 安装成功 / 进入设置页 / 四分区按序 / 几何已采样 / 控制台页面 E2E。全部通过才打 tag |
 | 7 | **工作区路径** | 仍是新会话注意事项：GUI 里要选 D 盘工作区，否则读不到 `docs/CONTEXT.md` |
 | 8 | ~~压缩只能用户发 `/compact`~~ | **已解决**（2026-11-18 插件更新）：`manage_context({action:"compact"})` 现在会排队到本轮结束后执行 |
@@ -57,7 +57,7 @@
 # 1) 工作区状态
 git log --oneline -5; git status --porcelain
 
-# 2) 单测基线（约 2 分钟；必须是 1289 条 / 188 套件 / 0 失败）
+# 2) 单测基线（约 2 分钟；必须是 1377 条 / 209 套件 / 0 失败）
 .\gradlew.bat :wear:testDebugUnitTest
 
 # 3) 上下文占用（有 manage_context 插件时）
@@ -79,7 +79,7 @@ git log --oneline -5; git status --porcelain
 | `git push` | 常断，用 `-c http.curloptResolve=github.com:443:<ip>` 轮换 `140.82.112/113/114/116.4` |
 | 中文写文件 | **不要用 `Set-Content -Encoding UTF8`**（会造成 mojibake）；用 `write` / `edit` 工具，或 `Out-File -Encoding utf8NoBOM` |
 | 导航自动化 | `docs/tools/nav.mjs`：`tapRow` 点完会检查有没有弹层；**点了不算成功，要验证效果** |
-| 发布自检 | `node docs/tools/release-check.mjs`，7 项判据（构建/单测/APK/安装/四分区/几何） |
+| 发布自检 | `node docs/tools/release-check.mjs`，4 段共 **8 条判据**（构建/单测/APK/安装/进入设置页/四分区/几何/控制台 E2E） |
 
 ---
 
@@ -108,7 +108,7 @@ git log --oneline -5; git status --porcelain
 | `wear/src/main/java/.../presentation/ui/settings/` | 设置页全部实现（`SettingsShared.kt` 是 DSL 内核） |
 | `wear/src/main/java/.../presentation/ui/chat/` | 聊天页（`ConversationList.kt` / `ChatScreen.kt`） |
 | `wear/src/main/java/.../agent/AgentPreferences.kt` | 全部偏好（20 个可调设置都在这里，带 `KEY_*` / `DEFAULT_*`） |
-| `wear/src/test/java/...` | 1289 条单测；**18 条结构性守卫**在这里（改动前先看它们） |
+| `wear/src/test/java/...` | 1377 条单测；**结构性守卫**在这里（改动前先看它们） |
 | `docs/device/v11/*.png` | 真机截图证据（同名文件更新即代表最近一次验证） |
 | `docs/tools/` | `release-check.mjs` / `nav.mjs` / `console-shot.mjs` |
 

@@ -116,7 +116,7 @@ object ShellPolicy {
         "/data/system", "/data/adb"
     )
 
-    private val rmInvocation = Regex("""(?:^|[\s;&|(])rm\s+([^\n\r;&|]+)""")
+    private val rmInvocation = Regex("""(?:^|[\s;&|(`"'/])rm\s+([^\n\r;&|]+)""")
 
     /** 只读命令白名单：命中且整条命令不含 shell 元字符才算 SAFE。 */
     private val readOnlyCommands = setOf(
@@ -141,18 +141,34 @@ object ShellPolicy {
      */
     private val commandSeparators = Regex("[\\n\\r;|&]+")
 
+    /**
+     * 判档前的**词法归一**：剥掉引号与反斜杠转义。
+     *
+     * shell 会在执行前吃掉引号，所以 `rm -rf "/data"`、`rm -rf '/system'`、
+     * `dd if=x of="/dev/block/mmcblk0"`、`pm uninstall "com.android.systemui"`
+     * 与不带引号的写法**执行效果完全一样**；但黑名单是对字符串做正则匹配的，
+     * 引号夹在中间就让规则全部失效 —— 破坏性被降级成 RISKY，而 RISKY 可被"记住此命令"
+     * 永久免审批，WORKSPACE 沙箱也只挡 DESTRUCTIVE。`sh -c 'rm -rf /data'` 同理：
+     * 去掉引号后内层命令就落进了 `rm` 的匹配范围。
+     *
+     * 注意：这个变换**只用于判档**，"记住此命令"的键仍是 [normalize] 的结果（用户看到的原文）。
+     */
+    private fun lexicalForm(normalized: String): String =
+        normalized.replace("\\", "").replace("\"", "").replace("'", "")
+
     fun dangerOf(command: String): ShellDanger {
         val normalized = normalize(command)
         if (normalized.isEmpty()) return ShellDanger.SAFE
+        val lexical = lexicalForm(normalized)
         // 整串先过黑名单：`:(){ :|:& };:` 这类命令拆开就什么都不剩，必须整串匹配
-        if (matchedRule(normalized) != null) return ShellDanger.DESTRUCTIVE
-        val whole = classifySingle(normalized)
+        if (matchedRule(lexical) != null) return ShellDanger.DESTRUCTIVE
+        val whole = classifySingle(lexical)
         if (!commandSeparators.containsMatchIn(command)) return whole
         var worst = whole
         for (part in command.split(commandSeparators)) {
             val trimmed = part.trim()
             if (trimmed.isEmpty()) continue
-            val danger = classifySingle(normalize(trimmed))
+            val danger = classifySingle(lexicalForm(normalize(trimmed)))
             if (danger.ordinal > worst.ordinal) worst = danger
         }
         return worst
@@ -313,8 +329,10 @@ object ShellPolicy {
             // 选项与目标可能任意排序（`rm /data -rf` 也合法），所以先整体扫一遍选项
             val flags = args.filter { it.startsWith("-") }.joinToString("").lowercase()
             val recursive = flags.contains('r') || flags.contains('f')
-            for (arg in args) {
-                if (arg.startsWith("-")) continue
+            for (raw in args) {
+                if (raw.startsWith("-")) continue
+                // 目标可能是 `/data/`、`//data`、`/./data`：shell 眼里它们是同一个路径
+                val arg = canonicalPath(raw)
                 if (!recursive && arg !in wholeTreeTargets) continue
                 if (arg in wholeTreeTargets) return ShellDanger.DESTRUCTIVE
                 if (systemTreePrefixes.any { arg == it || arg.startsWith("$it/") }) {
@@ -323,6 +341,20 @@ object ShellPolicy {
             }
         }
         return if (destructive) ShellDanger.DESTRUCTIVE else ShellDanger.RISKY
+
+    }
+
+    /**
+     * 把 rm 目标收敛成 shell 眼里的规范形式：去重复斜杠、去 `/./`、去尾随斜杠。
+     *
+     * `/data/`、`//data`、`/./data` 与 `/data` 在执行时是同一个路径，但字符串比较会漏。
+     * 通配（`/d*`）不展开 —— 那需要真正的 glob，这里只做保守的路径规范化。
+     */
+    private fun canonicalPath(raw: String): String {
+        var path = raw.replace(Regex("/{2,}"), "/")
+        while (path.contains("/./")) path = path.replace("/./", "/")
+        if (path.length > 1) path = path.trimEnd('/')
+        return if (path.isEmpty()) "/" else path
     }
 
     private fun isReadOnly(normalized: String): Boolean {
