@@ -219,22 +219,14 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
     private fun saveWebProviderProfiles(preferences: AgentPreferences, value: Any): Boolean {
         val entries = value as? List<*> ?: return false
         val existing = preferences.providerProfiles()
-        var book = ProviderProfileBook()
-        for (entry in entries) {
-            val row = entry as? Map<*, *> ?: return false
-            val name = (row["name"] as? String)?.trim().orEmpty()
-            if (name.isEmpty()) return false
-            val previous = existing.profiles.firstOrNull { it.name == name }
-            book = book.add(
-                ProviderProfile(
-                    id = previous?.id ?: providerProfileId(),
-                    name = name,
-                    baseUrl = (row["baseUrl"] as? String).orEmpty(),
-                    apiKey = previous?.apiKey ?: preferences.apiKey,
-                    modelName = (row["model"] as? String).orEmpty(),
-                )
-            )
-        }
+        // 纯逻辑在 ConsoleProviderProfiles：它会检测"这一行有没有真的进账本"，
+        // 满 5 套 / 同名导致 id 冲突时返回 null（旧实现只改了返回码，等于没修）
+        val book = rebuildProviderBookFromWebRows(
+            entries = entries,
+            existing = existing,
+            newId = { providerProfileId() },
+            fallbackApiKey = preferences.apiKey
+        ) ?: return false
         val activeId = existing.activeProfileId?.takeIf { id -> book.profiles.any { it.id == id } }
             ?: book.profiles.firstOrNull()?.id
         preferences.saveProviderProfiles(if (activeId == null) book else book.select(activeId))
