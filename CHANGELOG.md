@@ -11,6 +11,30 @@
 
 ---
 
+## [未发布]
+
+### 修复：网页控制台保存中文会损坏（数据不可逆）
+NanoHTTPD 解请求体时只看 `Content-Type` 里的 charset，缺省按 US-ASCII 处理。网页端发的是
+`application/json`（不带 charset），于是**任何中文在被保存前就被逐字节替换成 U+FFFD 并落库**
+——写「中文探针-ABC」，读回来是 12 个 `�`，且无法还原。
+
+- 服务端：新增 `ConsoleCharset.withUtf8()`，`ConsoleServer` 在 `parseBody` 前把缺省 charset 补成 `utf-8`，
+  解析完立刻还原请求头（不影响下游读到的头）；已显式声明 charset 或 `multipart/*` 一律原样不动。
+- 网页端：`api()` 显式发送 `application/json; charset=utf-8`。
+- 守卫：`ConsoleCharsetTest`（5 条，钉住"补/不补"的边界），`console-e2e.mjs` 的 F3 钉住端到端中文往返。
+
+### 新增：网页控制台页面级 E2E（`docs/tools/console-e2e.mjs`）
+headless Edge + CDP 驱动真实页面，断言 DOM 与抓到的请求，覆盖九组：认证闸门、令牌弹层、
+十个页面切换、搜索跳转与高亮、非法 JSON 拦截、文本域写回、滑杆写回、三档皮肤（watch/phone/desktop）、零 JS 异常。
+做法是在页面加载前包一层 `window.fetch`，"有没有发请求""发了什么"都变成证据，而不是靠推断。
+
+### 修复：控制台顶栏显示不出设备名
+`/api/state` 的 `capabilities` 缺少设备名字段，顶栏只能回退成「当前设备」。
+现在 `ConsoleBridge` 把 `Build.MODEL` 带进能力表，`ConsoleApi` 统一 trim 后输出空串兜底；
+真机实测顶栏显示 `TicWatch Pro 5`。守卫：`ConsoleApiTest` 2 条（空串兜底、trim）。
+
+---
+
 ## [0.0.0.56] - 2026-11-18（内部版，不对外发布）
 
 ### UI 第一优先：给四套风格建一张"槽位表"

@@ -126,3 +126,28 @@ POST /api/settings  {"temperature":0.8}  → 200，state 回到 0.8
 
 **仍未覆盖**：页面本身的交互（标签切换、表单校验、三档皮肤下的可点性）。
 那部分需要真浏览器驱动，工具链在 `docs/tools/console-shot.mjs`（headless Edge + CDP），下轮做。
+
+## 2.9 网页控制台 · 页面级交互（2026-11-18，0.0.0.87）
+
+脚本 `docs/tools/console-e2e.mjs`：headless Edge + CDP 驱动真页面，**断 DOM 与抓到的请求**，不是看截图。
+前置 `adb forward tcp:18080 tcp:8080`，`CONSOLE_TOKEN` 取手表端 `console_token`。
+
+| 组 | 覆盖 | 判据 |
+|---|---|---|
+| A | 认证闸门 | 无令牌顶栏「令牌 缺失/无效」且真的收到 401；带令牌「令牌 有效」；设备名/后端/端口/状态灯 |
+| B | 令牌弹层 | 点顶栏「令牌」开弹层、令牌已填、取消收起 |
+| C | 十个页面 | 逐个点侧栏：`content[data-page]` 对上、`.page-title` 等于行名、`document.title` 同步、`.row` 数 > 0、高亮跟随 |
+| D | 搜索 | 开层、搜「温度」命中、点结果跳到「生成参数」并给该行加 `is-flash`、无命中出空态、Esc 关闭 |
+| E | 非法 JSON | `customHeaders` 输入 `{` → 页内「不合法」+ `tone=bad` + **记录到的 POST 数为 0**；合法 JSON 回「已记录 1 个请求头」，但它是本地草稿键，仍 **0 笔请求**，出「只保存在本地」横幅 |
+| F | 文本域写回 | `customSystemPrompt` 发一笔带该键的 POST、200、**中文原样往返**（无 U+FFFD）、出「已保存」、还原 |
+| G | 滑杆写回 | 温度滑杆改数字胶囊 → 一笔带 `temperature` 的 POST → 手表侧读回同值 → 还原 |
+| H | 三档皮肤 | 400px→watch、700px→phone、1280px→desktop；无横向溢出；≤900px 用顶部标签条不显示侧栏，>900px 反之 |
+| I | 零 JS 异常 | 认证闸门刻意制造的 401 之外，页面不得有 console.error / exception / 4xx 资源错误 |
+
+**这里查出的真缺陷（已修）**：`Content-Type: application/json` 不带 charset 时，NanoHTTPD 按 US-ASCII 解 body，
+**网页里输入的中文会被逐字节换成 U+FFFD 再落库，且不可逆**（写「中文探针-ABC」读回来是 12 个 `�`）。
+修法：`ConsoleCharset.withUtf8()` 在 `parseBody` 前把缺省 charset 补成 utf-8 并即时还原请求头，
+网页端同时显式声明 `charset=utf-8`；单测 `ConsoleCharsetTest`（5 条）钉规则，本脚本 F3 钉端到端往返。
+
+**同一轮修的第二个缺陷**：`/api/state` 的 `capabilities` 里没有设备名字段，网页顶栏只能显示「当前设备」。
+现在 `ConsoleBridge` 把 `Build.MODEL` 带进能力表，顶栏实测显示 `TicWatch Pro 5`。
