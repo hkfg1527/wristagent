@@ -13,6 +13,15 @@
 
 ## [未发布]
 
+### 修复：子页 hero 卡 216dp，比同页所有卡宽 40dp（破「所有卡片同宽」）
+子页 hero 卡躺在一个 `fillMaxWidth()` 的 Box 里 —— 在 233dp 屏上就是 **216dp**，而组卡写死 176dp。
+同一页里一张卡比别家宽 40dp，正是用户点名的「规格不统一」。
+
+- 修法：hero 外层再套一层 `Modifier.width(SettingsContentWidth)`。
+- 这是**新加的 JVM 判据抓到的**：`SettingsCardWidthRobolectricTest` 六套风格各渲染一次，
+  量每个可点节点的宽度，断言「没有节点比 176dp 基准更宽」且「至少有一个正好等于基准」。
+  它在加上当天就报出 `GOOGLE_CARD：有行比卡片基准宽度还宽（最宽 216.0px，基准 176.0px）`。
+
 ### 修复：Base URL 带 `/v1` 时模型清单恒空（拼成 `/v1/v1/models`）
 旧实现一律 `$base/v1/models` —— 用户把 Base URL 填成 OpenAI 风格 `https://api.openai.com/v1` 时，
 实际请求 `/v1/v1/models` 得 404，模型清单恒空，而且被 `-1L to emptyList()` 静默吞掉，

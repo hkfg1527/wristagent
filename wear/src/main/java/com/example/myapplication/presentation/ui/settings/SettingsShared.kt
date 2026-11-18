@@ -626,7 +626,15 @@ fun SettingsSubPage(
                                 .padding(bottom = SettingsCardStyle.Gap),
                             contentAlignment = Alignment.Center
                         ) {
-                            hero?.invoke()
+                            // hero 卡也在 176dp 基准宽度内：以前它躺在一个 fillMaxWidth 的 Box 里，
+                            // 在 233dp 屏上就是 216dp —— 比同页所有组卡宽 40dp，直接破了
+                            // 「所有卡片同宽」这条硬约束（JVM 宽度判据 SettingsCardWidthRobolectricTest 抓到的）。
+                            Box(
+                                modifier = Modifier.width(SettingsContentWidth),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                hero?.invoke()
+                            }
                         }
                     }
                 }
