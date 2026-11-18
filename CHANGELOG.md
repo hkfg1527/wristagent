@@ -40,6 +40,9 @@
   用例按"连点三次加号 → 4dp 变 7dp"验它确实一段一步。
 - 踩坑记档：`WearAppearance.style` 是全局单例，用例之间会污染（切到 M3_LIST 后滑杆换成官方件、没有
   `contentDescription`，断言会以"找不到节点"的样子红），所以每个滑杆用例前显式 `applySettingsStyle(BALLOON)`。
+- `SettingsLuxTerminalRobolectricTest`（1 条）：Lux 终端的自由输入 → 弹层 → 确认 → 闸门 → 回显。
+  输入 2001 字符（上限 2000）必须**在进 shell 之前**被挡下并在转录里留下「被拒」，
+  否则被截断的尾巴会被当成命令的一部分跑掉。
 
 ### 新增：控制台页面级 E2E 接进发布自检
 `release-check.mjs` 第 4 项自动跑 `console-e2e.mjs`（69 条断言）。令牌不再手填：
