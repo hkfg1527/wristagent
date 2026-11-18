@@ -41,6 +41,22 @@
 
 ## [未发布]
 
+### 修复：请求里带着孤儿 tool 回执，整段对话会卡在 400
+上游要求每条 `tool` 消息都能找到发起它的 `assistant(tool_calls)`，只要有一条找不到就**整单 400**，
+而日志里只有一句不相关的错误 —— 用户看到的是整段对话长期卡在"网络通信异常"，越聊越糟。
+
+孤儿有两个来源：上一次请求被取消（回执只写了一半）、上下文窗口按条数裁剪时正好切在"发起 → 返回"中间。
+旧实现一处只补不删（`sanitizeConversationHistory` 只会补缺失回执），另一处完全不处理
+（请求侧裸 `takeLast(maxContextTurns * 2)`）。
+
+- 抽出 `ConversationWindow`（纯逻辑）：`sanitizeForRequest` 补缺失回执 + **丢孤儿**；
+  `trimRecentTurns` 取最近 N 条并保证**不以 TOOL 开头**（丢掉开头连续的 TOOL 是安全的：
+  发起方若还在，一定排在它们前面）。
+- 回归：`ConversationWindowTest` 4 条（丢孤儿 / 仍补缺失 / 裁剪不落在 TOOL 上 / 放得下时原样返回）。
+- 顺带修一个测试环境坑：补齐回执的内容原来用 `JSONObject().apply{...}.toString()`，
+  纯 JVM 单测里 `org.json` 是桩（`isReturnDefaultValues = true`），`toString()` 返回 null → NPE。
+  改成字符串常量后，这条路径也不再依赖 Android 运行时。
+
 ### 修复：正常文本参数被当成致命指令（搜索与记忆被硬拦）
 `SecurityGuardrail.assessTool` 对**整个 argsJson** 做致命命令子串匹配，而黑名单里含 `format `、`wipe `
 这种短词。于是：

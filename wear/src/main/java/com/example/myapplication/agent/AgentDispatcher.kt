@@ -758,34 +758,8 @@ class AgentDispatcher(
     }
 
     private fun sanitizeConversationHistory() {
-        val sanitized = mutableListOf<ChatMessage>()
-        var i = 0
-        while (i < conversationHistory.size) {
-            val msg = conversationHistory[i]
-            sanitized.add(msg)
-            if (msg.role == AgentRole.ASSISTANT && !msg.toolCalls.isNullOrEmpty()) {
-                val requiredToolCallIds = msg.toolCalls.map { it.id to it.name }.toMutableList()
-                var j = i + 1
-                while (j < conversationHistory.size && conversationHistory[j].role == AgentRole.TOOL) {
-                    val toolMsg = conversationHistory[j]
-                    sanitized.add(toolMsg)
-                    requiredToolCallIds.removeAll { it.first == toolMsg.toolCallId }
-                    j++
-                }
-                for ((missingId, missingName) in requiredToolCallIds) {
-                    val fallbackContent = JSONObject().apply {
-                        put("status", "cancelled")
-                        put("message", "任务中断，回执自愈补齐")
-                    }.toString()
-                    sanitized.add(
-                        ChatMessage(role = AgentRole.TOOL, content = fallbackContent, toolCallId = missingId, name = missingName)
-                    )
-                }
-                i = j
-            } else {
-                i++
-            }
-        }
+        // 补缺失回执 + 丢孤儿回执：具体规则见 ConversationWindow（那边有纯逻辑单测）
+        val sanitized = ConversationWindow.sanitizeForRequest(conversationHistory)
         conversationHistory.clear()
         conversationHistory.addAll(sanitized)
     }
@@ -1354,7 +1328,12 @@ internal fun buildMainRequestBody(
     val msgs = JSONArray()
     val turnsLimit = preferences.maxContextTurns
     val systemMsg = history.firstOrNull { it.role == AgentRole.SYSTEM }
-    val dialogMsgs = history.filter { it.role != AgentRole.SYSTEM }.takeLast(turnsLimit * 2)
+    // 按条数裁剪最容易切在"assistant 发起 → tool 返回"中间：切完必须以 assistant/user 开头，
+    // 否则第一条是孤儿回执，上游整单 400（表现是整段对话卡在"网络通信异常"）。
+    val dialogMsgs = ConversationWindow.trimRecentTurns(
+        history.filter { it.role != AgentRole.SYSTEM },
+        turnsLimit * 2
+    )
     if (systemMsg != null) msgs.put(systemMsg.toJson())
     dialogMsgs.forEach { msgs.put(it.forPayload(preferences.toolResultMaxChars).toJson()) }
     put("messages", msgs)
