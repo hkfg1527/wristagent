@@ -1146,6 +1146,15 @@ class AgentDispatcher(
             return rejectedToolResult(call, "致命指令已被安全护栏拦截：" + risk.riskSummary)
         }
 
+        // 沙箱等级先于审批：与主循环同一处判定（等级不允许 → 直接挡下，不进审批页）。
+        // 曾经只有主循环有这道闸门，子代理路径能执行 READ_ONLY 等级下本该死的 RISKY/DESTRUCTIVE 命令。
+        val sandboxBlock = shellCommand?.let { command ->
+            SandboxGate.blockMessage(preferences.sandboxLevel, ShellPolicy.dangerOf(command))
+        }
+        if (sandboxBlock != null) {
+            return rejectedToolResult(call, sandboxBlock)
+        }
+
         val gate = when {
             shellCommand != null -> ShellPolicy.gate(
                 ShellPolicy.dangerOf(shellCommand),

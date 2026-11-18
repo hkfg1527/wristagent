@@ -18,9 +18,9 @@
 
 ## 二、记录在案，排进后续（按严重度）
 
-### agent 核心（12 条，已修 3 条）
+### agent 核心（12 条，已修 4 条）
 
-- **高**｜子代理工具执行漏 `SandboxGate`（主循环有、`run_subagent` 路径没有）→ 沙箱等级对该路径形同不存在。
+- ~~**高**｜子代理工具执行漏 `SandboxGate`~~ → **已在 0.0.0.92 修**，`SandboxWiringGuardTest` 2 条守卫钉住（变异验证过）。
 - **中**｜`conversationHistory` 是裸 `mutableListOf`，执行中切会话可能 `ConcurrentModificationException` 或串会话。
 - **中**｜请求侧 `takeLast(turns*2)` 不剔除孤立 `tool` 回执；`maxContextTurns` 无 `coerceIn`（0 会静默丢全部历史）。
 - **中**｜`PrivilegedCommandRunner` 的外层 `withTimeoutOrNull` 与 `RootShell` 的 `future.get(15s)` 口径冲突 → 超时后命令仍在跑且持锁。

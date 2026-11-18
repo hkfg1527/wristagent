@@ -41,6 +41,15 @@
 
 ## [未发布]
 
+### 修复：子代理路径漏掉沙箱闸门（沙箱等级对子代理形同不存在）
+`AgentDispatcher.executeSubAgentTool` 只做了黑名单 + 审批，**没有** `SandboxGate` ——
+沙箱等级 `READ_ONLY` 时主循环会挡下 RISKY/DESTRUCTIVE 命令，子代理却照样执行。
+沙箱语义是"不问人直接拒"，与审批放宽是两条正交的轴，所以这条缺口不会被审批兜住。
+
+- 修法：把主循环那段判定原样搬进子代理路径，并排在审批闸门之前（等级不允许就不该弹审批页）。
+- 回归：`SandboxWiringGuardTest` 两条源码守卫（锚点自证 + 长度上界），分别钉
+  "两条路径都调用 `SandboxGate.blockMessage`"与"沙箱判定在审批之前"；把子代理那段改成 `null` 会立刻红（已实测）。
+
 ### 修复：官方两档（M3_LIST / M3_TRANSFORM）下所有子页弹窗都不出现
 `SettingsSubPage` 在 `rowShell == PLAIN` 时早退到 `OfficialListSubPage`，而 `overlay` 与 `overlayBack`
 挂在早退**之后** —— 于是这两套风格里改 Base URL、改 API Key、语音密钥、Lux 终端输入、提示词编辑、
