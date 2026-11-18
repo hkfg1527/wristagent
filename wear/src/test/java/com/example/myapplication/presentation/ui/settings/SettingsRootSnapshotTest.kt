@@ -93,8 +93,16 @@ class SettingsRootSnapshotTest {
     fun everyCachedPreferenceIsReadBackByTheSnapshot() {
         val source = readSettingsScreen()
         val cached = cacheInit.findAll(source).map { it.groupValues[1] }.toSet()
+        // 切片自证：锚点缺失时 substringAfter/Before 会原样返回整串，
+        // 那时 readBack 等于整个文件，missing 必然为空 —— 守卫看起来绿，实际什么都没验。
+        assertTrue("锚点缺失：fun AgentPreferences.rootSnapshot()", source.contains("fun AgentPreferences.rootSnapshot()"))
         val readBack = source.substringAfter("fun AgentPreferences.rootSnapshot()")
             .substringBefore("\n}")
+        assertTrue(
+            "rootSnapshot 切片异常（长度 " + readBack.length + "，全文 " + source.length + "）",
+            readBack.length < source.length / 2
+        )
+        assertTrue("rootSnapshot 切片里必须能看到 SettingsRootSnapshot(", readBack.contains("return SettingsRootSnapshot("))
 
         assertTrue("没扫到根页缓存初始化，扫描正则已失效", cached.size >= 15)
         val missing = cached.filterNot { readBack.contains(it) }

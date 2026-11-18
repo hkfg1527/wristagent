@@ -343,8 +343,19 @@ class LongTermMemoryWriteTest {
             "落盘必须走 AgentMemory.rememberFact 并使用上限常量",
             registry.contains("store.rememberFact(") && registry.contains("AgentPreferences.MAX_MEMORY_FACTS")
         )
+        // 切片自证：两个锚点缺一个，substringAfter/Before 就会原样返回整串，
+        // 下面的断言会退化成"整个文件里出现过某串"（0.0.0.90 审查点名）。
+        assertTrue("锚点缺失：private fun executeRememberFact", registry.contains("private fun executeRememberFact"))
+        assertTrue(
+            "锚点缺失：\\n    private suspend fun executeRunShell",
+            registry.contains("\n    private suspend fun executeRunShell")
+        )
         val rememberBody = registry.substringAfter("private fun executeRememberFact")
             .substringBefore("\n    private suspend fun executeRunShell")
+        assertTrue(
+            "executeRememberFact 切片异常（长度 " + rememberBody.length + "，全文 " + registry.length + "）",
+            rememberBody.length < registry.length / 2
+        )
         assertTrue(
             "总开关关掉时执行侧还要再拒一次（清单残留不许绕过）",
             rememberBody.contains("errorJson(\"memory_disabled\"")

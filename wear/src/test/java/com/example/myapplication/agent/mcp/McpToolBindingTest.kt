@@ -156,7 +156,10 @@ class McpToolBindingTest {
 
     @Test
     fun readTimeoutIsBoundedInsideTheBinding() = runBlocking {
-        server.callDelayMs = 900
+        // 假服务器睡 1200ms，被测读超时是 250ms —— 两者**故意不同值**：
+        // 旧写法是 callDelayMs = 900 且断言 elapsed < 900，阈值与假服务器睡眠重合，
+        // 一旦有人把睡眠调小，超时没生效也能过（0.0.0.90 审查点名）。
+        server.callDelayMs = 1200
         val binding = McpToolBinding(
             endpointSource = { server.endpointUrl },
             enabledSource = { true },
@@ -169,6 +172,8 @@ class McpToolBindingTest {
         val payload = json(binding.toolResult("call_7", "mcp_echo", "{\"text\":\"slow\"}").output)
         val elapsed = System.currentTimeMillis() - started
         assertEquals("mcp_timeout", field(payload, "error_type"))
-        assertTrue("读超时必须截断在 250ms 档，实际 " + elapsed + "ms", elapsed < 900)
+        // 700ms = 读超时 250ms + 450ms 余量；仍远小于假服务器的 1200ms，
+        // 所以"没在 250ms 档截断"一定会被抓到。
+        assertTrue("读超时必须在 250ms 档截断（上限 700ms），实际 " + elapsed + "ms", elapsed < 700)
     }
 }

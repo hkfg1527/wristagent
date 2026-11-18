@@ -41,6 +41,16 @@
 
 ## [未发布]
 
+### 测试：两处源码切片守卫补锚点自证
+`SettingsRootSnapshotTest` 与 `LongTermMemoryWriteTest` 都用 `substringAfter(...).substringBefore(...)` 取函数体，
+但没校验锚点：函数一改名，`substringBefore` 找不到分隔符就**原样返回整串** —— 后面的断言退化成
+"整个文件里出现过某串"，守卫永远绿。两处各补：锚点存在、切片长度 < 全文一半、切片里能看到该函数的特征行。
+
+### 测试：MCP 读超时断言不再与假服务器睡眠同值
+`readTimeoutIsBoundedInsideTheBinding` 原来是"假服务器睡 900ms + 断言 elapsed < 900ms"，
+阈值与睡眠重合：有人把睡眠调小，超时没生效也能过。现在睡眠 1200ms、断言 < 700ms
+（读超时 250ms + 450ms 余量），两个方向都留出了余量。
+
 ### 修复：网页改不动的键会「静默回滚，还提示已保存」
 供应商档案写到第 6 套（上限 5）时，服务端把这次写入塞进 `ignored` —— 而 `ignored` 的语义是
 "后端还没有这个字段"。网页据此把值存成草稿，紧接着 `pruneDrafts()` 又把草稿删掉（因为服务端快照里
