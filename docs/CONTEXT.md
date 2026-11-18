@@ -10,9 +10,9 @@
 **我是谁**：这台手表上 Wrist Agent 的常驻工程师。行事准则在 `docs/SELF.md`（用户可改），核心一句：
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
-**现在在哪**（截至 2026-11-19 01:30）：
-- 内部版 `0.0.0.90` / versionCode 128（整十发布点）；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` 均已打 tag。
-- 单测基线 **1360 条 / 205 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测，0 失败 0 跳过）。
+**现在在哪**（截至 2026-11-19 02:20）：
+- 内部版 `0.0.0.91` / versionCode 129；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` 均已打 tag 并推送。
+- 单测基线 **1361 条 / 205 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测，0 失败 0 跳过）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行；六套风格已上真机逐套核对。
 - 当前主线：**设置页功能回归搬到 JVM（Robolectric + Compose ui-test）**，已到 11 个测试类 / 39 条用例；
   借它当场查出并修掉一个无障碍真缺陷（两行滑杆被并成一个节点，第二个滑杆读屏拨不动）。
@@ -35,12 +35,29 @@
 3. 环境配方：`docs/HANDOFF-0.05.md`（无 shell 工具、gradle env、adb、GUI、git push 的坑）
 4. 跑一次 `./gradlew :wear:testDebugUnitTest` 确认基线（以 §0.5 的数字为准，别再在这里写死一份）
 
-## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-19 01:30
+## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-19 02:20
 
 **版本与基线**
-- 内部版 `0.0.0.90`（versionCode 128，整十发布点）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` 已打 tag。
-- 单测基线 **1360** 条 / **205** 套件全绿（0.0.0.90 新增 5 条：ShellPolicy 4 + ConsoleServer 1，全是安全回归）。
-- 上一个发布点：**0.0.0.50**。发布自检 `node docs/tools/release-check.mjs` 现在是 **4 段 8 条判据**。
+- 内部版 `0.0.0.91`（versionCode 129）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` 已打 tag 并推送。
+- 单测基线 **1361** 条 / **205** 套件全绿。
+- 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**。
+
+**0.0.0.91 · 修两处"点了没反应"的 UI 缺陷 + 三条假绿守卫**
+- **官方两档子页弹窗全不出来**（高）：`SettingsSubPage` 在 `rowShell == PLAIN` 时早退到 `OfficialListSubPage`，
+  而 `overlay` / `overlayBack` 挂在早退之后 —— M3_LIST / M3_TRANSFORM 下改 Base URL、API Key、
+  语音密钥、终端输入、提示词、网络体检**点「编辑」毫无反应**，内层页返回还会直接跳回设置根页。
+  修法：把 `overlay` / `overlayBack` 传进 `OfficialListSubPage`（浮层压在时钟之上 + 注册 BackHandler）。
+  回归：`SettingsModelConfigRobolectricTest.officialListStyleStillOpensTheTextDialog`（删掉修复会红）。
+- **触觉强度 / 播报队列点了圆点不动**（高）：`selected` 直接读 `preferences.*`，写存储不触发重组。
+  修法：两处都改成 `remember { mutableStateOf(...) }`，回调里先更状态再落盘。
+  回归：`threeHapticLevelsEachWriteThePreference` 追加"该行必须变成已选中"断言（删掉修复会红）。
+- 顺带把单选行从 `clickable(role = Button)` 换成 `selectable(role = RadioButton)`：
+  读屏能念出"单选按钮 / 已选中"，测试也终于能断言选中态。
+- **三条假绿守卫修好**（0.0.0.90 审查点名）：`SettingsSubtitleLineGuardTest` 的锚点 `可进入行` 在源文件里不存在
+  （切片实为 526 行整段）→ 换成真实锚点 + 切片长度/越界自证；`SettingsStylePolicyTest` 的
+  `spec.shell != null` / `back in values()` 被类型系统保证恒真 → 换成逐风格钉死返回控件位置与控件族；
+  `SettingsVisualGuardTest` 断言 `slot.contains("trailing")` 而切片起点正是声明该形参的函数 →
+  改成钉"有 null 判定 + 真的被调用"。**变异验证**：把旧锚点改回去，7 条用例全红（改之前全绿）。
 
 **0.0.0.90 · 第五次整十审查，修掉三条安全缺陷**
 - 按"每 10 个内部版派 ≥5 个子智能体做全代码审查"跑了 5 路（设置页 / 控制台 / agent 核心 / 测试有效性 / 文档一致性），

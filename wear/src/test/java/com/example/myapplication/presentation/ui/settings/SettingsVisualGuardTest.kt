@@ -21,9 +21,14 @@ class SettingsVisualGuardTest {
         val slot = shared
             .substringAfter("fun SettingsSlotRow(")
             .substringBefore("fun SettingsSubtitleLine(")
+        // 切片自证：锚点缺失时 substring* 会返回整串，后面几条断言就退化成"整个文件里出现过"
+        assertTrue("SettingsSlotRow 切片异常", slot.length < shared.length / 3)
         assertFalse("行内文字必须仍是左右两槽，不是整体居中", slot.contains("Alignment.CenterHorizontally"))
         assertTrue("左槽必须继续占剩余宽度", slot.contains(".weight(1f)"))
-        assertTrue("取值 / 控件必须仍落在右槽", slot.contains("trailing"))
+        // 旧断言是 slot.contains("trailing") —— 而切片起点正是声明 `trailing:` 形参的那个函数，
+        // 这条断言永远绿。改成钉"真的按条件渲染并调用"。
+        assertTrue("取值 / 控件必须仍落在右槽（要有 null 判定）", slot.contains("if (trailing != null)"))
+        assertTrue("右槽必须真的被调用", Regex("""\btrailing\(\)""").containsMatchIn(slot))
     }
 
     @Test

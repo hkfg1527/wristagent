@@ -16,6 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
@@ -328,7 +329,16 @@ private fun OfficialListSubPage(
     rows: List<SettingsRowEntry>,
     rowSlots: List<SettingsRowSlot?>,
     transformRows: Boolean,
-    exit: SettingsExitController
+    exit: SettingsExitController,
+    /**
+     * 子页自带的浮层（文本框弹层、终端输入、内层页…）。
+     *
+     * 必须从这里进：官方列表档在 `SettingsSubPage` 里是**早退**出去的，
+     * 浮层如果还挂在早退之后的代码里，M3_LIST / M3_TRANSFORM 两档下所有子页的弹窗都不会出现
+     * （点「编辑 Base URL」「语音密钥」毫无反应）。0.0.0.91 修的就是这一处。
+     */
+    overlay: @Composable () -> Unit = {},
+    overlayBack: (() -> Unit)? = null
 ) {
     val state = androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState()
     val spec = androidx.wear.compose.material3.lazy.rememberTransformationSpec()
@@ -410,6 +420,14 @@ private fun OfficialListSubPage(
         // 曲面时钟 + 右缘滚动指示器：与其余风格同一位置（本项目没有 AppScaffold，只能显式叠层）
         TimeText(modifier = Modifier.align(Alignment.TopCenter))
         ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
+
+        // 浮层放在最上层：与另外四套风格同一层级语义（弹层压在内容与时钟之上）
+        overlay()
+    }
+
+    // 内层浮层优先吃掉系统返回：官方两档此前完全没有这个钩子，返回会直接弹回设置根页
+    if (overlayBack != null) {
+        BackHandler { overlayBack.invoke() }
     }
 }
 
@@ -460,7 +478,9 @@ fun SettingsSubPage(
             rows = content,
             rowSlots = rowSlots,
             transformRows = SettingsStylePolicy.current().cardScaling,
-            exit = exit
+            exit = exit,
+            overlay = overlay,
+            overlayBack = overlayBack
         )
         return
     }
@@ -1064,23 +1084,35 @@ private fun SettingsGroupHairline() {
 internal fun SettingsCardRow(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    /**
+     * 非 null 时这一行是**单选行**：走 `selectable` 而不是 `clickable`。
+     *
+     * 差别不是外观而是无障碍：`clickable(role = Button)` 会让读屏把四个选项都念成"按钮"，
+     * 既听不出当前选的是哪个，也没有 `Selected` 语义可供断言（0.0.0.90 审查点名）。
+     */
+    selected: Boolean? = null,
     minHeight: Dp = SettingsSpacingMath.MinRowHeightDp.dp,
     content: @Composable () -> Unit
 ) {
     // 交互源只用来读"手指是否按住"：涟漪显式关掉，按下态由行底色承担（见 pressedRowBackground）
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val clickModifier =
-        if (onClick == null) {
-            Modifier
-        } else {
-            Modifier.clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick
-            )
-        }
+    val clickModifier = when {
+        onClick == null -> Modifier
+        selected != null -> Modifier.selectable(
+            selected = selected,
+            interactionSource = interaction,
+            indication = null,
+            role = Role.RadioButton,
+            onClick = onClick
+        )
+        else -> Modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            role = Role.Button,
+            onClick = onClick
+        )
+    }
     val slot = LocalSettingsRowSlot.current
     val shape = SettingsRowComposition.shapeOf(slot)
     val rowBackground = pressedRowBackground(
@@ -1273,10 +1305,12 @@ internal fun SettingsSlotRow(
     titleMaxLines: Int = 2,
     valueMaxLines: Int = 1,
     subItem: Boolean = false,
+    /** 非 null 表示这一行是单选行（见 [SettingsCardRow] 的 selected 说明）。 */
+    selected: Boolean? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val valueBelowRow = SettingsTextLayout.shouldPlaceValueBelowRow(title, value)
-    SettingsCardRow(modifier = modifier, onClick = onClick) {
+    SettingsCardRow(modifier = modifier, onClick = onClick, selected = selected) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

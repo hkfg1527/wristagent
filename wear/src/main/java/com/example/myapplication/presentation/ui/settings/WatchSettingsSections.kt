@@ -45,6 +45,9 @@ fun VoiceEntryContent(
     // 播报语速：出向语音唯一的可调量，0.5..2.0 按 0.1 一格
     var speechRate by remember { mutableFloatStateOf(preferences.ttsSpeechRate) }
     var volume by remember { mutableFloatStateOf(preferences.ttsVolume) }
+    // 播报队列必须走 Compose 状态：直接读 `preferences.ttsQueueMode` 时写存储不会触发重组，
+    // 表现为"点了圆点不动、页面毫无反应"（只有震动）。0.0.0.91 修。
+    var ttsQueue by remember { mutableStateOf(preferences.ttsQueueMode) }
     val asr = remember { preferences.asrSettings() }
 
     SettingsSubPage(
@@ -154,8 +157,11 @@ fun VoiceEntryContent(
             row(subItem = true) {
                 SettingsSubRadioRow(
                     label = stringResource(mode.labelRes),
-                    selected = preferences.ttsQueueMode == mode,
-                    onSelect = { preferences.ttsQueueMode = mode }
+                    selected = ttsQueue == mode,
+                    onSelect = {
+                        ttsQueue = mode
+                        preferences.ttsQueueMode = mode
+                    }
                 )
             }
         }
@@ -215,6 +221,8 @@ fun AppearanceContent(
     var spacing by remember { mutableFloatStateOf(preferences.matrixSpacingDp) }
     var rotaryGain by remember { mutableFloatStateOf(preferences.rotaryScrollGain) }
     var autoHideMs by remember { mutableFloatStateOf(preferences.bottomBarAutoHideMs.toFloat()) }
+    // 触觉档同理：直读偏好不会触发重组，点完圆点不动（0.0.0.91 修）
+    var haptic by remember { mutableStateOf(preferences.hapticAmplitude) }
 
     SettingsSubPage(
         title = stringResource(R.string.settings_sub_appearance),
@@ -269,8 +277,9 @@ fun AppearanceContent(
             row(subItem = true) {
                 SettingsSubRadioRow(
                     label = stringResource(level.labelRes),
-                    selected = preferences.hapticAmplitude == level,
+                    selected = haptic == level,
                     onSelect = {
+                        haptic = level
                         preferences.hapticAmplitude = level
                         context.vibrateTick()
                     }

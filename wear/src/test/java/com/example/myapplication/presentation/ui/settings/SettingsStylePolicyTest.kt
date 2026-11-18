@@ -20,14 +20,33 @@ class SettingsStylePolicyTest {
     private val all = SettingsStyle.values().toList()
 
     @Test
-    fun everyStyleDeclaresAllEightSlots() {
-        for (style in all) {
-            val spec = SettingsStylePolicy.specOf(style)
-            // 只是为了失败时能一眼看出是哪套风格缺东西
-            assertTrue("$style 的骨架槽位缺失", spec.shell != null)
-            assertTrue("$style 的返回槽位缺失", spec.back != null)
-        }
+    fun everyStyleDeclaresItsSlotsWithTheExpectedControlFamilies() {
+        // 注意：不要写 `assertTrue(spec.shell != null)` 这类断言 —— 槽位是非空枚举，
+        // 类型系统已经保证它不为 null，那种断言永远绿，等于没测（0.0.0.90 审查点名的三条之一）。
         assertEquals("风格数量变了就要同步 UI-STYLE-PLAN.md", 6, all.size)
+        for (style in listOf(SettingsStyle.BALLOON, SettingsStyle.SQUARE, SettingsStyle.GOOGLE_CARD, SettingsStyle.TERMINAL)) {
+            val spec = SettingsStylePolicy.specOf(style)
+            assertEquals("$style 的开关应是手搓胶囊档", SettingsToggleControl.COMPACT_SWITCH, spec.toggle)
+            assertEquals("$style 的滑杆应是自绘细轨", SettingsSliderControl.THIN_TRACK, spec.slider)
+        }
+        // 字族只有终端档例外，其余一律系统字族
+        val expectedTypeface = mapOf(
+            SettingsStyle.BALLOON to SettingsTypeface.DEFAULT,
+            SettingsStyle.SQUARE to SettingsTypeface.DEFAULT,
+            SettingsStyle.GOOGLE_CARD to SettingsTypeface.DEFAULT,
+            SettingsStyle.TERMINAL to SettingsTypeface.MONOSPACE,
+            SettingsStyle.M3_LIST to SettingsTypeface.DEFAULT,
+            SettingsStyle.M3_TRANSFORM to SettingsTypeface.DEFAULT
+        )
+        for (style in all) {
+            assertEquals("$style 的字族", expectedTypeface[style], SettingsStylePolicy.specOf(style).typeface)
+        }
+        for (style in listOf(SettingsStyle.M3_LIST, SettingsStyle.M3_TRANSFORM)) {
+            val spec = SettingsStylePolicy.specOf(style)
+            assertEquals("$style 的开关必须是官方 SwitchButton", SettingsToggleControl.OFFICIAL_SWITCH_BUTTON, spec.toggle)
+            assertEquals("$style 的滑杆必须是官方 Slider", SettingsSliderControl.OFFICIAL_SEGMENTED, spec.slider)
+            assertEquals("$style 的单选必须是官方 RadioButton", SettingsRadioControl.OFFICIAL_RADIO_BUTTON, spec.radio)
+        }
     }
 
     @Test
@@ -54,10 +73,22 @@ class SettingsStylePolicyTest {
 
     @Test
     fun everyStyleHasExactlyOneBackControl() {
-        // 返回控件是用户最容易"找不到"的东西：每套风格只能声明一种位置
+        // 返回控件是用户最容易"找不到"的东西：位置逐套钉死，改一处就必须同步文档并上机核对。
+        // 旧写法 `back in SettingsBackControl.values()` 被类型系统保证恒真 —— 整个用例是空测试。
+        val expected = mapOf(
+            SettingsStyle.BALLOON to SettingsBackControl.EDGE_BUTTON,
+            SettingsStyle.SQUARE to SettingsBackControl.SQUARE_EDGE_BUTTON,
+            SettingsStyle.GOOGLE_CARD to SettingsBackControl.LIST_ROW,
+            SettingsStyle.TERMINAL to SettingsBackControl.EDGE_BUTTON,
+            SettingsStyle.M3_LIST to SettingsBackControl.LIST_ROW,
+            SettingsStyle.M3_TRANSFORM to SettingsBackControl.LIST_ROW
+        )
         for (style in all) {
-            val back = SettingsStylePolicy.specOf(style).back
-            assertTrue("$style 的返回槽位不合法", back in SettingsBackControl.values())
+            assertEquals(
+                "$style 的返回控件位置变了 → 同步 docs/UI-STYLE-PLAN.md 并上机核对",
+                expected[style],
+                SettingsStylePolicy.specOf(style).back
+            )
         }
     }
 

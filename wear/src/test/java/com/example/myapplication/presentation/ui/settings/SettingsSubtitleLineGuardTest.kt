@@ -19,7 +19,29 @@ class SettingsSubtitleLineGuardTest {
         .substringBefore("fun SettingsSubtitleLine(")
     private val subtitleLine = shared
         .substringAfter("fun SettingsSubtitleLine(")
-        .substringBefore("可进入行")
+        .substringBefore("enum class SettingsStatusTone")
+
+    /**
+     * 切片锚点守卫。
+     *
+     * `substringAfter`/`substringBefore` 找不到分隔符时会**原样返回整串**，
+     * 于是"断言某个函数里出现过某段代码"退化成"整个文件里出现过" —— 守卫静默失效。
+     * 这个文件原来就是这种状态：`substringBefore("可进入行")` 里的 `可进入行`
+     * 在 `SettingsShared.kt` 里根本不存在，切片实际是 526 行（从 `fun SettingsSubtitleLine(` 到文件尾）。
+     * 所以每个切片先自证"我真的切到了那个函数"。
+     */
+    init {
+        assertTrue("锚点缺失：fun SettingsSubtitleLine(", shared.contains("fun SettingsSubtitleLine("))
+        assertTrue("锚点缺失：enum class SettingsStatusTone", shared.contains("enum class SettingsStatusTone"))
+        assertTrue(
+            "SettingsSubtitleLine 切片异常（长度 " + subtitleLine.length + "，整文件 " + shared.length + "）",
+            subtitleLine.length < shared.length / 3
+        )
+        assertFalse(
+            "SettingsSubtitleLine 切片越界到别的函数",
+            subtitleLine.contains("fun SettingsCaptionRow(") || subtitleLine.contains("fun SettingsTextDialog(")
+        )
+    }
     private val providerRow = providers
         .substringAfter("SettingsRadioRow(")
         .substringBefore("onSelect =")

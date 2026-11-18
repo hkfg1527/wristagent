@@ -120,6 +120,22 @@ class SettingsModelConfigRobolectricTest {
     }
 
     @Test
+    fun officialListStyleStillOpensTheTextDialog() {
+        // 回归：官方列表档（M3_LIST / M3_TRANSFORM）在 SettingsSubPage 里是早退到 OfficialListSubPage 的，
+        // 浮层如果还挂在早退之后，这两档下**所有子页的弹窗都不会出现** —— 点「编辑 Base URL」毫无反应。
+        applySettingsStyle(context, SettingsStyle.M3_LIST)
+        val p = prefs()
+        p.baseUrl = "https://keep.example/v1"
+        show(p)
+
+        SettingsUi.clickRow(compose, context.getString(R.string.settings_text_base_url))
+        assertTrue(
+            "官方列表档下点「Base URL」必须弹出输入框",
+            compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+        )
+    }
+
+    @Test
     fun apiKeyRowNeverRendersTheRawSecret() {
         val p = prefs()
         p.apiKey = "sk-very-secret-123"

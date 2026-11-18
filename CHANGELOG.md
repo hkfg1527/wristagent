@@ -41,6 +41,35 @@
 
 ## [未发布]
 
+### 修复：官方两档（M3_LIST / M3_TRANSFORM）下所有子页弹窗都不出现
+`SettingsSubPage` 在 `rowShell == PLAIN` 时早退到 `OfficialListSubPage`，而 `overlay` 与 `overlayBack`
+挂在早退**之后** —— 于是这两套风格里改 Base URL、改 API Key、语音密钥、Lux 终端输入、提示词编辑、
+网络体检内层页全都"点编辑毫无反应"，内层页的系统返回还会直接跳回设置根页。
+
+- 修法：`overlay` / `overlayBack` 传进 `OfficialListSubPage`，浮层压在时钟与列表之上，并注册 `BackHandler`。
+- 回归：`SettingsModelConfigRobolectricTest.officialListStyleStillOpensTheTextDialog`（把传参去掉就会红，已实测）。
+
+### 修复：触觉强度 / 播报队列点了圆点不动
+这两行的 `selected` 直接读 `preferences.*`，而 `AgentPreferences` 是普通 getter/setter，
+写存储不会触发重组 —— 表现是"点完只有震动，圆点停在原处"。
+
+- 修法：两处各加 `remember { mutableStateOf(...) }`，回调里先更状态再落盘。
+- 顺带把单选行从 `clickable(role = Button)` 换成 `selectable(role = RadioButton)`：
+  读屏能念出"单选按钮 / 已选中"，测试也终于能断言选中态。
+- 回归：`threeHapticLevelsEachWriteThePreference` 追加"该行必须变成已选中"（去掉修复就会红，已实测）。
+
+### 修复：三条"假绿"守卫测试
+0.0.0.90 审查点名，逐条修好并做了变异验证（把旧写法改回去必须变红）：
+
+- `SettingsSubtitleLineGuardTest`：锚点 `可进入行` 在 `SettingsShared.kt` 里**不存在**，
+  `substringBefore` 于是返回 526 行整段文件。换成真实锚点，并自证切片长度与越界函数名。
+- `SettingsStylePolicyTest`：`spec.shell != null`、`back in SettingsBackControl.values()` 被类型系统保证恒真，
+  整个用例是空的。改成逐风格钉死返回控件位置、开关/滑杆/单选控件族、字族。
+- `SettingsVisualGuardTest`：断言 `slot.contains("trailing")`，而切片起点正是声明 `trailing` 形参的函数。
+  改成钉"有 `if (trailing != null)` 判定 + 真的 `trailing()` 调用"。
+- `ChatMessageSurfaceVisualGuardTest`：`substringAfter("fun AgentSquareBlurBox(")` 没有终点，
+  描边规则只看一种字面量。改成截到下个函数 + 钉"全函数只允许一处描边，且必须挂在审批态分支里"。
+
 ### 新增：网络/采样参数/模型端点三页进 JVM 功能回归
 - `SettingsNetworkAndHyperRobolectricTest`（6 条）：请求超时 55.4→55 秒、重试 2.4→2 次、
   退避 3300→3400ms（200ms 一档）；top_p 0.63→0.65、最大 token 拨到第 3 级落在 `TokenLadder[3]`、

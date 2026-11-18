@@ -5,9 +5,12 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import androidx.wear.compose.material3.MaterialTheme
@@ -88,6 +91,11 @@ class SettingsAppearanceDeepRobolectricTest {
                 level,
                 p.hapticAmplitude
             )
+            // 只写存储不够：直接读 preferences 的 selected 不会触发重组，圆点会停在原处。
+            // 这里断言屏上那一行真的变成了"已选中"（单选行走 selectable，带 Selected 语义）。
+            compose.onAllNodesWithText(context.getString(level.labelRes))
+                .filterToOne(hasClickAction())
+                .assertIsSelected()
         }
     }
 

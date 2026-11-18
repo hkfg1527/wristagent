@@ -66,6 +66,7 @@ fun SettingsRadioRow(
         modifier = modifier,
         onClick = onSelect,
         subItem = subItem,
+        selected = selected,
         trailing = {
             SettingsRadioDot(selected = selected, danger = dangerSelected, dotColor = dotColor)
         }
