@@ -1032,11 +1032,17 @@ class AgentDispatcher(
                 // 真正的 SSE 实时流式读取 (零 delay 字节到达即刻上屏)
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
                 var line: String?
+                // 顺手留一份原始文本：网关忽略 Accept 直接回整段 JSON 时，靠它兜底
+                val rawForFallback = java.lang.StringBuilder()
                 try {
                     while (reader.readLine().also { line = it } != null) {
                         if (isCancelled) break
-                        val currentLine = line?.trim() ?: continue
+                        val rawLine = line ?: continue
+                        val currentLine = rawLine.trim()
                         if (currentLine.isEmpty()) continue
+                        if (rawForFallback.length < FALLBACK_RAW_LIMIT) {
+                            rawForFallback.append(rawLine).append('\n')
+                        }
                         // 一行 SSE -> 结构化事件：思考与正文各走各的通道，工具调用分片交给累加器拼接
                         val events = accumulator.applyLine(currentLine)
                         // 供应商的 [DONE] 是流结束标记：不等连接自然关闭，立刻去做收尾翻牌
@@ -1056,6 +1062,16 @@ class AgentDispatcher(
                     if (!isCancelled) throw e
                 } finally {
                     runCatching { reader.close() }
+                }
+                // 兜底：服务端回了 200 但根本没走 SSE（整段 JSON），此时所有行都不以 data: 开头，
+                // 累加器一个字都没收到 —— 不兜的话界面表现是"模型回了空消息"，而且没有任何错误提示。
+                if (!isCancelled && accumulator.content.isEmpty() && accumulator.reasoning.isEmpty()) {
+                    val fallbackEvents = parseWholeBodyEvents(rawForFallback.toString())
+                    if (fallbackEvents.isNotEmpty()) {
+                        accumulator.applyAll(fallbackEvents)
+                        if (fallbackEvents.any { it is StreamDelta.Reasoning }) publishReasoning()
+                        if (fallbackEvents.any { it is StreamDelta.Content }) publishContent()
+                    }
                 }
             } else {
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
@@ -1274,11 +1290,12 @@ class AgentDispatcher(
 
         suspend fun fetchRemoteModels(baseUrl: String, apiKey: String): Pair<Long, List<String>> = withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
-            val cleanBase = baseUrl.trim().trimEnd('/')
-            val urlStr = if (cleanBase.endsWith("/v1/models")) cleanBase else "$cleanBase/v1/models"
+            val urlStr = modelsUrl(baseUrl)
+            if (urlStr.isEmpty()) return@withContext -1L to emptyList()
+            var conn: HttpURLConnection? = null
             try {
                 val url = URL(urlStr)
-                val conn = url.openConnection() as HttpURLConnection
+                conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
                 conn.connectTimeout = 8000
                 conn.readTimeout = 8000
@@ -1304,12 +1321,58 @@ class AgentDispatcher(
                     }
                     latency to result
                 } else {
+                    // 非 2xx 也要把 errorStream 读掉/关掉，否则这条连接要等 GC 才归还
+                    runCatching { conn.errorStream?.close() }
                     -1L to emptyList()
                 }
             } catch (e: Exception) {
                 -1L to emptyList()
+            } finally {
+                runCatching { conn?.disconnect() }
             }
         }
+
+        /**
+         * 模型清单的 URL：**别把版本段拼两遍**。
+         *
+         * 旧实现一律 `$base/v1/models` —— 用户把 Base URL 填成 OpenAI 风格
+         * `https://api.openai.com/v1` 时就变成 `/v1/v1/models`，404 → 模型清单恒空，
+         * 而且被 `-1L to emptyList()` 静默吞掉，界面上只表现为"实拉模型永远失败"。
+         */
+        internal fun modelsUrl(baseUrl: String): String {
+            val base = baseUrl.trim().trimEnd('/')
+            if (base.isEmpty()) return ""
+            if (base.endsWith("/models")) return base
+            if (base.endsWith("/v1")) return "$base/models"
+            return "$base/v1/models"
+        }
+
+        /** SSE 兜底最多留多少原始字符：够装一整段 chat completion，又不至于让内存跟着响应体涨。 */
+        private const val FALLBACK_RAW_LIMIT = 512 * 1024
+    }
+}
+
+/**
+ * 整段响应按普通 chat completion JSON 解析（SSE 兜底）。
+ *
+ * 什么时候需要它：网关忽略 `Accept: text/event-stream`、直接回 200 + 一整段 JSON。
+ * 那时每一行都不以 `data:` 开头，SSE 累加器一个字都收不到 —— 界面上就是"模型回了空消息"，
+ * 而且没有任何错误提示（比报错更难查）。
+ *
+ * @return 解析出的事件；不是合法 JSON / 没有 choices 时返回空表，调用方据此保持原样。
+ */
+internal fun parseWholeBodyEvents(raw: String): List<StreamDelta> {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return emptyList()
+    return try {
+        val message = JSONObject(trimmed)
+            .optJSONArray("choices")
+            ?.optJSONObject(0)
+            ?.optJSONObject("message")
+            ?: return emptyList()
+        ModelStreamParser.messageEvents(message)
+    } catch (_: Throwable) {
+        emptyList()
     }
 }
 

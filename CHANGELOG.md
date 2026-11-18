@@ -13,6 +13,23 @@
 
 ## [未发布]
 
+### 修复：Base URL 带 `/v1` 时模型清单恒空（拼成 `/v1/v1/models`）
+旧实现一律 `$base/v1/models` —— 用户把 Base URL 填成 OpenAI 风格 `https://api.openai.com/v1` 时，
+实际请求 `/v1/v1/models` 得 404，模型清单恒空，而且被 `-1L to emptyList()` 静默吞掉，
+界面上只表现为「实拉模型永远失败」。
+
+- 抽出 `modelsUrl()`：已带 `/v1` 就不再叠、已经是 `/models` 就原样、空 base 直接返回空串（不发请求）。
+- 顺带补 `disconnect()`（原来全程没有）与非 2xx 时 errorStream 的关闭。
+- 回归：`ModelsUrlTest` 4 条（普通 / 已带 v1 / 已是 models / 空串）。
+
+### 修复：服务端回整段 JSON 时被当 SSE 读，界面只说「模型回了空消息」
+网关忽略 `Accept: text/event-stream`、直接回 200 + 一整段 JSON 时，每一行都不以 `data:` 开头，
+SSE 累加器一个字都收不到 —— 界面表现是**空消息**且没有任何错误提示，比报错更难查。
+
+- 修法：流式分支顺手留一份原始文本（上限 512K），若一个事件都没解析出，就按普通 chat completion
+  再解析一次（`parseWholeBodyEvents`）。
+- 回归：`SseWholeBodyFallbackTest` 3 条（正文 / 工具调用 / 垃圾输入不抛异常）。
+
 ### 修复：Shizuku 绑定超时/取消后不解绑（悬挂连接）
 `bind()` 的 `suspendCancellableCoroutine` 没有 `invokeOnCancellation` —— 绑定超时（`withTimeoutOrNull`）
 或调用方取消后连接**永不解绑**，Shizuku 进程里留一个悬挂绑定；而 `pendingConnection` 会被下一次 bind
