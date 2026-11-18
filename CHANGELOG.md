@@ -35,6 +35,11 @@
   定位不靠索引（同一句动作文案在页面上出现四次、懒加载下离屏项不存在），而是"两段标题之间那条带"。
 - `SettingsProviderAndTransferRobolectricTest`（4 条）：切档案必须换 `modelName` / `baseUrl` / `activeProfileId`；
   复制与删除改档案数；导出 → 改温度 → 导入复原；剪贴板塞废话再导入**一个字都不写**。
+- `SettingsSliderSweepRobolectricTest`（6 条）：记忆三根（轮数 / 压缩阈值 / 单条上限）、语音两根（语速 / 音量）
+  逐个验吸附；外加**官方档**（M3_LIST）的点阵间距 —— 那一档的轨道不可点，只有两端 ±按钮可点，
+  用例按"连点三次加号 → 4dp 变 7dp"验它确实一段一步。
+- 踩坑记档：`WearAppearance.style` 是全局单例，用例之间会污染（切到 M3_LIST 后滑杆换成官方件、没有
+  `contentDescription`，断言会以"找不到节点"的样子红），所以每个滑杆用例前显式 `applySettingsStyle(BALLOON)`。
 
 ### 新增：控制台页面级 E2E 接进发布自检
 `release-check.mjs` 第 4 项自动跑 `console-e2e.mjs`（69 条断言）。令牌不再手填：
