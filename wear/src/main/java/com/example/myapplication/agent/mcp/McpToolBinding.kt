@@ -59,7 +59,15 @@ class McpToolBinding(
     private val maxToolPages: Int = McpClient.MAX_TOOL_PAGES,
     private val clientFactory: (McpEndpoint) -> McpClient = { endpoint ->
         McpClient(endpoint, timeouts, maxToolPages = maxToolPages)
-    }
+    },
+    /**
+     * 工具调用的接缝：默认真打远端，测试可注入一个**必定抛异常**的实现。
+     *
+     * 为什么需要它：`tools/call` 的失败有两种，假服务器只能造出"工具自报失败"那一种
+     * （`isError=true` 的 `McpCallResult`）；而"传输层抛异常"这条路径会走到下面的
+     * catch 分支（正是它曾经清空整份清单），没有接缝就一条用例也写不出来。
+     */
+    private val callToolOverride: (suspend (McpClient, String, McpJson.Obj) -> McpCallResult)? = null
 ) : Closeable {
 
     @Volatile
@@ -232,7 +240,9 @@ class McpToolBinding(
         }
         val started = now()
         return try {
-            val outcome = sessionFor(endpoint).callTool(entry.remote.name, arguments)
+            val session = sessionFor(endpoint)
+            val outcome = callToolOverride?.invoke(session, entry.remote.name, arguments)
+                ?: session.callTool(entry.remote.name, arguments)
             ToolResult(
                 toolCallId = callId,
                 toolName = localName,

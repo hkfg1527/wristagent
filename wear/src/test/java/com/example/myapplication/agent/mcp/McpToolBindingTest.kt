@@ -66,6 +66,30 @@ class McpToolBindingTest {
     }
 
     @Test
+    fun aFailedCallDoesNotHideTheWholeRemoteCatalog() = runBlocking {
+        // 回归：一次工具调用抛异常时，以前会把 snapshot 的 tools 一起清空并锁 retryAtMs 15 秒 ——
+        // 某条工具超时就会**把整份远端清单从模型视野里拿走**，而兄弟调用可能还在跑。
+        // 用 callToolOverride 造"传输层抛异常"这条路：假服务器只能造"工具自报失败"，走不到 catch 分支。
+        val failing = McpToolBinding(
+            endpointSource = { server.endpointUrl },
+            enabledSource = { true },
+            callToolOverride = { _, _, _ -> throw McpTransportException("timeout", "读超时") }
+        )
+        this@McpToolBindingTest.binding = failing
+        failing.refresh()
+        assertEquals("准备阶段必须有三条远端工具", 3, failing.snapshot().tools.size)
+
+        val failed = failing.toolResult("call_fail", "mcp_echo", "{}")
+        // MCP 回执以 output 里的 status/error_type 表达失败（与内置工具的约定一致），不是 isError
+        assertEquals("error", McpJson.parse(failed.output)?.field("status")?.stringValue())
+        assertEquals("mcp_timeout", McpJson.parse(failed.output)?.field("error_type")?.stringValue())
+
+        assertEquals("一次调用失败不许把整份清单清空", 3, failing.snapshot().tools.size)
+        assertTrue("必须记下最后一次错误", !failing.snapshot().lastError.isNullOrEmpty())
+        assertEquals("工具定义也必须还在", 3, failing.toolDefinitions(emptySet()).size)
+    }
+
+    @Test
     fun toolCallRoundTripsThroughRealServer() = runBlocking {
         val binding = bindingFor(server.endpointUrl)
         binding.refresh()

@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 测试：给上一轮那条「改了没测」的 MCP 修复补上回归
+`McpToolBinding` 新增 `callToolOverride` 接缝（默认 `null` = 真打远端，生产行为不变）。
+上一轮试了三种办法都造不出"传输层抛异常"（停服务 / 读超时 / `failCallWithRpcError`），
+因为它们都会被假服务器映射成"工具自报失败"—— 没有接缝就一条用例也写不出来。
+
+- 新回归 `aFailedCallDoesNotHideTheWholeRemoteCatalog`：注入 `McpTransportException("timeout")` 后断言
+  回执是 `status=error` / `error_type=mcp_timeout`、**清单仍是 3 条**、`lastError` 有值、工具定义仍是 3 条。
+- **变异验证**：把异常分支改回清空 `tools`，用例立刻红（`expected:<3> but was:<0>`）；换回即绿。
+- 顺带确认约定：MCP 回执用 `output` 里的 `status/error_type` 表达失败，不设 `ToolResult.isError`。
+
 ### 修复：一次 MCP 工具调用失败会清空整份远端工具清单（15 秒）
 `McpToolBinding.toolResult` 的异常分支以前连 `snapshot.tools` 一起清空并把 `retryAtMs` 推后 15 秒 ——
 某条工具超时就会**把整份远端清单从模型视野里拿走 15 秒**，而兄弟调用可能还在跑，
