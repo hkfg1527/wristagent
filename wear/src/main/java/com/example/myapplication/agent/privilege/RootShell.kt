@@ -33,9 +33,6 @@ class RootShell(
 
     private val lock = ReentrantLock()
     private val live = AtomicReference<Live?>(null)
-    private val worker = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "root-shell").apply { isDaemon = true }
-    }
 
     private class Live(val process: Process, val session: RootSession, val writer: BufferedWriter) {
         fun close() {
@@ -63,22 +60,37 @@ class RootShell(
 
     override fun close() {
         lock.withLock { live.getAndSet(null)?.close() }
-        worker.shutdownNow()
     }
 
+    /**
+     * 每条命令一个**一次性**线程，不再共用单线程池。
+     *
+     * 旧实现用 `newSingleThreadExecutor` 常驻：命令超时后 `future.cancel(true)` 打断不了阻塞在
+     * `readLine()` 上的任务（管道读不响应 interrupt），这个线程就永久卡住单线程池 ——
+     * 之后每条命令都排在死任务后面、逐个超时，`isAvailable()` 恒 false，root 静默降级到 DIRECT。
+     * 一次性线程 + 超时即杀进程（管道随之关闭、阻塞读立即返回）才是收敛的。
+     */
     private fun execute(command: String, timeout: Long): ShellResult {
         val session = live.get() ?: open() ?: return ShellResult.failure(UNAVAILABLE)
 
-        val future = worker.submit<ShellResult> { session.session.run(command) }
+        val task = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "root-shell-cmd").apply { isDaemon = true }
+        }
         return try {
-            future.get(timeout, TimeUnit.MILLISECONDS)
+            val future = task.submit<ShellResult> { session.session.run(command) }
+            val result = future.get(timeout, TimeUnit.MILLISECONDS)
+            // 会话自己读到 EOF（su 被撤权 / 被杀）：进程已死，别把它留在 live 里反复复用。
+            // 旧实现不清缓存 —— 之后每条命令都返回同一句 "root shell closed"，root 永久失效。
+            if (result.stderr.contains(SESSION_CLOSED_MARKER)) dispose(session)
+            result
         } catch (e: TimeoutException) {
             dispose(session)
-            future.cancel(true)
             ShellResult.failure("timeout after " + timeout + "ms")
         } catch (t: Throwable) {
             dispose(session)
             ShellResult.failure(t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName)
+        } finally {
+            task.shutdownNow()
         }
     }
 
@@ -110,6 +122,9 @@ class RootShell(
         const val AVAILABILITY_TIMEOUT_MS = 2_000L
         private const val ID_COMMAND = "id"
         private const val UNAVAILABLE = "root 不可用：未取得 su 会话"
+
+        /** RootSession 读到 EOF 时的失败文案：见到它就说明会话已死，必须丢弃。 */
+        private const val SESSION_CLOSED_MARKER = "root shell closed"
 
         /** id 的输出形如 uid=0(root) gid=0(root) ...，只认 uid=0 这个标记。 */
         private val RootUidPattern = Regex("uid=0\\b")

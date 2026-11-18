@@ -8,9 +8,17 @@ package com.example.myapplication.agent.privilege
  */
 internal object RootShellProtocol {
 
-    /** 哨兵行形如 `<token>:<exitCode>`；token 每会话随机，避免命令输出自己撞上哨兵。 */
+    /**
+     * 哨兵行形如 `<token>:<exitCode>`；token 每会话随机，避免命令输出自己撞上哨兵。
+     *
+     * 两处细节都是为了"会话不错位"：
+     * - `</dev/null`：命令若读 stdin（`cat`、`read`、嵌套 `sh`）会**吞掉下一条命令**，
+     *   把整个会话后续全部错位；
+     * - 哨兵前先 `printf '\n'`：命令输出不带尾换行时（`printf hi`、`echo -n x`），
+     *   哨兵会粘成 `hitoken:0`，`classify` 认不出，读循环卡到超时。
+     */
     fun buildCommand(command: String, token: String): String =
-        "{ " + command + " ; } 2>&1 ; echo \"" + token + ":\$?\"\n"
+        "{ " + command + " ; } </dev/null 2>&1 ; printf '\\n' ; echo \"" + token + ":\$?\"\n"
 
     sealed interface Line {
         /** 哨兵行：命令结束，[exitCode] 是 shell 给出的退出码。 */

@@ -77,6 +77,20 @@ class RootSessionTest {
     }
 
     @Test
+    fun commandIsIsolatedFromStdinAndTheSentinelCannotStickToOutput() {
+        // 两个真实踩过的坑（0.0.0.100 审查）：
+        // 1) 命令读 stdin（cat / read / 嵌套 sh）会吞掉**下一条命令**，整个会话后续全错位；
+        // 2) 命令输出不带尾换行时（printf hi），哨兵会粘成 "hitoken:0"，classify 认不出，读循环卡到超时。
+        val (session, writes) = session(listOf("hi", "", "$token:0"))
+
+        session.run("printf hi")
+
+        val sent = writes.first()
+        assertTrue("命令必须隔离 stdin：$sent", sent.contains("</dev/null"))
+        assertTrue("哨兵前必须先打一个换行：$sent", sent.contains("printf '\\n' ;"))
+    }
+
+    @Test
     fun commandIsWrappedWithSentinelCarryingExitCode() {
         val (session, writes) = session(listOf("$token:0"))
 

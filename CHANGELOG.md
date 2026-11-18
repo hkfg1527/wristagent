@@ -13,6 +13,19 @@
 
 ## [未发布]
 
+### 修复：root 会话三条（超时卡死线程池 / 死会话复用 / 会话错位）
+- **超时永久卡死**：旧实现用常驻单线程池 + `future.cancel(true)`，而任务阻塞在 `readLine()`
+  （管道读不响应 interrupt）→ 该线程永久占住池子，之后**每条** root 命令都排在死任务后面逐个 15s 超时，
+  `isAvailable()` 恒 false，root 静默降级到 DIRECT。改成每条命令一个一次性线程；超时即杀进程
+  （管道关闭 → 阻塞读立刻返回）后丢弃。
+- **死会话被永久复用**：读到 EOF 返回 `root shell closed` 后不清缓存 → su 被撤权/被杀一次后，
+  之后每条命令都返回同一句失败且不会重新申请。现在见到该标记就丢弃会话。
+- **会话错位**：`RootShellProtocol.buildCommand` 现在 `</dev/null` 隔离 stdin
+  （否则 `cat`/`read`/嵌套 `sh` 会吞掉**下一条命令**）、哨兵前先 `printf '\n'`
+  （否则不带尾换行的输出会把哨兵粘成 `hitoken:0`，读循环卡到超时）。
+- 回归：`RootSessionTest.commandIsIsolatedFromStdinAndTheSentinelCannotStickToOutput`。
+  `RootShell` 的会话回收本身没有单测（要伪造 `java.lang.Process`），本轮由编译 + 全量单测兜底。
+
 ### 修复：MCP 三处（响应体无上限 / 取消不断连接 / 远端工具不过审批）
 - **响应体无上限**：`McpHttpTransport.readBody` 原来 `reader.readText()` 读完整个体 —— 端点回几百 MB、
   或每 5 秒吐一个字节（低于读超时，连接永不超时），就能把 IO 线程无限拖住并 OOM（手表堆仅数百 MB）。
