@@ -27,6 +27,21 @@ class ConsoleRequestPoolTest {
     private fun newPool(): ThreadPoolExecutor = server.newRequestPool()
 
     @Test
+    fun poolCanAbsorbABrowsersParallelConnections() {
+        val executor = newPool()
+        try {
+            // 浏览器对一个 host 会开 4~8 条并发连接，两个标签页就 16 条；再加页面里并发的几个请求。
+            // 池子小于这数就会把"空闲 keep-alive 连接"排到真请求前面 —— 真机上表现为保存 5~25 秒才回。
+            assertTrue(
+                "请求池至少要能同时容纳 24 条连接（当前最大 " + executor.maximumPoolSize + "）",
+                executor.maximumPoolSize >= 24
+            )
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun requestQueueHasABound() {
         val executor = newPool()
         try {

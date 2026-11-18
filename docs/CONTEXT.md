@@ -1,4 +1,4 @@
-﻿# 长期上下文（跨轮恢复的唯一入口）
+# 长期上下文（跨轮恢复的唯一入口）
 
 > 每轮开工先读这一页。它只记**会变的东西**：硬约束、已定决策、当前阶段、待办、恢复步骤。
 > 事实性细节去代码与 `docs/PERF-*.md`、`docs/brand/*`、`docs/DESIGN-*.md`。
@@ -15,8 +15,8 @@
 - 单测基线 **1314 条 / 193 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测，0 失败 0 跳过）。
 - P0–P3 四条主线全部收口（细节见 §0.5），20 个真实设置全部落地并带说明行；六套风格已上真机逐套核对。
 - 当前主线：网页控制台从"只验接口"升级到"页面级真浏览器 E2E"，并借它查出两个真缺陷（中文写库损坏、顶栏无设备名），都已修。
-- **本轮的欠账**：手表 USB 在 22:05 掉了（`adb devices` 空，Wi-Fi 能 ping 到但 5555 未开），
-  `0.0.0.87` 的 APK 已构建但**没能装到表上**，所以中文往返与页面级 E2E 的最后一次真机验证记为**未验证**，下轮第一件事是插回 USB 补装补跑。
+- **USB 掉线已恢复（23:05 插回）**：`0.0.0.87` 已装机，中文往返与控制台 E2E 都补了真机证据（**69/69**）。
+  原记录：22:05 USB 掉了（`adb devices` 空，Wi-Fi 能 ping 到但 5555 未开），APK 已构建但没装上去。
 
 **开工四步**（照做，不要凭印象）：
 1. `git log --oneline -5` + `git status --porcelain` —— 确认工作区干净、远端追上没有
@@ -137,17 +137,17 @@
   现在 `ConsoleBridge` 把 `Build.MODEL` 带进能力表，顶栏实测显示 `TicWatch Pro 5`。
 - 顺带纠正上一轮的判断错误：`customHeaders` / `requestHeaders` **不是服务端键**，网页把它们存本地草稿并发「只保存在本地」横幅；
   我原来写的"非法 JSON 没写回"是恒真断言（两边都取 `{}`），现在改成"记录到的 POST 数为 0"。
-- **未验证**：USB 在 22:05 掉线（`adb devices` 空、Wi-Fi 5555 未开），APK 已构建未安装，
-  所以"中文往返修好了"只有代码 + 单测证据，**没有装机证据**。下轮第一件事：插回 USB → `install -r` → 跑 `node docs/tools/console-e2e.mjs` 要 69/69。
+- **已补真机验证（23:20）**：装 `0.0.0.87` 后，不带 charset 写「中文探针-ABC」能原样读回、`deviceName = TicWatch Pro 5`、
+  控制台 E2E **69/69**。同轮还揪出并修掉第三个缺陷：保存偶发 9 秒超时（详见 §0.0.5 与 `docs/ACCEPTANCE-MATRIX.md` §2.9）。
 - **设备掉线期间的替代产物：JVM 上跑真 Compose**（Robolectric 4.18.1）。`SettingsPagesRobolectricTest` 直接渲染
   「网络与请求」「模型参数」「语音转写」三页真 composable，点语义节点、读 `AgentPreferences` 真值：
   仅 WiFi 请求 / 触觉反馈 / 开启 SSE 流式 / 极速 0.2 预设 / 语音转写开关 —— **5 个键的功能实测从"只有真机能验"变成 JVM 上 5 秒跑完**。
   另加 `SettingsSwitchRowRobolectricTest` 3 条（文案、点击取反、无障碍状态描述）与 `WearComposeSmokeTest` 1 条探针。
-  单测基线随之 1314 → **1326 条 / 198 套件 / 0 失败**；覆盖 15 个设置键 + 六套风格 + 三档安全模式（明细见 `docs/SETTINGS-FUNCTIONAL-TEST.md` §〇）。
+  单测基线随之 1314 → **1327 条 / 198 套件 / 0 失败**；覆盖 15 个设置键 + 六套风格 + 三档安全模式（明细见 `docs/SETTINGS-FUNCTIONAL-TEST.md` §〇）。
 
 **下一步（下一轮直接从这里开始）· 先补真机，再继续 UI**
-1. **插回手表 USB**，`adb devices` 见到设备后装 `0.0.0.87`，跑 `node docs/tools/console-e2e.mjs`（要 A–I 全绿），
-   并用 curl **不带 charset** 再写一次中文，确认往返没被换成 `�`——这是本轮唯一"未验证"的交付。
+1. **插回手表 USB**（✔ 23:05 已恢复）→ 装 `0.0.0.87` → 跑 `node docs/tools/console-e2e.mjs`（✔ 69/69 通过）。
+   下轮第一件事改成：把控制台 E2E 接进 `release-check.mjs` 当第 8 项，避免它再退化成"只有想起来才跑"。
 2. 设置页功能实测剩下三页（模型参数 / 网络与请求 / 语音与唤醒）改用 instrumentation 节点点击，别数表冠格数。
 3. 剩下 8 处 `style ==` 逐个改成读表（每处一跑单测 + 真机）。
 4. 大卡片档（M3E 基准）全链路换成官方件：开关 → `SwitchButton`、滑杆 → `Slider`、

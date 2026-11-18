@@ -49,8 +49,8 @@ class ConsoleServer(
             val httpd: NanoHTTPD = if (index == 0) this else FallbackHttpd(candidate)
             httpd.setAsyncRunner(PooledRunner(executor))
             try {
-                if (index == 0) super.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
-                else httpd.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                if (index == 0) super.start(IDLE_READ_TIMEOUT_MS, false)
+                else httpd.start(IDLE_READ_TIMEOUT_MS, false)
                 chosen = candidate
                 bound = httpd
                 break
@@ -201,6 +201,11 @@ class ConsoleServer(
             body.size.toLong(),
         )
         response.addHeader("Cache-Control", "no-store")
+        // 一问一答就关连接：NanoHTTPD 把「一个 keep-alive 连接」当成一个 worker 占着，
+        // 而浏览器会保留空闲连接；服务端读超时关掉它、客户端还不知道的那一瞬间发的请求会石沉大海
+        // （POST 不重试）—— 实测网页保存读到 9 秒超时报「未保存」。关掉 keep-alive 没有这个竞态，
+        // 代价只是局域网里多一次 TCP 握手。
+        response.closeConnection(true)
         return response
     }
 
@@ -272,9 +277,21 @@ class ConsoleServer(
 
     companion object {
         private const val TAG = "ConsoleServer"
-        private const val MAX_WORKERS = 8
 
-        /** 排队上界：8 个在跑 + 64 个排队，再多也只能证明有人在刷，不该进内存。 */
+        /**
+         * 同时在跑的连接数上限。
+         *
+         * 为什么是 32 而不是 8：NanoHTTPD 一个 TCP 连接就占一个 worker，直到对端关闭或读超时。
+         * 浏览器对同一 host 会开 4~8 条并发连接，两个标签页就顶满 8 个 worker；
+         * 2026-11-18 实测 12 笔并发 POST 被拉成 5.3s / 10.3s / 15.4s / 20.4s / 25.4s（每笔正好卡在 5s 读超时上），
+         * 网页端的 9s 超时就会报「未保存」，而其实写已经落盘了。
+         */
+        private const val MAX_WORKERS = 32
+
+        /** 空闲连接读超时：对端不发新请求就尽快把 worker 还回池子，别让空转连接继续占位。 */
+        private const val IDLE_READ_TIMEOUT_MS = 2000
+
+        /** 排队上界：32 个在跑 + 64 个排队，再多也只能证明有人在刷，不该进内存。 */
         const val QUEUE_CAPACITY = 64
 
         @Volatile

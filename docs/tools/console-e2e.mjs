@@ -164,17 +164,28 @@ try {
   await send('Log.enable');
   await send('Page.addScriptToEvaluateOnNewDocument', {
     source: `(() => {
-      window.__e2e = { posts: [] };
+      window.__e2e = { posts: [], log: [] };
       const orig = window.fetch;
       window.fetch = async (input, init) => {
         const url = typeof input === 'string' ? input : (input && input.url) || '';
         const method = ((init && init.method) || 'GET').toUpperCase();
-        const rec = { url: url, method: method, body: init && init.body ? String(init.body) : '', status: 0, resp: '' };
-        if (method === 'POST' && url.indexOf('/api/settings') >= 0) window.__e2e.posts.push(rec);
-        const res = await orig(input, init);
-        rec.status = res.status;
-        if (window.__e2e.posts.indexOf(rec) >= 0) { try { rec.resp = await res.clone().text(); } catch (e) { } }
-        return res;
+        const rec = { url: url, method: method, body: init && init.body ? String(init.body) : '', status: 0, resp: '', t0: Math.round(performance.now()), ms: 0, aborted: false, err: '' };
+        if (url.indexOf('/api/settings') >= 0 && method === 'POST') window.__e2e.posts.push(rec);
+        if (url.indexOf('/api/') === 0 || url.indexOf('/api/') > 0) window.__e2e.log.push(rec);
+        if (init && init.signal) {
+          init.signal.addEventListener('abort', () => { rec.aborted = true; rec.abortedAt = Math.round(performance.now()); });
+        }
+        try {
+          const res = await orig(input, init);
+          rec.status = res.status;
+          rec.ms = Math.round(performance.now()) - rec.t0;
+          if (window.__e2e.posts.indexOf(rec) >= 0) { try { rec.resp = (await res.clone().text()).slice(0, 200); } catch (e) { rec.resp = 'clone-failed:' + e; } }
+          return res;
+        } catch (e) {
+          rec.err = String(e);
+          rec.ms = Math.round(performance.now()) - rec.t0;
+          throw e;
+        }
       };
     })();`
   });
@@ -203,6 +214,7 @@ try {
   check('A6 顶栏读到端口', /端口 \d+/.test(top.port), top.port);
   check('A7 连接状态灯 = ok', top.state === 'ok', top.state);
 
+  if (!process.env.E2E_SKIP) {
   // ---------- B. 令牌弹层 ----------
   await run("document.getElementById('tbToken').click(); return true;");
   const sheetOpen = await waitFor('document.getElementById("sheet") && !document.getElementById("sheet").hidden');
@@ -317,6 +329,8 @@ try {
   })()`);
   await sleep(600);
 
+  }
+
   // ---------- F. 服务端键的写回（customSystemPrompt 是文本域，安全可还原） ----------
   // 手表侧写一笔要 1~2 秒，固定 sleep 会读到旧值；这里一律轮询到值真的变。
   async function waitSettings(predicate, ms = 9000) {
@@ -355,8 +369,9 @@ try {
   const afterPrompt = await waitSettings((s) => s.customSystemPrompt === probeText);
   const posted = await waitPostsSettled();
   const lastPost = posted.length ? posted[posted.length - 1] : null;
+  const apiLog = JSON.parse(await val('JSON.stringify((window.__e2e.log || []).slice(-14))'));
   check('F1 文本域改动发出带 customSystemPrompt 的 POST', !!lastPost && /customSystemPrompt/.test(lastPost.body), posted.length + ' 笔 / ' + (lastPost ? lastPost.body.slice(0, 60) : ''));
-  check('F2 POST 全部返回 200', posted.length >= 1 && posted.every((p) => p.status === 200), posted.map((p) => p.status).join(','));
+  check('F2 POST 全部返回 200', posted.length >= 1 && posted.every((p) => p.status === 200), posted.map((p) => p.status + '/' + p.ms + 'ms' + (p.aborted ? '/aborted' : '') + (p.err ? '/' + p.err.slice(0, 40) : '')).join(',') + ' || 最近 API：' + apiLog.map((e) => e.url + ' ' + e.status + ' ' + e.ms + 'ms' + (e.aborted ? '/aborted' : '') + (e.err ? '/' + e.err.slice(0, 30) : '')).join(' | '));
   check('F3 中文原样写回手表（没有 U+FFFD）', !!afterPrompt && afterPrompt.customSystemPrompt === probeText, JSON.stringify(afterPrompt && afterPrompt.customSystemPrompt));
   const toastText = await val("(document.getElementById('toastText')||{}).textContent");
   check('F4 出现「已保存」提示', /已保存/.test(toastText || ''), toastText);
@@ -374,14 +389,15 @@ try {
   const beforeTemp = Number((await apiSettings()).temperature);
   await resetPosts();
   const wantedTemp = beforeTemp >= 1.0 ? 0.3 : 1.2;
-  const pill = await run(`(() => {
+  // run() 自己会包一层 async 箭头函数，所以这里必须用 val() 直接求值这个同步 IIFE，否则拿到的是 undefined
+  const pill = await val(`(() => {
     const row = document.querySelector('.row[data-id="temperature"]');
     const inp = row && row.querySelector('input.slider');
     if (!inp) return { error: 'no slider', rowFound: !!row };
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, '${wantedTemp}');
     inp.dispatchEvent(new Event('input', { bubbles: true }));
     const p = row.querySelector('.value-pill');
-    return { value: inp.value, pill: p ? p.textContent : null, pillCount: row.querySelectorAll('.value-pill').length };
+    return { value: inp.value, pill: p ? p.textContent : null, pillCount: row.querySelectorAll('.value-pill').length, rowText: row.textContent.slice(0, 120) };
   })()`);
   const afterTemp = await waitSettings((s) => Math.abs(Number(s.temperature) - wantedTemp) < 0.001);
   const sliderPosts = await waitPostsSettled();
