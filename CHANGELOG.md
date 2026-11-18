@@ -13,6 +13,18 @@
 
 ## [未发布]
 
+### 测试：给 root 会话补上"超时后还能继续用"的回归
+0.0.0.103 修了"一条超时命令把 root 线程池占死"这个高危险故障，但**没有测试** —— 要多线程 + 假进程才能复现。
+现在补上 `FakeSuProcess`（`java.lang.Process` 的假实现）与 `RootShellTimeoutTest` 2 条。
+
+假进程有三处刻意"像真的一样"的细节，缺一条测试就失真：
+- `read()` 必须覆盖 `read(byte[], int, int)`：默认实现会一直调 `read()` 填满缓冲区，`readLine()` 永远返回不了；
+- `InterruptedException` 要吞掉继续等：真管道读不响应 `Thread.interrupt`，否则 `future.cancel(true)` 会"意外生效"；
+- `survivesDestroy`：模拟"su 被杀、但子孙进程仍握着管道"，这才是真实卡死的成因。
+
+**变异验证**：把 `execute` 换回旧的常驻单线程池，用例立刻红
+（`超时之后 root 必须还能用：timeout after 400ms`）；换回修复即绿。
+
 ### 修复：root 会话三条（超时卡死线程池 / 死会话复用 / 会话错位）
 - **超时永久卡死**：旧实现用常驻单线程池 + `future.cancel(true)`，而任务阻塞在 `readLine()`
   （管道读不响应 interrupt）→ 该线程永久占住池子，之后**每条** root 命令都排在死任务后面逐个 15s 超时，
