@@ -434,6 +434,27 @@ try {
     await shot(name);
   }
 
+  // ---------- J. 控制台 action 契约（网页按钮 ↔ 服务端 action） ----------
+  // 曾经「测试连接」按钮打的是 connection-test，而服务端 ACTION_NAMES 里没有这个名字 → 恒 404。
+  // 这类缺陷两边各自自洽，只有真点一次才暴露。
+  await run("document.querySelector('.nav-item[data-page=\"provider\"]').click(); return true;");
+  const actBtn = await waitFor("!!document.querySelector('button[data-action=\"connection-test\"]')");
+  check('J1 供应商页有「测试连接」按钮', !!actBtn);
+  await run("document.querySelector('button[data-action=\"connection-test\"]').click(); return true;");
+  const act = await waitFor(
+    `(() => {
+      const btn = document.querySelector('button[data-action="connection-test"]');
+      const box = btn && btn.closest('.row-control') && btn.closest('.row-control').querySelector('.action-result');
+      if (!box) return false;
+      const tone = box.dataset.tone || '';
+      if (!tone || tone === 'running' || tone === 'idle') return false;
+      return { tone: tone, text: (box.textContent || '').slice(0, 140) };
+    })()`,
+    45000
+  );
+  check('J2 「测试连接」不再是 404', !!act && !/not_found/.test(act.text || ''), act ? JSON.stringify(act) : '拿不到结果');
+  check('J3 「测试连接」给出明确结论', !!act && /连接成功|连接失败/.test(act.text || ''), act ? act.text : '拿不到结果');
+
   check('I 页面零 JS 异常', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
 } catch (err) {
   check('RUN 执行完成', false, err && err.message ? err.message : String(err));

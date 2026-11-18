@@ -41,6 +41,23 @@
 
 ## [未发布]
 
+### 修复：网页「测试连接」按钮恒 404（网页与服务端 action 清单没对齐）
+供应商档案卡上的「测试连接」打的是 `connection-test`，而服务端 `ACTION_NAMES` 里没有这个名字，
+于是点一次红一次（`not_found`）。这类缺陷不会让任何单测变红 —— 网页以为自己发了个合法 action，
+服务端以为自己收到个不认识的 action，各自都"自洽"。
+
+- 修法：服务端补 `connection-test`，拿当前 Base URL + API Key 打一次 `/models`，只报结论、不改缓存。
+- 守卫：`ConsoleActionContractTest`（3 条）扫 `app.js` 的 `actionName: '...'` 与 `ACTION_NAMES` 双向对齐；
+  摘掉 `connection-test` 后 2 条立刻红（已实测）。
+- E2E 新增 J 组 3 条：真点一次按钮，断言不再是 404 且给出「连接成功 / 连接失败」明确结论（69 → 72）。
+
+### 修复：429 被渲染成「无法连接控制台服务」
+连续输错令牌会被临时锁 60 秒并返回 429，而网页只特判 401，429 落到通用错误分支 ——
+横幅写「无法连接控制台服务」，还提示用户去确认手表端服务在跑、检查网络。服务其实好好的。
+
+- 修法：`api()` 单独抛 `throttled`，横幅改成「尝试次数过多 · 连续输错令牌会临时锁定 60 秒」，
+  并同时把「令牌状态」标成无效；`errorText()` 补 `429` 与 `too_many_attempts` 两条措辞。
+
 ### 修复：子代理路径漏掉沙箱闸门（沙箱等级对子代理形同不存在）
 `AgentDispatcher.executeSubAgentTool` 只做了黑名单 + 审批，**没有** `SandboxGate` ——
 沙箱等级 `READ_ONLY` 时主循环会挡下 RISKY/DESTRUCTIVE 命令，子代理却照样执行。

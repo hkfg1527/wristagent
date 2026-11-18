@@ -280,7 +280,7 @@ class ConsoleApi(
         private val BACKENDS = setOf("ROOT", "SHIZUKU", "DIRECT")
 
         val ACTION_NAMES: List<String> =
-            listOf("probe-privilege", "test-asr", "clear-memory", "refresh-models", "export-settings")
+            listOf("probe-privilege", "test-asr", "clear-memory", "refresh-models", "export-settings", "connection-test")
 
         val STATIC_RESOURCES: Map<String, String> = linkedMapOf(
             "index.html" to "text/html; charset=utf-8",

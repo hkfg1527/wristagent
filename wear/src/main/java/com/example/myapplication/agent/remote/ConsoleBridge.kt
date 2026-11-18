@@ -294,7 +294,27 @@ internal object ConsoleBridge {
         "clear-memory" -> clearMemory(preferences)
         "refresh-models" -> refreshModels(preferences)
         "export-settings" -> exportSettings(preferences)
+        // 网页端供应商档案那张卡的「测试连接」按钮打的就是这条：
+        // 0.0.0.92 之前它不在 ACTION_NAMES 里，于是恒返回 404，点一次红一次。
+        "connection-test" -> connectionTest(preferences)
         else -> ""
+    }
+
+    /**
+     * 连接体检：拿**当前** Base URL 与 API Key 打一次 `/models`，只报结论、不改缓存。
+     *
+     * 与 [refreshModels] 的区别就是"不写缓存" —— 用户只是想确认这套配置通不通，
+     * 不该顺手把他缓存的模型清单换掉。
+     */
+    private fun connectionTest(preferences: AgentPreferences): String = runBlocking {
+        val baseUrl = preferences.baseUrl
+        val (costMs, models) = AgentDispatcher.fetchRemoteModels(baseUrl, preferences.apiKey)
+        if (costMs < 0) {
+            "连接失败：网络不可达，或服务端拒绝了鉴权（请检查 Base URL 与 API Key）"
+        } else {
+            "连接成功（" + costMs + "ms）：" + baseUrl +
+                if (models.isEmpty()) "，但服务端未返回模型列表" else "，可用模型 " + models.size + " 个"
+        }
     }
 
     private fun probePrivilege(privilege: PrivilegeManager): String = runBlocking {

@@ -171,12 +171,14 @@
   function errorText(err) {
     if (!err) return '未知错误';
     if (err.kind === 'unauthorized') return '令牌无效或缺失（401）';
+    if (err.kind === 'throttled') return '尝试次数过多（429）';
     if (err.kind === 'network') return err.message || '网络不可用';
     if (err.kind === 'parse') return '服务端响应不是合法 JSON';
     if (err.kind === 'api' && err.data) {
       var e = err.data.error;
       if (e === 'bad_type') return '字段「' + (FIELD_LABEL[err.data.field] || err.data.field) + '」类型不符（bad_type）';
       if (e === 'unauthorized') return '令牌无效或缺失（401）';
+      if (e === 'too_many_attempts') return '尝试次数过多（429）';
       return '服务端返回错误：' + String(e);
     }
     return err.message || '请求失败';
@@ -215,6 +217,8 @@
     if (raw) { try { data = JSON.parse(raw); } catch (e3) { data = null; } }
 
     if (res.status === 401) throw ApiError('unauthorized', '令牌无效或缺失', { status: 401, data: data });
+    // 429 是"令牌错太多次被临时锁"，不是"服务挂了" —— 必须分开，否则用户会去查网络
+    if (res.status === 429) throw ApiError('throttled', '尝试次数过多，请稍后重试', { status: 429, data: data });
     if (!res.ok) {
       if (data && data.error) throw ApiError('api', String(data.error), { status: res.status, data: data });
       throw ApiError('http', 'HTTP ' + res.status, { status: res.status });
@@ -1544,6 +1548,18 @@
         setAuthBanner();
         setStatus('error');
         clearBanner('net');
+      } else if (err.kind === 'throttled') {
+        // 服务其实在跑，只是这个 IP 被临时锁了：不要把用户支去查网络/看手表
+        state.tokenStatus = 'invalid';
+        paintTopbar();
+        setBanner('net', {
+          tone: 'warn',
+          title: '尝试次数过多',
+          text: '连续输错令牌会临时锁定 60 秒。等锁过期后重试，或直接在顶部改令牌。',
+          actions: [{ label: '重试', run: function () { load({ silent: false }); } }]
+        });
+        setStatus('error');
+        clearBanner('auth');
       } else {
         state.tokenStatus = state.token ? 'unknown' : 'missing';
         paintTopbar();
