@@ -72,4 +72,48 @@ class SettingsCardWidthRobolectricTest {
         }
         assertEquals("卡片基准宽度必须仍是 176dp", 176f, SettingsContentWidth.value, 0.01f)
     }
+
+    /**
+     * 硬约束的另一半：**卡片不许互相重叠**。
+     *
+     * 判据只看"同一列（宽度相同）的节点"：设置页里行必然嵌在卡里，父卡与子行的区间是**包含**关系，
+     * 那是正常结构；真正要抓的是"两张卡部分重叠"—— 那才会让卡片边缘互相插入。
+     * 所以这里的失败条件是：区间相交，且谁都不完全包含对方。
+     */
+    @Test
+    fun cardsNeverPartiallyOverlapEachOther() {
+        applySettingsStyle(context, SettingsStyle.BALLOON)
+        val prefs = AgentPreferences(context)
+        compose.setContent { MaterialTheme { AppearanceContent(preferences = prefs, onBack = {}) } }
+        compose.waitForIdle()
+
+        var overlappingPairs = 0
+        for (style in SettingsStyle.values()) {
+            applySettingsStyle(context, style)
+            compose.waitForIdle()
+
+            val nodes = compose.onAllNodes(hasClickAction()).fetchSemanticsNodes()
+                .filter { it.boundsInRoot.width > 1f && it.boundsInRoot.height > 1f }
+            assertTrue("$style：一个可点节点都没扫到，判据无效", nodes.isNotEmpty())
+
+            for (i in nodes.indices) {
+                for (j in i + 1 until nodes.size) {
+                    val a = nodes[i].boundsInRoot
+                    val b = nodes[j].boundsInRoot
+                    if (abs(a.width - b.width) > 1f) continue
+                    val overlap = a.top < b.bottom - 1f && b.top < a.bottom - 1f
+                    if (!overlap) continue
+                    overlappingPairs++
+                    val aContainsB = a.top <= b.top + 1f && a.bottom >= b.bottom - 1f
+                    val bContainsA = b.top <= a.top + 1f && b.bottom >= a.bottom - 1f
+                    assertTrue(
+                        "$style：两张同宽卡片部分重叠 a=[${a.top}..${a.bottom}] b=[${b.top}..${b.bottom}]",
+                        aContainsB || bContainsA
+                    )
+                }
+            }
+        }
+        // 活性证明：一次"同宽且区间相交"的比较都没发生的话，这条用例等于什么都没验
+        assertTrue("一次嵌套/重叠比较都没发生，判据无效", overlappingPairs > 0)
+    }
 }
