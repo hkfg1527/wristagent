@@ -22,6 +22,8 @@
 - `SettingsSwitchRowRobolectricTest`（3 条）：开关行渲染文案与副标题、点击回调拿到取反值、
   `stateDescription` 跟随选中态（`已开启`）。
 - `WearComposeSmokeTest`（1 条）：Wear M3 主题 + Compose 在 Robolectric 下可渲染的落地探针。
+- `SettingsAppearanceAndToolsRobolectricTest`（3 条）：外观六套风格逐个点（断言偏好与运行时镜像同步）、紧凑模式、六个工具开关各点一次只翻转自己的键。
+- `SettingsSecurityAndMemoryRobolectricTest`（2 条）：安全三档逐个点断言回调收到的枚举、启用记忆落盘。
 - 工具链：`testOptions.unitTests.isIncludeAndroidResources = true`，`@Config(sdk=[35], qualifiers="zh-rCN")`；
   `android-all-instrumented`（197MB）不入库，放 `D:\gradle-home\robolectric-deps`，构建脚本里 `robolectric.offline=true` 指过去。
 

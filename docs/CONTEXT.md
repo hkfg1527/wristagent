@@ -1,4 +1,4 @@
-# 长期上下文（跨轮恢复的唯一入口）
+﻿# 长期上下文（跨轮恢复的唯一入口）
 
 > 每轮开工先读这一页。它只记**会变的东西**：硬约束、已定决策、当前阶段、待办、恢复步骤。
 > 事实性细节去代码与 `docs/PERF-*.md`、`docs/brand/*`、`docs/DESIGN-*.md`。
@@ -143,7 +143,7 @@
   「网络与请求」「模型参数」「语音转写」三页真 composable，点语义节点、读 `AgentPreferences` 真值：
   仅 WiFi 请求 / 触觉反馈 / 开启 SSE 流式 / 极速 0.2 预设 / 语音转写开关 —— **5 个键的功能实测从"只有真机能验"变成 JVM 上 5 秒跑完**。
   另加 `SettingsSwitchRowRobolectricTest` 3 条（文案、点击取反、无障碍状态描述）与 `WearComposeSmokeTest` 1 条探针。
-  单测基线随之 1314 → **1321 条 / 196 套件 / 0 失败**。
+  单测基线随之 1314 → **1326 条 / 198 套件 / 0 失败**；覆盖 15 个设置键 + 六套风格 + 三档安全模式（明细见 `docs/SETTINGS-FUNCTIONAL-TEST.md` §〇）。
 
 **下一步（下一轮直接从这里开始）· 先补真机，再继续 UI**
 1. **插回手表 USB**，`adb devices` 见到设备后装 `0.0.0.87`，跑 `node docs/tools/console-e2e.mjs`（要 A–I 全绿），

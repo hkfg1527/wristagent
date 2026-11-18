@@ -3,6 +3,26 @@
 > 用户要求："全部功能测试一下设置页的功能，是否切换了能正常使用，全部测试全盘测试。"
 > 本文件记录**已经测到的**、**测了但结论不成立的**、以及**还没测的**。三者分开写，不混。
 
+## 〇、JVM 功能回归（Robolectric，0.0.0.87 起）——当前最可信的一层
+
+真机探针受坐标与落点影响，结论反复不可靠；改成在 JVM 上**渲染真实页面 composable**，
+点语义节点、读 `AgentPreferences` 真值，5 秒跑完、可重复。覆盖如下（全部 0 失败）：
+
+| 测试类 | 页面 | 点到的行 | 断言的真值 |
+|---|---|---|---|
+| `SettingsPagesRobolectricTest` | 网络与请求 | 仅 WiFi 请求 / 触觉反馈 | `wifiOnlyRequests` / `hapticsEnabled` |
+| 同上 | 模型参数 | 开启 SSE 流式 / 极速 0.2 | `streamMode` / `temperature = 0.2` |
+| 同上 | 语音转写 | 语音转写开关 | `asrEnabled` |
+| `SettingsAppearanceAndToolsRobolectricTest` | 外观 | 六套风格逐个点 | `settingsStyle` + `WearAppearance.style` 同步 |
+| 同上 | 外观 | 紧凑模式 | `compactMode` |
+| 同上 | 工具与 MCP | 六个工具开关逐个点 | 六个 `tool*Enabled` 各自翻转，互不串 |
+| `SettingsSecurityAndMemoryRobolectricTest` | 安全策略 | 三档逐个点 | 回调收到的 `SecurityMode` |
+| 同上 | 记忆 | 启用记忆 | `memoryEnabled` |
+| `SettingsSwitchRowRobolectricTest` | 控件层 | 开关行 | 文案 / 点击取反 / `stateDescription` |
+
+合计 **15 个设置键 + 6 套风格 + 3 档安全模式**，从"只能真机手点"变成每次跑单测都验一遍。
+仍未覆盖：手势绑定、Lux 终端、供应商档案、导入导出、MCP 端点文本框（需要输入法/弹层，下一批做）。
+
 ## 方法
 
 每点一行，就把 `/data/data/dev.ghr.wristagent/shared_prefs/agent_prefs.xml` 前后各读一次做 diff：
