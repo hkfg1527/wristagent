@@ -107,16 +107,28 @@ class ShizukuShell(
 
             override fun onBindingDied(name: ComponentName?) {
                 cachedService = null
+                // binder 死了这条绑定已经没用：解掉，别留悬挂连接
+                runCatching { Shizuku.unbindUserService(serviceArgs(), this, true) }
+                if (pendingConnection === this) pendingConnection = null
                 if (cont.isActive) cont.resume(null)
             }
 
             override fun onNullBinding(name: ComponentName?) {
                 cachedService = null
+                runCatching { Shizuku.unbindUserService(serviceArgs(), this, true) }
+                if (pendingConnection === this) pendingConnection = null
                 if (cont.isActive) cont.resume(null)
             }
         }
         pendingConnection = connection
         registerBinderDeadListener()
+        // 超时（withTimeoutOrNull）或调用方取消时**必须解绑**：
+        // 否则 Shizuku 进程里会留一个悬挂绑定，而且 pendingConnection 会被下一次 bind 覆盖 ——
+        // release() 只能解掉最后一个，前面的永久挂着。
+        cont.invokeOnCancellation {
+            runCatching { Shizuku.unbindUserService(serviceArgs(), connection, true) }
+            if (pendingConnection === connection) pendingConnection = null
+        }
         try {
             Shizuku.bindUserService(serviceArgs(), connection)
         } catch (t: Throwable) {

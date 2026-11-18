@@ -13,6 +13,21 @@
 
 ## [未发布]
 
+### 修复：Shizuku 绑定超时/取消后不解绑（悬挂连接）
+`bind()` 的 `suspendCancellableCoroutine` 没有 `invokeOnCancellation` —— 绑定超时（`withTimeoutOrNull`）
+或调用方取消后连接**永不解绑**，Shizuku 进程里留一个悬挂绑定；而 `pendingConnection` 会被下一次 bind
+覆盖，`release()` 只能解掉最后一个。
+
+- 修法：取消时 `Shizuku.unbindUserService(...)`；`onBindingDied` / `onNullBinding` 也顺手解绑并清 `pendingConnection`。
+
+### 测试：`AgentToolHonestyTest` 从「自证」改成「真调用」
+原来三条一条都没碰被测代码：自己 `new Date()` 再断言格式含冒号、自己写一个常量再断言它等于自己、
+断言数据类存了构造参数 —— 永远绿。两次审查都点名过。
+
+- 现在走 `AgentToolRegistry.executeTool`：时间必须与**当前分钟**一致、天气必须如实声明
+  `unavailable_without_sensor_or_api`、空白关键词必须被真实入口挡下、非空关键词不许被误挡。
+- 这组测试改成 Robolectric：工具层用 `org.json`，纯 JVM 下是桩（`optString` 返回 null）→ 直接 NPE。
+
 ### 修复：`PrivilegeManager.release()` 不回收 root 会话（每进一次设置页留一个常驻 `su`）
 以前 `release()` 只解绑 Shizuku 监听：`RootShell` 里那个常驻 `su` 进程与它的读线程**一次都不会关**
 （`RootShell.close()` 全仓没有调用点），自建的 `scope` 也从不 cancel。`SettingsScreen` / `ConsoleBridge` /
