@@ -46,6 +46,13 @@ object ConsoleToken {
      * 展示用掩码：4 位验证码没有可遮蔽的余量（遮住等于不给用户看），直接回原样；
      * 只有历史遗留的长口令才折叠成 ab12…ef34。
      */
+    /**
+     * 展示用掩码：4 位验证码没有可遮蔽的余量（遮住等于不给用户看），直接回原样；
+     * 只有历史遗留的长口令才折叠成 ab12…ef34。
+     *
+     * **只给手表本机 UI 用**（`RemoteConsoleSection`：主人自己看自己的访问码）。
+     * 对外响应体一律用 [redacted]。
+     */
     fun mask(token: String?): String {
         val text = token.orEmpty()
         return when {
@@ -55,4 +62,14 @@ object ConsoleToken {
             else -> "\u2026"
         }
     }
+
+    /**
+     * 对外响应体里的令牌字段：**永远不给原文**。
+     *
+     * 以前这里直接用 [mask]，而 `mask` 对 4 位访问码原样返回 —— 于是 `/api/state` 的
+     * `tokenMasked` 字段名承诺脱敏、实际把**可用的访问码**写进了每一个响应体
+     * （截图、DevTools、抓包、日志里都会带着它）。调用方本来就持有令牌，
+     * 这个字段只需要表达"已经设置了一个令牌"。
+     */
+    fun redacted(token: String?): String = if (token.isNullOrEmpty()) "\u2026" else "\u2022\u2022\u2022\u2022"
 }

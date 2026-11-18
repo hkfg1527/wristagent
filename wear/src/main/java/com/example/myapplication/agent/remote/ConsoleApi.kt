@@ -179,7 +179,7 @@ class ConsoleApi(
             "activeBackend" to backend,
             "internet" to (live["internet"] as? Boolean ?: false),
             "deviceName" to ((live["deviceName"] as? String)?.trim().orEmpty()),
-            "tokenMasked" to ConsoleToken.mask(token()),
+            "tokenMasked" to ConsoleToken.redacted(token()),
         )
     }
 

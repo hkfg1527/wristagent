@@ -97,7 +97,9 @@ class ConsoleServer(
 
     override fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response = try {
         dispatch(session).toNanoResponse()
-    } catch (_: Throwable) {
+    } catch (failure: Throwable) {
+        // 500 必须留痕：以前这里零日志，真缺陷在真机上完全没有证据（只有客户端拿到 internal）
+        Log.w(TAG, "serve 失败：" + (session.method?.name ?: "?") + " " + (session.uri ?: "?"), failure)
         errorResponse(500, "internal").toNanoResponse()
     }
 

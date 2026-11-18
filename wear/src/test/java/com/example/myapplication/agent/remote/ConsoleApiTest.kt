@@ -152,8 +152,11 @@ class ConsoleApiTest {
         assertEquals("ROOT", capabilities["activeBackend"])
         assertEquals(true, capabilities["internet"])
         assertEquals("TicWatch Pro 5", capabilities["deviceName"])
-        assertEquals("ab12…cd56", capabilities["tokenMasked"])
+        // 4 位访问码也必须被遮蔽：以前这里回的是 mask()，而 mask 对 ≤4 位原样返回 ——
+        // 字段名承诺脱敏、实际把可用令牌写进每一个响应体。
+        assertEquals("\u2022\u2022\u2022\u2022", capabilities["tokenMasked"])
         assertFalse("不得回传完整 token", capabilities["tokenMasked"] == token)
+        assertFalse("也不许回传长度可辨的片段", (capabilities["tokenMasked"] as String).contains(token.substring(0, 2)))
         val runtime = map(body["runtime"])
         assertEquals(8081, runtime["serverPort"])
         assertEquals(4321, runtime["uptimeMs"])

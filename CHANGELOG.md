@@ -41,6 +41,24 @@
 
 ## [未发布]
 
+### 安全：`/api/state` 的 `tokenMasked` 其实回的是明文访问码
+`tokenMasked` 用的是 `ConsoleToken.mask()`，而 `mask` 对 **≤4 位直接原样返回**
+（那是给手表本机 UI 显示自己访问码用的）。默认令牌正是 4 位 —— 于是字段名承诺脱敏、
+实际把**可用的访问码**写进了每一个 `/api/state` 响应体，截图、DevTools、抓包、日志里都会带着它。
+
+- 新增 `ConsoleToken.redacted()`：固定回 `••••`，不透露长度、不留片段；对外响应一律用它。
+- 手表本机 UI（`RemoteConsoleSection`）仍用 `mask()` —— 主人看自己的访问码是功能，不是泄漏。
+- 回归：`ConsoleApiTest` 断言 4 位令牌下 `tokenMasked == ••••`，且不含令牌的任何片段。
+
+### 修复：控制台 500 一律零日志
+`serve()` 的兜底 catch 以前直接吞掉异常并回 `{"error":"internal"}`：真缺陷在真机上没有任何证据。
+现在记 `Log.w(TAG, "serve 失败：<method> <uri>", failure)`。
+
+### 修复：网页开关会被同一次 flush 的响应弹回去
+文本域 / 密钥 / 滑杆 / 下拉都有"脏键优先于快照"的保护，唯独开关直接 `input.checked = readValue(row)`。
+拨完开关到真正落盘之间（300ms 防抖 + 一次往返），任何一次 flush 的响应都会把刚拨的开关弹回旧值 ——
+用户看到"跳两下"，弱网下会被当成没生效。现在 switch 的 `sync` 先查 `dirty` 里有没有它的服务端键。
+
 ### 修复：请求里带着孤儿 tool 回执，整段对话会卡在 400
 上游要求每条 `tool` 消息都能找到发起它的 `assistant(tool_calls)`，只要有一条找不到就**整单 400**，
 而日志里只有一句不相关的错误 —— 用户看到的是整段对话长期卡在"网络通信异常"，越聊越糟。

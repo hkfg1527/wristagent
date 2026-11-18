@@ -660,7 +660,20 @@
     el.appendChild(h('div', { class: 'row-control' }, [
       h('label', { class: 'switch' }, [input, h('span', { class: 'switch-track' }, [h('span', { class: 'switch-knob' })])])
     ]));
-    registry.push({ sync: function () { input.checked = !!readValue(row); } });
+    registry.push({
+      /* 脏键优先于快照：拨了开关到真正落盘之间（300ms 防抖 + 一次往返），
+         任何一次 flush 的响应都会把刚拨的开关弹回旧值，用户看到"跳两下"，
+         弱网下会被误认为没生效。文本/密钥/滑杆/下拉都已经有这层保护，唯独开关漏了。 */
+      sync: function () {
+        // 与服务端键同名的那一条：row.keys 里落在 SERVER_KEYS 的那几个就是这次写入的键
+        var pending = false;
+        (row.keys || []).forEach(function (k) {
+          if (Object.prototype.hasOwnProperty.call(dirty, k)) pending = true;
+        });
+        if (pending) return;
+        input.checked = !!readValue(row);
+      }
+    });
     return el;
   }
 
