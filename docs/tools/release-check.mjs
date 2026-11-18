@@ -3,9 +3,10 @@
  * 发布点自检：把"每 10 个内部版一次"的手工流程固化成一条命令。
  *
  * 用法（在仓库根）：
- *   node docs/tools/release-check.mjs                # 全跑：clean 构建 + 单测 + 真机走查
- *   node docs/tools/release-check.mjs --skip-build    # 只跑真机走查
+ *   node docs/tools/release-check.mjs                # 全跑：clean 构建 + 单测 + 真机走查 + 控制台页面 E2E
+ *   node docs/tools/release-check.mjs --skip-build    # 只跑真机走查与控制台 E2E
  *   node docs/tools/release-check.mjs --skip-device   # 只跑构建与单测
+ *   node docs/tools/release-check.mjs --skip-console  # 跳过控制台页面 E2E
  *
  * 为什么要有它：前两次发布点（10 / 20 / 30）都是临场手打命令，
  * 每次都要现编 adb 坐标、现写像素扫描，还漏过"没验四分区名字"这种事。
@@ -21,6 +22,7 @@ const DEVICE = 'C101X35122973';
 const args = process.argv.slice(2);
 const skipBuild = args.includes('--skip-build');
 const skipDevice = args.includes('--skip-device');
+const skipConsole = args.includes('--skip-console');
 
 const results = [];
 const record = (name, ok, detail) => {
@@ -50,7 +52,7 @@ const versionName = () => {
 };
 
 const build = () => {
-  console.log('\n[1/3] clean 构建 + 全量单测');
+  console.log('\n[1/4] clean 构建 + 全量单测');
   const r = run('cmd', ['/c', 'gradlew.bat', '--console=plain', 'clean', ':wear:assembleRelease', ':wear:testDebugUnitTest'], { env: gradleEnv });
   const out = (r.stdout || '') + (r.stderr || '');
   record('构建成功', r.status === 0, (out.match(/BUILD \w+ in [^\n]+/) || [''])[0]);
@@ -77,7 +79,7 @@ const crown = (delta, n) =>
   adb('shell', "su -c 'for i in $(seq 1 " + n + "); do sendevent /dev/input/event0 2 8 " + delta + "; sendevent /dev/input/event0 0 0 0; done'");
 
 const device = () => {
-  console.log('\n[2/3] 真机安装与走查');
+  console.log('\n[2/4] 真机安装与走查');
   adb('start-server');
   const install = adb('install', '-r', '-d', 'wear/build/outputs/apk/release/wear-release.apk');
   const pkg = adb('shell', 'dumpsys', 'package', 'dev.ghr.wristagent').stdout || '';
@@ -117,7 +119,7 @@ const device = () => {
 };
 
 const geometry = () => {
-  console.log('\n[3/3] 卡片几何（同屏宽度 + 不重叠）');
+  console.log('\n[3/4] 卡片几何（同屏宽度 + 不重叠）');
   crown(5, 200);
   spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
   const shot = path.join(ROOT, 'docs/device/v11/release-check.png');
@@ -144,10 +146,39 @@ const geometry = () => {
   record('几何已采样', runs.length > 0, runs.slice(0, 120));
 };
 
+/**
+ * 控制台「页面级」E2E：真浏览器 + CDP，断 DOM 而不是只看接口。
+ *
+ * 令牌不再手填：设备已 root，直接 `su -c cat` 读手表端 console_prefs.xml。
+ * 这样发布点只剩一条命令，不会因为"忘了 dot-source 环境变量"而漏跑一项。
+ */
+const consoleE2E = () => {
+  console.log('\n[4/4] 控制台页面 E2E（真浏览器 + CDP）');
+  const raw = (adb('shell', "su -c 'cat /data/data/dev.ghr.wristagent/shared_prefs/console_prefs.xml'").stdout || '');
+  const token = (raw.match(/name="console_token">([^<]+)</) || [])[1];
+  if (!token) {
+    record('控制台页面 E2E', false, '读不到手表端 console_token（设备未 root 或未启动过控制台）');
+    return;
+  }
+  // 控制台服务器跑在 App 进程内：先确保 App 活着，再转发端口。
+  adb('shell', 'am', 'start', '-n', 'dev.ghr.wristagent/com.example.myapplication.presentation.MainActivity');
+  spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 4']);
+  adb('forward', 'tcp:18080', 'tcp:8080');
+  const r = spawnSync('node', ['docs/tools/console-e2e.mjs'], {
+    cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 600000,
+    env: { ...process.env, CONSOLE_TOKEN: token, CONSOLE_URL: 'http://127.0.0.1:18080/', OUT_DIR: 'docs/device/release-check' },
+  });
+  const out = (r.stdout || '') + (r.stderr || '');
+  const summary = (out.match(/(\d+)\/(\d+) 通过[^\n]*/) || [])[0] || out.trim().split('\n').slice(-1)[0] || '';
+  const reds = [...out.matchAll(/^FAIL ([^\n]+)/gm)].map((m) => m[1].slice(0, 60));
+  record('控制台页面 E2E', r.status === 0, summary + (reds.length ? ' | 红：' + reds.join('；') : ''));
+};
+
 const main = () => {
   console.log('release-check · 版本 ' + versionName());
   if (!skipBuild) build();
   if (!skipDevice) { device(); geometry(); }
+  if (!skipConsole) consoleE2E();
   const failed = results.filter((r) => !r.ok);
   console.log('\n=== 结果：' + (results.length - failed.length) + '/' + results.length + ' 通过 ===');
   if (failed.length) { failed.forEach((f) => console.log('  失败：' + f.name + ' ' + f.detail)); process.exit(1); }

@@ -19,9 +19,33 @@
 | `SettingsSecurityAndMemoryRobolectricTest` | 安全策略 | 三档逐个点 | 回调收到的 `SecurityMode` |
 | 同上 | 记忆 | 启用记忆 | `memoryEnabled` |
 | `SettingsSwitchRowRobolectricTest` | 控件层 | 开关行 | 文案 / 点击取反 / `stateDescription` |
+| `SettingsAppearanceDeepRobolectricTest` | 外观 | 触觉三档逐个点 | `hapticAmplitude` |
+| 同上 | 外观 | 字号三档逐个点 | `WearAppearance.fontScale` **+ 落盘** `AppearanceStore.fontScale()` |
+| 同上 | 外观 | 强调色五档逐个点 | `WearAppearance.accentOverride` **+ 落盘** `AppearanceStore.accent()` |
+| 同上 | 外观 | 点阵间距滑杆（语义拨动 9.4） | `matrixSpacingDp = 9`（吸附 + 区间必须是它自己的） |
+| 同上 | 外观 | 底栏延时滑杆（拨 3300） | `bottomBarAutoHideMs = 3500`（吸附 0.5s） |
+| 同上 | 外观 | 表冠增益滑杆（拨 2.27） | `rotaryScrollGain = 2.3`（吸附 0.1） |
+| `SettingsGestureRobolectricTest` | 手势与侧键 | 四段各点一个动作 | 四条绑定**逐个**落盘，且其余三条不动 |
+| `SettingsProviderAndTransferRobolectricTest` | 供应商档案 | 逐个切档案 | `modelName` / `baseUrl` / `activeProfileId` 三项一起换 |
+| 同上 | 供应商档案 | 复制当前配置 / 删除当前配置 | `profiles.size` +1 / −1 |
+| 同上 | 导入导出 | 导出 → 改温度 → 导入 | `temperature` 回到导出时的 0.3 |
+| 同上 | 导入导出 | 剪贴板塞一句废话再导入 | **一个字都不写**（`temperature` 保持 0.7） |
 
-合计 **15 个设置键 + 6 套风格 + 3 档安全模式**，从"只能真机手点"变成每次跑单测都验一遍。
-仍未覆盖：手势绑定、Lux 终端、供应商档案、导入导出、MCP 端点文本框（需要输入法/弹层，下一批做）。
+合计 **21 个设置键 + 6 套风格 + 3 档安全模式 + 四条手势绑定 + 两套跨对象搬运**，从"只能真机手点"变成每次跑单测都验一遍。
+仍未覆盖：Lux 终端的"跑一条命令"（要真的起 `sh`，JVM 上没有可信替身）、MCP 端点文本框（表端只读展示，写入在网页端）。
+
+### 〇·二 这一层当场查出的缺陷（0.0.0.88）
+
+自绘滑轨 `SettingsThinSlider` 原来**没有挂任何无障碍语义**：读屏读不到、也拨不动。补语义时又发现更糟的一层：
+
+- 卡组外层是 `Card(onClick = {})`，可点即 `mergeDescendants`；滑杆行不可点，于是**被整张卡吸成一个无障碍节点**。
+- 实测（Robolectric 打印被匹配到的节点）：一个节点的 `contentDescription` 同时是
+  **【底栏自动收起延时, 表冠滚动增益】**，`ProgressBarRangeInfo` 只保留了前者 `3000.0 / 1000..8000`。
+- 后果：读屏用户看到的是一整块卡，第二个滑杆的 `SetProgress` 被丢弃 —— 它**不可调**。
+- 修法：滑杆行自己加一个空语义边界（`Modifier.semantics(mergeDescendants = true) {}`），
+  每行独立成节点；同时给自绘轨道补 `contentDescription` + `ProgressBarRangeInfo` + `SetProgress`。
+- 回归判据：三个滑杆测试都断言"匹配到的节点区间必须是它自己的"，串了就直接红。
+
 
 ## 方法
 

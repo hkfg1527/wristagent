@@ -159,3 +159,20 @@ POST /api/settings  {"temperature":0.8}  → 200，state 回到 0.8
 紧接着的一笔串行 GET 也要 5.06s。修法两条：`MAX_WORKERS` 8 → 32、空闲读超时 5s → 2s、
 响应一律 `closeConnection(true)`（一问一答就关连接，局域网多一次握手，换掉整个竞态）。
 修后同一压测：12 笔并发全部 ≤166ms，串行 GET 39~45ms；端到端 E2E 从 62/69 变 **69/69**。
+
+**已接进发布自检**（0.0.0.88）：`node docs/tools/release-check.mjs` 的第 4 项就是这个脚本。
+令牌不手填 —— 设备已 root，脚本 `su -c cat /data/data/dev.ghr.wristagent/shared_prefs/console_prefs.xml` 自己取。
+
+## 2.10 表端无障碍 · 滑杆节点的独立性（2026-11-19，0.0.0.88）
+
+判据来自 Robolectric 直接读语义树，不是看截图：一条滑杆行必须**独立成一个可调节节点**，
+且它上报的 `ProgressBarRangeInfo` 必须是它自己的区间。
+
+| 行 | 修前 | 修后 |
+|---|---|---|
+| 底栏自动收起延时 + 表冠增益 | 同一节点：`cd = 【底栏自动收起延时, 表冠滚动增益】`、`range = 3000.0 / 1000..8000`；第二个滑杆 `SetProgress` 丢失 | 两个节点，各自 `cd` 与 `range`（`0.5..3`），各能拨 |
+| 点阵间距 / 底栏延时 / 表冠增益 自绘轨道 | 无 `contentDescription`、无 `RangeInfo`、无 `SetProgress`（读屏完全读不到） | 三者齐备，语义动作可拨，吸附仍生效（9.4→9dp、3.3s→3.5s、2.27→2.3） |
+
+根因与修法见 `docs/SETTINGS-FUNCTIONAL-TEST.md` §〇·二；回归在
+`SettingsAppearanceDeepRobolectricTest`（三条滑杆用例都断言"区间必须是它自己的"）。
+

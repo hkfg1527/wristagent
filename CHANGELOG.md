@@ -13,6 +13,33 @@
 
 ## [未发布]
 
+### 修复：设置页两行滑杆被并成一个无障碍节点，第二个滑杆读屏拨不动
+卡组外层是 `Card(onClick = {})`（可点 → `mergeDescendants`），而自绘滑杆行本身不可点，
+于是被整张卡吸进同一个无障碍节点。Robolectric 打印出来的那个节点：
+
+- `contentDescription` = **【底栏自动收起延时, 表冠滚动增益】**（两行并成一个）；
+- `ProgressBarRangeInfo` = `3000.0 / 1000.0..8000.0`（只保留前一行）；
+- 第二个滑杆的 `SetProgress` 被丢弃 → 读屏用户**拨不动**表冠增益。
+
+另外自绘轨道 `SettingsThinSlider` 原本没有挂任何语义（读不到、也拨不动）。
+
+- 修法一：滑杆行自设空语义边界 `Modifier.semantics(mergeDescendants = true) {}`，每行独立成节点。
+- 修法二：轨道补 `contentDescription`（取行标签）、`ProgressBarRangeInfo`、`SetProgress`，与官方 Slider 的 rangeSemantics 同义。
+- 视觉零改动（只加语义，不动几何与配色）。
+- 回归：三条滑杆测试都断言"匹配到的节点区间必须是它自己的"，串了立刻红。
+
+### 新增：设置页功能回归扩到 21 个键 + 四条手势 + 两套跨对象搬运
+- `SettingsAppearanceDeepRobolectricTest`（6 条）：触觉三档、字号三档（连落盘一起验）、强调色五档（连落盘）、
+  点阵间距 / 底栏延时 / 表冠增益三条滑杆用**语义动作**拨动并验吸附（9.4→9dp、3.3s→3.5s、2.27→2.3）。
+- `SettingsGestureRobolectricTest`（1 条）：四段手势各点一个动作，断言四条绑定逐个落盘且其余三条不动。
+  定位不靠索引（同一句动作文案在页面上出现四次、懒加载下离屏项不存在），而是"两段标题之间那条带"。
+- `SettingsProviderAndTransferRobolectricTest`（4 条）：切档案必须换 `modelName` / `baseUrl` / `activeProfileId`；
+  复制与删除改档案数；导出 → 改温度 → 导入复原；剪贴板塞废话再导入**一个字都不写**。
+
+### 新增：控制台页面级 E2E 接进发布自检
+`release-check.mjs` 第 4 项自动跑 `console-e2e.mjs`（69 条断言）。令牌不再手填：
+设备已 root，脚本直接 `su -c cat /data/data/dev.ghr.wristagent/shared_prefs/console_prefs.xml` 取。
+
 ### 修复：网页控制台保存偶发 9 秒超时（写其实已经落盘）
 NanoHTTPD 把一条 TCP 连接当成一个 worker 占着，而浏览器会保留空闲 keep-alive 连接；服务端读超时关掉连接、
 客户端还没收到 FIN 时发出的请求会石沉大海（POST 不重试）。用户体验就是点了保存、转圈 9 秒、"未保存"，
