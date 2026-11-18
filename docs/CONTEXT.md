@@ -139,6 +139,11 @@
   我原来写的"非法 JSON 没写回"是恒真断言（两边都取 `{}`），现在改成"记录到的 POST 数为 0"。
 - **未验证**：USB 在 22:05 掉线（`adb devices` 空、Wi-Fi 5555 未开），APK 已构建未安装，
   所以"中文往返修好了"只有代码 + 单测证据，**没有装机证据**。下轮第一件事：插回 USB → `install -r` → 跑 `node docs/tools/console-e2e.mjs` 要 69/69。
+- **设备掉线期间的替代产物：JVM 上跑真 Compose**（Robolectric 4.18.1）。`SettingsPagesRobolectricTest` 直接渲染
+  「网络与请求」「模型参数」「语音转写」三页真 composable，点语义节点、读 `AgentPreferences` 真值：
+  仅 WiFi 请求 / 触觉反馈 / 开启 SSE 流式 / 极速 0.2 预设 / 语音转写开关 —— **5 个键的功能实测从"只有真机能验"变成 JVM 上 5 秒跑完**。
+  另加 `SettingsSwitchRowRobolectricTest` 3 条（文案、点击取反、无障碍状态描述）与 `WearComposeSmokeTest` 1 条探针。
+  单测基线随之 1314 → **1321 条 / 196 套件 / 0 失败**。
 
 **下一步（下一轮直接从这里开始）· 先补真机，再继续 UI**
 1. **插回手表 USB**，`adb devices` 见到设备后装 `0.0.0.87`，跑 `node docs/tools/console-e2e.mjs`（要 A–I 全绿），
@@ -204,6 +209,13 @@
    写文档时**先 grep 界面文案再落笔**。
 
 **环境坑（每次都会踩）**
+- **Robolectric 已在用（0.0.0.87 起）**：设置页的"点了有没有反应"可以在 JVM 上断，不必等手表。
+  配方：`testOptions.unitTests.isIncludeAndroidResources = true`；测试类上 `@RunWith(RobolectricTestRunner::class)`
+  `@Config(sdk = [35], qualifiers = "zh-rCN")`（不写 qualifiers 断言中文会全红，默认是 en-US）。
+  `android-all-instrumented` 的 197MB jar **不在仓库里**，放在 `D:\gradle-home\robolectric-deps\`
+  （`build.gradle.kts` 里 `robolectric.offline=true` 指过去）；换机器/清缓存后要重新放，否则报 `Path is not a file`。
+  两个坑：①`performScrollToNode` 会撞上两个可滚动节点 → 用 `hasScrollAction() and keyIsDefined(CollectionInfo)`
+  取列表那个；②同一句文案可能既是分区标题又是行标签（「语音转写开关」）→ `filterToOne(hasClickAction())`。
 - 无 shell 工具：一切经 `run_code` + `node:child_process`；gradle 必须给全 env。
 - 表冠注入走 `su`，每次都弹 Magisk toast：**把连续滚动合并成一次 `su` 调用，等 6 秒再截图**。
 - `git push` 常断：`-c http.curloptResolve=github.com:443:<ip>`，轮换 140.82.112/113/114/116.4。

@@ -83,6 +83,14 @@ android {
     testOptions {
         // 单测直接构造 Application/AndroidViewModel：框架方法返回默认值而不是抛 Stub!
         unitTests.isReturnDefaultValues = true
+        // Robolectric 要读 res/（Compose 语义里的中文文案全在 strings_settings.xml）
+        unitTests.isIncludeAndroidResources = true
+        // Robolectric 运行时会自己去 Maven 下 android-all（~200MB）；本机这个下载器连不上，
+        // 于是改成离线读本地目录，jar 由脚本预置（不在仓库里）。
+        unitTests.all { test ->
+            test.systemProperty("robolectric.offline", "true")
+            test.systemProperty("robolectric.dependency.dir", "D:/gradle-home/robolectric-deps")
+        }
         // 实测过 maxParallelForks = 4：50.3s → 1 fork 51.3s，差 2%（噪声内）。
         // 原因很朴素 —— 1295 条测试真正执行只占约 10s，剩下 40s 是编译。
         // 既然零收益，按"简洁优先"不引入这条配置。
@@ -107,6 +115,12 @@ dependencies {
     implementation(libs.nanohttpd)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Robolectric：JVM 上渲染 Compose，让"控件点了到底有没有变"不必等真机
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

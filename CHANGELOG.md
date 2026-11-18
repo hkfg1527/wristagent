@@ -13,6 +13,18 @@
 
 ## [未发布]
 
+### 新增：设置页的 JVM 端功能测试（Robolectric 渲染真 Compose）
+手表只有一块，USB 一掉线所有 UI 验证就停摆。现在用 Robolectric 4.18.1 在 JVM 上渲染真实页面，
+点语义节点、读 `AgentPreferences` 真值，把"控件点下去有没有落到偏好里"变成 5 秒能跑完的断言。
+
+- `SettingsPagesRobolectricTest`（3 条）：**仅 WiFi 请求**、**触觉反馈**、**开启 SSE 流式**、
+  **极速 0.2 快捷预设**、**语音转写开关** —— 五个键从"只能真机手点"变成可回归。
+- `SettingsSwitchRowRobolectricTest`（3 条）：开关行渲染文案与副标题、点击回调拿到取反值、
+  `stateDescription` 跟随选中态（`已开启`）。
+- `WearComposeSmokeTest`（1 条）：Wear M3 主题 + Compose 在 Robolectric 下可渲染的落地探针。
+- 工具链：`testOptions.unitTests.isIncludeAndroidResources = true`，`@Config(sdk=[35], qualifiers="zh-rCN")`；
+  `android-all-instrumented`（197MB）不入库，放 `D:\gradle-home\robolectric-deps`，构建脚本里 `robolectric.offline=true` 指过去。
+
 ### 修复：网页控制台保存中文会损坏（数据不可逆）
 NanoHTTPD 解请求体时只看 `Content-Type` 里的 charset，缺省按 US-ASCII 处理。网页端发的是
 `application/json`（不带 charset），于是**任何中文在被保存前就被逐字节替换成 U+FFFD 并落库**
