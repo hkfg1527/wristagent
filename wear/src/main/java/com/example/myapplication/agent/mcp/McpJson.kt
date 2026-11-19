@@ -49,6 +49,12 @@ sealed class McpJson {
 
     companion object {
 
+        /**
+         * 嵌套深度上限。取值与 `ConsoleJson.MAX_DEPTH` 一致（32），
+         * 正常 MCP 报文最多 6~8 层，32 层足够宽松，又远低于会打爆线程栈的量级。
+         */
+        const val MAX_DEPTH = 32
+
         fun obj(vararg entries: Pair<String, McpJson>): Obj = Obj(linkedMapOf(*entries))
 
         fun write(value: McpJson): String {
@@ -132,6 +138,9 @@ sealed class McpJson {
 
             private var index = 0
 
+            /** 当前容器嵌套深度（只在 parseObject/parseArray 期间增减）。 */
+            private var depth = 0
+
             fun parseDocument(): McpJson {
                 skipWhitespace()
                 val value = parseValue()
@@ -142,6 +151,10 @@ sealed class McpJson {
 
             private fun parseValue(): McpJson {
                 if (index >= text.length) fail("JSON 意外结束")
+                // 深度封顶：以前是无限深递归，远端回一段 [[[[… 就会 StackOverflowError ——
+                // 那是 Error 不是 Exception，工具循环的 catch 拦不住，整个进程直接崩。
+                // （控制台侧 ConsoleJson 早有 MAX_DEPTH=32，这里一直漏着。）
+                if (depth >= MAX_DEPTH) fail("JSON 嵌套超过 " + MAX_DEPTH + " 层")
                 return when (val char = text[index]) {
                     '{' -> parseObject()
                     '[' -> parseArray()
@@ -155,7 +168,17 @@ sealed class McpJson {
                 }
             }
 
+            /** 只在进入容器时递增；标量不占层数。 */
             private fun parseObject(): Obj {
+                depth += 1
+                try {
+                    return parseObjectBody()
+                } finally {
+                    depth -= 1
+                }
+            }
+
+            private fun parseObjectBody(): Obj {
                 index += 1
                 skipWhitespace()
                 val fields = linkedMapOf<String, McpJson>()
@@ -186,6 +209,15 @@ sealed class McpJson {
             }
 
             private fun parseArray(): Arr {
+                depth += 1
+                try {
+                    return parseArrayBody()
+                } finally {
+                    depth -= 1
+                }
+            }
+
+            private fun parseArrayBody(): Arr {
                 index += 1
                 skipWhitespace()
                 val items = mutableListOf<McpJson>()

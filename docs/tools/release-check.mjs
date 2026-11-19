@@ -114,7 +114,7 @@ const device = () => {
     crown(-5, 12);
     spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 2200']);
   }
-  record('四分区按序', found.length === 4, found.join(' → '));
+  record('四分区按序', found.length === 4 && found.every((z, i) => z === zones[i]), found.join(' → '));
   return found;
 };
 

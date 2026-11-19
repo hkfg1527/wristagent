@@ -91,6 +91,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -499,7 +500,12 @@ fun SettingsSubPage(
             .background(Wear.Palette.Bg)
             // 下滑退出：只有真实触摸、且列表已到顶时才累积；表冠不产生指针事件，天然进不来。
             // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
-            .pullDownToDismiss(canPullDown = { listState.isAtScrollTop() }, onDismiss = onBack)
+            // 浮层打开时一律不许下滑退页：否则在对话框上往下拖 50dp 就把整页退掉，
+            // 正在编辑的系统提示词草稿直接丢（根页 SettingsScreen 有 activeDialog 门禁，子页以前没有）。
+            .pullDownToDismiss(
+                canPullDown = { overlayBack == null && listState.isAtScrollTop() },
+                onDismiss = onBack
+            )
     ) {
         // 内层浮层优先吃掉系统返回：先关浮层，再退页面。
         // 注册顺序上它比外层 SettingsScreen 的 BackHandler 晚，所以默认就能先收到事件。
@@ -1146,12 +1152,24 @@ internal fun SettingsCardRow(
     // 原来是 if (WearAppearance.style == SettingsStyle.GOOGLE_CARD)，现在读表：rowShell 槽位
     if (SettingsStylePolicy.current().rowShell == SettingsRowShell.CARD_EACH) {
         // 大卡片档：一行一张独立圆角卡，行与行之间靠 8dp 间隙分开，不再共用一张曲面。
+        // 单选行的语义必须补回到卡片节点上：官方 Card(onClick) 自己就是一个按钮节点，
+        // 上面那个 selectable 是挂在卡**外**的（这里以前整段丢掉 clickModifier），
+        // 于是大卡片档下六套风格选择、安全三档、播报队列、手势绑定全都读不出"已选中"、也不是单选框。
+        // 这里只补语义、不挂第二个点击处理器（否则一次点击会触发两次）。
+        val selectedSemantics = if (selected != null) {
+            Modifier.semantics {
+                this.selected = selected
+                role = Role.RadioButton
+            }
+        } else {
+            Modifier
+        }
         Column(
             modifier = modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             SettingsM3Card(
-                modifier = Modifier.width(SettingsContentWidth),
+                modifier = Modifier.width(SettingsContentWidth).then(selectedSemantics),
                 onClick = onClick
             ) {
                 // 内边距交给官方 Card 的 contentPadding：这里再补一层会把文字挤成两行

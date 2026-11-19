@@ -42,6 +42,55 @@ class ShellPolicyTest {
         }
     }
 
+    /**
+     * 命令替换与路径变体不能把破坏性命令洗成「有风险」。
+     *
+     * 回归背景（0.0.0.113 审查，高）：`rmInvocation` 的正则会把收尾的 `)` / 反引号一起吞进目标，
+     * 于是 `echo $(rm -rf /data)` 的目标是 `/data)`、`` `rm -rf /` `` 的目标是 ``/` ``，
+     * 都比不上 `/data` / `/` —— 判成 RISKY，而 RISKY 可以被「记住此命令」永久免审批，
+     * 并且能过 WORKSPACE 沙箱（只有 DESTRUCTIVE 被挡）。`/storage/..` 同理，它执行时就是 `/`。
+     */
+    @Test
+    fun commandSubstitutionAndDotDotCannotLaunderADestructiveCommand() {
+        val launderable = listOf(
+            "echo \$(rm -rf /data)",
+            "echo `rm -rf /`",
+            "rm -rf /storage/..",
+            "rm -rf /data)",
+            "rm -rf /data`"
+        )
+        for (command in launderable) {
+            assertEquals(
+                "命令替换/路径变体必须仍判破坏性: $command",
+                ShellDanger.DESTRUCTIVE,
+                ShellPolicy.dangerOf(command)
+            )
+        }
+    }
+
+    /**
+     * 用 `$IFS` 之类的变量拼分隔符绕过关键词匹配。
+     *
+     * `rm$IFS-rf$IFS/data` 在静态正则里连 `rm ` 都不匹配 → 以前落到 RISKY（可记住免审批、过 WORKSPACE 沙箱），
+     * 而 `sh -c` 执行时会真的展开成 `rm -rf /data`。这类写法没有正当用途，命中即按破坏性处理。
+     */
+    @Test
+    fun ifsBasedSeparatorEvasionIsTreatedAsDestructive() {
+        val evasions = listOf(
+            "rm\$IFS-rf\$IFS/data",
+            "rm\${IFS}-rf\${IFS}/data",
+            "rm\$@-rf\$@/data",
+            "su -c 'rm\$IFS-rf\$IFS/data'"
+        )
+        for (command in evasions) {
+            assertEquals(
+                "变量拼分隔符必须判破坏性: $command",
+                ShellDanger.DESTRUCTIVE,
+                ShellPolicy.dangerOf(command)
+            )
+        }
+    }
+
     @Test
     fun readOnlyCommandsStaySafe() {
         val safeSamples = listOf(

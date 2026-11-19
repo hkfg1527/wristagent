@@ -100,6 +100,13 @@ class RootSessionTest {
         val sent = writes.first()
         assertTrue("命令必须以换行结尾，否则 shell 不会执行", sent.endsWith("\n"))
         assertTrue("必须把 stderr 并入 stdout，否则错误信息读不到", sent.contains("2>&1"))
-        assertTrue("必须带哨兵回显", sent.contains(token + ":\$?"))
+        // 退出码必须先存进变量再补换行：直接 `echo "token:$?"` 取到的是 printf 的退出码（恒 0），
+        // 所有失败命令都会被回成 exit_code=0（0.0.0.113 审查发现）。
+        assertTrue("必须先保存 \$? 再 printf：" + sent, sent.contains("__rc=\$?"))
+        assertTrue("哨兵要回显保存下来的退出码：" + sent, sent.contains(token + ":\$__rc"))
+        assertTrue(
+            "printf 补换行必须发生在保存 \$? 之后：" + sent,
+            sent.indexOf("__rc=\$?") < sent.indexOf("printf")
+        )
     }
 }

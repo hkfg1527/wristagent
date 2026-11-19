@@ -75,7 +75,14 @@ internal class FakeSuProcess : Process() {
 
     /** 从命令行里解析会话 token，然后把"输出 + 哨兵"推进 stdout。 */
     private fun replyTo(commandLine: String) {
-        val token = Regex("""(dsh[0-9a-f]+):\$\?""").find(commandLine)?.groupValues?.get(1) ?: return
+        // 哨兵形态是 `echo "dsh…:$__rc"`（退出码先存进 __rc，见 RootShellProtocol.buildCommand）。
+        // 这里两种形态都认：旧形态 `token:$?` 只用于对照历史行为。
+        // 哨兵形态是 `echo "dsh…:$__rc"`（退出码先存进 __rc，见 RootShellProtocol.buildCommand）。
+        // 用 Regex.escape 拼，避免在正则里把 $ 当成行尾锚点。
+        val newStyle = "(dsh[0-9a-f]+):" + Regex.escape("$" + "__rc")
+        val token = Regex(newStyle).find(commandLine)?.groupValues?.get(1)
+            ?: Regex("""(dsh[0-9a-f]+):\$\?""").find(commandLine)?.groupValues?.get(1)
+            ?: return
         send("uid=0(root) gid=0(root)")
         send("$token:0")
     }

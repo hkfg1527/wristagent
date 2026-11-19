@@ -16,9 +16,12 @@ internal object RootShellProtocol {
      *   把整个会话后续全部错位；
      * - 哨兵前先 `printf '\n'`：命令输出不带尾换行时（`printf hi`、`echo -n x`），
      *   哨兵会粘成 `hitoken:0`，`classify` 认不出，读循环卡到超时。
+     *
+     * 退出码必须**先存再补换行**：`printf` 会把 `$?` 覆盖成它自己的退出码（恒 0），
+     * 于是所有 root 命令都以 `exit_code=0` 回给模型 —— 失败的命令会被当成"已经改成功了"。
      */
     fun buildCommand(command: String, token: String): String =
-        "{ " + command + " ; } </dev/null 2>&1 ; printf '\\n' ; echo \"" + token + ":\$?\"\n"
+        "{ " + command + " ; } </dev/null 2>&1 ; __rc=\$? ; printf '\\n' ; echo \"" + token + ":\$__rc\"\n"
 
     sealed interface Line {
         /** 哨兵行：命令结束，[exitCode] 是 shell 给出的退出码。 */
@@ -49,15 +52,34 @@ internal class RootSession(
             return ShellResult.failure(describe(t))
         }
         val output = StringBuilder()
+        var truncated = false
         while (true) {
             val line = readLine() ?: return ShellResult.failure("root shell closed")
             when (val classified = RootShellProtocol.classify(line, token)) {
                 is RootShellProtocol.Line.Done ->
-                    return ShellResult(classified.exitCode, output.toString().trim(), "")
+                    return ShellResult(
+                        classified.exitCode,
+                        output.toString().trim() + if (truncated) "\n" + TRUNCATED_MARK else "",
+                        ""
+                    )
 
-                is RootShellProtocol.Line.Output -> output.appendLine(classified.text)
+                is RootShellProtocol.Line.Output -> {
+                    // 输出封顶：root 下一条 logcat / dumpsys 15 秒能产数十 MB，手表堆只有数百 MB。
+                    // 超出后继续读干（否则写满的管道会卡住子进程），但不再入内存。
+                    if (output.length < MAX_OUTPUT_CHARS) {
+                        output.appendLine(classified.text)
+                    } else {
+                        truncated = true
+                    }
+                }
             }
         }
+    }
+
+    private companion object {
+        /** 与 ProcessExec 的同名上限保持一致（256K 字符）。 */
+        const val MAX_OUTPUT_CHARS = 256 * 1024
+        const val TRUNCATED_MARK = "…[truncated]"
     }
 
     private fun describe(t: Throwable): String =

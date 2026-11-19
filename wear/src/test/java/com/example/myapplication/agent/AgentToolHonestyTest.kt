@@ -49,7 +49,10 @@ class AgentToolHonestyTest {
             "天气必须如实声明 unavailable，实际：" + output,
             output.contains("unavailable_without_sensor_or_api")
         )
-        assertFalse("不许凭空给出温度：" + output, output.contains("22"))
+        // 诚实性：不许凭空给出温度。别用"输出里没有 22"这种判据 —— 当前时间正好 22:00 时会误报，
+        // 直接钉"没有 temperature / 天气字段"。
+        assertFalse("不许凭空给出温度：" + output, output.contains("temperature"))
+        assertFalse("不许凭空给出天气状况：" + output, output.contains("\"weather\""))
     }
 
     @Test

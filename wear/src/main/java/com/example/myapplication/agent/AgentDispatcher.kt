@@ -17,6 +17,7 @@ import com.example.myapplication.agent.contract.RiskLevel
 import com.example.myapplication.agent.contract.SecurityGuardrail
 import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.agent.privilege.PrivilegeManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -722,7 +723,12 @@ class AgentDispatcher(
             when (toolName) {
                 "get_device_status" -> "电量 ${json.optInt("battery_level_percent", 0)}% · 温控 ${json.optDouble("battery_temperature_celsius", 0.0)}℃"
                 "web_search" -> "已检索 ${json.optInt("results_count", 1)} 条互联网最新事实"
-                "query_time_weather" -> "${json.optString("temperature", "22℃")} · ${json.optString("weather", "晴朗")}"
+                // 这个工具**从不**返回 temperature / weather 两个键（它只回 weather_status），
+                // 以前带默认值 "22℃"/"晴朗" 就等于替用户编造了一条天气结果 ——
+                // 工具胶囊上写着 22℃·晴朗，人会以为真查到了。
+                "query_time_weather" -> json.optString("weather_status").takeIf { it.isNotBlank() }
+                    ?.let { "天气不可用（$it）" }
+                    ?: "已读取本地时间"
                 "vibrate_device" -> "触觉脉冲已触发"
                 "set_system_power_mode" -> if (json.optBoolean("ultra_saving_enabled", false)) "极致省电已开启" else "标准性能已恢复"
                 "adjust_matrix_density" -> "点阵网格已更新"
@@ -740,8 +746,21 @@ class AgentDispatcher(
         }
     }
 
+    /**
+     * 取消时给**还没有回执**的工具调用补一条 cancelled。
+     *
+     * 不能无脑遍历整批：同一轮里可能已有调用执行完（或已被审批拒绝）写了回执，
+     * 再补一条会让同一个 `tool_call_id` 出现两条 `tool` 消息 —— 严格供应商（OpenAI/Azure/DeepSeek/vLLM）
+     * 直接 400，宽松一点的会让模型看到两份互相矛盾的结果。这里按 id 去重。
+     */
     private fun handleCancelledTools(pendingCalls: List<ToolCall>) {
+        val alreadyReplied = conversationHistory
+            .asSequence()
+            .filter { it.role == AgentRole.TOOL }
+            .mapNotNull { it.toolCallId }
+            .toHashSet()
         for (call in pendingCalls) {
+            if (call.id in alreadyReplied) continue
             val cancelJson = JSONObject().apply {
                 put("status", "cancelled")
                 put("message", "任务已被主人终止")
@@ -933,6 +952,10 @@ class AgentDispatcher(
             // 非流式回显因此也不会退化成 0s（旧代码把起点记在了响应到达之后）。
             var requestStartedAtMs = 0L
             while (true) {
+                // 重试前先认取消：取消是靠 disconnect 打断阻塞读的，那条 IOException 会被
+                // 下面的 catch 当成"可重试网络错误"，于是用户点了停止仍会再发 1~3 次真实请求
+                // （默认 retries=1、超时 40s），最后还把"用户取消"显示成「请求失败 · Socket closed」。
+                if (isCancelled) return@withContext Result.failure(CancellationException("cancelled"))
                 conn?.disconnect()
                 requestStartedAtMs = System.currentTimeMillis()
                 val activeConn = openConnection()
@@ -944,6 +967,8 @@ class AgentDispatcher(
                         .use { it.write(buildRequestBody().toString()) }
                     activeConn.responseCode
                 } catch (e: IOException) {
+                    // 取消引起的 disconnect 不是网络故障，既不重试也不算失败
+                    if (isCancelled) return@withContext Result.failure(CancellationException("cancelled"))
                     if (retriesLeft > 0) {
                         retriesLeft--
                         if (preferences.retryBackoffMs > 0) delay(preferences.retryBackoffMs.toLong())

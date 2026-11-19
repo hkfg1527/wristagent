@@ -13,6 +13,45 @@
 
 ## [未发布]
 
+### 修复：JSON 解析无深度上限导致进程崩溃
+`McpJson.parseValue` 是无限深递归，`McpClient`/`McpSse` 只 catch `McpJsonException` —— 远端回一段
+`[[[[…` 就是 `StackOverflowError`（`Error` 不是 `Exception`），工具循环拦不住，App 直接崩。
+
+- 修法：加 `MAX_DEPTH = 32`（与 `ConsoleJson` 同值），进容器时计数、出容器时回退。
+- 回归 `McpJsonDepthTest` 3 条；**变异验证**：上限改 100000，两条立刻红。
+
+### 修复：root 命令的退出码恒为 0
+`RootSession.buildCommand` 里 `printf '\n'` 排在 `echo "$?"` 之前，`$?` 取到的是 printf 自己的退出码（恒 0）——
+**所有 root 命令都以 `exit_code=0` 回报**，失败的命令会被模型当成"已经改成功了"继续下一步。
+
+- 修法：`__rc=$?` 先存，再 `printf`，再 `echo "token:$__rc"`。
+- 顺带给 root 常驻会话的输出加 256K 封顶（`ProcessExec` 早有，这条最热的路径反而漏了）。
+
+### 修复：命令替换与 `$IFS` 可以给破坏性命令洗白
+`ShellPolicy` 的两处漏判都能把 `rm -rf /data` 降级成「有风险」——RISKY 可以被"记住此命令"永久免审批，
+也能过 WORKSPACE 沙箱（只挡 DESTRUCTIVE）：
+
+- `echo $(rm -rf /data)` / `` `rm -rf /` `` / `/storage/..`：`canonicalPath` 把收尾定界符一起吃成路径、且不折叠 `..`；
+  已改成剥定界符 + 逐段消 `..`。
+- `rm$IFS-rf$IFS/data`：静态匹配不到 `rm `；现在命中 `${IFS}`/`$IFS`/`$@`/`$*` 一律按破坏性。
+- 回归各 1 条（含 4 个 `$IFS` 变体）；**变异验证**：去掉 `)` 剥离，立刻红（`expected DESTRUCTIVE but was RISKY`）。
+
+### 修复：取消之后仍会重发请求 / 取消回执重复
+- 重试循环里没有取消检查：取消靠 `disconnect` 打断读，那条 `IOException` 被当成"可重试"——
+  用户点停止仍会再发 1~3 次真实请求，最后把"取消"显示成「请求失败 · Socket closed」。现在循环开头与 catch 都先判取消。
+- `handleCancelledTools` 遍历整批补回执，已执行/已拒绝的调用会重复，同一 `tool_call_id` 两条 `tool` 消息 → 严格供应商 400。
+  现在按 `toolCallId` 去重。
+
+### 修复：工具胶囊编造天气
+`query_time_weather` 从不返回 `temperature`/`weather` 两个键，`extractToolSummary` 却带默认值 `"22℃"/"晴朗"`——
+工具卡上凭空显示"22℃ · 晴朗"。现在读 `weather_status`，显示"天气不可用（原因）"。
+
+### 修复：大卡片档丢了单选语义 / 子页浮层打开时仍能下滑退页
+- `CARD_EACH` 分支只把 `onClick` 交给 Card，`Modifier.selectable(role=RadioButton)` 整段被丢 →
+  六套风格选择、安全三档、播报队列、手势绑定读不出"已选中"、也不是单选框。现在在卡片节点上补 `selected` + `Role.RadioButton`。
+- 子页的 `pullDownToDismiss` 不看浮层：对话框打开时往下拖 50dp 就把整页退掉，正在编辑的系统提示词草稿直接丢。
+  现在 `canPullDown = { overlayBack == null && listState.isAtScrollTop() }`。
+
 ### 修复：MCP `abort()` 只能断掉一条在途请求（单槽位）
 `McpHttpTransport.active` 原来是**单个槽位**，而同一个 client 会并发发请求（`ensureFresh` 后台刷新 + `callTool`）：
 后开的连接覆盖前者 → `abort()` 断错连接；先结束者的 `finally` 又会把仍在途的连接从槽里清空 →

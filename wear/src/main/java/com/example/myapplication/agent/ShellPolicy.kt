@@ -142,6 +142,14 @@ object ShellPolicy {
     private val commandSeparators = Regex("[\\n\\r;|&]+")
 
     /**
+     * 用变量拼分隔符的写法（`$IFS`、`${IFS}`、`$@`、`$*`）。
+     *
+     * 这类命令没法静态判读真正的参数切分，而它们只有一个用途：绕过关键词匹配。
+     * 命中即按破坏性处理，不做意图猜测。
+     */
+    private val separatorEvasion = Regex("\\$\\{?IFS\\}?|\\$[@*]")
+
+    /**
      * 判档前的**词法归一**：剥掉引号与反斜杠转义。
      *
      * shell 会在执行前吃掉引号，所以 `rm -rf "/data"`、`rm -rf '/system'`、
@@ -159,6 +167,11 @@ object ShellPolicy {
     fun dangerOf(command: String): ShellDanger {
         val normalized = normalize(command)
         if (normalized.isEmpty()) return ShellDanger.SAFE
+        // 变量展开会隐藏分隔符：`rm$IFS-rf$IFS/data` 在静态正则里连 `rm ` 都不匹配，
+        // 归一化后判不出 rm → 掉到 RISKY。而 RISKY 可以被「记住此命令」永久免审批、
+        // 也能过 WORKSPACE 沙箱（只挡 DESTRUCTIVE），`sh -c` 一执行就真的删了。
+        // 这里不猜语义：凡是拿 IFS 之类拼分隔符的，一律按破坏性处理。
+        if (separatorEvasion.containsMatchIn(normalized)) return ShellDanger.DESTRUCTIVE
         val lexical = lexicalForm(normalized)
         // 整串先过黑名单：`:(){ :|:& };:` 这类命令拆开就什么都不剩，必须整串匹配
         if (matchedRule(lexical) != null) return ShellDanger.DESTRUCTIVE
@@ -353,7 +366,22 @@ object ShellPolicy {
     private fun canonicalPath(raw: String): String {
         var path = raw.replace(Regex("/{2,}"), "/")
         while (path.contains("/./")) path = path.replace("/./", "/")
+        // 命令替换的收尾定界符会被正则一起捕获：`echo $(rm -rf /data)` 里目标是 `/data)`，
+        // 反引号写法是 `/data\``。不剥掉就不等于 `/data` —— 破坏性判档会漏成 RISKY（可记住免审批）。
+        path = path.trimEnd(')', '`', ';', '&', '|', '"', '\'')
         if (path.length > 1) path = path.trimEnd('/')
+        // 逐段消掉 `..`：`/storage/..` 执行时就是 `/`，字符串比较却认不出。
+        if (path.contains("..")) {
+            val parts = ArrayDeque<String>()
+            for (segment in path.split('/')) {
+                when (segment) {
+                    "", "." -> Unit
+                    ".." -> if (parts.isNotEmpty()) parts.removeLast()
+                    else -> parts.addLast(segment)
+                }
+            }
+            path = "/" + parts.joinToString("/")
+        }
         return if (path.isEmpty()) "/" else path
     }
 
