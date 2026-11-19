@@ -137,7 +137,13 @@ data class SettingsStyleSpec(
     val rowEnterSlide: Boolean,
 
     /** 卡片是否吃屏幕边缘的等比缩小与淡出（`Modifier.cardEdgeZoom`）。 */
-    val cardEdgeZoom: Boolean
+    val cardEdgeZoom: Boolean,
+
+    /**
+     * 卡片圆角（dp）。十套风格各自给值：气泡 32（最软）、方角 0（直角）、终端 0、
+     * 手帐 6（近纸边）、弧列 28、磨砂/大卡片/官方 26（贴合官方 `CornerLarge`）。
+     */
+    val cardRadiusDp: Float
 )
 
 object SettingsStylePolicy {
@@ -160,7 +166,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = true,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 32f
         )
         // 方角：全直角、横线分隔、标题居中
         SettingsStyle.SQUARE -> SettingsStyleSpec(
@@ -178,7 +185,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = true,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 0f
         )
         // 大卡片：M3E 基准档 —— 骨架走官方 ScreenScaffold，返回进列表首项
         SettingsStyle.GOOGLE_CARD -> SettingsStyleSpec(
@@ -196,7 +204,8 @@ object SettingsStylePolicy {
             subPageHero = true,
             animateRootSections = false,
             rowEnterSlide = false,
-            cardEdgeZoom = true
+            cardEdgeZoom = true,
+            cardRadiusDp = 26f
         )
         // 终端：等宽 + `> ` 前缀；行外壳与方角档共用发丝线，差别只在排版层
         SettingsStyle.TERMINAL -> SettingsStyleSpec(
@@ -214,7 +223,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = true,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 0f
         )
         // 官方列表档：骨架 + 控件全部官方件（宿主：SettingsShared.kt 的 OfficialListSubPage）
         SettingsStyle.M3_LIST -> SettingsStyleSpec(
@@ -232,7 +242,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = false,
             rowEnterSlide = false,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 26f
         )
         // 官方转场档：同一份官方列表 + 每行 SurfaceTransformation（差别只在行转场）
         SettingsStyle.M3_TRANSFORM -> SettingsStyleSpec(
@@ -250,7 +261,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = false,
             rowEnterSlide = false,
-            cardEdgeZoom = true
+            cardEdgeZoom = true,
+            cardRadiusDp = 26f
         )
         // ==== 自研四套：结构先按最接近的既有壳落位，视觉实现各自独立（stylekit/<style>/）====
 
@@ -270,7 +282,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = false,
-            cardEdgeZoom = true
+            cardEdgeZoom = true,
+            cardRadiusDp = 24f
         )
         // 手帐：无卡片，靠下划线分行的纸张感
         SettingsStyle.PAPER -> SettingsStyleSpec(
@@ -288,7 +301,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = true,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 6f
         )
         // 磨砂玻璃：半透明卡，一行一张，柔和的边缘淡出
         SettingsStyle.GLASS -> SettingsStyleSpec(
@@ -306,7 +320,8 @@ object SettingsStylePolicy {
             subPageHero = true,
             animateRootSections = false,
             rowEnterSlide = false,
-            cardEdgeZoom = true
+            cardEdgeZoom = true,
+            cardRadiusDp = 26f
         )
         // 弧列：行沿圆弧排布，最贴圆屏；返回进列表首项
         SettingsStyle.ARC -> SettingsStyleSpec(
@@ -324,7 +339,8 @@ object SettingsStylePolicy {
             subPageHero = false,
             animateRootSections = true,
             rowEnterSlide = true,
-            cardEdgeZoom = false
+            cardEdgeZoom = false,
+            cardRadiusDp = 28f
         )
     }
 

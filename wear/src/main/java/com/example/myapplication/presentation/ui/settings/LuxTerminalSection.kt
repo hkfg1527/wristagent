@@ -205,7 +205,7 @@ fun LuxTerminalContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 60.dp, max = 150.dp)
-                    .background(Wear.Palette.SurfaceAlt, SettingsCardRowShape)
+                    .background(Wear.Palette.SurfaceAlt, settingsCardRowShape())
                     .padding(Wear.Space.Sm)
                     .verticalScroll(transcript)
             ) {

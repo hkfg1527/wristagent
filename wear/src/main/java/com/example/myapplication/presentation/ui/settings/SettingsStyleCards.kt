@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -168,8 +169,16 @@ internal fun SettingsHeroCard(
     }
 }
 
-/** 行卡里的普通行：官方 Card，内容由调用方给。 */
-internal val SettingsCardRowShape = RoundedCornerShape(Wear.Radius.Card)
+/**
+ * 行卡圆角：**按风格取**（`SettingsStyleSpec.cardRadiusDp`）。
+ *
+ * 以前是写死的 `Wear.Radius.Card`（24dp），十套风格共用同一个圆角 —— 气泡和方角看起来一个样，
+ * 正是用户说的"大杂烩"。现在气泡 32（最软）、方角/终端 0（直角）、手帐 6、弧列 28、
+ * 磨砂/大卡片/官方 26。
+ */
+@Composable
+internal fun settingsCardRowShape(): Shape =
+    RoundedCornerShape(SettingsStylePolicy.current().cardRadiusDp.dp)
 
 /** 徽标尺寸上限：没有位图时用缩写，宽度受控。 */
 internal val SettingsBadgeSize = 26.dp

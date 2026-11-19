@@ -106,6 +106,22 @@ class SettingsStylePolicyTest {
     }
 
     @Test
+    fun everyStyleHasItsOwnCardCornerRadius() {
+        // 以前所有风格共用 Wear.Radius.Card(24dp)：气泡和方角看起来一样，正是用户说的"大杂烩"。
+        val radius = SettingsStyle.values().associateWith { SettingsStylePolicy.specOf(it).cardRadiusDp }
+        assertEquals("气泡必须是最软的圆角", 32f, radius[SettingsStyle.BALLOON])
+        assertEquals("方角必须是直角", 0f, radius[SettingsStyle.SQUARE])
+        assertEquals("终端也必须是直角（命令行语义）", 0f, radius[SettingsStyle.TERMINAL])
+        assertEquals("手帐近纸边", 6f, radius[SettingsStyle.PAPER])
+        assertEquals("弧列最大圆角之一", 28f, radius[SettingsStyle.ARC])
+        // 十套里至少要有四种不同的圆角，否则"独立视觉"是假的
+        assertTrue(
+            "圆角必须真的分档，实际=" + radius.values.sorted().distinct(),
+            radius.values.toSet().size >= 4
+        )
+    }
+
+    @Test
     fun terminalIsTheOnlyMonospaceStyle() {
         val mono = all.filter { SettingsStylePolicy.specOf(it).typeface == SettingsTypeface.MONOSPACE }
         assertEquals(listOf(SettingsStyle.TERMINAL), mono)
