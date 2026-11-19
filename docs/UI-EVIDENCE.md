@@ -3,6 +3,23 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
+## 0.0.0.138 · S6 关键发现：M3_TRANSFORM 与 M3_LIST **像素几乎相同**
+
+同一页「语音与唤醒」两套各截一张（都取自 release-check 的 subpageShot）：
+
+| 文件 | 风格 |
+|---|---|
+| `docs/device/v28/transform-voice.png` | `M3_TRANSFORM` |
+| `docs/device/subpages/list-voice.png` | `M3_LIST` |
+
+**像素差：采样 54289 点，不同 98 点 = 0.18%**（阈值：RGB 差和 > 24；步长 2px）。
+差异集中在边缘缩放区，正文/按钮/标题逐像素相同。
+
+结论：官方转场这套**目前与普通官方列表无法分辨**，根因是 `OfficialListSubPage` 的 `transformRows`
+从未被使用（`SurfaceTransformation` / `transformedHeight` 没接）。S6 必须先接它，再谈“肉眼可辨”。
+
+另记：本轮两次 release-check 中一次 7/8（`进入设置页 undefined`，stage 2 偶发），需加重试。
+
 ## 0.0.0.137 · 终端数值条达标（真机）
 
 截图 `docs/device/v27/subpage-slider.png`（网络与请求页）：
