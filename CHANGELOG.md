@@ -13,6 +13,17 @@
 
 ## [未发布]
 
+### 修复：MCP `abort()` 只能断掉一条在途请求（单槽位）
+`McpHttpTransport.active` 原来是**单个槽位**，而同一个 client 会并发发请求（`ensureFresh` 后台刷新 + `callTool`）：
+后开的连接覆盖前者 → `abort()` 断错连接；先结束者的 `finally` 又会把仍在途的连接从槽里清空 →
+此后 `abort()` 变成空操作，取消失效只能等读超时。
+
+- 修法：改成并发集合（`newSetFromMap(ConcurrentHashMap)`），`abort()` 断开并清空全部，
+  各自的 `finally` 只摘自己那一条。
+- 回归：`McpTransportAbortTest` —— 假服务器把 `tools/call` 拖 10 秒，两条请求都进在途后 `abort()`，
+  断言两条都失败且 5 秒内返回。**变异验证**：把 `abort()` 改回"只断最后一条"，
+  用例立刻红（`expected:<2> but was:<1>`）。
+
 ### 测试：给上一轮那条「改了没测」的 MCP 修复补上回归
 `McpToolBinding` 新增 `callToolOverride` 接缝（默认 `null` = 真打远端，生产行为不变）。
 上一轮试了三种办法都造不出"传输层抛异常"（停服务 / 读超时 / `failCallWithRpcError`），

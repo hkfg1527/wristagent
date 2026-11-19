@@ -36,12 +36,22 @@ data class McpTimeouts(
  */
 class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
 
-    @Volatile
-    private var active: HttpURLConnection? = null
+    /**
+     * 在途连接集合（**不是单个槽位**）。
+     *
+     * 同一个 client 会并发发请求：`ensureFresh` 的后台刷新与 `callTool` 可能同时在跑。
+     * 以前只有一个 `active` 槽位 —— 后开的连接覆盖前者，`abort()` 会断错连接；
+     * 先结束者的 `finally` 又会把仍在途的连接从槽里清空，此后 `abort()` 变成空操作、取消失效。
+     */
+    private val active = java.util.Collections.newSetFromMap(
+        java.util.concurrent.ConcurrentHashMap<HttpURLConnection, Boolean>()
+    )
 
     fun abort() {
-        val connection = active ?: return
-        runCatching { connection.disconnect() }
+        for (connection in active.toList()) {
+            runCatching { connection.disconnect() }
+        }
+        active.clear()
     }
 
     fun post(endpoint: McpEndpoint, body: String, headers: Map<String, String>): McpHttpResponse {
@@ -99,7 +109,8 @@ class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
                     "MCP 端点不可达（" + current.url + "）：" + (error.message ?: error.javaClass.simpleName)
                 )
             } finally {
-                active = null
+                // 只摘自己这一条：别的请求可能还在途
+                active.remove(connection)
                 runCatching { connection.disconnect() }
             }
         }
@@ -120,7 +131,7 @@ class McpHttpTransport(private val timeouts: McpTimeouts = McpTimeouts()) {
         connection.setRequestProperty("Accept", "application/json, text/event-stream")
         connection.setRequestProperty("User-Agent", USER_AGENT)
         headers.forEach { entry -> connection.setRequestProperty(entry.key, entry.value) }
-        active = connection
+        active.add(connection)
         return connection
     }
 
