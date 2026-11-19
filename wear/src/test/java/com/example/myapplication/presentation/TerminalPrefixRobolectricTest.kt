@@ -1,6 +1,12 @@
 package com.example.myapplication.presentation
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.wear.compose.material3.MaterialTheme
@@ -53,6 +59,53 @@ class TerminalPrefixRobolectricTest {
         )
     }
 
+
+    /**
+     * 把懒列表整页扫一遍，收集所有出现过的文本（首屏之后的行只有滚动才会组合）。
+     * 这是"页级判据"的公共工具：控件藏在页面深处时，直接在首屏断言会永远为 0。
+     */
+    private fun collectPageTexts(steps: Int = 24): Set<String> {
+        val seen = LinkedHashSet<String>()
+        val scrollable = compose
+            .onAllNodes(
+                hasScrollAction() and
+                    SemanticsMatcher.keyIsDefined(SemanticsProperties.CollectionInfo)
+            )
+            .onFirst()
+        repeat(steps) {
+            compose.onAllNodes(SemanticsMatcher("has text") { node ->
+                node.config.contains(SemanticsProperties.Text)
+            }).fetchSemanticsNodes().forEach { node ->
+                // 直接拿 config 的字符串形态：语义里 Text 的具体类型在不同 compose 版本上不一致，
+                // 这里只需要"出现过哪些文本"，用 toString 最稳。
+                seen.add(node.config.toString())
+            }
+            runCatching { scrollable.performTouchInput { swipeUp() } }
+            compose.waitForIdle()
+        }
+        return seen
+    }
+
+    @Test
+    fun terminalSlidersRenderAsValueBars() {
+        applySettingsStyle(context, SettingsStyle.TERMINAL)
+        val prefs = AgentPreferences(context)
+        compose.setContent {
+            MaterialTheme {
+                com.example.myapplication.presentation.ui.settings.AppearanceContent(
+                    preferences = prefs,
+                    onBack = {}
+                )
+            }
+        }
+        compose.waitForIdle()
+        val texts = collectPageTexts()
+        val bars = texts.filter { it.contains("[■") || it.contains("[□") }
+        assertTrue(
+            "终端档滑杆必须渲染成数值条（扫完整页仍无 [■/[□ 文本：" + texts.take(12) + "）",
+            bars.isNotEmpty()
+        )
+    }
     private companion object {
         /** 与 `TerminalText.ROW_PREFIX` 一致；这里写死一份，改常量时这条会红。 */
         const val TerminalPrefix = "> "
