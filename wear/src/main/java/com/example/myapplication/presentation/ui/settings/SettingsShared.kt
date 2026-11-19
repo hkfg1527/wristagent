@@ -1404,6 +1404,8 @@ internal fun SettingsSlotRow(
      * "官方列表"、"大卡片" 这类风格名的用例与读屏都会失效（0.0.0.128 实测踩过）。
      */
     plainLabel: Boolean = false,
+    /** 标签下方的整行内容槽（终端档数值条等"行尾放不下"的东西）。 */
+    belowContent: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val valueBelowRow = SettingsTextLayout.shouldPlaceValueBelowRow(title, value)
@@ -1519,6 +1521,12 @@ internal fun SettingsSlotRow(
                     maxLines = Int.MAX_VALUE,
                     overflow = TextOverflow.Visible
                 )
+            }
+            // 行尾槽放不下的内容（终端档的数值条就是这种）：整行宽度画在标签下方。
+            // 放进 trailing 会把标题列压到不足两字宽 —— 0.0.0.138 真机截图已经证明了这一点。
+            if (belowContent != null) {
+                Spacer(Modifier.height(SettingsRowLineGap))
+                belowContent.invoke()
             }
         }
     }

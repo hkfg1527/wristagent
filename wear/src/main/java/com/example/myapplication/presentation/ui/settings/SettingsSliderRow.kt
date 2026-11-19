@@ -91,6 +91,34 @@ fun SettingsSliderRow(
         return
     }
 
+    // 终端档：滑杆换成数值条，且画在**标签下方**（belowContent 槽）。
+    // 以前塞在 trailing，把标题列压成每行一个字（0.0.0.138 真机截图）。
+    if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+            com.example.myapplication.presentation.ui.settings.WearAppearance.style
+        )
+    ) {
+        SettingsSlotRow(
+            title = label,
+            subtitle = secondary,
+            modifier = modifier,
+            belowContent = {
+                androidx.compose.foundation.text.BasicText(
+                    text = com.example.myapplication.presentation.ui.settings.stylekit.TerminalText.valueBar(
+                        value, valueRange.start, valueRange.endInclusive
+                    ),
+                    style = androidx.compose.ui.text.TextStyle(
+                        color = com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Foreground,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp)
+                    ),
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+        )
+        return
+    }
+
     if (SettingsStylePolicy.current().slider == SettingsSliderControl.OFFICIAL_SEGMENTED) {
         OfficialSliderRow(
             label = label,
