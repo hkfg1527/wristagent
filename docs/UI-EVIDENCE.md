@@ -3,6 +3,12 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
+## 0.0.0.125 · S3 修好'一行一张卡'（外层组卡不再重复包一层）
+
+- 病因：SettingsBalloonGroup 把 CARD_EACH 也套了外层卡 → 行卡 + 同圆角大卡，肉眼=一张大卡。
+- 修后截图：`docs/device/v24/google-card-perrow.png`（'关于'独立成一张卡，卡间有暗色空隙）
+- 量测对比：长段采样行 402 → **148**；出现卡间空隙 **65px / 101px**；卡宽上限仍 **352px = 176dp**
+
 ## 0.0.0.124 · S3 起手：GOOGLE_CARD 现状量测（暴露真问题）
 
 - 截图：`docs/device/v24/google-card-root.png`（`release-check` 第 2 段自己上机截的）

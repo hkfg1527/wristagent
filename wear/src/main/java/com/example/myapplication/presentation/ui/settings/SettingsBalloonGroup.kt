@@ -54,7 +54,10 @@ fun SettingsGroupCard(
         // - HAIRLINE_FLAT（方角/终端）：行靠行间发丝线分隔，再套卡就是"卡里画线"，两种外壳打架。
         // 全项目只有这一个 SettingsGroupCard 定义（0.0.0.70 用 grep 确认过），根页与子页都走这里。
         val rowShell = SettingsStylePolicy.current().rowShell
-        if (rowShell != SettingsRowShell.CARD_GROUP && rowShell != SettingsRowShell.CARD_EACH) {
+        // **只有 CARD_GROUP 才在外层套卡**。CARD_EACH 以前也被套了一层 —— 于是"每行一张卡"
+        // 变成了"每行一张卡，装在另一张同圆角的卡里"：两层的圆角与颜色一模一样，肉眼看到的就是
+        // 一张大卡里塞着几行（0.0.0.124 的 GOOGLE_CARD 截图就是这样）。
+        if (rowShell != SettingsRowShell.CARD_GROUP) {
             Column(modifier = Modifier.width(SettingsContentWidth)) {
                 CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
                     content()
