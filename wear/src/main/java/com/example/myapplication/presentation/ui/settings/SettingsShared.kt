@@ -355,7 +355,11 @@ private fun OfficialListSubPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Wear.Palette.Bg)
+            .background(
+                // 终端档用近黑底（TerminalPalette.Background）：比全局背景更冷更暗，
+                // 绿字才能既高对比又整体低亮度。其他档仍是全局背景。
+                if (TerminalPalette.isTerminal(WearAppearance.style)) TerminalPalette.Background else Wear.Palette.Bg
+            )
     ) {
         LaunchedEffect(Unit) {
             withFrameNanos { }
@@ -508,7 +512,11 @@ fun SettingsSubPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Wear.Palette.Bg)
+            .background(
+                // 终端档用近黑底（TerminalPalette.Background）：比全局背景更冷更暗，
+                // 绿字才能既高对比又整体低亮度。其他档仍是全局背景。
+                if (TerminalPalette.isTerminal(WearAppearance.style)) TerminalPalette.Background else Wear.Palette.Bg
+            )
             // 下滑退出：只有真实触摸、且列表已到顶时才累积；表冠不产生指针事件，天然进不来。
             // 到顶判据走 isAtScrollTop()，不能用 canScrollBackward（autoCentering 下恒为 true）。
             // 浮层打开时一律不许下滑退页：否则在对话框上往下拖 50dp 就把整页退掉，
