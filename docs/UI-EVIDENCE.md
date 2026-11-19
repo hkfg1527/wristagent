@@ -3,6 +3,20 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
+## 0.0.0.138 · 终端数值条接线**已回滚**（真机截图暴露版式问题）
+
+`docs/device/v27/subpage-slider.png`（网络与请求页）暴露两个真问题：
+
+1. 8 格时 `[■■□□□□□□] 22%` **折行**成两行；
+2. 改成 6 格后不折行了，但**标签被挤成 `> 体检探…` 三行**（每行一个字），因为数值条塞在 trailing 槽里把
+   标题列压到不足两字宽；改成 5 格 + 11sp 仍然挤。
+
+**结论：数值条不能放在 trailing 槽。** 正确做法是给 `SettingsSlotRow` 加一个 `belowContent` 槽
+（标签下方、整行宽度），数值条画在那里 —— 既不挤标签，也不会折行。
+
+本轮已 `git checkout` 回滚 `SettingsSliderRow` 的终端分支（宁可保留滑杆，也不留一个挤坏的版式）。
+`TerminalText.valueBar` 的 4 条纯函数判据保留；页级判据（`[■` 文本存在）也随之失效，需随新槽位重写。
+
 ## 0.0.0.137 · S4 终端子页证据（本次拿到）
 
 - 截图：`docs/device/v27/subpage.png`（release-check 新增的 `subpageShot()` 自动拍的「语音与唤醒」页）

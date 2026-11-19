@@ -185,6 +185,9 @@ const device = () => {
   };
   const shot = subpageShot('语音与唤醒', 'subpage.png');
   console.log('  子页证据：' + (shot ? shot : '未取得（目标行没在 16 步内出现）'));
+  // 第二个子页：网络与请求（含滑杆 —— 终端档要看到 `[■■□□] 50%` 数值条）
+  const shot2 = subpageShot('网络与请求', 'subpage-slider.png');
+  console.log('  滑杆页证据：' + (shot2 ? shot2 : '未取得'));
 
   return found;
 };
