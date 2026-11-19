@@ -359,12 +359,10 @@ private fun OfficialListSubPage(
 
         androidx.wear.compose.foundation.lazy.TransformingLazyColumn(
             state = state,
-            // 磁滑：官方 Transforming 档的吸附惯性，节距按风格给（官方两套也吃这一条）
+            // 磁滑：官方 Transforming 档的吸附惯性（吸附到"某一项正好居中"，
+            // snapOffset 是相对屏心的锚点偏移，不要传行距 —— 0.0.0.118 就是这么踩的）
             flingBehavior = androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
-                .snapFlingBehavior(
-                    state = state,
-                    snapOffset = StyleMotions.current.snapPitchDp.dp
-                ),
+                .snapFlingBehavior(state = state),
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent {
@@ -787,10 +785,10 @@ fun SettingsSubPage(
 private fun settingsFlingBehavior(listState: ScalingLazyListState): androidx.compose.foundation.gestures.FlingBehavior {
     val motion = StyleMotions.current
     return if (motion.snapToRows) {
-        ScalingLazyColumnDefaults.snapFlingBehavior(
-            state = listState,
-            snapOffset = motion.snapPitchDp.dp
-        )
+        // snapOffset 是**吸附锚点相对屏心的偏移**，不是行距！默认 0 = 吸附到"某一项正好居中"。
+        // 0.0.0.118 我误把行距（72dp）当成节距传进来，结果每格偏移 72dp —— JVM 手势测试实测
+        // centerOffset = -4px；改回默认 0 后实测 centerOffset = 0（精确居中）。
+        ScalingLazyColumnDefaults.snapFlingBehavior(state = listState)
     } else {
         androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
     }

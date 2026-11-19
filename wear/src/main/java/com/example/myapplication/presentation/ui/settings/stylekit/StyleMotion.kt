@@ -23,21 +23,20 @@ data class StyleMotion(
     val exitSlideDp: Float,
     /** 单行退场时长。 */
     val exitDurationMs: Int,
-    /** 松手后是否吸附到最近一行（表冠与手势共用）。 */
+    /**
+     * 松手后是否吸附（磁滑）。
+     *
+     * 吸附用的是官方 `snapFlingBehavior(state)`：**吸附到某一项正好居中**。
+     * 它没有"节距"参数 —— `snapOffset` 是相对屏心的锚点偏移，传行距会每格偏一行
+     * （0.0.0.118 就这么错过一次，JVM 手势测试实测 -4px，改回默认 0 后精确居中）。
+     */
     val snapToRows: Boolean,
     /** 贴边时卡片最小缩放（1f = 不缩放）。 */
     val edgeScaleMin: Float,
     /** 贴边时最小透明度。 */
     val edgeAlphaMin: Float,
     /** 入场起始缩放（1f = 不缩放）。 */
-    val enterScaleFrom: Float = 1f,
-    /**
-     * 磁滑吸附节距（dp）：松手后按这个间距吸附到最近一行。
-     *
-     * 取"行高 + 行间隙"的实际节距，吸附才会正好停在一行上；各套风格行高不同，所以逐套给值。
-     * [snapToRows] 为 false 时忽略。
-     */
-    val snapPitchDp: Float = 64f
+    val enterScaleFrom: Float = 1f
 ) {
     init {
         require(enterDurationMs in 60..600) { "入场时长越界：$enterDurationMs" }
@@ -46,7 +45,6 @@ data class StyleMotion(
         require(edgeScaleMin in 0.75f..1f) { "边缘缩放越界：$edgeScaleMin" }
         require(edgeAlphaMin in 0.3f..1f) { "边缘透明度越界：$edgeAlphaMin" }
         require(enterScaleFrom in 0.75f..1f) { "入场缩放越界：$enterScaleFrom" }
-        require(snapPitchDp in 36f..120f) { "吸附节距越界：$snapPitchDp" }
     }
 }
 
@@ -55,8 +53,8 @@ object StyleMotions {
     /**
      * 每套风格一行；缺一套编译期就过不了。
      *
-     * 设计依据见 `docs/UI-REBUILD-PLAN.md` §2：三套自绘档要"有性格"（气泡浮、方角硬、终端不吸附），
-     * 三套官方档克制（官方默认节奏，不额外加位移）。
+     * 设计依据见 `docs/UI-REBUILD-PLAN.md` §2：自研档要"有性格"（气泡浮、方角硬、终端不吸附），
+     * 官方档克制（官方默认节奏，不额外加位移）。
      */
     fun of(style: SettingsStyle): StyleMotion = when (style) {
         // 气泡：从下方轻轻浮上来，慢一点、错峰大一点，贴合"软"的气质
@@ -68,8 +66,7 @@ object StyleMotions {
             exitDurationMs = 200,
             snapToRows = true,
             edgeScaleMin = 0.94f,
-            edgeAlphaMin = 0.5f,
-            snapPitchDp = 72f
+            edgeAlphaMin = 0.5f
         )
         // 方角：短促、干脆，位移小、错峰小
         SettingsStyle.SQUARE -> StyleMotion(
@@ -92,8 +89,7 @@ object StyleMotions {
             snapToRows = true,
             edgeScaleMin = 0.90f,
             edgeAlphaMin = 0.4f,
-            enterScaleFrom = 0.92f,
-            snapPitchDp = 80f
+            enterScaleFrom = 0.92f
         )
         // 终端：命令行语义 —— 连续滚动**不吸附**，只有淡出，没有位移与缩放
         SettingsStyle.TERMINAL -> StyleMotion(
@@ -104,8 +100,7 @@ object StyleMotions {
             exitDurationMs = 100,
             snapToRows = false,
             edgeScaleMin = 1f,
-            edgeAlphaMin = 0.5f,
-            snapPitchDp = 44f
+            edgeAlphaMin = 0.5f
         )
         // 官方列表：不给额外位移，保持库的默认节奏
         SettingsStyle.M3_LIST -> StyleMotion(
@@ -116,8 +111,7 @@ object StyleMotions {
             exitDurationMs = 160,
             snapToRows = true,
             edgeScaleMin = 0.95f,
-            edgeAlphaMin = 0.5f,
-            snapPitchDp = 72f
+            edgeAlphaMin = 0.5f
         )
         // 官方转场：缩放交给 SurfaceTransformation，这里只声明吸附与贴边
         SettingsStyle.M3_TRANSFORM -> StyleMotion(
@@ -128,8 +122,7 @@ object StyleMotions {
             exitDurationMs = 180,
             snapToRows = true,
             edgeScaleMin = 0.90f,
-            edgeAlphaMin = 0.4f,
-            snapPitchDp = 72f
+            edgeAlphaMin = 0.4f
         )
         // 霓虹：快、亮、有回弹感（缩放浮入），贴边缩得明显
         SettingsStyle.NEON -> StyleMotion(
@@ -141,8 +134,7 @@ object StyleMotions {
             snapToRows = true,
             edgeScaleMin = 0.88f,
             edgeAlphaMin = 0.42f,
-            enterScaleFrom = 0.94f,
-            snapPitchDp = 72f
+            enterScaleFrom = 0.94f
         )
         // 手帐：缓慢、几乎不位移，像翻纸
         SettingsStyle.PAPER -> StyleMotion(
@@ -164,8 +156,7 @@ object StyleMotions {
             exitDurationMs = 220,
             snapToRows = true,
             edgeScaleMin = 0.92f,
-            edgeAlphaMin = 0.45f,
-            snapPitchDp = 72f
+            edgeAlphaMin = 0.45f
         )
         // 弧列：沿弧线扫入（位移最大），贴边只淡出不缩放（弧线本身已在动）
         SettingsStyle.ARC -> StyleMotion(
@@ -176,8 +167,7 @@ object StyleMotions {
             exitDurationMs = 200,
             snapToRows = true,
             edgeScaleMin = 1f,
-            edgeAlphaMin = 0.35f,
-            snapPitchDp = 68f
+            edgeAlphaMin = 0.35f
         )
     }
 

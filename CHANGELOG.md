@@ -13,6 +13,15 @@
 
 ## [未发布]
 
+### 修复：磁滑（snap）参数用错 —— `snapOffset` 是屏心锚点偏移，不是行距
+官方 `snapFlingBehavior` 吸附的是"某一项正好居中"，`snapOffset` 表示吸附锚点相对屏心的偏移量。
+之前把行距（72dp）当成节距传进去，等于给吸附网格整体偏移 72dp，看起来就像"没有吸附"。
+
+- 新增 `SnapFlingReachTest`：Robolectric 里用同一段 `swipeUp()` 跑吸附组与对照组，读 `centerItemScrollOffset`。
+  **实测 `snapOffset=72dp` → centerOffset=-4px；默认 `0dp` → centerOffset=0**（精确居中）。
+- 两条列表改回 `snapFlingBehavior(state)`；`StyleMotion` 删掉概念错误的 `snapPitchDp`，只留 `snapToRows` 开关。
+- 真机 5 次快甩落点 `28/62/62/62/62` px（稳定收敛）；精确居中由 JVM 测试证明，真机只证明落点稳定。
+
 ### UI S1：逐行动效按风格读表 + 磁滑接线（**未生效，待查**）
 - 入场/退场位移、时长、错峰、入场缩放全部改读 `StyleMotions.current`，不再是写死的 4dp/40ms/140ms；
   入场缩放 `scaleX == scaleY`（不产生横向形变）。
