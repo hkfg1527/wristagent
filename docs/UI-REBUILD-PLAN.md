@@ -81,6 +81,17 @@ presentation/ui/settings/stylekit/
 
 ## 4. 已知要顺带修掉的三件事
 
+0. **官方滑杆丢了无障碍标签（S1 拦路石，2026-11-20 实测）**：把 BALLOON 的滑杆槽位改成
+   `OFFICIAL_SEGMENTED` 后，11 条滑杆用例全红 —— 节点上不再同时带 `contentDescription`（"某设置项"）
+   与 `SetProgress`（区间）。现状：
+   - 官方 `Slider` 自己带 `SetProgress`，但行标签没并进去，读屏只念百分比不念是哪一项；
+   - `M3_LIST` / `M3_TRANSFORM` **也是** `OFFICIAL_SEGMENTED`，但现有用例只在**默认风格（BALLOON）**
+     下渲染这些页面，所以这两套的滑杆无障碍**从来没被测过**。
+   - 修法（下一轮）：在官方滑杆行上建立独立语义边界，把标签与区间并到同一个可调节节点
+     （`Modifier.semantics(mergeDescendants = true) { contentDescription = …; stateDescription = … }`
+     包住官方 `Slider`），再补一条"在 M3_LIST 风格下渲染并断言同一节点带标签+区间"的用例。
+   只有修完这条，BALLOON 才能安全切到官方件，S1 才算真正开始。
+
 1. **边缘缩放是空操作**：`CardEdgeZoom.MinScale = 1.00f` → 缩放恒等于 1（`SettingsCardEdgeZoom.kt:40`）。按 §2 表给每套真实值，并把判据从「宽度 == 176dp」改成「未缩放基准宽度 == 176dp」。
 2. **没有磁滑**：全仓无 `snapFlingBehavior`。要加一个共享的吸附 fling（表冠与手势共用）。
 3. **M3_TRANSFORM 名不副实**：`transformRows` 从未被使用 → 与 M3_LIST 逐像素相同。
