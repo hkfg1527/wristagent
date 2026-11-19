@@ -110,9 +110,18 @@ class SettingsGroupLineGuardTest {
             "等比缩小改由卡片承担",
             cardZoom.contains("scaleX = scale") && cardZoom.contains("scaleY = scale")
         )
-        // 这条项目里是"只淡出不缩放"：MinScale 恒为 1.0（见 CONTEXT §1 与硬约束），
-        // 所以这里钉的是"卡不横向形变"，不是"缩到 70%"。
-        assertTrue("卡片边缘不得缩放（只淡出）", cardZoom.contains("const val MinScale = 1.00f"))
+        // 用户 2026-11-20 明确要求"边缘缩放要真做，不能是空操作"：
+        // 以前这里钉的是 `MinScale = 1.00f`（只淡出不缩放）。现在改成钉**两条真正的不变量**：
+        // ① 最小缩放必须是 0.92（真缩放，但不会缩到像缩小版 App）；
+        // ② 缩放两轴同值（禁止横向形变），代码里必须是 `scaleX = scale` / `scaleY = scale`。
+        assertTrue(
+            "边缘缩放必须真的发生（0.92），不再是空操作",
+            cardZoom.contains("const val MinScale = 0.92f")
+        )
+        assertTrue(
+            "两轴必须同值，禁止横向形变",
+            cardZoom.contains("scaleX = scale") && cardZoom.contains("scaleY = scale")
+        )
         assertFalse("禁止只做横向拉伸", cardRow.contains("scaleX = SettingsCurveMath.contentScaleX"))
         assertTrue(pressHelper.contains("Wear.Motion.quick()"))
         assertTrue(pressHelper.contains("lift.snapTo(1f)"))

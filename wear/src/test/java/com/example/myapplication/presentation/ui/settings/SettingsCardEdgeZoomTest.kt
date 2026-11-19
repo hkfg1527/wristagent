@@ -24,12 +24,20 @@ class SettingsCardEdgeZoomTest {
      * 缩放恒为 1.0，边缘只淡出。这条测试钉住这个解，防止以后又把它改回"缩一点"。
      */
     @Test
-    fun cardsKeepOneWidthSoTheEdgeEffectIsFadeOnly() {
-        assertEquals("缩放必须恒为 1.0：任何等比缩放都会改变卡片宽度", 1f, CardEdgeZoom.MinScale, 0.0001f)
+    fun theEdgeEffectReallyScalesButNeverBelowTheDocumentedFloor() {
+        // 用户 2026-11-20 要求"边缘缩放要真做，不能是空操作"：以前这里是 MinScale 恒为 1.0。
+        // 现在钉三件事：有下限 0.92、屏心必是 1.0、贴边单调收缩且**永不小于下限**。
+        assertEquals("贴边最小缩放", 0.92f, CardEdgeZoom.MinScale, 0.0001f)
         assertTrue("边缘必须仍然淡出", CardEdgeZoom.MinAlpha <= 0.5f)
+        assertEquals("屏心不缩放", 1f, CardEdgeZoom.scaleFor(0f), 0.0001f)
         var d = 0f
+        var previous = 1f
         while (d <= 2f) {
-            assertEquals("任何距离下缩放都必须是 1", 1f, CardEdgeZoom.scaleFor(CardEdgeZoom.progress(d)), 0.0001f)
+            val scale = CardEdgeZoom.scaleFor(CardEdgeZoom.progress(d))
+            assertTrue("缩放不得放大（scale=$scale d=$d）", scale <= 1f + 0.0001f)
+            assertTrue("缩放不得低于下限（scale=$scale d=$d）", scale >= 0.92f - 0.0001f)
+            assertTrue("必须单调收缩（previous=$previous scale=$scale）", scale <= previous + 0.0001f)
+            previous = scale
             d += 0.05f
         }
     }

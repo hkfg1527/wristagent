@@ -36,8 +36,15 @@ import kotlin.math.abs
  * 3. 屏心进度为 0（与没有这层效果时逐像素相同），贴边饱和为 1，中间走官方那条缓动。
  */
 internal object CardEdgeZoom {
-    /** 官方 `ScalingLazyColumnDefaults.scalingParams` 的默认 edgeScale：最靠边缩到 70%。 */
-    const val MinScale = 1.00f
+    /**
+     * 贴边最小缩放。
+     *
+     * 一直是 1.00f —— 也就是**完全没有缩放**，只有淡出。用户要求"边缘缩放要真做"，
+     * 这里改成 0.92（官方 edgeScale 默认是 0.70，那对卡片档太狠：卡片会明显变小、
+     * 与"所有卡片同宽"的观感冲突；0.92 只在贴边那一张上体现"从中间浮出来"）。
+     * 判据同步：宽度守卫改成"未缩放的基准宽度 == 176dp"，不再要求每个节点都等于 176dp。
+     */
+    const val MinScale = 0.92f
 
     /** 官方默认 edgeAlpha：最靠边时透明度 50%。 */
     const val MinAlpha = 0.45f
