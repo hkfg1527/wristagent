@@ -140,6 +140,9 @@ import androidx.compose.ui.platform.LocalContext
  */
 val SettingsContentWidth: Dp = SettingsDesignMath.ContentWidthDp.dp
 
+/** 大卡片档「小方块卡」的边长（88dp）：正好是通栏卡宽度的一半，与 8dp 间距同网格。 */
+val SettingsSquareCardDp: Dp = 88.dp
+
 /** 卡片外壳最大宽度：233dp 屏 216dp，192dp 屏退回 176dp。 */
 @Composable
 fun settingsCardWidth(): Dp {
@@ -1136,6 +1139,8 @@ internal fun SettingsCardRow(
      * 既听不出当前选的是哪个，也没有 `Selected` 语义可供断言（0.0.0.90 审查点名）。
      */
     selected: Boolean? = null,
+    /** 大卡片档：这一行画成"小方块卡"（见 [SettingsSlotRow] 的说明）。 */
+    squareCard: Boolean = false,
     minHeight: Dp = SettingsSpacingMath.MinRowHeightDp.dp,
     content: @Composable () -> Unit
 ) {
@@ -1200,7 +1205,13 @@ internal fun SettingsCardRow(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             SettingsM3Card(
-                modifier = Modifier.width(SettingsContentWidth).then(selectedSemantics),
+                // 小方块卡：边长 88dp（比 176dp 通栏卡矮一半宽一半），内容居中；
+                // 其余行仍是通栏长卡 —— 一页里两种粒度混排，这是用户要的"有些项单独做成小方块"。
+                modifier = if (squareCard) {
+                    Modifier.size(SettingsSquareCardDp).then(selectedSemantics)
+                } else {
+                    Modifier.width(SettingsContentWidth).then(selectedSemantics)
+                },
                 onClick = onClick
             ) {
                 // 内边距交给官方 Card 的 contentPadding：这里再补一层会把文字挤成两行
@@ -1368,10 +1379,46 @@ internal fun SettingsSlotRow(
     subItem: Boolean = false,
     /** 非 null 表示这一行是单选行（见 [SettingsCardRow] 的 selected 说明）。 */
     selected: Boolean? = null,
+    /**
+     * 大卡片档里的"小方块卡"粒度。
+     *
+     * 用户 2026-11-20：「有些单独的像甚至可以做成小方块卡片」。只有 `CARD_EACH` 档会用到它；
+     * 开关这类"一行一个动作"的项做成方块，滑杆/长文本仍走通栏长卡 —— 一页里两种粒度混排，
+     * 才不会所有行都一样长。
+     */
+    squareCard: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val valueBelowRow = SettingsTextLayout.shouldPlaceValueBelowRow(title, value)
-    SettingsCardRow(modifier = modifier, onClick = onClick, selected = selected) {
+    SettingsCardRow(
+        modifier = modifier,
+        onClick = onClick,
+        selected = selected,
+        squareCard = squareCard
+    ) {
+        // 方块卡里放不下"标签 + 控件"两行：只保留控件并居中，标签转成无障碍描述，
+        // 这样读屏仍然能念出这是哪一项（视觉上是纯方块，符合"有些项单独做成小方块"）。
+        if (squareCard) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = title },
+                contentAlignment = Alignment.Center
+            ) {
+                val slot = trailing
+                if (slot != null) {
+                    slot.invoke()
+                } else {
+                    BasicText(
+                        text = title,
+                        style = SettingsRowLabelStyle.copy(textAlign = TextAlign.Center),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            return@SettingsCardRow
+        }
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

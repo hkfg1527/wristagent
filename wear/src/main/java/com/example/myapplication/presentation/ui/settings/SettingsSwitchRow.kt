@@ -60,6 +60,8 @@ fun SettingsSwitchRow(
         subtitleBelowRow = subtitleBelowRow,
         modifier = modifier,
         onClick = { onCheckedChange(!checked) },
+        // 大卡片档：开关行做成"小方块卡"（用户要的混排粒度）；其他档仍是通栏行。
+        squareCard = SettingsStylePolicy.current().rowShell == SettingsRowShell.CARD_EACH,
         trailing = { SettingsCompactSwitch(checked = checked) }
     )
 }
