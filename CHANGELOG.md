@@ -13,6 +13,15 @@
 
 ## [未发布]
 
+### UI S1：逐行动效按风格读表 + 磁滑接线（**未生效，待查**）
+- 入场/退场位移、时长、错峰、入场缩放全部改读 `StyleMotions.current`，不再是写死的 4dp/40ms/140ms；
+  入场缩放 `scaleX == scaleY`（不产生横向形变）。
+- 磁滑：两条列表（`ScalingLazyColumn` / `TransformingLazyColumn`）都接官方 `snapFlingBehavior`，
+  节距按风格给（`StyleMotion.snapPitchDp`，36..120 校验），终端档保留连续滚动。
+- **未验证/疑似未生效**：BALLOON（snap 开）与 TERMINAL（snap 关）同样慢拖 100px，锚点位移
+  -70px / -69px，没有区别。慢拖末速接近 0 可能根本没进 `performFling`，也可能是自定义表冠处理器
+  与外层手势包装吃掉了这条路径。下一步先定位，不把"磁滑"当已完成。
+
 ### UI 重构 S0：设置页从 6 套风格扩到 10 套（互相独立）
 用户要求「全部都按各自风格重新做」「做完十套风格，相互独立」。本轮先落地架构，视觉逐套实现。
 

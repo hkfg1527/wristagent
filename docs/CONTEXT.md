@@ -10,11 +10,11 @@
 **我是谁**：这台手表上 Wrist Agent 的常驻工程师。行事准则在 `docs/SELF.md`（用户可改），核心一句：
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
-**现在在哪**（截至 2026-11-20 02:05）：
-- 内部版 `0.0.0.117` / versionCode 155；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
-- 单测基线 **1409 条 / 218 套件全绿**（`./gradlew :wear:testDebugUnitTest` 实测）。
-- **UI 全面重构已开工（用户 2026-11-20 授权，目标改成十套风格）**：
-  计划 `docs/UI-REBUILD-PLAN.md`，说明书 `docs/UI-STYLES.md`。S0 已完成：十套入册 + 动效参数表 `stylekit/StyleMotion.kt`。
+**现在在哪**（截至 2026-11-20 02:30）：
+- 内部版 `0.0.0.118` / versionCode 156；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
+- 单测基线 **1409 条 / 218 套件全绿**。
+- **UI 重构 S1 进行中**：入场/退场动效已按风格读表；磁滑用官方 `snapFlingBehavior` 接线，
+  但**实测未生效**（见 0.0.0.118 记录），下一步先查清再谈"做完了"。
 - CI：`Android CI` 已稳定通过（`f4f5b3e` / `a8abad3` 两次 `success`）；以前每次 push 都失败并给作者发邮件，原因与修法见 0.0.0.115。
 - 设置页巡检：`docs/SETTINGS-PAGEWALK.md`，**根页 14 个可点条目全部验过**（能打开 + 能返回根页 + 页内有内容）。
   两级结构已记档：`子代理模式` 在工具与 MCP 页内；`会话与上下文` 是提示词与记忆页里的一行。
@@ -46,6 +46,19 @@
 - 内部版 `0.0.0.117`（versionCode 155）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
 - 单测基线 **1409** 条 / **218** 套件全绿。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
+
+**0.0.0.118 · S1：逐行动效改为按风格读表；磁滑接线（实测未生效）**
+- `SettingsRowStagger.kt` 不再用写死的 4dp/40ms/140ms：入场位移、时长、错峰、退场位移与时长、
+  入场缩放全部读 `StyleMotions.current`；入场缩放两轴同值（不产生横向形变）。
+- 磁滑：`ScalingLazyColumn` 与 `TransformingLazyColumn` 都换成官方
+  `*Defaults.snapFlingBehavior(state, snapOffset = 该风格节距)`；`StyleMotion` 新增 `snapPitchDp`
+  （36..120 校验），TERMINAL 仍走连续衰减。
+- **实测结论（重要）**：BALLOON（snap 开、节距 72dp=144px）与 TERMINAL（snap 关）做同样的
+  100px 慢拖，锚点位移分别是 **-70px / -69px** —— 两者没有差别，说明吸附**没有生效**。
+  慢拖末速接近 0，可能根本没进入 `performFling`；也可能是自定义 `onRotaryScrollEvent` +
+  外层手势包装吃掉了这条路径。**未定论，下一步先定位**，不要声称"磁滑已完成"。
+- 表冠吸附同样未做：rotary 走自建 `dispatchRawDelta`，没接 `HighResSnapRotaryScrollableBehavior`。
+- 复核脚本：`build-logs/snap-probe2.ps1`（锚点前后位移对比）。
 
 **0.0.0.117 · UI 重构 S0：十套风格入册 + 动效参数表**
 - 用户改口：不是六套，而是 **十套互相独立**。新增四套自研风格：

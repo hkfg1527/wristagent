@@ -15,6 +15,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
 import com.example.myapplication.presentation.ui.theme.Wear
 import kotlinx.coroutines.delay
 
@@ -166,35 +168,45 @@ fun SettingsStaggeredRow(
     val playsEnter = remember(index) { stagger.claimEnter(index) }
     val enter = remember(index) { Animatable(if (playsEnter) 0f else 1f) }
 
+    // 动效参数按风格取（stylekit/StyleMotion.kt）。以前这里是写死的 4dp / 40ms / 140ms，
+    // 十套风格只能共用一套节奏；现在每套风格有自己的入场位移、时长与错峰。
+    val motion = StyleMotions.current
+
     LaunchedEffect(index) {
         if (playsEnter) {
-            val startMs = staggerDelayMs(index, SettingsRowEnterStepMs, SettingsRowEnterCapMs)
+            val stepMs = if (motion.staggerMs > 0) motion.staggerMs else SettingsRowEnterStepMs
+            val startMs = staggerDelayMs(index, stepMs, maxOf(SettingsRowEnterCapMs, stepMs * 4))
             if (startMs > 0) delay(startMs.toLong())
-            enter.animateTo(1f, Wear.Motion.base())
+            enter.animateTo(1f, tween(durationMillis = motion.enterDurationMs))
         }
     }
 
     // 退场反向起跑：末行先走，标题最后走。行数由调用方传入，子页行数与根页不同也能正确反向。
-    val exitStartMs = remember(index, rowCount) {
-        staggerDelayMs(rowCount - 1 - index, SettingsRowExitStepMs, SettingsRowExitCapMs)
+    val exitStepMs = if (motion.staggerMs > 0) motion.staggerMs else SettingsRowExitStepMs
+    val exitStartMs = remember(index, rowCount, exitStepMs) {
+        staggerDelayMs(rowCount - 1 - index, exitStepMs, maxOf(SettingsRowExitCapMs, exitStepMs * 4))
     }
 
     val density = LocalDensity.current
-    val enterOffsetPx = with(density) { RowEnterOffset.toPx() }
-    val exitOffsetPx = with(density) { RowExitOffset.toPx() }
+    val enterOffsetPx = with(density) { motion.enterSlideDp.dp.toPx() }
+    val exitOffsetPx = with(density) { motion.exitSlideDp.dp.toPx() }
 
     // 卡片档只做淡入、不做位移：入场时每行先下移 24dp 再上浮，位移期间会压过上一张卡 ——
     // 实机连拍可见相邻两张卡的扫描行程连成一整段（h≈293 = 两张卡），静止时才分开。
-    // 卡片之间的 8dp 间隙必须始终存在，所以位移在卡片档里恒为 0；其余三套保持原来的浮入。
-    // 原来是 val slideOnEnter = WearAppearance.style != SettingsStyle.GOOGLE_CARD，现在读表
-    val slideOnEnter = SettingsStylePolicy.current().rowEnterSlide
+    // 卡片之间的 8dp 间隙必须始终存在，所以位移在卡片档里恒为 0；其余档位保持浮入。
+    // 现在两条都读表：结构看 rowEnterSlide，动效看 StyleMotion.enterSlideDp。
+    val slideOnEnter = SettingsStylePolicy.current().rowEnterSlide && motion.enterSlideDp > 0f
     Box(
         modifier = modifier.graphicsLayer {
             val enterValue = enter.value
-            val exitValue = exitFraction(exit.elapsedMs, exitStartMs, SettingsRowExitDurationMs)
+            val exitValue = exitFraction(exit.elapsedMs, exitStartMs, motion.exitDurationMs)
             val enterOffset = if (slideOnEnter) (1f - enterValue) * enterOffsetPx else 0f
             translationY = enterOffset + exitValue * exitOffsetPx
             alpha = enterValue * (1f - exitValue)
+            // 入场缩放（GOOGLE_CARD / NEON 用）：两轴同值，禁止横向形变
+            val enterScale = 1f + (motion.enterScaleFrom - 1f) * (1f - enterValue)
+            scaleX = enterScale
+            scaleY = enterScale
         }
     ) {
         content()

@@ -20,6 +20,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.rememberOverscrollEffect
@@ -104,6 +105,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -357,6 +359,12 @@ private fun OfficialListSubPage(
 
         androidx.wear.compose.foundation.lazy.TransformingLazyColumn(
             state = state,
+            // 磁滑：官方 Transforming 档的吸附惯性，节距按风格给（官方两套也吃这一条）
+            flingBehavior = androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
+                .snapFlingBehavior(
+                    state = state,
+                    snapOffset = StyleMotions.current.snapPitchDp.dp
+                ),
             modifier = Modifier
                 .fillMaxSize()
                 .onRotaryScrollEvent {
@@ -569,8 +577,10 @@ fun SettingsSubPage(
                 .focusRequester(listFocusRequester)
                 .focusable(),
             state = listState,
-            // 显式钉死连续衰减惯性，不吃库默认值（默认随时可能随版本改成吸附）
-            flingBehavior = ScrollableDefaults.flingBehavior(),
+            // 磁滑：松手吸附到最近一行（官方 snapFlingBehavior，节距按风格给）。
+            // 以前这里是写死的 ScrollableDefaults.flingBehavior() —— 没有任何吸附；
+            // TERMINAL 例外：命令行语义要连续滚动，仍然用连续衰减。
+            flingBehavior = settingsFlingBehavior(listState),
             rotaryScrollableBehavior = null,
             overscrollEffect = null,
             // 关闭逐行等比缩放：曲面宽度与内容呼吸由卡片几何负责
@@ -763,6 +773,29 @@ fun SettingsSubPage(
  * [SettingsLayoutMath.BottomScrimDp]，底部可达高度 [Wear.Size.SettingsBottomInset] 大于后者，
  * 所以最后一行永远不会停在遮罩里。
  */
+/**
+ * 磁滑（snap）惯性：松手后吸附到最近一行。
+ *
+ * 用官方 [ScalingLazyColumnDefaults.snapFlingBehavior]，节距取该风格的行距（[StyleMotions]）。
+ * [StyleMotions.snapToRows] 关闭时退回连续衰减 —— 终端档要的就是命令行那种连续滚动。
+ *
+ * 表冠路径目前仍是 `dispatchRawDelta` + 连续衰减（rotary 使用的是自建处理器，不是库的
+ * RotaryScrollableBehavior），所以这一条**只作用于手指滑动/惯性**；表冠吸附留待接入
+ * `HighResSnapRotaryScrollableBehavior` 后再补。
+ */
+@Composable
+private fun settingsFlingBehavior(listState: ScalingLazyListState): androidx.compose.foundation.gestures.FlingBehavior {
+    val motion = StyleMotions.current
+    return if (motion.snapToRows) {
+        ScalingLazyColumnDefaults.snapFlingBehavior(
+            state = listState,
+            snapOffset = motion.snapPitchDp.dp
+        )
+    } else {
+        androidx.compose.foundation.gestures.ScrollableDefaults.flingBehavior()
+    }
+}
+
 @Composable
 fun SettingsEdgeScrim(modifier: Modifier = Modifier) {
     val topPx = SettingsLayoutMath.TopScrimDp.dp
