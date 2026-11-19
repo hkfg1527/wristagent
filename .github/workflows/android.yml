@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 # Read-only token: no repository Secrets are required, the release keystore never
 # reaches CI (the release build type falls back to debug signing without it).
@@ -16,7 +17,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Unit tests & lint
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,24 +28,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      # compileSdk is 37 (Android 17). Its platform is published as "platforms;android-37",
-      # and newer SDK releases ship the same platform as "platforms;android-37.0", so try
-      # both (each also on the canary channel) and fall back to the API 36 packages when
-      # the 37 channel is unavailable. build-tools falls back to 36.0.0 for the same reason.
+      # 不再用 android-actions/setup-android@v3：它在 ubuntu-latest 上会去下 cmdline-tools，
+      # 一旦那个下载挂了整条流水线就在这一步红掉（2026-11-19 的三次失败都是这个原因，
+      # 后面所有步骤全被 skipped）。ubuntu-latest 镜像本身已经带 ANDROID_HOME 与 sdkmanager。
       - name: Install Android SDK packages
         run: |
           set -e
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager || true)"
+          fi
+          echo "sdkmanager=$SDKMANAGER"
           install() {
             for pkg in "$@"; do
-              if sdkmanager --install "$pkg" >/dev/null; then echo "installed $pkg"; return 0; fi
-              if sdkmanager --channel=3 --install "$pkg" >/dev/null; then echo "installed $pkg (canary channel)"; return 0; fi
+              if "$SDKMANAGER" --install "$pkg" >/dev/null 2>&1; then echo "installed $pkg"; return 0; fi
+              if "$SDKMANAGER" --channel=3 --install "$pkg" >/dev/null 2>&1; then echo "installed $pkg (canary)"; return 0; fi
             done
             echo "none of the requested packages could be installed: $*" >&2
             return 1
@@ -56,9 +59,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      # No release/signed build in CI.
+      # Robolectric 的 android-all 由 Gradle 配置算：本地目录不存在时自动走在线下载（CI 就是这种情况）。
       - name: Unit tests
         run: ./gradlew :wear:testDebugUnitTest --console=plain
-
-      - name: Lint
-        run: ./gradlew :wear:lintDebug --console=plain

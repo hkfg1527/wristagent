@@ -32,8 +32,8 @@ android {
         minSdk = compatMinSdk ?: 33
         targetSdk = 37
         manifestPlaceholders["wearableLibRequired"] = (compatMinSdk == null).toString()
-        versionCode = 152
-        versionName = "0.0.0.114"
+        versionCode = 153
+        versionName = "0.0.0.115"
         // 任何密钥都不参与构建：API key 只能由用户在应用设置里填，进 SharedPreferences。
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }
@@ -87,9 +87,18 @@ android {
         unitTests.isIncludeAndroidResources = true
         // Robolectric 运行时会自己去 Maven 下 android-all（~200MB）；本机这个下载器连不上，
         // 于是改成离线读本地目录，jar 由脚本预置（不在仓库里）。
+        //
+        // 关键：**目录不存在就别设离线**。CI（GitHub 的 ubuntu-latest）没有 D 盘，
+        // 写死这套属性会让 Robolectric 找不到 android-all → 所有 Robolectric 用例全红，
+        // 而本机行为完全不变（目录在 → 照旧离线、不下载）。
+        val robolectricDeps = file(
+            providers.gradleProperty("robolectricDepsDir").getOrElse("D:/gradle-home/robolectric-deps")
+        )
         unitTests.all { test ->
-            test.systemProperty("robolectric.offline", "true")
-            test.systemProperty("robolectric.dependency.dir", "D:/gradle-home/robolectric-deps")
+            if (robolectricDeps.isDirectory) {
+                test.systemProperty("robolectric.offline", "true")
+                test.systemProperty("robolectric.dependency.dir", robolectricDeps.absolutePath)
+            }
         }
         // 实测过 maxParallelForks = 4：50.3s → 1 fork 51.3s，差 2%（噪声内）。
         // 原因很朴素 —— 1295 条测试真正执行只占约 10s，剩下 40s 是编译。

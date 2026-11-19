@@ -40,11 +40,22 @@ class SettingsCurveMathTest {
     }
 
     @Test
-    fun adjacentRowsShareTheSameBoundaryWidth() {
-        val boundaryY = 233f / 2f + 50f
-        val above = SettingsCurveMath.halfWidthDp(boundaryY - 233f / 2f, 233f, 108f)
-        val below = SettingsCurveMath.halfWidthDp(boundaryY - 233f / 2f, 233f, 108f)
-        assertEquals(above, below, 0f)
+    fun theHalfWidthHasNoStepAtARowBoundary() {
+        // 旧写法把同一个表达式算两遍再 assertEquals(above, below) —— 纯函数同参数同结果，
+        // 数学上恒成立，边界处哪怕有 1dp 台阶也永远绿（0.0.0.113 审查点名）。
+        // 现在改成真判据：跨过边界 y 前后各 0.5dp 取值，宽度不许跳变。
+        // 入参是"距屏心的 dp"，必须落在圆内（|y| < radius），否则两边都是 0、判据空转。
+        val boundary = 50f
+        val justAbove = SettingsCurveMath.halfWidthDp(boundary - 0.5f, 233f, 108f)
+        val justBelow = SettingsCurveMath.halfWidthDp(boundary + 0.5f, 233f, 108f)
+        assertTrue("取样点必须在圆内（否则两边都是 0）：above=$justAbove", justAbove > 1f)
+        assertTrue(
+            "边界两侧宽度出现台阶：above=$justAbove below=$justBelow",
+            kotlin.math.abs(justAbove - justBelow) < 0.5f
+        )
+        // 反证函数在这个位置不是常数：越靠上越窄
+        val atCenter = SettingsCurveMath.halfWidthDp(0f, 233f, 108f)
+        assertTrue("越远离屏心必须越窄：center=$atCenter boundary=$justAbove", atCenter > justAbove)
     }
 
     @Test

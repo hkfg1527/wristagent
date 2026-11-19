@@ -70,6 +70,11 @@ class SettingsRowStaggerStateTest {
         )
         val closeCall = source.indexOf("state.closeEntry()")
         assertTrue("入场窗口必须由页面级 remember 关闭", closeCall > 0)
-        assertTrue("关窗前必须等满两帧（首屏 lazy 项在 measure 阶段才组合）", source.substring(0, closeCall).contains("withFrameNanos"))
+        // 旧判据只 `contains("withFrameNanos")` —— 文件第 14 行的 `import …withFrameNanos`
+        // 就落在 closeCall 之前，把两处真正的 withFrameNanos {} 全删掉它照样绿（0.0.0.113 审查点名）。
+        // 现在按**调用形态**计数，import 行不会被算进去。
+        val beforeClose = source.substring(0, closeCall)
+        val frameCalls = Regex("\\n\\s*withFrameNanos\\s*\\{").findAll(beforeClose).count()
+        assertTrue("关窗前必须等满两帧（实际调用 $frameCalls 处）", frameCalls >= 2)
     }
 }

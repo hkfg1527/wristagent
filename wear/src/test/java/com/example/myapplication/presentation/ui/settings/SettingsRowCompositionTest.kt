@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settings
 
+import com.example.myapplication.TestSlices
 import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -85,12 +86,20 @@ class SettingsRowCompositionTest {
         val source = readProjectFile(
             "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsShared.kt"
         )
-        val section = source
-            .substringAfter("fun section(text: String)")
-            .substringBefore("fun standaloneRow")
-        assertTrue(
-            "组标题必须以 SECTION 登记，否则会被 rowSlots 当成卡片行，卡片上下穹顶永远不出现",
-            section.contains("kind = SettingsRowEntryKind.SECTION")
+        // 切片必须走 TestSlices：旧写法 `substringAfter("fun section(text: String)")`
+        // 配 `substringBefore("fun standaloneRow")`，而 standaloneRow 在 **282 行**、section 在 293 行 ——
+        // 终点锚在起点之前，substringBefore 找不到就返回整段尾巴，切片占全文 85%。
+        // 那条断言于是退化成"整个文件里出现过 SECTION"，改坏了也照样绿。
+        val section = TestSlices.slice(
+            source,
+            "fun section(text: String)",
+            "private fun OfficialListSubPage(",
+            "section()"
+        )
+        assertEquals(
+            "组标题里 SECTION 必须恰好一处（多一处就说明切片越界了）",
+            1,
+            Regex("kind = SettingsRowEntryKind\\.SECTION").findAll(section).count()
         )
     }
 
