@@ -62,7 +62,24 @@ fun SettingsSwitchRow(
         onClick = { onCheckedChange(!checked) },
         // 大卡片档：开关行做成"小方块卡"（用户要的混排粒度）；其他档仍是通栏行。
         squareCard = SettingsStylePolicy.current().rowShell == SettingsRowShell.CARD_EACH,
-        trailing = { SettingsCompactSwitch(checked = checked) }
+        trailing = {
+            // 终端档不用胶囊：按命令行习惯显示 [ ON ] / [ OFF ]（等宽 + 终端绿）
+            if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style
+                )
+            ) {
+                androidx.compose.foundation.text.BasicText(
+                    text = if (checked) "[ ON ]" else "[ OFF ]",
+                    style = androidx.compose.ui.text.TextStyle(
+                        color = com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Foreground,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp)
+                    )
+                )
+            } else {
+                SettingsCompactSwitch(checked = checked)
+            }
+        }
     )
 }
 

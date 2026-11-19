@@ -57,4 +57,22 @@ class TerminalPrefixRobolectricTest {
         /** 与 `TerminalText.ROW_PREFIX` 一致；这里写死一份，改常量时这条会红。 */
         const val TerminalPrefix = "> "
     }
+
+    @Test
+    fun terminalSwitchesAreTextNotCapsules() {
+        applySettingsStyle(context, SettingsStyle.TERMINAL)
+        val prefs = AgentPreferences(context)
+        compose.setContent {
+            MaterialTheme { VoiceEntryContent(preferences = prefs, onBack = {}, onOpenAsr = {}) }
+        }
+        compose.waitForIdle()
+
+        // 终端里没有胶囊开关：状态用 [ ON ] / [ OFF ] 文本表达（命令行习惯）
+        val onNodes = compose.onAllNodes(hasText("[ ON ]", substring = true)).fetchSemanticsNodes()
+        val offNodes = compose.onAllNodes(hasText("[ OFF ]", substring = true)).fetchSemanticsNodes()
+        assertTrue(
+            "终端档开关必须渲染成 [ ON ]/[ OFF ] 文本（ON=${onNodes.size} OFF=${offNodes.size}）",
+            onNodes.isNotEmpty() || offNodes.isNotEmpty()
+        )
+    }
 }
