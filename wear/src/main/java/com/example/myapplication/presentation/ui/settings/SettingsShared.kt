@@ -1237,10 +1237,14 @@ internal fun SettingsCardRow(
                     ),
                 contentAlignment = Alignment.CenterStart
             ) { content() }
+            // 分隔线：方角档走"缩进 + 半像素"（与文字左缘对齐，像印刷标尺）；
+            // 终端档保持通栏 1dp（命令行里的横线是整行的）。
+            val terminalLine = SettingsStylePolicy.usesMonospace
             Box(
                 modifier = Modifier
                     .width(SettingsContentWidth)
-                    .height(1.dp)
+                    .padding(horizontal = if (terminalLine) 0.dp else SettingsRowSidePadding)
+                    .height(if (terminalLine) 1.dp else 0.5.dp)
                     .background(Wear.Palette.Border)
             )
         }
