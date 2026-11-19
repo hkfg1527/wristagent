@@ -99,6 +99,40 @@ presentation/ui/settings/stylekit/
 **实现位置**：`stylekit/terminal/TerminalStyle.kt`（新建），只由 `SettingsStylePolicy.usesMonospace` 分流进入；
 共享层只提供"这一行是不是终端档"的布尔，不承载终端视觉。
 
+## 3.6.1 加载行接线（下一步的具体落点）
+
+`TerminalText.loadingLine(label, phaseMs)` 与 `cursor(phaseMs)` 已写好并有判据，但**还没有界面把它画出来**。
+落点调查结果（2026-11-20，`grep` 实测）：
+
+| 现状 | 位置 |
+|---|---|
+| 思考指示是一个 `thinkingIntensity` 浮点亮度，由 `animateFloatAsState` 驱动 | `ChatScreen.kt:161`（`label = "thinkingIntensity"`），下传 `730` / `773` |
+| 该亮度最终传给消息行渲染 | `ConversationList.kt:93` / `235` |
+| 终端配色/前缀/数值条都在 settings 的 `stylekit` 里，聊天侧尚未引用 | `stylekit/TerminalPalette.kt` |
+
+接线方案（**按这个做，别再另起一套**）：
+
+1. 在 `ChatScreen` 里加一个 600ms 相位：
+   ```kotlin
+   val phaseMs by produceState(0L, isThinking) {
+       while (isThinking) { value = withFrameMillis { it }; delay(16) }
+   }
+   ```
+   或更省电：`LaunchedEffect(isThinking) { while (isThinking) { phase += 600; delay(600) } }`（只需两态，不必每帧）。
+2. 当 `TerminalPalette.isTerminal(WearAppearance.style) && isThinking` 时，
+   用 `BasicText(TerminalText.loadingLine(本地化"正在思考", phaseMs))` 取代现有的呼吸点/亮度指示；
+   等宽 + `TerminalPalette.Foreground`。
+3. 判据（Robolectric，**不要靠截图数帧**）：
+   ```kotlin
+   compose.mainClock.autoAdvance = false
+   // 渲染 isThinking = true，断言存在文本 "> 正在思考…█"
+   compose.mainClock.advanceTimeBy(600)
+   // 断言该文本变成 "> 正在思考… "
+   ```
+4. 真机验收：三态截图（列表 / 开关 ON / **加载中**），加载那张要能看到方块光标。
+
+**不要**在终端档保留"呼吸点"：那是 M3 的语言，不是命令行的语言。
+
 ## 4. 已知要顺带修掉的三件事
 
 0. **官方滑杆丢了无障碍标签（S1 拦路石，2026-11-20 实测）**：把 BALLOON 的滑杆槽位改成
