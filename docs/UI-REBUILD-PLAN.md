@@ -133,6 +133,42 @@ presentation/ui/settings/stylekit/
 
 **不要**在终端档保留"呼吸点"：那是 M3 的语言，不是命令行的语言。
 
+## 3.6.2 S6 行转场：1.7.1 的真实 API（javap 实测，别再猜）
+
+`compose-foundation-1.7.1.aar` 里与行转场有关的类型只有这些：
+
+```
+androidx/wear/compose/foundation/lazy/TransformingLazyColumnItemScope          ← item 的接收者
+androidx/wear/compose/foundation/lazy/TransformingLazyColumnItemScrollProgress
+androidx/wear/compose/foundation/lazy/TransformingLazyColumnItemProvider
+```
+
+`TransformingLazyColumnItemScope` 的公开方法（`javap` 原文）：
+
+```kotlin
+fun Modifier.transformedHeight(
+    modifier: Modifier,
+    heightProvider: (itemHeightPx: Int, progress: TransformingLazyColumnItemScrollProgress) -> Int
+): Modifier
+
+fun DrawScope.getScrollProgress(): () -> Float        // 由 getScrollProgress-CyslRjo 反推
+fun GraphicsLayerScope.getScrollProgress(): () -> Float
+fun Modifier.animateItem(...)
+fun Modifier.minimumVerticalContentPadding(...)
+```
+
+**没有** `SurfaceTransformation` 这个类型 —— 我之前计划里写的名字是错的，官方在这一版里给的是
+**`Modifier.transformedHeight { h, progress -> newH }`**，靠改高度实现"滚到边缘变矮/缩小"。
+
+接线步骤（下一轮照做）：
+
+1. 在 `OfficialListSubPage` 的 `TransformingLazyColumn { item { … } }` 里，item 内容的最外层
+   `Modifier` 上按风格加 `.transformedHeight { h, progress -> … }`；
+2. `progress` 是 `TransformingLazyColumnItemScrollProgress`，先用它做**高度收缩**（例如 到上限时缩到 92%），
+   再在同一个 Modifier 链上用 `graphicsLayer` 做等比缩放（`scaleX == scaleY`，禁止横向形变）；
+3. 只在 `SettingsStyle.M3_TRANSFORM` 时加，`M3_LIST` 保持不变 —— 这是两套唯一的差别；
+4. 验收：同一页两套截图 + 像素差 **必须显著大于 0.18%**（当前实测值，见 `docs/UI-EVIDENCE.md`）。
+
 ## 4. 已知要顺带修掉的三件事
 
 0. **官方滑杆丢了无障碍标签（S1 拦路石，2026-11-20 实测）**：把 BALLOON 的滑杆槽位改成
