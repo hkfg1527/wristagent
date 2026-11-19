@@ -13,6 +13,20 @@
 
 ## [未发布]
 
+### 安全：控制台不再"先收完 body 再鉴权"
+没有 `Content-Length` 或用了 `Transfer-Encoding: chunked` 的请求，NanoHTTPD 会先把整段 body 物化成字符串
+再交给 `handle` —— 64K 闸门来不及生效，而且这一步发生在 **token 校验之前**：局域网里任何未鉴权主机
+都能让手表把任意大的 body 读进内存（OOM/卡死）。
+
+- 修法：这类请求直接回 `411 length_required`，不做"先收再判"。
+- 回归：`ConsoleServerTest.aChunkedBodyWithoutContentLengthIsRejectedBeforeItIsRead`（裸 socket 只发头不发 body）。
+  **变异验证**：关掉闸门后服务端读完空 body 才回 **401** —— 正是"先收后判"。
+
+### 修复：非流式响应体无上限（大响应 OOM）
+非流式分支把整段响应读进 `StringBuilder`，随后 `JSONObject` 再复制一份，没有任何上限。
+
+- 修法：按 4M 字符封顶，超限中止并如实报错（不把半截 JSON 交给解析器）；读取放进 `finally` 关闭，循环内检查取消。
+
 ### 修复：JSON 解析无深度上限导致进程崩溃
 `McpJson.parseValue` 是无限深递归，`McpClient`/`McpSse` 只 catch `McpJsonException` —— 远端回一段
 `[[[[…` 就是 `StackOverflowError`（`Error` 不是 `Exception`），工具循环拦不住，App 直接崩。

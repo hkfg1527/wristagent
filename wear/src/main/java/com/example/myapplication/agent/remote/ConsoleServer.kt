@@ -130,9 +130,16 @@ class ConsoleServer(
         var tooLarge = false
 
         val declared = headers["content-length"]?.trim()?.toLongOrNull() ?: -1L
+        val chunked = headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true
+        val hasBody = method == "POST" || method == "PUT" || method == "PATCH"
         if (declared > ConsoleApi.MAX_BODY_BYTES) {
             tooLarge = true
-        } else if (method == "POST" || method == "PUT" || method == "PATCH") {
+        } else if (hasBody && (chunked || declared < 0)) {
+            // 没有 Content-Length（或用了 chunked）：NanoHTTPD 会先把整段 body 物化成字符串再交给我们，
+            // 64K 闸门根本来不及生效 —— 而且这一步发生在 token 校验之前，局域网里任何未鉴权主机
+            // 都能让手表把任意大的 body 读进内存。这类请求直接拒掉，不做"先收再判"。
+            return errorResponse(411, "length_required")
+        } else if (hasBody) {
             val files = HashMap<String, String>()
             val restoreHeaders = forceUtf8Charset(session)
             try {

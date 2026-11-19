@@ -47,6 +47,39 @@ class ConsoleServerTest {
         false
     }
 
+    @Test
+    fun aChunkedBodyWithoutContentLengthIsRejectedBeforeItIsRead() {
+        val port = freePort()
+        val server = ConsoleServer(api(), preferredPort = port)
+        server.start()
+        val bound = server.port
+        try {
+            // 回归（0.0.0.113 审查，高）：没有 Content-Length 时 NanoHTTPD 会先把整段 body
+            // 物化成字符串再交给我们，64K 闸门来不及生效 —— 而且这一步发生在 token 校验之前，
+            // 局域网里任何未鉴权主机都能让手表把任意大的 body 读进内存。现在直接 411。
+            //
+            // 用裸 socket 发**只有头、没有 body** 的请求：这样能证明服务端没在等 body，
+            // 而是看到 Transfer-Encoding 就立刻回绝。
+            val statusLine = Socket().use { socket ->
+                socket.connect(InetSocketAddress("127.0.0.1", bound), 2000)
+                socket.soTimeout = 3000
+                socket.getOutputStream().apply {
+                    write(
+                        ("POST /api/settings HTTP/1.1\r\n" +
+                            "Host: 127.0.0.1\r\n" +
+                            "Transfer-Encoding: chunked\r\n" +
+                            "Content-Type: application/json\r\n\r\n").toByteArray()
+                    )
+                    flush()
+                }
+                socket.getInputStream().bufferedReader().readLine().orEmpty()
+            }
+            assertTrue("必须回 411，实际状态行：" + statusLine, statusLine.contains("411"))
+        } finally {
+            server.stop()
+        }
+    }
+
     private fun http(path: String, port: Int): Pair<Int, String> {
         val connection = URI("http://127.0.0.1:" + port + path).toURL().openConnection() as HttpURLConnection
         connection.connectTimeout = 5000

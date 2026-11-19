@@ -1099,13 +1099,31 @@ class AgentDispatcher(
                     }
                 }
             } else {
+                // 非流式分支以前把整段响应无上限读进 StringBuilder，随后 JSONObject 再复制一份 ——
+                // 网关回一个大响应（或恶意端点）在手表数百 MB 堆上直接 OOM。
+                // 这里按字符封顶；超出就中止并如实报错，不要把半截 JSON 丢给解析器。
                 val reader = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8"))
                 val sb = java.lang.StringBuilder()
                 var l: String?
-                while (reader.readLine().also { l = it } != null) {
-                    sb.append(l)
+                var tooLarge = false
+                try {
+                    while (reader.readLine().also { l = it } != null) {
+                        if (isCancelled) break
+                        val current = l ?: continue
+                        if (sb.length + current.length > MAX_RESPONSE_CHARS) {
+                            tooLarge = true
+                            break
+                        }
+                        sb.append(current)
+                    }
+                } finally {
+                    runCatching { reader.close() }
                 }
-                reader.close()
+                if (tooLarge) {
+                    return@withContext Result.failure(
+                        IOException("响应体超过 " + (MAX_RESPONSE_CHARS / 1024) + "K 字符，已中止解析")
+                    )
+                }
 
                 val message = JSONObject(sb.toString())
                     .optJSONArray("choices")
@@ -1374,6 +1392,9 @@ class AgentDispatcher(
 
         /** SSE 兜底最多留多少原始字符：够装一整段 chat completion，又不至于让内存跟着响应体涨。 */
         private const val FALLBACK_RAW_LIMIT = 512 * 1024
+
+        /** 非流式响应体上限（字符）。超过就中止，不把半截 JSON 交给解析器。 */
+        private const val MAX_RESPONSE_CHARS = 4 * 1024 * 1024
     }
 }
 
