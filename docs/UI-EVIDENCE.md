@@ -3,7 +3,7 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
-## 0.0.0.126 · S3 小方块卡（88dp）：**未验证**
+## 0.0.0.127 · S3 小方块卡：已由 JVM 几何判据验证\n\n- `GoogleCardGranularityTest`（Robolectric）渲染「语音与唤醒」页，下滑 24 步收集宽度：\n  同时命中 **176dp（通栏长卡）** 与 **88dp（小方块卡）**，并断言方块卡 `width == height`。\n- 结论：粒度、正方形、与长卡共存 —— 都有确定性判据；真机截图仍缺，但**不再是未验证**。\n\n## 0.0.0.126 · S3 小方块卡（88dp）：真机截图未取得
 
 - 截到的两张：`docs/device/v24/google-card-appearance.png`（外观与动效页顶：返回 + 页面风格 hero 卡）、
   `docs/device/v24/google-card-switch2.png`（十套风格单选列表：方角 / 大卡片 / 霓虹 / 手帐）
