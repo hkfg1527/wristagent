@@ -66,6 +66,31 @@ fun SettingsSliderRow(
     modifier: Modifier = Modifier
 ) {
     // 官方分段滑杆：没有文本槽，数值由调用点另画（本函数只负责控件本身）。
+    // 终端档：滑杆换成数值条 `[■■■■□□□□] 50%`（等宽 + 终端绿），命令行里没有胶囊滑杆
+    if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+            com.example.myapplication.presentation.ui.settings.WearAppearance.style
+        )
+    ) {
+        SettingsSlotRow(
+            title = label,
+            subtitle = secondary,
+            modifier = modifier,
+            trailing = {
+                androidx.compose.foundation.text.BasicText(
+                    text = com.example.myapplication.presentation.ui.settings.stylekit.TerminalText.valueBar(
+                        value, valueRange.start, valueRange.endInclusive
+                    ),
+                    style = androidx.compose.ui.text.TextStyle(
+                        color = com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Foreground,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp)
+                    )
+                )
+            }
+        )
+        return
+    }
+
     if (SettingsStylePolicy.current().slider == SettingsSliderControl.OFFICIAL_SEGMENTED) {
         OfficialSliderRow(
             label = label,
