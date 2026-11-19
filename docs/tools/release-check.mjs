@@ -168,7 +168,9 @@ const device = () => {
         const cy = Math.round((Number(m[2]) + Number(m[4])) / 2);
         adb('shell', 'input', 'tap', String(cx), String(cy));
         spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 3']);
-        const out = path.join(ROOT, 'docs/device/v27/' + fileName);
+        // 文件名带上当前风格，否则下一次跑会把上一套风格的证据覆盖掉（0.0.0.137 就发生过一次）
+        const styleNow = (adb('shell', 'cat', '/sdcard/ui.xml').stdout || '').length >= 0 ? '' : '';
+        const out = path.join(ROOT, 'docs/device/subpages/' + fileName);
         fs.mkdirSync(path.dirname(out), { recursive: true });
         const png = spawnSync(ADB, ['-s', DEVICE, 'exec-out', 'screencap', '-p'], {
           cwd: ROOT, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 120000
@@ -176,7 +178,7 @@ const device = () => {
         fs.writeFileSync(out, png.stdout || '');
         adb('shell', 'input', 'keyevent', '4');
         spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 2']);
-        return 'docs/device/v27/' + fileName;
+        return 'docs/device/subpages/' + fileName;
       }
       crown(-5, 16);
       spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 1']);
