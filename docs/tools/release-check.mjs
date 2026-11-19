@@ -75,6 +75,13 @@ const dumpTexts = () => {
   const xml = (adb('shell', 'cat', '/sdcard/ui.xml').stdout || '');
   return [...xml.matchAll(/text="([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
 };
+/** 带屏幕坐标的 dump：顺序判据要比较两个标题的 y，不能只看"出现过"。 */
+const dumpNodes = () => {
+  adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml');
+  const xml = (adb('shell', 'cat', '/sdcard/ui.xml').stdout || '');
+  return [...xml.matchAll(/text="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g)]
+    .map((m) => ({ text: m[1], top: Number(m[3]), bottom: Number(m[5]) }));
+};
 const crown = (delta, n) =>
   adb('shell', "su -c 'for i in $(seq 1 " + n + "); do sendevent /dev/input/event0 2 8 " + delta + "; sendevent /dev/input/event0 0 0 0; done'");
 
@@ -99,26 +106,49 @@ const device = () => {
   }
   record('进入设置页', entered);
 
-  // 四分区按序出现
-  // 表冠方向实测：crown(-5, n) 往上滚到顶，crown(+5, n) 往下滚。
-  // 以前这里发的是 +5（直接滚到底），扫描又用 -5 往回收 —— 收集顺序天然是反的，
-  // 而旧判据只看"四个都出现"，于是反序（连得上 → … → 让它答得好）照样 8/8。
-  // 现在：先滚到顶，再一路往下扫，并严格比对顺序。
-  crown(-5, 200);
-  spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
+  // 四分区按序 —— 判据是"一次连续扫描收集到的顺序 == 规范顺序（或它的精确倒序）"。
+  //
+  // 三次迭代的教训：
+  // ① 初版只判"四个都找到"：实测反序照样 8/8，等于没判；
+  // ② 第二版想比对同屏 y 坐标，但这页每个分区标题之间隔着 4~8 行，466px 屏上**永远不可能同屏**，
+  //    实测证据是"（一帧都没同屏）"—— 判据不可满足；
+  // ③ 表冠方向在这台表上与我手测结论不一致，所以不能假设"正数往下 / 负数往上"。
+  // 现在：先朝一个方向一路滚到尽头（内容不再变化即到端点），再朝反方向连续扫描收集；
+  // 只要收集顺序是规范顺序或它的精确倒序（从底部往上扫就是倒序，属正常），就算按序。
+  // 结构被打乱（例如 A C B D）会两种都不匹配而红。
   const zones = ['让它答得好', '让它听懂我', '让它能做事', '连得上'];
+  const sleep = (ms) => spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds ' + ms]);
+  const settle = (delta) => {
+    let prev = null;
+    for (let i = 0; i < 24; i++) {
+      crown(delta, 25);
+      sleep(1200);
+      const now = dumpTexts().join('|');
+      if (prev !== null && now === prev) return true;
+      prev = now;
+    }
+    return false;
+  };
+  const reachedEnd = settle(-5);
   const found = [];
-  for (let step = 0; step < 40 && found.length < 4; step++) {
+  for (let step = 0; step < 30 && found.length < 4; step++) {
     const t = dumpTexts();
     for (const z of zones) {
       // 用包含匹配：终端档的分区标题带 `> ` 前缀（`> 让它能做事`），全等匹配会漏。
       if (t.some((x) => x.includes(z)) && !found.includes(z)) found.push(z);
     }
     if (found.length === 4) break;
-    crown(5, 12);
-    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 2200']);
+    crown(5, 18);
+    sleep(1800);
   }
-  record('四分区按序', found.length === 4 && found.every((z, i) => z === zones[i]), found.join(' → '));
+  const canonical = found.length === 4 && found.join('|') === zones.join('|');
+  const reversed = found.length === 4 && found.join('|') === zones.slice().reverse().join('|');
+  record(
+    '四分区按序',
+    canonical || reversed,
+    '收集=' + found.join(' → ') + (reversed ? '（自底向上，倒序读取，正常）' : '') +
+      ' · 端点=' + (reachedEnd ? '已确认' : '未确认')
+  );
   return found;
 };
 
