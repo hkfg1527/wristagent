@@ -10,12 +10,12 @@
 **我是谁**：这台手表上 Wrist Agent 的常驻工程师。行事准则在 `docs/SELF.md`（用户可改），核心一句：
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
-**现在在哪**（截至 2026-11-20 03:00）：
-- 内部版 `0.0.0.119` / versionCode 157；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
-- 单测基线 **1412 条 / 219 套件全绿**。
-- **磁滑已定性并修好参数**：官方 `snapFlingBehavior(state)` 的 `snapOffset` 是"锚点相对屏心的偏移"，
-  **不是行距**（0.0.0.118 传了 72dp，JVM 手势实测 centerOffset=-4px；改回默认 0 后**精确 0**）。
-- UI 重构 S1 继续：下一步 BALLOON 独立视觉实现，然后 S2–S7 + P1–P10 打磨。
+**现在在哪**（截至 2026-11-20 03:20）：
+- 内部版 `0.0.0.120` / versionCode 158；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
+- 单测基线 **1414 条 / 220 套件全绿**。
+- **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
+  BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
+- 下一步：BALLOON 自己的曲面与间距（32dp 大圆角、专属节奏），然后 S2–S7 → P1–P10。
 - CI：`Android CI` 已稳定通过（`f4f5b3e` / `a8abad3` 两次 `success`）；以前每次 push 都失败并给作者发邮件，原因与修法见 0.0.0.115。
 - 设置页巡检：`docs/SETTINGS-PAGEWALK.md`，**根页 14 个可点条目全部验过**（能打开 + 能返回根页 + 页内有内容）。
   两级结构已记档：`子代理模式` 在工具与 MCP 页内；`会话与上下文` 是提示词与记忆页里的一行。
@@ -44,9 +44,19 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-19 07:55
 
 **版本与基线**
-- 内部版 `0.0.0.119`（versionCode 157）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
-- 单测基线 **1412** 条 / **219** 套件全绿。
+- 内部版 `0.0.0.120`（versionCode 158）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
+- 单测基线 **1414** 条 / **220** 套件全绿。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
+
+**0.0.0.120 · S1：官方滑杆无障碍修好 + BALLOON 切官方件**
+- `OfficialSliderRow`：语义挂在**官方 `Slider` 自己的 modifier** 上（`Modifier.semantics { contentDescription = label }`）。
+  先试过"外层 Box + mergeDescendants"—— **不行**：合并只搬属性，`SetProgress` 是**动作**，留在子节点，
+  父节点实测仍然没有它。
+- 新增 `OfficialSliderAccessibilityTest` 2 条：同一节点同时有标签 + `SetProgress` + `ProgressBarRangeInfo`；
+  且 `SetProgress` 真的把值传出去（0.8f）。
+- BALLOON 槽位切官方：`toggle = OFFICIAL_SWITCH_BUTTON`、`slider = OFFICIAL_SEGMENTED`、`radio = OFFICIAL_RADIO_BUTTON`。
+  这同时补上了 `M3_LIST` / `M3_TRANSFORM` 一直存在但**从未被测试覆盖**的滑杆无障碍缺口。
+- 基线 1412 → **1414 条 / 220 套件**。
 
 **0.0.0.119 · 磁滑定性 + 参数修对（`snapOffset` 不是行距）**
 - 新增 `SnapFlingReachTest`（Robolectric + `swipeUp()`）：同一段手势跑"吸附 / 不吸附"两组，

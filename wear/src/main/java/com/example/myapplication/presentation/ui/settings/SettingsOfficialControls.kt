@@ -1,11 +1,14 @@
 package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.RadioButton
@@ -356,12 +359,18 @@ fun OfficialSliderRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        // 官方 Slider 自带区间（SetProgress），但**行标签不在那个节点上** —— 读屏只会念
+        // "百分之几"，不会念"这是哪一项"（0.0.0.119 实测：11 条滑杆用例全红）。
+        // 关键细节：语义必须挂在 **Slider 自己**的 modifier 上。包一层 Box + mergeDescendants
+        // 不行 —— 合并只搬属性，`SetProgress` 是**动作**，留在子节点上（实测父节点仍然没有它）。
+        // 这同时补上了 M3_LIST / M3_TRANSFORM 一直存在、却从未被测试覆盖的无障碍缺口。
         Slider(
             value = value,
             onValueChange = onValueChange,
             steps = steps,
             valueRange = valueRange,
-            segmented = true
+            segmented = true,
+            modifier = Modifier.semantics { contentDescription = label }
         )
     }
 }

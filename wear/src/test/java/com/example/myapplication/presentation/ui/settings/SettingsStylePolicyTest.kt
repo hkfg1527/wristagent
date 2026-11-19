@@ -24,8 +24,10 @@ class SettingsStylePolicyTest {
         // 注意：不要写 `assertTrue(spec.shell != null)` 这类断言 —— 槽位是非空枚举，
         // 类型系统已经保证它不为 null，那种断言永远绿，等于没测（0.0.0.90 审查点名的三条之一）。
         assertEquals("风格数量变了就要同步 docs/UI-STYLES.md", 10, all.size)
+        // 自研档里 SQUARE / TERMINAL / NEON / PAPER / GLASS / ARC 仍是自研控件；
+        // BALLOON 从 S1 起改用官方开关/滑杆/单选（自研件正是用户点名的"大杂烩"）。
         for (style in listOf(
-            SettingsStyle.BALLOON, SettingsStyle.SQUARE, SettingsStyle.GOOGLE_CARD, SettingsStyle.TERMINAL,
+            SettingsStyle.SQUARE, SettingsStyle.TERMINAL,
             SettingsStyle.NEON, SettingsStyle.PAPER, SettingsStyle.GLASS, SettingsStyle.ARC
         )) {
             val spec = SettingsStylePolicy.specOf(style)

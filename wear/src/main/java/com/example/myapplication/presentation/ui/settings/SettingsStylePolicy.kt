@@ -144,14 +144,14 @@ object SettingsStylePolicy {
 
     /** 每套风格一行：8 个槽位 + 7 条逐像素开关全部给值（缺一个编译期就过不了）。 */
     fun specOf(style: SettingsStyle): SettingsStyleSpec = when (style) {
-        // 气泡：整页一块连续曲面，行外壳是"一组一张卡"，其余控件仍是手搓件（待收口）
+        // 气泡：整页一块连续曲面 + 官方开关/滑杆/单选（S1 起；自研件是被用户点名的"大杂烩"）
         SettingsStyle.BALLOON -> SettingsStyleSpec(
             shell = SettingsPageShell.PLAIN_LIST,
             header = SettingsGroupHeader.ACCENT_MARK,
             rowShell = SettingsRowShell.CARD_GROUP,
-            toggle = SettingsToggleControl.COMPACT_SWITCH,
-            slider = SettingsSliderControl.THIN_TRACK,
-            radio = SettingsRadioControl.DOT,
+            toggle = SettingsToggleControl.OFFICIAL_SWITCH_BUTTON,
+            slider = SettingsSliderControl.OFFICIAL_SEGMENTED,
+            radio = SettingsRadioControl.OFFICIAL_RADIO_BUTTON,
             back = SettingsBackControl.EDGE_BUTTON,
             typeface = SettingsTypeface.DEFAULT,
             cardScaling = false,

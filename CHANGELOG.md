@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 修复：官方滑杆读不出「这是哪一项」（并补上 M3_LIST / M3_TRANSFORM 的无障碍缺口）
+官方 `Slider` 自带区间，但行标签不在那个节点上 —— 读屏只念百分比，不念项目名。
+
+- 修法：语义挂在 **`Slider` 自己的 modifier** 上（`Modifier.semantics { contentDescription = label }`）。
+  先试的"外层 Box + `mergeDescendants`"无效：合并只搬属性，`SetProgress` 是**动作**，仍留在子节点。
+- 新增 `OfficialSliderAccessibilityTest` 2 条：同一节点同时具备标签、`SetProgress`、`ProgressBarRangeInfo`；
+  `SetProgress` 能真正把值传出（0.8f）。
+- BALLOON 起把开关/滑杆/单选切到官方件（`SwitchButton` / `Slider(segmented)` / `RadioButton`），
+  这条修复同时消除了 M3_LIST / M3_TRANSFORM 之前未被测试覆盖的同类缺口。
+
 ### 修复：磁滑（snap）参数用错 —— `snapOffset` 是屏心锚点偏移，不是行距
 官方 `snapFlingBehavior` 吸附的是"某一项正好居中"，`snapOffset` 表示吸附锚点相对屏心的偏移量。
 之前把行距（72dp）当成节距传进去，等于给吸附网格整体偏移 72dp，看起来就像"没有吸附"。
