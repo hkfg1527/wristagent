@@ -43,7 +43,21 @@ enum class SettingsStyle(
      * 官方转场档：与 [M3_LIST] 同一份列表，但每行挂 `SurfaceTransformation` + `transformedHeight`，
      * 滚到屏幕边缘时按官方曲线缩小淡出。实现上是"同一份列表 + 一个开关"，不是另一份代码。
      */
-    M3_TRANSFORM(R.string.settings_style_m3_transform, R.string.settings_style_m3_transform_summary);
+    M3_TRANSFORM(R.string.settings_style_m3_transform, R.string.settings_style_m3_transform_summary),
+
+    // ==== 以下四套是自研风格（不受 Google 规范约束，但必须"像另一个 App"）====
+
+    /** 霓虹：近黑底 + 发光描边卡 + 高饱和强调色，夜里最抓眼。 */
+    NEON(R.string.settings_style_neon, R.string.settings_style_neon_summary),
+
+    /** 手帐：纸色底、无卡片、下划线分隔、衬线感排版，安静。 */
+    PAPER(R.string.settings_style_paper, R.string.settings_style_paper_summary),
+
+    /** 磨砂玻璃：半透明卡片 + 极细白描边 + 背景光斑，层次感强。 */
+    GLASS(R.string.settings_style_glass, R.string.settings_style_glass_summary),
+
+    /** 弧列：每一行沿圆屏弧线排布（CurvedText），最贴合圆形表盘的一套。 */
+    ARC(R.string.settings_style_arc, R.string.settings_style_arc_summary);
 
     companion object {
         val Default = BALLOON

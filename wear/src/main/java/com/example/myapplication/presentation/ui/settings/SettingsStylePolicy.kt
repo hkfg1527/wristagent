@@ -252,6 +252,80 @@ object SettingsStylePolicy {
             rowEnterSlide = false,
             cardEdgeZoom = true
         )
+        // ==== 自研四套：结构先按最接近的既有壳落位，视觉实现各自独立（stylekit/<style>/）====
+
+        // 霓虹：一行一张发光卡，贴边缩放最明显
+        SettingsStyle.NEON -> SettingsStyleSpec(
+            shell = SettingsPageShell.PLAIN_LIST,
+            header = SettingsGroupHeader.ACCENT_MARK,
+            rowShell = SettingsRowShell.CARD_EACH,
+            toggle = SettingsToggleControl.COMPACT_SWITCH,
+            slider = SettingsSliderControl.THIN_TRACK,
+            radio = SettingsRadioControl.DOT,
+            back = SettingsBackControl.EDGE_BUTTON,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = false,
+            rootFocusBlock = true,
+            rootHeroCards = false,
+            subPageHero = false,
+            animateRootSections = true,
+            rowEnterSlide = false,
+            cardEdgeZoom = true
+        )
+        // 手帐：无卡片，靠下划线分行的纸张感
+        SettingsStyle.PAPER -> SettingsStyleSpec(
+            shell = SettingsPageShell.PLAIN_LIST,
+            header = SettingsGroupHeader.CENTERED,
+            rowShell = SettingsRowShell.HAIRLINE_FLAT,
+            toggle = SettingsToggleControl.COMPACT_SWITCH,
+            slider = SettingsSliderControl.THIN_TRACK,
+            radio = SettingsRadioControl.DOT,
+            back = SettingsBackControl.LIST_ROW,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = false,
+            rootFocusBlock = true,
+            rootHeroCards = false,
+            subPageHero = false,
+            animateRootSections = true,
+            rowEnterSlide = true,
+            cardEdgeZoom = false
+        )
+        // 磨砂玻璃：半透明卡，一行一张，柔和的边缘淡出
+        SettingsStyle.GLASS -> SettingsStyleSpec(
+            shell = SettingsPageShell.PLAIN_LIST,
+            header = SettingsGroupHeader.ACCENT_MARK,
+            rowShell = SettingsRowShell.CARD_EACH,
+            toggle = SettingsToggleControl.COMPACT_SWITCH,
+            slider = SettingsSliderControl.THIN_TRACK,
+            radio = SettingsRadioControl.DOT,
+            back = SettingsBackControl.EDGE_BUTTON,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = true,
+            rootFocusBlock = true,
+            rootHeroCards = false,
+            subPageHero = true,
+            animateRootSections = false,
+            rowEnterSlide = false,
+            cardEdgeZoom = true
+        )
+        // 弧列：行沿圆弧排布，最贴圆屏；返回进列表首项
+        SettingsStyle.ARC -> SettingsStyleSpec(
+            shell = SettingsPageShell.PLAIN_LIST,
+            header = SettingsGroupHeader.CENTERED,
+            rowShell = SettingsRowShell.PLAIN,
+            toggle = SettingsToggleControl.COMPACT_SWITCH,
+            slider = SettingsSliderControl.THIN_TRACK,
+            radio = SettingsRadioControl.DOT,
+            back = SettingsBackControl.LIST_ROW,
+            typeface = SettingsTypeface.DEFAULT,
+            cardScaling = false,
+            rootFocusBlock = true,
+            rootHeroCards = false,
+            subPageHero = false,
+            animateRootSections = true,
+            rowEnterSlide = true,
+            cardEdgeZoom = false
+        )
     }
 
     /** 当前生效的风格声明。渲染侧只读它。 */

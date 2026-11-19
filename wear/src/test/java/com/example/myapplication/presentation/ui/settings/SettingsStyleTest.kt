@@ -23,7 +23,12 @@ class SettingsStyleTest {
         SettingsStyle.values().forEach { style ->
             assertEquals(style, SettingsStyle.fromStorage(style.name))
         }
-        assertEquals("六套风格：气泡/方角/大卡片/终端 + 官方列表 + 官方转场", 6, SettingsStyle.values().size)
+        assertEquals(
+            "十套风格：气泡/方角/大卡片/终端 + 官方列表 + 官方转场 + 霓虹/手帐/磨砂/弧列" +
+                "（每套必须独立，不许靠同一套控件糊过去）",
+            10,
+            SettingsStyle.values().size
+        )
     }
 
     @Test

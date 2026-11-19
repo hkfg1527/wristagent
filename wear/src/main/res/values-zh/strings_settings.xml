@@ -547,7 +547,16 @@
     <string name="settings_style_m3_list">官方列表</string>
     <string name="settings_style_m3_list_summary">官方 M3E 列表：一行一个胶囊控件，全程官方件</string>
     <string name="settings_style_m3_transform">官方转场</string>
-    <string name="settings_style_m3_transform_summary">同官方列表，滚动时边缘行按官方曲线缩小淡出</string></resources>
+    <string name="settings_style_m3_transform_summary">同官方列表，滚动时边缘行按官方曲线缩小淡出</string>
+    <string name="settings_style_neon">霓虹</string>
+    <string name="settings_style_neon_summary">近黑底、发光描边、高对比配色，夜里最抓眼</string>
+    <string name="settings_style_paper">手帐</string>
+    <string name="settings_style_paper_summary">纸色底、不用卡片、下划线分隔，安静耐看</string>
+    <string name="settings_style_glass">磨砂玻璃</string>
+    <string name="settings_style_glass_summary">半透明卡片 + 极细白描边 + 背景光斑</string>
+    <string name="settings_style_arc">弧列</string>
+    <string name="settings_style_arc_summary">每一行都沿圆弧排布，最贴合圆表盘</string>
+</resources>
 
 
 

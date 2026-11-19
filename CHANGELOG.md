@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### UI 重构 S0：设置页从 6 套风格扩到 10 套（互相独立）
+用户要求「全部都按各自风格重新做」「做完十套风格，相互独立」。本轮先落地架构，视觉逐套实现。
+
+- 新增四套自研风格：`NEON` 霓虹、`PAPER` 手帐、`GLASS` 磨砂玻璃、`ARC` 弧列（沿圆弧排布）。
+- `SettingsStyle` 枚举 6 → 10，`specOf()` 十套全给值，中英文字符串各补 8 条。
+- 新增 `stylekit/StyleMotion.kt`：入场/退场位移、时长、错峰、磁滑开关、贴边缩放与透明度按风格分别给值，
+  带区间校验；`StyleMotionTest` 4 条钉住「十套互不相同 / 终端不吸附 / 官方两套不加位移 /
+  贴边缩放只有 ARC·TERMINAL 允许为 1」。
+- 计划与说明书：`docs/UI-REBUILD-PLAN.md`、`docs/UI-STYLES.md`（十套速览）。
+
 ### 安全：控制台不再"先收完 body 再鉴权"
 没有 `Content-Length` 或用了 `Transfer-Encoding: chunked` 的请求，NanoHTTPD 会先把整段 body 物化成字符串
 再交给 `handle` —— 64K 闸门来不及生效，而且这一步发生在 **token 校验之前**：局域网里任何未鉴权主机

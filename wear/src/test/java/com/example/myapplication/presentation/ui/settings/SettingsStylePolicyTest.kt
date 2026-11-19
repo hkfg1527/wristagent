@@ -23,8 +23,11 @@ class SettingsStylePolicyTest {
     fun everyStyleDeclaresItsSlotsWithTheExpectedControlFamilies() {
         // 注意：不要写 `assertTrue(spec.shell != null)` 这类断言 —— 槽位是非空枚举，
         // 类型系统已经保证它不为 null，那种断言永远绿，等于没测（0.0.0.90 审查点名的三条之一）。
-        assertEquals("风格数量变了就要同步 UI-STYLE-PLAN.md", 6, all.size)
-        for (style in listOf(SettingsStyle.BALLOON, SettingsStyle.SQUARE, SettingsStyle.GOOGLE_CARD, SettingsStyle.TERMINAL)) {
+        assertEquals("风格数量变了就要同步 docs/UI-STYLES.md", 10, all.size)
+        for (style in listOf(
+            SettingsStyle.BALLOON, SettingsStyle.SQUARE, SettingsStyle.GOOGLE_CARD, SettingsStyle.TERMINAL,
+            SettingsStyle.NEON, SettingsStyle.PAPER, SettingsStyle.GLASS, SettingsStyle.ARC
+        )) {
             val spec = SettingsStylePolicy.specOf(style)
             assertEquals("$style 的开关应是手搓胶囊档", SettingsToggleControl.COMPACT_SWITCH, spec.toggle)
             assertEquals("$style 的滑杆应是自绘细轨", SettingsSliderControl.THIN_TRACK, spec.slider)
@@ -36,7 +39,11 @@ class SettingsStylePolicyTest {
             SettingsStyle.GOOGLE_CARD to SettingsTypeface.DEFAULT,
             SettingsStyle.TERMINAL to SettingsTypeface.MONOSPACE,
             SettingsStyle.M3_LIST to SettingsTypeface.DEFAULT,
-            SettingsStyle.M3_TRANSFORM to SettingsTypeface.DEFAULT
+            SettingsStyle.M3_TRANSFORM to SettingsTypeface.DEFAULT,
+            SettingsStyle.NEON to SettingsTypeface.DEFAULT,
+            SettingsStyle.PAPER to SettingsTypeface.DEFAULT,
+            SettingsStyle.GLASS to SettingsTypeface.DEFAULT,
+            SettingsStyle.ARC to SettingsTypeface.DEFAULT
         )
         for (style in all) {
             assertEquals("$style 的字族", expectedTypeface[style], SettingsStylePolicy.specOf(style).typeface)
@@ -81,11 +88,15 @@ class SettingsStylePolicyTest {
             SettingsStyle.GOOGLE_CARD to SettingsBackControl.LIST_ROW,
             SettingsStyle.TERMINAL to SettingsBackControl.EDGE_BUTTON,
             SettingsStyle.M3_LIST to SettingsBackControl.LIST_ROW,
-            SettingsStyle.M3_TRANSFORM to SettingsBackControl.LIST_ROW
+            SettingsStyle.M3_TRANSFORM to SettingsBackControl.LIST_ROW,
+            SettingsStyle.NEON to SettingsBackControl.EDGE_BUTTON,
+            SettingsStyle.PAPER to SettingsBackControl.LIST_ROW,
+            SettingsStyle.GLASS to SettingsBackControl.EDGE_BUTTON,
+            SettingsStyle.ARC to SettingsBackControl.LIST_ROW
         )
         for (style in all) {
             assertEquals(
-                "$style 的返回控件位置变了 → 同步 docs/UI-STYLE-PLAN.md 并上机核对",
+                "$style 的返回控件位置变了 → 同步 docs/UI-STYLES.md 并上机核对",
                 expected[style],
                 SettingsStylePolicy.specOf(style).back
             )
