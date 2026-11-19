@@ -26,4 +26,22 @@ class TerminalTextTest {
         assertEquals("播报音量", TerminalText.decorate("播报音量", isTerminal = false, active = true))
         assertEquals("> 已带前缀", TerminalText.decorate("> 已带前缀", isTerminal = false))
     }
+
+    @Test
+    fun theValueBarHasEightCellsAndRoundsToTheNearestCell() {
+        // 0% / 50% / 100% 三个锚点：8 格时分别是 0 / 4 / 8 个实心
+        assertEquals("[□□□□□□□□] 0%", TerminalText.valueBar(0f, 0f, 1f))
+        assertEquals("[■■■■□□□□] 50%", TerminalText.valueBar(0.5f, 0f, 1f))
+        assertEquals("[■■■■■■■■] 100%", TerminalText.valueBar(1f, 0f, 1f))
+        // 非 0 起点：2..6 里的 4 就是 50%
+        assertEquals("[■■■■□□□□] 50%", TerminalText.valueBar(4f, 2f, 6f))
+    }
+
+    @Test
+    fun theValueBarClampsOutOfRangeValuesAndSurvivesABadRange() {
+        assertEquals("[□□□□□□□□] 0%", TerminalText.valueBar(-5f, 0f, 1f))
+        assertEquals("[■■■■■■■■] 100%", TerminalText.valueBar(99f, 0f, 1f))
+        // range 配错（下界 >= 上界）不能抛异常，按 0% 处理
+        assertEquals("[□□□□□□□□] 0%", TerminalText.valueBar(3f, 5f, 5f))
+    }
 }
