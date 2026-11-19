@@ -38,10 +38,28 @@ class TerminalTextTest {
     }
 
     @Test
+    fun theCursorBlinksWithTheDocumentedPeriod() {
+        // 前半周期亮、后半周期灭（600ms 周期）
+        assertEquals("█", TerminalText.cursor(0))
+        assertEquals("█", TerminalText.cursor(599))
+        assertEquals(" ", TerminalText.cursor(600))
+        assertEquals(" ", TerminalText.cursor(1199))
+        assertEquals("█", TerminalText.cursor(1200))
+        // 负相位按 0 处理，不抛异常
+        assertEquals("█", TerminalText.cursor(-5))
+    }
+
+    @Test
     fun theValueBarClampsOutOfRangeValuesAndSurvivesABadRange() {
         assertEquals("[□□□□□□□□] 0%", TerminalText.valueBar(-5f, 0f, 1f))
         assertEquals("[■■■■■■■■] 100%", TerminalText.valueBar(99f, 0f, 1f))
         // range 配错（下界 >= 上界）不能抛异常，按 0% 处理
         assertEquals("[□□□□□□□□] 0%", TerminalText.valueBar(3f, 5f, 5f))
+    }
+
+    @Test
+    fun theLoadingLineLooksLikeACommandLine() {
+        assertEquals("> 正在思考…█", TerminalText.loadingLine("正在思考", 0))
+        assertEquals("> 正在思考… ", TerminalText.loadingLine("正在思考", 600))
     }
 }

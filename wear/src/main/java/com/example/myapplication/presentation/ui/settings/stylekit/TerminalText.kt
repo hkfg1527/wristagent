@@ -54,4 +54,30 @@ object TerminalText {
 
     /** 数值条的格子数：8 格在 466px 屏上正好不换行。 */
     const val BAR_CELLS = 8
+
+    /** 方块光标周期（毫秒）：亮一半、灭一半，命令行那种常见节奏。 */
+    const val CURSOR_PERIOD_MS = 600L
+
+    /** 光标方块。 */
+    const val CURSOR_BLOCK = "█"
+
+    /**
+     * 光标在某一时刻的形态：前半周期亮、后半周期灭。
+     *
+     * 纯函数（只看相位），所以时序能被单测钉住 —— 不需要等真机截图去数帧。
+     * [phaseMs] 取"从加载开始到现在"的毫秒数；负数按 0 处理。
+     */
+    fun cursor(phaseMs: Long, periodMs: Long = CURSOR_PERIOD_MS): String {
+        val period = if (periodMs <= 0L) CURSOR_PERIOD_MS else periodMs
+        val phase = if (phaseMs < 0L) 0L else phaseMs
+        return if ((phase / period) % 2L == 0L) CURSOR_BLOCK else " "
+    }
+
+    /**
+     * 终端档的加载行：`> 正在思考…█`，光标按 [cursor] 闪。
+     *
+     * 用户原话「加载呀那些都是命令行一样的」—— 所以不是转圈，而是一行文字 + 方块光标。
+     */
+    fun loadingLine(label: String, phaseMs: Long, periodMs: Long = CURSOR_PERIOD_MS): String =
+        ROW_PREFIX + label + "…" + cursor(phaseMs, periodMs)
 }
