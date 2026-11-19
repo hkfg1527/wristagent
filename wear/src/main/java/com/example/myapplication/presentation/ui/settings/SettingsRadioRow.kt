@@ -59,6 +59,8 @@ fun SettingsRadioRow(
     }
     SettingsSlotRow(
         title = label,
+        // 选项行不加终端前缀（否则按文本找风格名会失败）
+        plainLabel = true,
         subtitle = subtitle,
         subtitleMaxLines = subtitleMaxLines,
         subtitleStatus = subtitleStatus,

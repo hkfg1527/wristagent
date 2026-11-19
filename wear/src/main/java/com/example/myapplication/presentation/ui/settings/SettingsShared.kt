@@ -21,6 +21,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
+import com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette
+import com.example.myapplication.presentation.ui.settings.stylekit.TerminalText
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.rememberOverscrollEffect
@@ -1387,9 +1389,25 @@ internal fun SettingsSlotRow(
      * 才不会所有行都一样长。
      */
     squareCard: Boolean = false,
+    /**
+     * 这一行是「选项」（单选 / 风格选择器），不加终端前缀。
+     *
+     * 终端档给动作行加 `> ` 前缀很好看，但选项行必须保持原文 —— 否则按文本找
+     * "官方列表"、"大卡片" 这类风格名的用例与读屏都会失效（0.0.0.128 实测踩过）。
+     */
+    plainLabel: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val valueBelowRow = SettingsTextLayout.shouldPlaceValueBelowRow(title, value)
+    // 终端档：动作行加 `> ` 前缀并染绿；选项行（plainLabel）保持原文。
+    // 配色与前缀的唯一真源在 stylekit/TerminalPalette.kt / TerminalText.kt。
+    val terminalStyle = TerminalPalette.isTerminal(WearAppearance.style) && !plainLabel
+    val shownTitle = TerminalText.decorate(title, terminalStyle, active = selected == true)
+    val labelStyle = if (terminalStyle) {
+        SettingsRowLabelStyle.copy(color = TerminalPalette.Foreground)
+    } else {
+        SettingsRowLabelStyle
+    }
     SettingsCardRow(
         modifier = modifier,
         onClick = onClick,
@@ -1432,8 +1450,8 @@ internal fun SettingsSlotRow(
                         )
                 ) {
                     BasicText(
-                        text = title,
-                        style = SettingsRowLabelStyle,
+                        text = shownTitle,
+                        style = labelStyle,
                         maxLines = titleMaxLines,
                         overflow = TextOverflow.Ellipsis
                     )
