@@ -15,7 +15,13 @@
 - 单测基线 **1414 条 / 220 套件全绿**。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
-- 下一步：BALLOON 自己的曲面与间距（32dp 大圆角、专属节奏），然后 S2–S7 → P1–P10。
+- **进度表（十套风格重构，截至 0.0.0.125）**：
+  S0 入册 ✅ / S1 气泡（官方件 + 32dp + 8dp 留白）✅ / S2 方角（0dp + 缩进半像素发丝线）✅ /
+  **S3 大卡片：一行一张卡 ✅，小方块卡粒度 ⬜（下一件）** / S4 终端 ⬜ / S5 官方列表 ⬜ /
+  S6 官方转场 ⬜ / S7 十套回归 ⬜ / **P1–P10 打磨（每轮一套，五种截图 + 几何色值数字）⬜**。
+- 证据台账：`docs/UI-EVIDENCE.md`（每轮截图路径 + 量法 + 数字 + 对应代码），找不到证据时先看它。
+- 下一步：S3 第二步「开关类行做成小方块卡」——注意实现路径是 `SettingsSlotRow`（不是 `SettingsCardRow`），
+  要给 CARD_EACH 增加"方块卡"粒度需在此函数签名上加开关，再由 `SettingsSwitchRow` 传 true。
 - CI：`Android CI` 已稳定通过（`f4f5b3e` / `a8abad3` 两次 `success`）；以前每次 push 都失败并给作者发邮件，原因与修法见 0.0.0.115。
 - 设置页巡检：`docs/SETTINGS-PAGEWALK.md`，**根页 14 个可点条目全部验过**（能打开 + 能返回根页 + 页内有内容）。
   两级结构已记档：`子代理模式` 在工具与 MCP 页内；`会话与上下文` 是提示词与记忆页里的一行。
