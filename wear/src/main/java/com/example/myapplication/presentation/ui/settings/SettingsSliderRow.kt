@@ -66,30 +66,6 @@ fun SettingsSliderRow(
     modifier: Modifier = Modifier
 ) {
     // 官方分段滑杆：没有文本槽，数值由调用点另画（本函数只负责控件本身）。
-    // 终端档：滑杆换成数值条 `[■■■■□□□□] 50%`（等宽 + 终端绿），命令行里没有胶囊滑杆
-    if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
-            com.example.myapplication.presentation.ui.settings.WearAppearance.style
-        )
-    ) {
-        SettingsSlotRow(
-            title = label,
-            subtitle = secondary,
-            modifier = modifier,
-            trailing = {
-                androidx.compose.foundation.text.BasicText(
-                    text = com.example.myapplication.presentation.ui.settings.stylekit.TerminalText.valueBar(
-                        value, valueRange.start, valueRange.endInclusive
-                    ),
-                    style = androidx.compose.ui.text.TextStyle(
-                        color = com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Foreground,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp)
-                    )
-                )
-            }
-        )
-        return
-    }
 
     // 终端档：滑杆换成数值条，且画在**标签下方**（belowContent 槽）。
     // 以前塞在 trailing，把标题列压成每行一个字（0.0.0.138 真机截图）。
@@ -104,12 +80,12 @@ fun SettingsSliderRow(
             belowContent = {
                 androidx.compose.foundation.text.BasicText(
                     text = com.example.myapplication.presentation.ui.settings.stylekit.TerminalText.valueBar(
-                        value, valueRange.start, valueRange.endInclusive
+                        value, valueRange.start, valueRange.endInclusive, cells = 6
                     ),
                     style = androidx.compose.ui.text.TextStyle(
                         color = com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Foreground,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp)
+                        fontSize = androidx.compose.ui.unit.TextUnit(12f, androidx.compose.ui.unit.TextUnitType.Sp)
                     ),
                     maxLines = 1,
                     softWrap = false
