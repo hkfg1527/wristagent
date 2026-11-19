@@ -100,18 +100,22 @@ const device = () => {
   record('进入设置页', entered);
 
   // 四分区按序出现
-  crown(5, 200);
+  // 表冠方向实测：crown(-5, n) 往上滚到顶，crown(+5, n) 往下滚。
+  // 以前这里发的是 +5（直接滚到底），扫描又用 -5 往回收 —— 收集顺序天然是反的，
+  // 而旧判据只看"四个都出现"，于是反序（连得上 → … → 让它答得好）照样 8/8。
+  // 现在：先滚到顶，再一路往下扫，并严格比对顺序。
+  crown(-5, 200);
   spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
   const zones = ['让它答得好', '让它听懂我', '让它能做事', '连得上'];
   const found = [];
-  for (let step = 0; step < 26 && found.length < 4; step++) {
+  for (let step = 0; step < 40 && found.length < 4; step++) {
     const t = dumpTexts();
     for (const z of zones) {
       // 用包含匹配：终端档的分区标题带 `> ` 前缀（`> 让它能做事`），全等匹配会漏。
       if (t.some((x) => x.includes(z)) && !found.includes(z)) found.push(z);
     }
     if (found.length === 4) break;
-    crown(-5, 12);
+    crown(5, 12);
     spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 2200']);
   }
   record('四分区按序', found.length === 4 && found.every((z, i) => z === zones[i]), found.join(' → '));
@@ -120,7 +124,8 @@ const device = () => {
 
 const geometry = () => {
   console.log('\n[3/4] 卡片几何（同屏宽度 + 不重叠）');
-  crown(5, 200);
+  // 先滚到顶（-5 是往上），否则采到的是页面底部那一屏，采样区间跟"根页首屏"没有可比性
+  crown(-5, 200);
   spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
   const shot = path.join(ROOT, 'docs/device/v11/release-check.png');
   const png = spawnSync(ADB, ['-s', DEVICE, 'exec-out', 'screencap', '-p'], { cwd: ROOT, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 120000 });
