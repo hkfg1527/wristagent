@@ -149,6 +149,43 @@ const device = () => {
     '收集=' + found.join(' → ') + (reversed ? '（自底向上，倒序读取，正常）' : '') +
       ' · 端点=' + (reachedEnd ? '已确认' : '未确认')
   );
+  // 子页证据（不计分，只落盘）：进设置后点进目标页并截图。
+  // 为什么放在这里：进设置页只有"审批浮层上滑 / 会话抽屉"两条路，adb 手势不可靠；
+  // 而本脚本已经能稳定进设置，顺手拍子页比自己现摸便宜得多。
+  const subpageShot = (target, fileName) => {
+    const xml = () => {
+      adb('shell', 'uiautomator', 'dump', '/sdcard/sub.xml');
+      return (adb('shell', 'cat', '/sdcard/sub.xml').stdout || '');
+    };
+    crown(5, 200);
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 4']);
+    for (let i = 0; i < 16; i++) {
+      const raw = xml();
+      // 终端档的标签带 `> ` 前缀（`> 语音与唤醒`），所以匹配要放宽成「包含目标文本」
+      const m = raw.match(new RegExp('text="[^"]*' + target + '[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"'));
+      if (m) {
+        const cx = Math.round((Number(m[1]) + Number(m[3])) / 2);
+        const cy = Math.round((Number(m[2]) + Number(m[4])) / 2);
+        adb('shell', 'input', 'tap', String(cx), String(cy));
+        spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 3']);
+        const out = path.join(ROOT, 'docs/device/v27/' + fileName);
+        fs.mkdirSync(path.dirname(out), { recursive: true });
+        const png = spawnSync(ADB, ['-s', DEVICE, 'exec-out', 'screencap', '-p'], {
+          cwd: ROOT, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 120000
+        });
+        fs.writeFileSync(out, png.stdout || '');
+        adb('shell', 'input', 'keyevent', '4');
+        spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 2']);
+        return 'docs/device/v27/' + fileName;
+      }
+      crown(-5, 16);
+      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 1']);
+    }
+    return '';
+  };
+  const shot = subpageShot('语音与唤醒', 'subpage.png');
+  console.log('  子页证据：' + (shot ? shot : '未取得（目标行没在 16 步内出现）'));
+
   return found;
 };
 
