@@ -70,7 +70,12 @@ fun SettingsGroupCard(
             colors = CardDefaults.cardColors(containerColor = SettingsCardSurface),
             // 行的左右内边距由行自己带（[SettingsRowSidePadding]），这里不能再加一层，
             // 否则卡内文字会被推进圆角里（176dp 卡上多 10dp 就是看得见的错位）。
-            contentPadding = PaddingValues(horizontal = 0.dp, vertical = Wear.Space.Xs),
+            contentPadding = PaddingValues(
+                horizontal = 0.dp,
+                // 气泡档自己的节奏：组内上下留 8dp（原来是 4dp，行贴着圆角顶边显得"挤"）。
+                // 只有 BALLOON 走 CARD_GROUP，所以这里就是它自己的呼吸，不影响别套风格。
+                vertical = if (rowShell == SettingsRowShell.CARD_GROUP) 8.dp else Wear.Space.Xs
+            ),
             content = {
                 CompositionLocalProvider(LocalSettingsGroupChrome provides true) {
                     content()

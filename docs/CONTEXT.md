@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.121` / versionCode 159；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
+- 内部版 `0.0.0.122` / versionCode 160；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
 - 单测基线 **1414 条 / 220 套件全绿**。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -44,11 +44,11 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-19 07:55
 
 **版本与基线**
-- 内部版 `0.0.0.121`（versionCode 159）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
+- 内部版 `0.0.0.122`（versionCode 160）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` 已打 tag 并推送。
 - 单测基线 **1415** 条 / **220** 套件全绿。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
 
-**0.0.0.121 · S1：卡片圆角按风格给值（十套不再共用 24dp）\n- `SettingsStyleSpec.cardRadiusDp`：气泡 32 / 方角 0 / 终端 0 / 手帐 6 / 霓虹 24 / 磨砂·大卡片·官方 26 / 弧列 28。\n- `settingsCardRowShape()` 读表（原来写死 `Wear.Radius.Card`=24dp，气泡和方角长得一样）。\n- 新增守卫 `everyStyleHasItsOwnCardCornerRadius`：钉死关键值 + 十套里至少四种不同圆角。\n\n**0.0.0.120 · S1：官方滑杆无障碍修好 + BALLOON 切官方件**
+**0.0.0.122 · S1：气泡档自己的留白（组内上下 4dp → 8dp）\n- `SettingsBalloonGroup` 的 CARD_GROUP 分支 `contentPadding.vertical = 8.dp`（只有 BALLOON 走这条分支）。\n- 真机 0.0.0.122 量测：卡片宽度 **352px（=176dp×2.0）**，81 行采样 min=median=max=352 —— 同宽约束仍然成立。\n\n**0.0.0.121 · S1：卡片圆角按风格给值（十套不再共用 24dp）\n- `SettingsStyleSpec.cardRadiusDp`：气泡 32 / 方角 0 / 终端 0 / 手帐 6 / 霓虹 24 / 磨砂·大卡片·官方 26 / 弧列 28。\n- `settingsCardRowShape()` 读表（原来写死 `Wear.Radius.Card`=24dp，气泡和方角长得一样）。\n- 新增守卫 `everyStyleHasItsOwnCardCornerRadius`：钉死关键值 + 十套里至少四种不同圆角。\n\n**0.0.0.120 · S1：官方滑杆无障碍修好 + BALLOON 切官方件**
 - `OfficialSliderRow`：语义挂在**官方 `Slider` 自己的 modifier** 上（`Modifier.semantics { contentDescription = label }`）。
   先试过"外层 Box + mergeDescendants"—— **不行**：合并只搬属性，`SetProgress` 是**动作**，留在子节点，
   父节点实测仍然没有它。
