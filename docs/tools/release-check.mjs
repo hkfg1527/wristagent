@@ -104,6 +104,16 @@ const device = () => {
     spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 700']);
     entered = /请求超时|全部启用|模型与服务/.test(JSON.stringify(dumpTexts()));
   }
+  // 偶发失败兜底：这一段的"上滑进设置"手势偶尔不生效（0.0.0.137 那天就出现过 7/8，
+  // 报错是「进入设置页 undefined」）。失败时按同样的动作再试一轮，仍失败才算失败 ——
+  // 不重试的话，发布判断会被一次手势抖动带偏。
+  if (!entered) {
+    for (let i = 0; i < 3 && !entered; i++) {
+      adb('shell', 'input', 'swipe', '233', '440', '233', '40', '240');
+      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500']);
+      entered = /请求超时|全部启用|模型与服务/.test(JSON.stringify(dumpTexts()));
+    }
+  }
   record('进入设置页', entered);
 
   // 四分区按序 —— 判据是"一次连续扫描收集到的顺序 == 规范顺序（或它的精确倒序）"。
