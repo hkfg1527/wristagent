@@ -3,43 +3,16 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
-    <string name="settings_section_models">Models</string>
     <string name="settings_temperature_value">Temp %1$.1f</string>
-    <string name="settings_tools_and_mcp">Tools &amp; MCP</string>
-    <string name="settings_tools_all_enabled">All enabled</string>
-    <string name="settings_tools_enabled_count">%1$d enabled</string>
-    <string name="settings_card_meta_context">%1$d turns · %2$.1f</string>
-    <string name="settings_card_meta_profiles">%1$d saved</string>
     <string name="settings_card_meta_tokens">max %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_card_transfer_items">%1$d portable items</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
-    <string name="settings_lux_terminal">Lux terminal</string>
-    <string name="settings_lux_input">Run a command</string>
-    <string name="settings_lux_free_input">Type a command…</string>
-    <string name="settings_lux_input_title">Command</string>
-    <string name="settings_lux_input_placeholder">echo lux</string>
-    <string name="settings_lux_saved">My slots</string>
-    <string name="settings_lux_saved_hint">Run a command first</string>
-    <string name="settings_lux_save_last">Save: %1$s</string>
-    <string name="settings_lux_save_action">Save</string>
-    <string name="settings_lux_delete">Delete</string>
-    <string name="settings_lux_quick">Quick commands</string>
-    <string name="settings_lux_history_empty">No commands yet</string>
-    <string name="settings_lux_rerun">Run again</string>
-    <string name="settings_lux_history">History</string>
-    <string name="settings_lux_clear">Clear transcript</string>
-    <string name="settings_lux_output">Transcript</string>
-    <string name="settings_lux_empty">No commands run yet.</string>
-    <string name="settings_lux_meta">timeout %1$d s</string>
     <string name="settings_security_policy">Security Policy</string>
-    <string name="settings_asr">Speech to Text</string>
     <string name="settings_asr_off">Turned off</string>
     <string name="settings_asr_key_missing">API key missing</string>
     <string name="settings_asr_baidu">Baidu short speech</string>
     <string name="settings_asr_system">System recognizer</string>
-    <string name="settings_sub_model_config">Models &amp; Services</string>
     <string name="settings_sub_hyper_params">Model Parameters</string>
 
     <!-- Hyper parameters. -->
@@ -91,51 +64,18 @@
     <string name="settings_security_expert_desc">Runs without any dialog except for fatally dangerous commands</string>
 
     <!-- Model configuration section. -->
-    <string name="settings_model_pick">Direct model pick</string>
-    <string name="settings_no_models">No models available yet, tap the button below to fetch the list</string>
-    <string name="settings_api_endpoint">API endpoint</string>
-    <string name="settings_ping_running">Pinging...</string>
-    <string name="settings_ping_idle">Endpoint speed test with a live handshake ping</string>
-    <string name="settings_probe_ready">Endpoint ready • %1$dms latency (%2$d models available)</string>
-    <string name="settings_model_refresh_failed">Refresh failed \u00b7 %1$s</string>
     <string name="settings_model_error_dns">DNS lookup failed</string>
     <string name="settings_model_error_timeout">Timed out (3s), retried once</string>
     <string name="settings_model_error_unauthorized">HTTP 401 unauthorized</string>
     <string name="settings_model_error_non_json">Endpoint did not return a model list</string>
     <string name="settings_model_error_http">HTTP %1$s</string>
     <string name="settings_model_error_unknown">Network unavailable</string>
-    <string name="settings_model_source_remote">Remote</string>
-    <string name="settings_model_source_builtin">Built-in default</string>
-    <string name="settings_model_not_in_list">Current model %1$s is not in this list</string>
 
     <!-- Prompt viewer section. -->
 
     <!-- Tools and MCP section. -->
-    <string name="settings_tool_device_status">Battery and temperature</string>
-    <string name="settings_tool_vibrate">Haptic alerts</string>
-    <string name="settings_tool_matrix_density">Watch face dot pitch</string>
-    <string name="settings_tool_power_mode">Power saving mode</string>
-    <string name="settings_tool_time_weather">Time and weather</string>
-    <string name="settings_tool_web_search">Live web search</string>
-    <string name="settings_tools_release_header">On-device tool allowlist</string>
-    <string name="settings_mcp_protocol">MCP protocol</string>
-    <string name="settings_mcp_probe">MCP protocol probe</string>
 
     <!-- Voice and ASR section. -->
-    <string name="settings_asr_toggle_header">Speech-to-text switch</string>
-    <string name="settings_asr_service_header">Recognition service</string>
-    <string name="settings_asr_baidu_desc">Baidu short speech: falls back to the system recognizer when the key is missing</string>
-    <string name="settings_asr_system_desc">System recognizer: uses the speech service built into the watch</string>
-    <string name="settings_baidu_keys_header">Baidu speech keys</string>
-    <string name="settings_baidu_api_key_hint">Enter the API Key</string>
-    <string name="settings_baidu_secret_key_hint">Enter the Secret Key</string>
-    <string name="settings_asr_language_header">Recognition language</string>
-    <string name="settings_asr_selftest_header">Connectivity self-test</string>
-    <string name="settings_asr_testing">Testing...</string>
-    <string name="settings_asr_test">Test transcription</string>
-    <string name="settings_asr_recording">Recording, please speak...</string>
-    <string name="settings_asr_success">Transcribed: %1$s</string>
-    <string name="settings_asr_failure">Transcription failed: %1$s</string>
 
     <!-- Privileged execution (Root / Shizuku) section. -->
     <string name="settings_privilege_title">Privileged Execution</string>
@@ -159,12 +99,6 @@
     <string name="settings_dialog_cancel">Cancel</string>
     <string name="settings_dialog_confirm">Done</string>
     <string name="settings_value_empty">Not set</string>
-    <string name="settings_text_base_url">Base URL</string>
-    <string name="settings_text_api_key">API Key</string>
-    <string name="settings_base_url_hint">https://api.example.com</string>
-    <string name="settings_api_key_hint">sk-...</string>
-    <string name="settings_baidu_api_key">API Key (AK)</string>
-    <string name="settings_baidu_secret_key">Secret Key (SK)</string>
     <string name="settings_temp_presets">Quick presets</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
     <!-- 根页取值只放端口号本身：「Port」会把 15sp 的「Web Console」挤成两行；
@@ -172,21 +106,6 @@
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
-    <string name="settings_provider_profiles">Providers</string>
-    <string name="settings_providers_saved">Saved profiles</string>
-    <string name="settings_providers_empty">No saved profile yet — copy the current config to add one</string>
-    <string name="settings_providers_actions">Manage</string>
-    <string name="settings_providers_copy">Copy current config</string>
-    <string name="settings_providers_rename">Rename active profile</string>
-    <string name="settings_providers_delete">Delete active profile</string>
-    <string name="settings_providers_none_active">Not set</string>
-    <string name="settings_providers_default_name">Config %1$d</string>
-    <string name="settings_providers_capacity">%1$d/%2$d</string>
-    <string name="settings_providers_rename_title">Profile name</string>
-    <string name="settings_providers_rename_placeholder">Name this profile</string>
-    <string name="settings_ui_and_beta_header">Interface &amp; motion</string>
-    <string name="settings_animations">Animation effects</string>
-    <string name="settings_animations_secondary">Off stops matrix breathing, shockwave and button springs</string>
 <!-- 网络体检：九项检查 + 修复预案 -->
     <string name="settings_netdiag_title">Network Check</string>
     <string name="settings_netdiag_subtitle">Diagnose school or complex networks and try to fix them</string>
@@ -358,12 +277,8 @@
     <string name="settings_accent_pink">Pink</string>
     <string name="settings_accent_amber">Amber</string>
 
-    <string name="settings_web_tools_header">Web tools</string>
 
     <string name="settings_memory_max_fact_length">Max length per memory</string>
-    <string name="settings_subagent_max_depth_secondary">Zero turns sub-agents off entirely</string>
-    <string name="settings_subagent_max_depth">Sub-agent depth</string>
-    <string name="settings_subagent_depth_off">Off</string>
     <string name="settings_memory_enabled">Long-term memory</string>
     <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
     <string name="settings_context_compress">Auto-compress context</string>
@@ -375,17 +290,12 @@
     <string name="settings_context_window_web">Context window: set on the web console</string>
     <string name="settings_context_truncation_web">Compress threshold and truncation strategy: web console</string>
 
-    <string name="settings_tools_provider_search">Provider-hosted web search</string>
-    <string name="settings_tools_provider_search_secondary">Falls back to built-in search when unavailable</string>
 
     <string name="settings_model_default_thinking">Thinking on by default</string>
     <string name="settings_model_default_thinking_secondary">New sessions request reasoning</string>
 
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
-    <string name="settings_sub_agent">Sub-agent mode</string>
-    <string name="settings_sub_agent_secondary">Effective in expert mode only</string>
-    <string name="settings_sub_agent_requires_expert">Expert mode only</string>
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
     <string name="settings_context_turns_secondary">How many turns ride along in each request</string>
     <string name="settings_context_turns">Context turns</string>
@@ -394,15 +304,7 @@
     <string name="settings_context_budget">Context budget</string>
     <string name="settings_context_budget_value">Compress after %1$d of %2$d messages</string>
 
-    <string name="settings_approval_policy">Tool approval</string>
-    <string name="settings_approval_always">Confirm every call</string>
-    <string name="settings_approval_risky">Confirm risky calls only</string>
-    <string name="settings_approval_never">Never confirm</string>
 
-    <string name="settings_sandbox_level">Sandbox level</string>
-    <string name="settings_sandbox_read_only">Read only</string>
-    <string name="settings_sandbox_workspace">Workspace</string>
-    <string name="settings_sandbox_full">Full access</string>
 
     <string name="settings_sub_gesture">Bottom Bar Side Key</string>
     <string name="settings_gesture_long_press">Long press</string>
@@ -416,24 +318,8 @@
     <string name="settings_gesture_bound_count">%1$d bound</string>
     <string name="settings_gesture_hint">Each binding maps to one real action; unbound stays a grey dot</string>
 
-    <string name="settings_sub_transfer">Config export / import</string>
-    <string name="settings_transfer_header">Settings snapshot</string>
-    <string name="settings_transfer_export">Copy snapshot to clipboard</string>
-    <string name="settings_transfer_import">Paste snapshot</string>
-    <string name="settings_transfer_dialog_title">Paste snapshot JSON</string>
-    <string name="settings_transfer_placeholder">version 1 · settings { ... }</string>
-    <string name="settings_transfer_exported">Snapshot copied</string>
-    <string name="settings_transfer_imported">Imported %1$d settings</string>
-    <string name="settings_transfer_invalid">Malformed snapshot, nothing written</string>
-    <string name="settings_transfer_hint">Portable settings only; API keys never leave the device</string>
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
-    <string name="settings_remembered_header">Approval allow-list</string>
-    <string name="settings_remembered_title">Remembered commands</string>
-    <string name="settings_remembered_count">%1$d of %2$d</string>
-    <string name="settings_remembered_full">List is full: new "remember" calls are refused until you forget some</string>
-    <string name="settings_remembered_forget">Forget all remembered commands</string>
-    <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
     <string name="settings_bottom_bar_auto_hide">Auto-hide bottom bar after</string>
     <string name="settings_rotary_gain_secondary">How far one crown click travels</string>
     <string name="settings_rotary_gain">Crown scroll gain</string>
@@ -472,17 +358,6 @@
     <string name="settings_stream_emit_interval_secondary">Longer = smoother but laggier</string>
     <string name="settings_stream_emit_interval">Stream frame interval</string>
     <string name="settings_stream_emit_interval_value">%1$d ms</string>
-    <string name="settings_mcp_limits">MCP pages &amp; sub-agent timeout</string>
-    <string name="settings_mcp_max_pages_secondary">Cap on tools/list paging</string>
-    <string name="settings_mcp_max_pages">MCP tool list pages</string>
-    <string name="settings_subagent_read_timeout">Sub-agent read timeout</string>
-    <string name="settings_tool_result_chars_secondary">How much of a tool result reaches the model</string>
-    <string name="settings_tool_result_chars">Tool output limit</string>
-    <string name="settings_shell_timeout">Command timeout</string>
-    <string name="settings_shell_timeout_value">%1$d ms</string>
-    <string name="settings_approval_threshold_secondary">How far you must slide to allow</string>
-    <string name="settings_approval_threshold">Allow threshold</string>
-    <string name="settings_approval_threshold_value">%1$.2f</string>
     <string name="settings_tts_queue_mode">Reply queue</string>
     <string name="settings_tts_queue_interrupt">Interrupt the previous reply</string>
     <string name="settings_tts_queue_append">Queue after the previous reply</string>

@@ -3,43 +3,16 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
-    <string name="settings_section_models">模型</string>
     <string name="settings_temperature_value">温度 %1$.1f</string>
-    <string name="settings_tools_and_mcp">工具与 MCP</string>
-    <string name="settings_tools_all_enabled">全部启用</string>
-    <string name="settings_tools_enabled_count">%1$d 项启用</string>
-    <string name="settings_card_meta_context">上下文 %1$d 轮 · 温度 %2$.1f</string>
-    <string name="settings_card_meta_profiles">已存 %1$d 套</string>
     <string name="settings_card_meta_tokens">上限 %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_card_transfer_items">%1$d 项可移植设置</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
-    <string name="settings_lux_terminal">Lux 终端</string>
-    <string name="settings_lux_input">运行命令</string>
-    <string name="settings_lux_free_input">输入命令…</string>
-    <string name="settings_lux_input_title">命令</string>
-    <string name="settings_lux_input_placeholder">echo lux</string>
-    <string name="settings_lux_saved">我的快捷位</string>
-    <string name="settings_lux_saved_hint">先跑一条命令</string>
-    <string name="settings_lux_save_last">存为快捷位：%1$s</string>
-    <string name="settings_lux_save_action">保存</string>
-    <string name="settings_lux_delete">删除</string>
-    <string name="settings_lux_quick">快捷命令</string>
-    <string name="settings_lux_history_empty">还没有运行过命令</string>
-    <string name="settings_lux_rerun">再跑一次</string>
-    <string name="settings_lux_history">历史</string>
-    <string name="settings_lux_clear">清空转录</string>
-    <string name="settings_lux_output">转录</string>
-    <string name="settings_lux_empty">还没有运行过命令。</string>
-    <string name="settings_lux_meta">上限 %1$d 秒</string>
     <string name="settings_security_policy">安全策略</string>
-    <string name="settings_asr">语音转写</string>
     <string name="settings_asr_off">已关闭</string>
     <string name="settings_asr_key_missing">密钥未填写</string>
     <string name="settings_asr_baidu">百度短语音</string>
     <string name="settings_asr_system">系统识别</string>
-    <string name="settings_sub_model_config">模型与服务</string>
     <string name="settings_sub_hyper_params">模型参数</string>
 
     <!-- 推理参数。 -->
@@ -91,41 +64,12 @@
     <string name="settings_security_expert_desc">除致命危险指令外，跳过所有弹窗直接执行</string>
 
     <!-- 模型配置分区。 -->
-    <string name="settings_model_pick">模型直选</string>
-    <string name="settings_no_models">未发现可用模型，请先点击下方按钮拉取模型列表</string>
-    <string name="settings_api_endpoint">API 端点</string>
-    <string name="settings_ping_running">正在 Ping 测试...</string>
-    <string name="settings_ping_idle">端点测速与实时握手 Ping</string>
-    <string name="settings_probe_ready">端点就绪 • 延迟 %1$dms（%2$d 个可用模型）</string>
 
     <!-- 系统提示词分区。 -->
 
     <!-- 端侧工具与 MCP 分区。 -->
-    <string name="settings_tool_device_status">电量与温度感知</string>
-    <string name="settings_tool_vibrate">马达振动提醒</string>
-    <string name="settings_tool_matrix_density">表盘点阵间距</string>
-    <string name="settings_tool_power_mode">省电模式设置</string>
-    <string name="settings_tool_time_weather">时间与天气感知</string>
-    <string name="settings_tool_web_search">真实网络搜索</string>
-    <string name="settings_tools_release_header">端侧工具放行</string>
-    <string name="settings_mcp_protocol">MCP 协议</string>
-    <string name="settings_mcp_probe">MCP 协议探针</string>
 
     <!-- 语音转写分区。 -->
-    <string name="settings_asr_toggle_header">语音转写开关</string>
-    <string name="settings_asr_service_header">识别服务</string>
-    <string name="settings_asr_baidu_desc">百度短语音：密钥缺失时自动回退系统识别</string>
-    <string name="settings_asr_system_desc">系统识别：依赖手表现有语音服务</string>
-    <string name="settings_baidu_keys_header">百度语音密钥</string>
-    <string name="settings_baidu_api_key_hint">请输入 API Key</string>
-    <string name="settings_baidu_secret_key_hint">请输入 Secret Key</string>
-    <string name="settings_asr_language_header">识别语言</string>
-    <string name="settings_asr_selftest_header">连通性自检</string>
-    <string name="settings_asr_testing">正在测试…</string>
-    <string name="settings_asr_test">测试转写</string>
-    <string name="settings_asr_recording">录音中，请说话…</string>
-    <string name="settings_asr_success">转写成功：%1$s</string>
-    <string name="settings_asr_failure">转写失败：%1$s</string>
 
     <!-- 特权执行（Root / Shizuku）分区。 -->
     <string name="settings_privilege_title">特权执行</string>
@@ -149,12 +93,6 @@
     <string name="settings_dialog_cancel">取消</string>
     <string name="settings_dialog_confirm">完成</string>
     <string name="settings_value_empty">未设置</string>
-    <string name="settings_text_base_url">接口地址</string>
-    <string name="settings_text_api_key">API Key</string>
-    <string name="settings_base_url_hint">https://api.example.com</string>
-    <string name="settings_api_key_hint">sk-...</string>
-    <string name="settings_baidu_api_key">百度 API Key（AK）</string>
-    <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
     <string name="settings_temp_presets">快捷预设</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
     <!-- 根页取值只放端口号本身：「端口」两字会把 15sp 的「网页控制台」挤成两行；
@@ -162,21 +100,6 @@
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
-    <string name="settings_provider_profiles">供应商</string>
-    <string name="settings_providers_saved">已保存配置</string>
-    <string name="settings_providers_empty">还没有保存的配置，复制当前配置即可新增一套</string>
-    <string name="settings_providers_actions">管理</string>
-    <string name="settings_providers_copy">复制当前配置</string>
-    <string name="settings_providers_rename">重命名当前配置</string>
-    <string name="settings_providers_delete">删除当前配置</string>
-    <string name="settings_providers_none_active">未选择</string>
-    <string name="settings_providers_default_name">配置 %1$d</string>
-    <string name="settings_providers_capacity">%1$d/%2$d</string>
-    <string name="settings_providers_rename_title">配置名称</string>
-    <string name="settings_providers_rename_placeholder">给这套配置起个名字</string>
-    <string name="settings_ui_and_beta_header">界面与动效</string>
-    <string name="settings_animations">动画特效</string>
-    <string name="settings_animations_secondary">关闭后点阵不再呼吸、没有冲击波，按钮弹性改为直接切换</string>
 <!-- 网络体检：九项检查 + 修复预案 -->
     <string name="settings_netdiag_title">网络体检</string>
     <string name="settings_netdiag_subtitle">诊断校园网等复杂网络并尝试自动修复</string>
@@ -348,12 +271,8 @@
     <string name="settings_accent_pink">粉</string>
     <string name="settings_accent_amber">橙</string>
 
-    <string name="settings_web_tools_header">网页工具</string>
 
     <string name="settings_memory_max_fact_length">单条记忆长度上限</string>
-    <string name="settings_subagent_max_depth_secondary">0 表示彻底关闭子代理</string>
-    <string name="settings_subagent_max_depth">子代理层数</string>
-    <string name="settings_subagent_depth_off">关闭</string>
     <string name="settings_memory_enabled">启用记忆</string>
     <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
     <string name="settings_context_compress">自动压缩上下文</string>
@@ -365,27 +284,18 @@
     <string name="settings_context_window_web">上下文窗口：请在手机网页修改</string>
     <string name="settings_context_truncation_web">压缩阈值与截断策略：请在手机网页修改</string>
 
-    <string name="settings_tools_provider_search">允许模型调用托管搜索</string>
-    <string name="settings_tools_provider_search_secondary">托管不可用时静默回落到内置检索</string>
 
     <string name="settings_model_default_thinking">默认启用思考</string>
     <string name="settings_model_default_thinking_secondary">新会话默认发起推理请求</string>
 
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
-    <string name="settings_sub_agent">子代理模式</string>
-    <string name="settings_sub_agent_secondary">仅专家模式生效</string>
-    <string name="settings_sub_agent_requires_expert">需专家模式</string>
-    <string name="settings_model_refresh_failed">刷新失败 · %1$s</string>
     <string name="settings_model_error_dns">DNS 解析失败</string>
     <string name="settings_model_error_timeout">请求超时（3 秒），已重试一次</string>
     <string name="settings_model_error_unauthorized">HTTP 401 未授权</string>
     <string name="settings_model_error_non_json">接口没有返回模型列表</string>
     <string name="settings_model_error_http">HTTP %1$s</string>
     <string name="settings_model_error_unknown">网络不可用</string>
-    <string name="settings_model_source_remote">来自远端</string>
-    <string name="settings_model_source_builtin">内置默认</string>
-    <string name="settings_model_not_in_list">当前模型 %1$s 不在此列表内</string>
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
     <string name="settings_context_turns_secondary">每次请求带多少轮上下文</string>
     <string name="settings_context_turns">上下文轮数</string>
@@ -394,15 +304,7 @@
     <string name="settings_context_budget">上下文预算</string>
     <string name="settings_context_budget_value">满 %2$d 条中的 %1$d 条后开始压缩</string>
 
-    <string name="settings_approval_policy">工具审批策略</string>
-    <string name="settings_approval_always">全部确认</string>
-    <string name="settings_approval_risky">只确认风险项</string>
-    <string name="settings_approval_never">从不确认</string>
 
-    <string name="settings_sandbox_level">沙箱等级</string>
-    <string name="settings_sandbox_read_only">只读</string>
-    <string name="settings_sandbox_workspace">工作区</string>
-    <string name="settings_sandbox_full">全权限</string>
 
     <string name="settings_sub_gesture">底栏副键</string>
     <string name="settings_gesture_long_press">长按</string>
@@ -416,24 +318,8 @@
     <string name="settings_gesture_bound_count">已绑定 %1$d 条</string>
     <string name="settings_gesture_hint">每条绑定都对应一个真实动作；不绑定时行尾是灰点</string>
 
-    <string name="settings_sub_transfer">配置导入导出</string>
-    <string name="settings_transfer_header">设置快照</string>
-    <string name="settings_transfer_export">复制快照到剪贴板</string>
-    <string name="settings_transfer_import">粘贴快照</string>
-    <string name="settings_transfer_dialog_title">粘贴快照 JSON</string>
-    <string name="settings_transfer_placeholder">version 1 · settings { ... }</string>
-    <string name="settings_transfer_exported">快照已复制</string>
-    <string name="settings_transfer_imported">已导入 %1$d 项设置</string>
-    <string name="settings_transfer_invalid">格式不合法，未写入任何设置</string>
-    <string name="settings_transfer_hint">只含可移植设置项，密钥不会离开本机</string>
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
-    <string name="settings_remembered_header">审批放行清单</string>
-    <string name="settings_remembered_title">已记住的命令</string>
-    <string name="settings_remembered_count">%1$d / %2$d 条</string>
-    <string name="settings_remembered_full">清单已满：新的「记住」不会生效，请先忘掉一部分</string>
-    <string name="settings_remembered_forget">忘掉全部已记住的命令</string>
-    <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
     <string name="settings_bottom_bar_auto_hide">底栏自动收起延时</string>
     <string name="settings_rotary_gain_secondary">表冠转一格走多远</string>
     <string name="settings_rotary_gain">表冠滚动增益</string>
@@ -472,17 +358,6 @@
     <string name="settings_stream_emit_interval_secondary">越长越平滑，也越滞后</string>
     <string name="settings_stream_emit_interval">流式合帧间隔</string>
     <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
-    <string name="settings_mcp_limits">MCP 分页与子代理超时</string>
-    <string name="settings_mcp_max_pages_secondary">工具清单最多翻几页</string>
-    <string name="settings_mcp_max_pages">MCP 工具清单页数</string>
-    <string name="settings_subagent_read_timeout">子代理读取超时</string>
-    <string name="settings_tool_result_chars_secondary">单次工具结果回灌给模型的上限</string>
-    <string name="settings_tool_result_chars">工具结果上限</string>
-    <string name="settings_shell_timeout">命令超时</string>
-    <string name="settings_shell_timeout_value">%1$d 毫秒</string>
-    <string name="settings_approval_threshold_secondary">滑到多远才算放行</string>
-    <string name="settings_approval_threshold">放行阈值</string>
-    <string name="settings_approval_threshold_value">%1$.2f</string>
     <string name="settings_tts_queue_mode">播报队列</string>
     <string name="settings_tts_queue_interrupt">打断上一句</string>
     <string name="settings_tts_queue_append">排在上一句之后</string>
