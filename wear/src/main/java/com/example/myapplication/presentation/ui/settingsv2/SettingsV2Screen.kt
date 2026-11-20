@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.style.M3CardSettings
+import com.example.myapplication.presentation.ui.settingsv2.style.M3ListSettings
 
 /**
  * 设置页 V2 的唯一入口。
@@ -37,6 +38,7 @@ fun SettingsV2Screen(
     ) {
         when (style) {
             SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections)
+            SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections)
             // R2~R4 逐个补齐；在此之前明确显示"这套还没做"，而不是假装它是别的风格。
             else -> Text(
                 text = style.label + "：渲染待实现（R2~R4）",
