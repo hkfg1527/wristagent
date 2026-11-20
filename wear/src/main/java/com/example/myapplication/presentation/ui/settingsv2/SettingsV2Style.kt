@@ -26,7 +26,10 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             pageBackground = Color(0xFF000000),
             surface = Color(0xFF1F2429),
             titleColor = Color(0xFFF2F4F7),
-            subtitleColor = Color(0xFF9AA4AF)
+            subtitleColor = Color(0xFF9AA4AF),
+            rowMinHeight = 140.dp,
+            dividers = false,
+            centeredText = false
         )
     ),
 
@@ -40,8 +43,12 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             pageBackground = Color(0xFF000000),
             surface = Color(0x00000000),
             titleColor = Color(0xFFF2F4F7),
-            subtitleColor = Color(0xFF9AA4AF)
+            subtitleColor = Color(0xFF9AA4AF),
+            rowMinHeight = 48.dp,
+            dividers = true,
+            centeredText = false
         )
+
     ),
 
     /** 华为手表式贴边卡：外侧贴屏（0 圆角），内侧留圆角。 */
@@ -54,8 +61,12 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             pageBackground = Color(0xFF000000),
             surface = Color(0xFF2A313C),
             titleColor = Color(0xFFF2F4F7),
-            subtitleColor = Color(0xFF9AA4AF)
+            subtitleColor = Color(0xFF9AA4AF),
+            rowMinHeight = 56.dp,
+            dividers = false,
+            centeredText = false
         )
+
     ),
 
     /** 方角 + 发丝线：最克制的一套。 */
@@ -68,8 +79,12 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             pageBackground = Color(0xFF000000),
             surface = Color(0x00000000),
             titleColor = Color(0xFFF2F4F7),
-            subtitleColor = Color(0xFF9AA4AF)
+            subtitleColor = Color(0xFF9AA4AF),
+            rowMinHeight = 48.dp,
+            dividers = true,
+            centeredText = true
         )
+
     ),
 
     /** 终端：等宽绿字 + `> ` 前缀（这个 App 是 agent，这套最贴主题）。 */
@@ -82,7 +97,10 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             pageBackground = Color(0xFF0B0F0C),
             surface = Color(0x00000000),
             titleColor = Color(0xFF3BFF9A),
-            subtitleColor = Color(0xFF1E7A4E)
+            subtitleColor = Color(0xFF1E7A4E),
+            rowMinHeight = 40.dp,
+            dividers = false,
+            centeredText = false
         )
     ),
     ;
@@ -114,4 +132,10 @@ data class StyleIdentity(
     val surface: Color,
     val titleColor: Color,
     val subtitleColor: Color,
+    /** 行/卡的最小高度：一屏能放几条，由它决定。 */
+    val rowMinHeight: Dp,
+    /** 行间是否画 1px 分隔线（有卡面的风格不画）。 */
+    val dividers: Boolean,
+    /** 行内文字对齐：圆屏官方建议标题居中时用 CenterHorizontally。 */
+    val centeredText: Boolean,
 )

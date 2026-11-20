@@ -20,20 +20,23 @@ import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
-import com.example.myapplication.presentation.ui.settingsv2.StyleIdentity
 
 /**
- * `M3_CARD`：谷歌健康（Google Health）那种**大卡片**。
+ * `M3_CARD`：谷歌健康（Google Health）式**大卡片**。
  *
- * 一屏 1~2 张卡，一张卡负责一组设置：卡内是"组标题 + 若干行"，行尾直接放值/开关。
- * 全部用官方 `androidx.wear.compose.material3` 组件（Card / SwitchButton / Text），不手搓。
- *
- * 这个文件只读 [StyleIdentity]，不判断风格、不 import 其它 style 文件。
+ * 规格来自 `docs/SETTINGS-REBUILD-V2.md`：
+ * - 一屏 1~2 张主卡，**卡最小高度 140dp**、内边距 **12dp**、卡间距 **8dp**、圆角 **26dp**；
+ * - 卡内用 M3 类型标尺两档：组标题 `titleMedium`、行标题/状态 `bodyMedium`；
+ * - 走**官方** `Card(transformation = SurfaceTransformation(itemScope, spec))`：
+ *   `transformationSpec` 由 `rememberTransformationSpec()` 提供，这样卡片的形状与高度会随滚动位置变化
+ *   （M3E 的 shape morphing），而不是自己用 graphicsLayer 手搓缩放。
  */
 @Composable
 fun M3CardSettings(
@@ -42,29 +45,32 @@ fun M3CardSettings(
 ) {
     val identity = SettingsV2Style.M3_CARD.identity
     val shape = RoundedCornerShape(identity.cornerRadius)
+    val transformationSpec = rememberTransformationSpec()
     TransformingLazyColumn(
         modifier = modifier.fillMaxWidth(),
+        // 页边距：左右 8dp（卡自己再留 12dp 内边距），上下 12dp
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(sections, key = { it.title }) { section ->
             Card(
+                onClick = {},
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp),
+                    .heightIn(min = identity.rowMinHeight),
                 shape = shape,
                 colors = CardDefaults.cardColors(containerColor = identity.surface),
+                contentPadding = PaddingValues(12.dp),
+                transformation = SurfaceTransformation(transformationSpec),
             ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                    Text(
-                        text = section.title,
-                        color = identity.titleColor,
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Spacer(Modifier.heightIn(min = 6.dp))
-                    section.rows.forEach { row ->
-                        M3CardRow(row = row, identity = identity)
-                    }
+                Text(
+                    text = section.title,
+                    color = identity.titleColor,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.heightIn(min = 6.dp))
+                section.rows.forEach { row ->
+                    M3CardRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
                 }
             }
         }
@@ -72,7 +78,11 @@ fun M3CardSettings(
 }
 
 @Composable
-private fun M3CardRow(row: SettingsV2Row, identity: StyleIdentity) {
+private fun M3CardRow(
+    row: SettingsV2Row,
+    titleColor: androidx.compose.ui.graphics.Color,
+    valueColor: androidx.compose.ui.graphics.Color,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -81,22 +91,22 @@ private fun M3CardRow(row: SettingsV2Row, identity: StyleIdentity) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = row.title, color = identity.titleColor, style = MaterialTheme.typography.bodyMedium)
+            Text(text = row.title, color = titleColor, style = MaterialTheme.typography.bodyMedium)
             row.subtitle?.let {
-                Text(text = it, color = identity.subtitleColor, style = MaterialTheme.typography.labelSmall)
+                Text(text = it, color = valueColor, style = MaterialTheme.typography.labelSmall)
             }
         }
         Spacer(Modifier.width(8.dp))
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
-                color = identity.subtitleColor,
-                style = MaterialTheme.typography.bodySmall,
+                color = valueColor,
+                style = MaterialTheme.typography.labelLarge,
             )
             is RowTrailing.Toggle -> SwitchButton(
                 checked = trailing.checked,
                 onCheckedChange = trailing.onChange,
-                // 标签由外部行标题承担，这里给空标签避免重复朗读
+                // 标签由外部行标题承担，避免读屏重复朗读
                 label = {},
             )
             is RowTrailing.Chevron, RowTrailing.None -> Unit
