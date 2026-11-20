@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
@@ -29,6 +29,9 @@ import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /**
  * `M3_LIST`：官方列表形态 —— 无卡面、左标题右值/开关、行间 1px 分隔。
@@ -67,12 +70,15 @@ fun M3ListSettings(
                             .padding(top = 10.dp, bottom = 4.dp),
                     )
                 }
-                items(section.rows, key = { it.key }) { row ->
+                itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
+                val motion = SettingsV2Motions.of(SettingsV2Style.M3_LIST)
+                val enter = rememberEnterProgress(rowIndex, motion)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         M3ListRow(
                             row = row,
                             identity = identity,
                             spec = transformationSpec,
+                            modifier = Modifier.enterAppearance(enter, motion),
                         )
                         if (identity.dividers) {
                             Box(
@@ -94,9 +100,10 @@ private fun M3ListRow(
     row: SettingsV2Row,
     identity: com.example.myapplication.presentation.ui.settingsv2.StyleIdentity,
     spec: androidx.wear.compose.material3.lazy.TransformationSpec,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .heightIn(min = identity.rowMinHeight)
             .padding(vertical = 6.dp),

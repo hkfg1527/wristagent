@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
@@ -29,6 +29,9 @@ import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /** 方角行的测试标识。 */
 internal const val SquareRowTag = "square-row"
@@ -73,7 +76,9 @@ fun SquareSettings(
                             .padding(top = 10.dp, bottom = 6.dp),
                     )
                 }
-                items(section.rows, key = { it.key }) { row ->
+                itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
+                val motion = SettingsV2Motions.of(SettingsV2Style.SQUARE)
+                val enter = rememberEnterProgress(rowIndex, motion)
                     Column(modifier = Modifier.fillMaxWidth().testTag(SquareRowTag)) {
                         Row(
                             modifier = Modifier

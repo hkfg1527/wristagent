@@ -21,12 +21,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
@@ -80,7 +83,9 @@ fun TerminalSettings(
                             .padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
-                items(section.rows, key = { it.key }) { row ->
+                itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
+                val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
+                val enter = rememberEnterProgress(rowIndex, motion)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
