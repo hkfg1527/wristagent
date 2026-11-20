@@ -3,6 +3,8 @@ package com.example.myapplication.presentation.ui.settingsv2
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
@@ -34,6 +36,11 @@ fun SettingsV2Screen(
     modifier: Modifier = Modifier,
 ) {
     val identity = style.identity
+    // 宽度策略：Standard（其余四套）统一 176dp 居中；ARC 贴边满宽（它的辨识度就来自贴边）
+    val widthModifier = when (identity.width) {
+        RowWidthPolicy.Standard -> Modifier.width(SettingsV2StandardWidth)
+        RowWidthPolicy.EdgeToEdge -> Modifier.fillMaxWidth()
+    }
     // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
     // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
     key(style) {
@@ -44,11 +51,11 @@ fun SettingsV2Screen(
         contentAlignment = Alignment.TopCenter,
     ) {
             when (style) {
-            SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections)
-            SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections)
-            SettingsV2Style.ARC -> ArcSettings(sections = sections)
-            SettingsV2Style.SQUARE -> SquareSettings(sections = sections)
-            SettingsV2Style.TERMINAL -> TerminalSettings(sections = sections)
+            SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = widthModifier)
+            SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = widthModifier)
+            SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = widthModifier)
+            SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = widthModifier)
+            SettingsV2Style.TERMINAL -> TerminalSettings(sections = sections, modifier = widthModifier)
             // R2~R4 逐个补齐；在此之前明确显示"这套还没做"，而不是假装它是别的风格。
             else -> Text(
                 text = style.label + "：渲染待实现（R2~R4）",
@@ -60,3 +67,6 @@ fun SettingsV2Screen(
         }
     }
 }
+
+/** 除 ARC 贴边外的四套：卡片/行统一宽度（dp）。 */
+val SettingsV2StandardWidth = 176.dp

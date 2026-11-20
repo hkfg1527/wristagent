@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -98,7 +100,13 @@ private fun M3CardRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = row.title, color = titleColor, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = row.title,
+                color = titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             row.subtitle?.let {
                 Text(text = it, color = valueColor, style = MaterialTheme.typography.labelSmall)
             }
@@ -108,7 +116,12 @@ private fun M3CardRow(
             is RowTrailing.Value -> Text(
                 text = trailing.text,
                 color = valueColor,
-                style = MaterialTheme.typography.labelLarge,
+                // 176dp 列宽下，右值降到 labelMedium，给左标题留出至少 3 个字的空间
+                style = MaterialTheme.typography.labelMedium,
+                // 右值优先按需取宽（模型名不能被截成 deepse…）；左标题用 weight 吃剩下的空间
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             is RowTrailing.Toggle -> SwitchButton(
                 checked = trailing.checked,

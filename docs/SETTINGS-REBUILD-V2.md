@@ -248,3 +248,15 @@ Kotlin 的同包隐式引用、全限定名、KDoc 引用、重复 import 四种
 **改为不移动**：这 9 组共享符号**留在 `ui/settings/` 不动**（它们是基础设施，不是"旧设置页"）；
 删除时只删**页面渲染文件**（`SettingsScreen.kt`、`SettingsBalloonGroup.kt`、`SettingsStyleCards.kt`、
 `SettingsShared.kt` 等）与其测试，并用 IDE 逐个删除、每次删完立刻编译。
+
+
+## 8. V2 信息架构（与 SettingsV2Data.zoneTitles 同源）
+
+| 顺序 | 分区 | 内容 |
+|---|---|---|
+| 1 | 连得上 | 供应商 / 模型 / 温度 |
+| 2 | 让它能做事 | 工具与 MCP / 安全策略 / 特权执行 |
+| 3 | 让它听懂我 | 语音与唤醒 / 自动播报 / 唤醒词 |
+| 4 | 让它答得好 | 页面风格 / 紧凑模式 / 网页控制台 |
+
+> 守卫：`SettingsV2IaGuardTest` 断言这四个名字与顺序，并校验它们同时出现在本文件与 `docs/CONTEXT.md`。
