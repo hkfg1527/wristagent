@@ -269,7 +269,18 @@ fun SettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Wear.Palette.Bg)
+                    .background(
+            // 终端档用近黑底：这里才是设置页最外层的绘制者（SettingsShared 里那两处被子页/行覆盖了），
+            // 所以 0.0.0.145 实测底色仍是纯黑 —— 背景必须画在最外层才有用。
+            if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style
+                )
+            ) {
+                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
+            } else {
+                Wear.Palette.Bg
+            }
+        )
             ) {
                 val settingsFocusRequester = remember { FocusRequester() }
                 // 着色器预热：滑块与开关的把手是圆角矩形（圆形），第一次绘制时驱动会在帧内现编译
@@ -288,7 +299,18 @@ fun SettingsScreen(
                         .size(1.dp)
                         .align(Alignment.TopStart)
                         .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(Wear.Palette.Bg)
+                        .background(
+            // 终端档用近黑底：这里才是设置页最外层的绘制者（SettingsShared 里那两处被子页/行覆盖了），
+            // 所以 0.0.0.145 实测底色仍是纯黑 —— 背景必须画在最外层才有用。
+            if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style
+                )
+            ) {
+                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
+            } else {
+                Wear.Palette.Bg
+            }
+        )
                 )
 
                 // 曲面时钟 + 右缘滚动指示器：Wear 的两个强约定，缺了就不像一块真表。
