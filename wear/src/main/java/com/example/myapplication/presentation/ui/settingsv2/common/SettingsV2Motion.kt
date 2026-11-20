@@ -5,7 +5,12 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -96,4 +101,23 @@ fun Modifier.edgeAppearance(distance: Float, motion: V2Motion): Modifier = this.
     scaleX = scale
     scaleY = scale
     alpha = SettingsV2Motions.edgeAlpha(distance, motion)
+}
+
+/**
+ * 一行"离屏幕中心有多远"（0=正中，1=上下边缘）。
+ *
+ * 不用官方 `scrollProgress`：它在 material3 里是 `val DrawScope.scrollProgress` 这类**成员扩展属性**，
+ * 普通 lambda 里取不到（试过两次编译失败）。用布局位置自己算，不依赖内部 API，行为也更好解释。
+ */
+@Composable
+fun rememberEdgeDistance(): MutableState<Float> = remember { mutableFloatStateOf(0f) }
+
+/** 上报自身位置，算出"离屏幕中心的比例"并写回 [state]。 */
+fun Modifier.reportEdgeDistance(state: MutableState<Float>): Modifier = this.onGloballyPositioned { coords ->
+    val centerY = coords.positionInRoot().y + coords.size.height / 2f
+    val parentHeight = coords.parentLayoutCoordinates?.size?.height?.toFloat() ?: 0f
+    if (parentHeight > 0f) {
+        val half = parentHeight / 2f
+        state.value = (kotlin.math.abs(centerY - half) / half).coerceIn(0f, 1f)
+    }
 }
