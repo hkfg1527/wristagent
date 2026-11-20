@@ -3,50 +3,16 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
-    <string name="settings_temperature_value">温度 %1$.1f</string>
-    <string name="settings_card_meta_tokens">上限 %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
     <string name="settings_security_policy">安全策略</string>
-    <string name="settings_asr_off">已关闭</string>
-    <string name="settings_asr_key_missing">密钥未填写</string>
-    <string name="settings_asr_baidu">百度短语音</string>
-    <string name="settings_asr_system">系统识别</string>
-    <string name="settings_sub_hyper_params">模型参数</string>
 
     <!-- 推理参数。 -->
-    <string name="settings_temperature_secondary">越高越发散，越低越稳</string>
-    <string name="settings_temperature">采样温度</string>
-    <string name="settings_temp_fast">极速 0.2</string>
-    <string name="settings_temp_balanced">平衡 0.7</string>
-    <string name="settings_temp_creative">发散 1.2</string>
-    <string name="settings_top_p_secondary">候选词范围，越低越保守</string>
-    <string name="settings_top_p">核采样 top_p</string>
-    <string name="settings_max_tokens_secondary">单次回复的字数上限</string>
-    <string name="settings_max_tokens">最大输出 Token</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
-    <string name="settings_max_tokens_custom">最大输出 Token · 自定义</string>
     <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
-    <string name="settings_max_tokens_range_hint">%1$d – %2$d</string>
-    <string name="settings_transport">传输协议</string>
-    <string name="settings_sse_on">开启 SSE 流式</string>
-        <string name="settings_thought_group">思考过程</string>
-    <string name="settings_show_thought_process">显示思考过程</string>
-    <string name="settings_reasoning_effort">推理努力</string>
-    <string name="settings_reasoning_effort_low">低</string>
-    <string name="settings_reasoning_effort_medium">中</string>
-    <string name="settings_reasoning_effort_high">高</string>
-    <string name="settings_reasoning_effort_unsupported">该模型不支持推理努力，将忽略</string>
     <string name="settings_switch_on">已开启</string>
     <string name="settings_switch_off">已关闭</string>
-    <string name="settings_reply_style_header">回答风格</string>
-    <string name="settings_reply_style_concise">精炼</string>
-    <string name="settings_reply_style_concise_secondary">先给结论，只保留关键步骤</string>
-    <string name="settings_reply_style_balanced">平衡</string>
-    <string name="settings_reply_style_balanced_secondary">结论加必要解释，不铺陈</string>
-    <string name="settings_reply_style_detailed">详尽</string>
-    <string name="settings_reply_style_detailed_secondary">展开推理与例子，适合复杂任务</string>
     <string name="agent_reply_style_concise">回答保持精炼：先给结论，只保留关键步骤与必要风险提示，不重复问题。</string>
     <string name="agent_reply_style_balanced">回答保持平衡：先给结论，再给必要解释与可执行步骤，避免空泛铺陈。</string>
     <string name="agent_reply_style_detailed">回答保持详尽：在结论后展开关键推理、边界条件与例子，但仍避免重复和套话。</string>
@@ -93,7 +59,6 @@
     <string name="settings_dialog_cancel">取消</string>
     <string name="settings_dialog_confirm">完成</string>
     <string name="settings_value_empty">未设置</string>
-    <string name="settings_temp_presets">快捷预设</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
     <!-- 根页取值只放端口号本身：「端口」两字会把 15sp 的「网页控制台」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
@@ -232,39 +197,13 @@
     <string name="settings_netdiag_plan_all_ok_guide">无需修复</string>
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
-    <string name="settings_sub_voice_entry">语音与唤醒</string>
-    <string name="settings_voice_switch_header">语音</string>
-    <string name="settings_voice_asr_enabled">启用语音识别</string>
-    <string name="settings_voice_auto_speak">自动播报回答</string>
-    <string name="settings_voice_auto_speak_secondary">出向能力，与识别开关互相独立</string>
-    <string name="settings_voice_live_transcript">边说边显示文字</string>
-    <string name="settings_voice_live_transcript_secondary">说话过程中实时上屏中间结果</string>
-    <string name="settings_voice_wake_header">唤醒方式</string>
-    <string name="settings_voice_wake_screen">亮屏唤起自动语音输入</string>
-    <string name="settings_voice_wake_lock">锁屏唤起自动语音输入</string>
-    <string name="settings_voice_wake_removed">已移除 · 续航</string>
-    <string name="settings_voice_wake_removed_hint">常驻麦克风会在每次抬腕时唤醒音频链路，两种唤醒已整体移除</string>
-    <string name="settings_voice_entry_header">仅保留显式入口</string>
-    <string name="settings_voice_entry_mic">输入弹窗里的麦克风按钮</string>
-    <string name="settings_voice_entry_main_key">按住主键说话</string>
-    <string name="settings_voice_power">长按电源键</string>
-    <string name="settings_voice_power_value">需系统按键自定义映射</string>
-    <string name="settings_voice_power_hint">应用收不到 KEYCODE_POWER，需在系统设置里把长按电源键映射为本应用</string>
 
-    <string name="settings_sub_appearance">外观与动效</string>
-    <string name="settings_appearance_compact">简洁模式</string>
-    <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
-    <string name="settings_appearance_matrix_header">点阵</string>
-    <string name="settings_appearance_matrix_spacing_secondary">点阵的间距</string>
-    <string name="settings_appearance_matrix_spacing">点阵间距</string>
     <string name="settings_appearance_web_only">请在手机网页修改</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
-    <string name="settings_appearance_font_scale">字号</string>
     <string name="settings_font_scale_standard">标准</string>
     <string name="settings_font_scale_large">大</string>
     <string name="settings_font_scale_xlarge">特大</string>
     <!-- 强调色五档：档名是颜色名，不是令牌名。 -->
-    <string name="settings_appearance_accent_color">强调色</string>
     <string name="settings_accent_cyan">青</string>
     <string name="settings_accent_green">绿</string>
     <string name="settings_accent_violet">紫</string>
@@ -285,8 +224,6 @@
     <string name="settings_context_truncation_web">压缩阈值与截断策略：请在手机网页修改</string>
 
 
-    <string name="settings_model_default_thinking">默认启用思考</string>
-    <string name="settings_model_default_thinking_secondary">新会话默认发起推理请求</string>
 
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
@@ -320,11 +257,6 @@
 
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
-    <string name="settings_bottom_bar_auto_hide">底栏自动收起延时</string>
-    <string name="settings_rotary_gain_secondary">表冠转一格走多远</string>
-    <string name="settings_rotary_gain">表冠滚动增益</string>
-    <string name="settings_style_header">页面风格</string>
-    <string name="settings_style_options">可选风格</string>
     <string name="settings_style_balloon">气泡</string>
     <string name="settings_style_balloon_summary">整页一个气球，宽度随圆屏收缩</string>
     <string name="settings_style_square">方角</string>
@@ -333,38 +265,11 @@
     <string name="settings_style_card_summary">官方 M3E 卡片：一行一张，滚到边缘会缩小</string>
     <string name="settings_style_terminal">终端</string>
     <string name="settings_style_terminal_summary">等宽字体、无底色、按键像控制台</string>
-        <string name="settings_sub_network_request">网络与请求</string>
-    <string name="settings_card_meta_network">重试 %1$d 次 · 退避 %2$d ms</string>
-<string name="settings_section_network">网络与交互</string>
-    <string name="settings_net_diag_timeout_secondary">每次探测最多等多久</string>
-    <string name="settings_net_diag_timeout">体检探测超时</string>
-    <string name="settings_net_timeout">请求超时</string>
-    <string name="settings_net_timeout_secondary">单次请求超过这个时长就放弃</string>
-    <string name="settings_net_retries">自动重试</string>
-    <string name="settings_net_retries_secondary">掉线或服务端报错时再试一次</string>
-    <string name="settings_net_backoff">重试退避</string>
-    <string name="settings_net_backoff_secondary">重试之前先等这么久</string>
-    <string name="settings_wifi_only">仅 WiFi 请求</string>
-    <string name="settings_wifi_only_secondary">开启后蜂窝网络下不发请求</string>
-    <string name="settings_haptic_amplitude">触觉强度</string>
     <string name="settings_haptic_light">轻</string>
     <string name="settings_haptic_standard">标准</string>
     <string name="settings_haptic_strong">强</string>
-    <string name="settings_haptics">触觉反馈</string>
-    <string name="settings_haptics_secondary">点按与确认时震动</string>
-    <string name="settings_idle_spin_stop_secondary">同一份调用重复几次就停手</string>
-    <string name="settings_idle_spin_stop">空转收口轮次</string>
-    <string name="settings_stream_emit_chars">突发判定字数</string>
-    <string name="settings_stream_emit_interval_secondary">越长越平滑，也越滞后</string>
-    <string name="settings_stream_emit_interval">流式合帧间隔</string>
-    <string name="settings_stream_emit_interval_value">%1$d 毫秒</string>
-    <string name="settings_tts_queue_mode">播报队列</string>
     <string name="settings_tts_queue_interrupt">打断上一句</string>
     <string name="settings_tts_queue_append">排在上一句之后</string>
-    <string name="settings_tts_volume_secondary">播报的音量</string>
-    <string name="settings_tts_volume">播报音量</string>
-    <string name="settings_tts_speech_rate">播报语速</string>
-    <string name="settings_tts_speech_rate_value">%1$.1f 倍</string>
     <string name="settings_style_m3_list">官方列表</string>
     <string name="settings_style_m3_list_summary">官方 M3E 列表：一行一个胶囊控件，全程官方件</string>
     <string name="settings_style_m3_transform">官方转场</string>

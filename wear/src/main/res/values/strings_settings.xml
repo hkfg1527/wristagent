@@ -3,50 +3,16 @@
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
-    <string name="settings_temperature_value">Temp %1$.1f</string>
-    <string name="settings_card_meta_tokens">max %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
     <string name="settings_security_policy">Security Policy</string>
-    <string name="settings_asr_off">Turned off</string>
-    <string name="settings_asr_key_missing">API key missing</string>
-    <string name="settings_asr_baidu">Baidu short speech</string>
-    <string name="settings_asr_system">System recognizer</string>
-    <string name="settings_sub_hyper_params">Model Parameters</string>
 
     <!-- Hyper parameters. -->
-    <string name="settings_temperature_secondary">Higher = wilder; lower = steadier</string>
-    <string name="settings_temperature">Sampling temperature</string>
-    <string name="settings_temp_fast">Fast 0.2</string>
-    <string name="settings_temp_balanced">Balanced 0.7</string>
-    <string name="settings_temp_creative">Creative 1.2</string>
-    <string name="settings_top_p_secondary">Narrower candidate pool; lower = safer</string>
-    <string name="settings_top_p">Nucleus sampling top_p</string>
-    <string name="settings_max_tokens_secondary">Upper bound for one reply</string>
-    <string name="settings_max_tokens">Max output tokens</string>
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
-    <string name="settings_max_tokens_custom">Max output tokens · Custom</string>
     <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
-    <string name="settings_max_tokens_range_hint">%1$d – %2$d</string>
-    <string name="settings_transport">Transport protocol</string>
-    <string name="settings_sse_on">Enable SSE streaming</string>
-        <string name="settings_thought_group">Reasoning process</string>
-    <string name="settings_show_thought_process">Show reasoning</string>
-    <string name="settings_reasoning_effort">Reasoning effort</string>
-    <string name="settings_reasoning_effort_low">Low</string>
-    <string name="settings_reasoning_effort_medium">Medium</string>
-    <string name="settings_reasoning_effort_high">High</string>
-    <string name="settings_reasoning_effort_unsupported">This model ignores the reasoning effort setting</string>
     <string name="settings_switch_on">On</string>
     <string name="settings_switch_off">Off</string>
-    <string name="settings_reply_style_header">Reply style</string>
-    <string name="settings_reply_style_concise">Concise</string>
-    <string name="settings_reply_style_concise_secondary">Conclusion first, key steps only</string>
-    <string name="settings_reply_style_balanced">Balanced</string>
-    <string name="settings_reply_style_balanced_secondary">Conclusion with necessary context</string>
-    <string name="settings_reply_style_detailed">Detailed</string>
-    <string name="settings_reply_style_detailed_secondary">Reasoning and examples for complex tasks</string>
     <string name="agent_reply_style_concise">Keep replies concise: conclusion first, only essential steps and risks, no restating the question.</string>
     <string name="agent_reply_style_balanced">Keep replies balanced: conclusion first, then necessary explanation and actionable steps, no filler.</string>
     <string name="agent_reply_style_detailed">Keep replies detailed: after the conclusion, include key reasoning, edge cases and examples, without repetition or boilerplate.</string>
@@ -99,7 +65,6 @@
     <string name="settings_dialog_cancel">Cancel</string>
     <string name="settings_dialog_confirm">Done</string>
     <string name="settings_value_empty">Not set</string>
-    <string name="settings_temp_presets">Quick presets</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
     <!-- 根页取值只放端口号本身：「Port」会把 15sp 的「Web Console」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
@@ -238,39 +203,13 @@
     <string name="settings_netdiag_plan_all_ok_guide">Nothing to fix</string>
     <string name="settings_netdiag_action_probe">Run one real request</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
-    <string name="settings_sub_voice_entry">Voice &amp; Wake</string>
-    <string name="settings_voice_switch_header">Voice</string>
-    <string name="settings_voice_asr_enabled">Speech recognition</string>
-    <string name="settings_voice_auto_speak">Speak replies aloud</string>
-    <string name="settings_voice_auto_speak_secondary">Output side, independent of recognition</string>
-    <string name="settings_voice_live_transcript">Show words while speaking</string>
-    <string name="settings_voice_live_transcript_secondary">Intermediate results appear as you talk</string>
-    <string name="settings_voice_wake_header">Wake triggers</string>
-    <string name="settings_voice_wake_screen">Wake on screen on</string>
-    <string name="settings_voice_wake_lock">Wake on lock screen</string>
-    <string name="settings_voice_wake_removed">Removed · battery</string>
-    <string name="settings_voice_wake_removed_hint">An always-on mic wakes the audio path on every raise, so both wake triggers are gone</string>
-    <string name="settings_voice_entry_header">Explicit entries only</string>
-    <string name="settings_voice_entry_mic">Mic button in the input dialog</string>
-    <string name="settings_voice_entry_main_key">Hold the main key to talk</string>
-    <string name="settings_voice_power">Long-press power key</string>
-    <string name="settings_voice_power_value">Needs system button mapping</string>
-    <string name="settings_voice_power_hint">An app cannot receive KEYCODE_POWER; map the system button to this app in system settings</string>
 
-    <string name="settings_sub_appearance">Appearance &amp; motion</string>
-    <string name="settings_appearance_compact">Compact mode</string>
-    <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
-    <string name="settings_appearance_matrix_header">Dot matrix</string>
-    <string name="settings_appearance_matrix_spacing_secondary">Spacing of the dot lattice</string>
-    <string name="settings_appearance_matrix_spacing">Matrix spacing</string>
     <string name="settings_appearance_web_only">Change this on the web console</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
-    <string name="settings_appearance_font_scale">Font size</string>
     <string name="settings_font_scale_standard">Default</string>
     <string name="settings_font_scale_large">Large</string>
     <string name="settings_font_scale_xlarge">Extra large</string>
     <!-- 强调色五档：档名是颜色名，不是令牌名。 -->
-    <string name="settings_appearance_accent_color">Accent color</string>
     <string name="settings_accent_cyan">Cyan</string>
     <string name="settings_accent_green">Green</string>
     <string name="settings_accent_violet">Violet</string>
@@ -291,8 +230,6 @@
     <string name="settings_context_truncation_web">Compress threshold and truncation strategy: web console</string>
 
 
-    <string name="settings_model_default_thinking">Thinking on by default</string>
-    <string name="settings_model_default_thinking_secondary">New sessions request reasoning</string>
 
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
@@ -320,11 +257,6 @@
 
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
-    <string name="settings_bottom_bar_auto_hide">Auto-hide bottom bar after</string>
-    <string name="settings_rotary_gain_secondary">How far one crown click travels</string>
-    <string name="settings_rotary_gain">Crown scroll gain</string>
-    <string name="settings_style_header">Page style</string>
-    <string name="settings_style_options">Available styles</string>
     <string name="settings_style_balloon">Balloon</string>
     <string name="settings_style_balloon_summary">One balloon per page, width follows the round screen</string>
     <string name="settings_style_square">Square</string>
@@ -333,38 +265,11 @@
     <string name="settings_style_card_summary">Official M3E cards, one per row, shrinking at the edges</string>
     <string name="settings_style_terminal">Terminal</string>
     <string name="settings_style_terminal_summary">Monospace list, no surfaces, keys read like a console</string>
-        <string name="settings_sub_network_request">Network &amp; requests</string>
-    <string name="settings_card_meta_network">retries %1$d · backoff %2$d ms</string>
-<string name="settings_section_network">Network &amp; interaction</string>
-    <string name="settings_net_diag_timeout_secondary">How long each probe waits</string>
-    <string name="settings_net_diag_timeout">Diagnostics probe timeout</string>
-    <string name="settings_net_timeout">Request timeout</string>
-    <string name="settings_net_timeout_secondary">Give up on a single request after this long</string>
-    <string name="settings_net_retries">Auto retry</string>
-    <string name="settings_net_retries_secondary">Retry once on a dropped connection or a server error</string>
-    <string name="settings_net_backoff">Retry backoff</string>
-    <string name="settings_net_backoff_secondary">Wait this long before retrying</string>
-    <string name="settings_wifi_only">Wi-Fi only</string>
-    <string name="settings_wifi_only_secondary">Refuse to spend cellular data on a request</string>
-    <string name="settings_haptic_amplitude">Haptic strength</string>
     <string name="settings_haptic_light">Light</string>
     <string name="settings_haptic_standard">Standard</string>
     <string name="settings_haptic_strong">Strong</string>
-    <string name="settings_haptics">Haptics</string>
-    <string name="settings_haptics_secondary">Vibrate on taps and confirmations</string>
-    <string name="settings_idle_spin_stop_secondary">Stop after this many identical calls</string>
-    <string name="settings_idle_spin_stop">Stop repeating after</string>
-    <string name="settings_stream_emit_chars">Chars per frame burst</string>
-    <string name="settings_stream_emit_interval_secondary">Longer = smoother but laggier</string>
-    <string name="settings_stream_emit_interval">Stream frame interval</string>
-    <string name="settings_stream_emit_interval_value">%1$d ms</string>
-    <string name="settings_tts_queue_mode">Reply queue</string>
     <string name="settings_tts_queue_interrupt">Interrupt the previous reply</string>
     <string name="settings_tts_queue_append">Queue after the previous reply</string>
-    <string name="settings_tts_volume_secondary">Volume of the spoken reply</string>
-    <string name="settings_tts_volume">Reply volume</string>
-    <string name="settings_tts_speech_rate">Speech rate</string>
-    <string name="settings_tts_speech_rate_value">%1$.1f×</string>
     <string name="settings_style_m3_list">Official list</string>
     <string name="settings_style_m3_list_summary">Official M3E list: one pill per row, official components only</string>
     <string name="settings_style_m3_transform">Official transform</string>
