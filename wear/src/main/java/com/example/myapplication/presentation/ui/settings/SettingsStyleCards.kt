@@ -65,7 +65,7 @@ internal fun SettingsM3Card(
         Card(
             onClick = onClick,
             modifier = cardModifier,
-            colors = CardDefaults.cardColors(containerColor = SettingsCardSurface),
+            colors = CardDefaults.cardColors(containerColor = settingsCardSurface()),
             content = content
         )
     } else {
@@ -73,7 +73,7 @@ internal fun SettingsM3Card(
         Card(
             onClick = {},
             modifier = cardModifier,
-            colors = CardDefaults.cardColors(containerColor = SettingsCardSurface),
+            colors = CardDefaults.cardColors(containerColor = settingsCardSurface()),
             content = content
         )
     }
@@ -310,3 +310,20 @@ internal fun SettingsBackCardRow(
         }
     }
 }
+
+/**
+ * 卡片表面色：纸感档用浅纸面（`#FAF6EE`），其余档用原来的 [SettingsCardSurface]。
+ *
+ * 为什么需要单独一个函数：Wear 的 `ColorScheme` 没有 surface 这组字段（试过，编译不过），
+ * 所以卡片表面只能在自己的容器色上分支。
+ */
+@androidx.compose.runtime.Composable
+internal fun settingsCardSurface(): Color =
+    if (com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
+            com.example.myapplication.presentation.ui.settings.WearAppearance.style
+        )
+    ) {
+        Color(0xFFFAF6EE)
+    } else {
+        SettingsCardSurface
+    }
