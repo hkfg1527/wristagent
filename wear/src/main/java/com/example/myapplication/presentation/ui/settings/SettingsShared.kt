@@ -21,6 +21,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
+import com.example.myapplication.presentation.ui.settings.stylekit.neonFrame
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalText
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1258,6 +1259,19 @@ internal fun SettingsCardRow(
             }
             Spacer(Modifier.height(SettingsCardStyle.Gap))
         }
+        return
+    }
+
+    // 霓虹档：给每一行套一圈发光描边（P7 实测发现此前只有一个深灰卡片，招牌特征没画出来）。
+    // 放在 HAIRLINE_FLAT 分支之前，因为霓虹档的行外壳也是"无曲面"的，只是多了描边。
+    if (SettingsStylePolicy.isActive(com.example.myapplication.appearance.SettingsStyle.NEON)) {
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 3.dp)
+                .neonFrame(),
+            contentAlignment = Alignment.CenterStart
+        ) { content() }
         return
     }
 

@@ -459,3 +459,21 @@
 - 发光描边（外发光）未实现或未生效；
 - 霓虹色（青/品红）没有出现在任何行；
 - 因此与 BALLOON/GOOGLE_CARD 在根页上几乎无法区分（除了卡片圆角略小）。
+### 本轮修复尝试（0.0.0.150）：描边写了，但**没生效**
+
+新增 `stylekit/NeonPalette.kt`（描边青 `#00E5FF`、次色品红 `#FF2D95`、底板 `#05070A`、1.5dp 描边、4 层外发光）
++ `Modifier.neonFrame(radius)`（多层 `drawRoundRect` 近似发光 + 一圈实心描边）+ `NeonPaletteTest` 3 条判据（全绿，基线 1430/227）。
+
+接在 `SettingsCardRow` 的 `HAIRLINE_FLAT` 分支之前，但真机实测：
+
+| 量 | 修前 | 修后 |
+|---|---|---|
+| 截图哈希 | E4C661C5C871 | **E4C661C5C871（完全没变）** |
+| 青色像素 | 0 | **0** |
+| 最饱和色 | `#4B525B`（16） | `#4B525B`（16） |
+
+**结论：这个分支根本执行不到。** 霓虹档的 `rowShell` 不是 `HAIRLINE_FLAT`，行在更前面的分支（CARD_EACH / CARD_GROUP）
+就 `return` 掉了 —— 和 0.0.0.137 那次"改成 belowContent 却看不出变化"是**同一类错误**：没先确认槽位就把代码插进某分支。
+
+**下一轮正确做法**：先把霓虹的描边加在**卡片分支**（`CARD_EACH` / `CARD_GROUP` 的卡片 modifier 上），
+或用 `SettingsStylePolicy.specOf(NEON).rowShell` 打印出真实槽位再插入；插完必须用哈希/像素判据确认生效。
