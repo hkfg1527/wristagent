@@ -123,8 +123,15 @@ fun WearMaterialTheme(content: @Composable () -> Unit) {
         LocalAccentColor provides accent,
         LocalFontScale provides fontScale
     ) {
+        // 纸感档是"浅色主题"：只改背景会变成浅底白字（0.0.0.153 实测背景 #21211F、字仍是白的），
+        // 所以整棵树换一套浅色 scheme —— 文字/表面/描边都跟着走，不用逐处改颜色。
+        val paper = com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
+            com.example.myapplication.presentation.ui.settings.WearAppearance.style
+        )
         MaterialTheme(
-            colorScheme = remember(accent) { WearMaterialColorScheme.withAccent(accent) },
+            colorScheme = remember(accent, paper) {
+                if (paper) PaperColorScheme(accent) else WearMaterialColorScheme.withAccent(accent)
+            },
             typography = WearTypography,
             shapes = WearShapes,
             //
@@ -138,4 +145,22 @@ fun WearMaterialTheme(content: @Composable () -> Unit) {
             content = content
         )
     }
+}
+
+/**
+ * 纸感档的浅色 scheme：纸色底 + 墨色字。
+ *
+ * 与暗色 scheme 的区别只在"底/字"两组 —— Wear 的 `ColorScheme` 没有 `surface` 这组字段，
+ * 所以卡片表面仍由各自的容器色决定；强调色仍由用户设置决定（[accent] 传入）。
+ *
+ * 不是 @Composable：它只做一次颜色计算，调用点在 `remember {}` 里属于普通表达式。
+ */
+internal fun PaperColorScheme(accent: androidx.compose.ui.graphics.Color): ColorScheme {
+    val paper = com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette
+    return WearMaterialColorScheme
+        .withAccent(accent)
+        .copy(
+            background = paper.Background,
+            onBackground = paper.Ink
+        )
 }
