@@ -21,7 +21,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
-import com.example.myapplication.presentation.ui.settings.stylekit.neonFrame
+import com.example.myapplication.presentation.ui.settings.stylekit.neonGlowCard
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalText
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1250,7 +1250,7 @@ internal fun SettingsCardRow(
                     // 霓虹档的真正接线点：它的 rowShell 是 CARD_EACH（0.0.0.150 把代码插到
                     // HAIRLINE_FLAT 分支里，那个分支对它永远执行不到）。
                     if (SettingsStylePolicy.isActive(com.example.myapplication.appearance.SettingsStyle.NEON)) {
-                        Modifier.neonFrame()
+                        Modifier.neonGlowCard()
                     } else {
                         Modifier
                     }

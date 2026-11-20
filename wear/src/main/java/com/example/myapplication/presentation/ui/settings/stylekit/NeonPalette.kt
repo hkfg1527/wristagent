@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -88,4 +89,45 @@ fun Modifier.neonFrame(radius: Dp = 26.dp): Modifier {
 @Composable
 fun NeonFrameBox(radius: Dp = 26.dp, content: @Composable () -> Unit) {
     Box(modifier = Modifier.neonFrame(radius)) { content() }
+}
+
+/**
+ * 画在**卡片外侧**的霓虹发光 + 画在**卡片之上**的描边。
+ *
+ * 为什么不复用 [neonFrame]：那个把光画在自己背景之下，卡片表面会盖住它（0.0.0.151 实测只剩边缘漏光）。
+ * 这里改成：发光用负偏移画到边界之外，描边在内容之后叠一层 —— 两者都不会被卡片遮住。
+ */
+fun Modifier.neonGlowCard(radius: Dp = 26.dp, spread: Dp = 6.dp): Modifier {
+    val layers = NeonPalette.glowLayers(count = 5, step = 2.dp)
+    return this
+        .drawBehind {
+            val r = radius.toPx()
+            for ((width, alpha) in layers) {
+                val w = width.toPx()
+                drawRoundRect(
+                    color = NeonPalette.Glow.copy(alpha = alpha),
+                    topLeft = Offset(-w / 2f, -w / 2f),
+                    size = Size(size.width + w, size.height + w),
+                    cornerRadius = CornerRadius(r + w / 2f, r + w / 2f),
+                    style = Stroke(width = w)
+                )
+            }
+            // 再补一圈稍宽的柔光，让光晕不那么硬
+            val halo = spread.toPx()
+            drawRoundRect(
+                color = NeonPalette.Glow.copy(alpha = 0.10f),
+                topLeft = Offset(-halo / 2f, -halo / 2f),
+                size = Size(size.width + halo, size.height + halo),
+                cornerRadius = CornerRadius(r + halo / 2f, r + halo / 2f),
+                style = Stroke(width = halo)
+            )
+        }
+        .drawWithContent {
+            drawContent()
+            drawRoundRect(
+                color = NeonPalette.Stroke,
+                cornerRadius = CornerRadius(radius.toPx(), radius.toPx()),
+                style = Stroke(width = NeonPalette.StrokeWidth.toPx())
+            )
+        }
 }
