@@ -78,9 +78,9 @@
 | 风格 | 旧枚举 | 哈希 | 目视 |
 |---|---|---|---|
 | M3_CARD | BALLOON | 33ee3a92925a | 大卡片：`连得上` 一张卡内含 供应商/模型/温度 三行 + 下方第二张卡 ✅ |
-| M3_LIST | M3_LIST | cb38ad9a045a | 待目视 |
-| ARC | ARC | a61368d46dc6 | 待目视 |
-| SQUARE | SQUARE | f7bfa8288b4d | 待目视 |
+| M3_LIST | M3_LIST | cb38ad9a045a | 官方列表：分区头 + 供应商/模型/温度 三行 + 1px 分隔线，无卡面 ✅ |
+| ARC | ARC | a61368d46dc6 | 华为式贴边卡：卡片**左侧贴屏**、右侧 28dp 圆角 ✅（与旧实现"永远 176dp"形成对比） |
+| SQUARE | SQUARE | f7bfa8288b4d | 待目视（哈希独立；方角 + 0.5dp 发丝线） |
 | TERMINAL | TERMINAL | bf02da38ade6 | 绿字 `# 连得上` / `> 供应商 配置 1` / `> 模型 deepseek-v4` ✅ |
 
 **关键教训（写死）**：之前三轮"截图哈希相同"的真因是——
@@ -88,7 +88,7 @@
 ②我用 `input keyevent 26` 连按两次唤醒，把应用按到了后台（dump 出来是系统"最近用过"列表）。
 正确做法：`svc power stayon true` + `keyevent 224`(WAKEUP) 点亮，`am start` 前台化，再进设置页。
 
-**已知小问题**：TERMINAL 的标记校验 MISS —— uiautomator 把 `>` 转义成 `&gt;`，校验串要写成 `&gt;`。
+**已修**：TERMINAL 的标记校验曾 MISS（uiautomator 把 `>` 转义成 `&gt;`），工具里校验串已改成转义形式。
 
 ## 0.0.0.142 · 十套批量截图仍无效（3 个哈希 / 10 套）——工具留下，结论是别再用这条路
 

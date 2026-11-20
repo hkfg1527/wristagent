@@ -24,7 +24,7 @@ const STYLES = [
   ['M3_LIST', 'M3_LIST', [/连得上/]],
   ['ARC', 'ARC', [/连得上/]],
   ['SQUARE', 'SQUARE', [/连得上/]],
-  ['TERMINAL', 'TERMINAL', ['# ', '> ']],
+  // uiautomator 把 > 转义成 &gt;，校验串必须用转义形式，否则永远 MISS\n  ['TERMINAL', 'TERMINAL', ['# ', '&gt; ']],
 ];
 
 const adb = (...args) => spawnSync(ADB, ['-s', DEVICE, ...args], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
