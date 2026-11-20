@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.MaterialTheme
@@ -27,6 +27,9 @@ import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /**
  * `M3_CARD`：谷歌健康（Google Health）式**大卡片**。
@@ -52,12 +55,16 @@ fun M3CardSettings(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(sections, key = { it.title }) { section ->
+        itemsIndexed(sections, key = { _, section -> section.title }) { index, section ->
+            val motion = SettingsV2Motions.of(SettingsV2Style.M3_CARD)
+            val enter = rememberEnterProgress(index, motion)
             Card(
                 onClick = {},
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = identity.rowMinHeight),
+                    .heightIn(min = identity.rowMinHeight)
+                    // 入场逐行错峰：延迟 = index × staggerMs（判据见 SettingsV2MotionTest）
+                    .enterAppearance(enter, motion),
                 shape = shape,
                 colors = CardDefaults.cardColors(containerColor = identity.surface),
                 contentPadding = PaddingValues(12.dp),

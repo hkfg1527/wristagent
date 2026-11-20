@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
@@ -28,6 +28,9 @@ import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /** ARC 卡片在测试里的标识（判据要量它的边界，不靠猜）。 */
 internal const val ArcCardTag = "arc-card"
@@ -75,12 +78,15 @@ fun ArcSettings(
                         .padding(start = 26.dp, end = 26.dp, top = 12.dp, bottom = 6.dp),
                 )
             }
-            items(section.rows, key = { it.key }) { row ->
+            itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
+                val motion = SettingsV2Motions.of(SettingsV2Style.ARC)
+                val enter = rememberEnterProgress(rowIndex, motion)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp)
                         .background(color = identity.surface, shape = edgeShape)
+                        .enterAppearance(enter, motion)
                         .testTag(ArcCardTag),
                 ) {
                     ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
