@@ -80,7 +80,15 @@
 | M3_CARD | BALLOON | 33ee3a92925a | 大卡片：`连得上` 一张卡内含 供应商/模型/温度 三行 + 下方第二张卡 ✅ |
 | M3_LIST | M3_LIST | cb38ad9a045a | 官方列表：分区头 + 供应商/模型/温度 三行 + 1px 分隔线，无卡面 ✅ |
 | ARC | ARC | a61368d46dc6 | 华为式贴边卡：卡片**左侧贴屏**、右侧 28dp 圆角 ✅（与旧实现"永远 176dp"形成对比） |
-| SQUARE | SQUARE | f7bfa8288b4d | 待目视（哈希独立；方角 + 0.5dp 发丝线） |
+| SQUARE | SQUARE | f7bfa8288b4d | 方角：**居中分区头**（`连得上` 居中）+ 三行 + 比列表更亮的发丝线、无卡面 ✅ |
+
+**五套目视全部完成**（M3_CARD / M3_LIST / ARC / SQUARE / TERMINAL），且 M3_LIST 与 SQUARE 的差别肉眼可辨
+（前者左对齐分区头 + 灰细线，后者居中分区头 + 更亮的线）。
+
+**边缘缩放接线的技术障碍（记录）**：`scrollProgress` 不是 `TransformingLazyColumnItemScope` 上的普通属性，
+而是 `fun DrawScope.getScrollProgress()` / `fun GraphicsLayerScope.getScrollProgress()` 两个**成员扩展**
+（javap 实测）。所以在 `itemsIndexed` 的普通 lambda 里拿不到它，必须写在 `Modifier.graphicsLayer { }`
+或 `drawWithContent { }` 内部；本次尝试因此编译失败并已回退，未留下半成品。
 | TERMINAL | TERMINAL | bf02da38ade6 | 绿字 `# 连得上` / `> 供应商 配置 1` / `> 模型 deepseek-v4` ✅ |
 
 **关键教训（写死）**：之前三轮"截图哈希相同"的真因是——
