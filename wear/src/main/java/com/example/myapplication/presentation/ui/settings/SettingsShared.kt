@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
 import com.example.myapplication.presentation.ui.settings.stylekit.neonGlowCard
+import com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalText
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1449,10 +1450,12 @@ internal fun SettingsSlotRow(
     // 配色与前缀的唯一真源在 stylekit/TerminalPalette.kt / TerminalText.kt。
     val terminalStyle = TerminalPalette.isTerminal(WearAppearance.style) && !plainLabel
     val shownTitle = TerminalText.decorate(title, terminalStyle, active = selected == true)
-    val labelStyle = if (terminalStyle) {
-        SettingsRowLabelStyle.copy(color = TerminalPalette.Foreground)
-    } else {
-        SettingsRowLabelStyle
+    val paperStyle = PaperPalette.isPaper(WearAppearance.style)
+    val labelStyle = when {
+        terminalStyle -> SettingsRowLabelStyle.copy(color = TerminalPalette.Foreground)
+        // 纸感档：浅底必须换墨字，否则白字看不见（P8 实测背景是纯黑、字色一直是白的）
+        paperStyle -> SettingsRowLabelStyle.copy(color = PaperPalette.Ink)
+        else -> SettingsRowLabelStyle
     }
     SettingsCardRow(
         modifier = modifier,

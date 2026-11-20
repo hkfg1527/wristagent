@@ -272,13 +272,14 @@ fun SettingsScreen(
                     .background(
             // 终端档用近黑底：这里才是设置页最外层的绘制者（SettingsShared 里那两处被子页/行覆盖了），
             // 所以 0.0.0.145 实测底色仍是纯黑 —— 背景必须画在最外层才有用。
-            if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+            when {
+                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
                     com.example.myapplication.presentation.ui.settings.WearAppearance.style
-                )
-            ) {
-                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
-            } else {
-                Wear.Palette.Bg
+                ) -> com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
+                com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style
+                ) -> com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.Background
+                else -> Wear.Palette.Bg
             }
         )
             ) {
@@ -302,13 +303,14 @@ fun SettingsScreen(
                         .background(
             // 终端档用近黑底：这里才是设置页最外层的绘制者（SettingsShared 里那两处被子页/行覆盖了），
             // 所以 0.0.0.145 实测底色仍是纯黑 —— 背景必须画在最外层才有用。
-            if (com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
+            when {
+                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.isTerminal(
                     com.example.myapplication.presentation.ui.settings.WearAppearance.style
-                )
-            ) {
-                com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
-            } else {
-                Wear.Palette.Bg
+                ) -> com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette.Background
+                com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style
+                ) -> com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.Background
+                else -> Wear.Palette.Bg
             }
         )
                 )
