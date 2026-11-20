@@ -23,6 +23,7 @@ import androidx.compose.foundation.gestures.ScrollableDefaults
 import com.example.myapplication.presentation.ui.settings.stylekit.StyleMotions
 import com.example.myapplication.presentation.ui.settings.stylekit.neonGlowCard
 import com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette
+import com.example.myapplication.presentation.ui.settings.stylekit.arcRule
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalPalette
 import com.example.myapplication.presentation.ui.settings.stylekit.TerminalText
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1451,6 +1452,10 @@ internal fun SettingsSlotRow(
     val terminalStyle = TerminalPalette.isTerminal(WearAppearance.style) && !plainLabel
     val shownTitle = TerminalText.decorate(title, terminalStyle, active = selected == true)
     val paperStyle = PaperPalette.isPaper(WearAppearance.style)
+    // 弧档：每行底部画一条真正的弧线（体检发现它此前没有任何弧线特征）
+    val arcStyle = com.example.myapplication.presentation.ui.settings.stylekit.ArcPalette.isArc(
+        WearAppearance.style
+    )
     val labelStyle = when {
         terminalStyle -> SettingsRowLabelStyle.copy(color = TerminalPalette.Foreground)
         // 纸感档：浅底必须换墨字，否则白字看不见（P8 实测背景是纯黑、字色一直是白的）
@@ -1458,7 +1463,8 @@ internal fun SettingsSlotRow(
         else -> SettingsRowLabelStyle
     }
     SettingsCardRow(
-        modifier = modifier,
+        // 弧档：给每行挂一条弧形分隔线（此前这套风格没有任何弧线特征）
+        modifier = if (arcStyle) modifier.arcRule() else modifier,
         onClick = onClick,
         selected = selected,
         squareCard = squareCard
