@@ -2,6 +2,9 @@ package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.appearance.SettingsStyle
@@ -25,10 +28,17 @@ fun SettingsV2Style.Companion.fromLegacy(legacy: SettingsStyle): SettingsV2Style
 
 @Composable
 fun SettingsV2Host(
+    preferences: com.example.myapplication.agent.AgentPreferences,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val style = SettingsV2Style.fromLegacy(WearAppearance.style)
+    // 风格**只从偏好读**：控制台 POST 写的就是偏好，`/api/state` 读的也是偏好。
+    // 之前读内存态 `WearAppearance.style`，结果真机上怎么切都不变（0.0.0.153 实测：重启后仍是默认档），
+    // 因为那条内存态在进程启动时并没有从偏好回填。
+    val revision by com.example.myapplication.agent.SettingsChangeBus.revision.collectAsState()
+    val style = remember(revision, preferences.settingsStyle) {
+        SettingsV2Style.fromLegacy(preferences.settingsStyle)
+    }
     MaterialTheme {
         SettingsV2Screen(style = style, modifier = modifier.fillMaxSize())
     }

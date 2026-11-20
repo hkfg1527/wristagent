@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,13 +34,16 @@ fun SettingsV2Screen(
     modifier: Modifier = Modifier,
 ) {
     val identity = style.identity
+    // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
+    // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
+    key(style) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(identity.pageBackground),
         contentAlignment = Alignment.TopCenter,
     ) {
-        when (style) {
+            when (style) {
             SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections)
             SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections)
             SettingsV2Style.ARC -> ArcSettings(sections = sections)
@@ -50,8 +54,9 @@ fun SettingsV2Screen(
                 text = style.label + "：渲染待实现（R2~R4）",
                 color = Color(0xFF9AA4AF),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(16.dp),
-            )
+                    modifier = Modifier.padding(16.dp),
+                )
+        }
         }
     }
 }
