@@ -29,7 +29,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             subtitleColor = Color(0xFF9AA4AF),
             rowMinHeight = 140.dp,
             dividers = false,
-            centeredText = false
+            centeredText = false,
+            snapScroll = true
         )
     ),
 
@@ -46,7 +47,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             subtitleColor = Color(0xFF9AA4AF),
             rowMinHeight = 48.dp,
             dividers = true,
-            centeredText = false
+            centeredText = false,
+            snapScroll = true
         )
 
     ),
@@ -64,7 +66,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             subtitleColor = Color(0xFF9AA4AF),
             rowMinHeight = 56.dp,
             dividers = false,
-            centeredText = false
+            centeredText = false,
+            snapScroll = true
         )
 
     ),
@@ -82,7 +85,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             subtitleColor = Color(0xFF9AA4AF),
             rowMinHeight = 48.dp,
             dividers = true,
-            centeredText = true
+            centeredText = true,
+            snapScroll = true
         )
 
     ),
@@ -100,7 +104,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             subtitleColor = Color(0xFF1E7A4E),
             rowMinHeight = 40.dp,
             dividers = false,
-            centeredText = false
+            centeredText = false,
+            snapScroll = false
         )
     ),
     ;
@@ -138,4 +143,6 @@ data class StyleIdentity(
     val dividers: Boolean,
     /** 行内文字对齐：圆屏官方建议标题居中时用 CenterHorizontally。 */
     val centeredText: Boolean,
+    /** 磁滑是否吸附到整行（TERMINAL 用连续滚动，不吸附）。 */
+    val snapScroll: Boolean,
 )
