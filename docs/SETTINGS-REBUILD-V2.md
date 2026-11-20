@@ -260,3 +260,38 @@ Kotlin 的同包隐式引用、全限定名、KDoc 引用、重复 import 四种
 | 4 | 让它答得好 | 页面风格 / 紧凑模式 / 网页控制台 |
 
 > 守卫：`SettingsV2IaGuardTest` 断言这四个名字与顺序，并校验它们同时出现在本文件与 `docs/CONTEXT.md`。
+
+---
+
+## 9. 旧实现剩余文件清单（0.0.0.170 实测，按"是否被 ui/settings 之外的代码引用"分类）
+
+### 9.1 真·基础设施（外部有引用，**保留**）
+
+| 外部引用 | 内部引用 | 大小 | 文件 |
+|---|---|---|---|
+| 42 | 6 | 5KB | `AdvancedPermissionSection.kt` |
+| 18 | 5 | 2KB | `SettingsHaptics.kt` |
+| 17 | 28 | 97KB | `SettingsShared.kt` |
+| 14 | 24 | 6KB | `SettingsCardEdgeZoom.kt` |
+| 9 | 2 | 5KB | `ModelCatalogFetcher.kt` |
+| 7 | 0 | 1KB | `SettingsMotion.kt` |
+| 4 | 5 | 5KB | `SettingsRowText.kt` |
+| 3 | 9 | 7KB | `AppearanceSettings.kt` |
+| 2 | 7 | 26KB | `SettingsUiMath.kt` |
+| 1 | 2 | 2KB | `SettingsRowStaggerMath.kt` |
+| 1 | 1 | 1KB | `HapticAmplitude.kt` |
+| 1 | 0 | 4KB | `VoiceEntryPolicy.kt` |
+
+### 9.2 死代码（外部 0 引用，**待清理**，共 19 个 / 约 160KB）
+
+`NetworkDiagnosticsSection` `SettingsBalloonGroup` `WebOnlyRow` `SettingsHeroRing` `SettingsCardTypography`
+`ModelCatalog` `MemoryAndSecuritySections` `BalloonSegment` `SettingsCoverage` `SettingsSwitchRow`
+`SettingsSliderRow` `SettingsRadioRow` `SettingsScaling` `SettingsRowStagger` `SettingsOfficialControls`
+`SettingsCurve` `SettingsTextLayout` `SettingsStyleCards` `SettingsStylePolicy`
+
+### 9.3 为什么不立即删
+
+它们**只被本目录内的文件互相引用**，而本目录里"还在用的"文件（如 `SettingsShared`）可能引用它们。
+逐个删要重新跑一遍"删除→编译→删孤立文案→删过期守卫"的链路（本目录已走 4 轮，删掉 24 个文件、
+约 900 条文案、13 个守卫）。这属于**纯死代码清理**，不改变任何用户可见行为，
+因此按"V2 验收优先"处理：先打 tag 收口，清理单开任务。
