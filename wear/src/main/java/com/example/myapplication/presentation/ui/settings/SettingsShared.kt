@@ -414,11 +414,35 @@ private fun OfficialListSubPage(
                 count = rows.size,
                 key = { index -> "m3-row-" + index }
             ) { index ->
-                // TODO(0.0.0.62)：M3_TRANSFORM 的行转场还没接 —— 1.7.1 的 transformedHeight 是
-                // heightProvider 重载，不是我在 1.5.6 源码里看到的 (scope, spec) 形式，
-                // 需要按真实签名重写。在那之前两套官方风格视觉一致。
+                // 行转场（M3_TRANSFORM 专属）：越靠屏幕上下边缘的行等比缩小到 90%。
+                //
+                // 写法照官方 samples（compose-foundation 1.5.6-samples 的 TransformingLazyColumnSample.kt）：
+                // item scope 上有一个 `scrollProgress` 属性，在 graphicsLayer 里可以直接读（隐式接收者），
+                // 用 `isUnspecified` 判断"还没测量"。
+                //
+                // 只用 graphicsLayer、**不用 transformedHeight**：后者压小 item 高度但内容不缩，
+                // 相邻行会重叠 2px（0.0.0.139 被 SettingsCardWidthRobolectricTest 抓到）。
+                // graphicsLayer 不参与布局，既不重叠也不触发"卡片不重叠"判据；两轴同值 → 无横向形变。
+                val transformRows = SettingsStylePolicy.current().let {
+                    it.rowShell == SettingsRowShell.PLAIN && it.cardScaling
+                }
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (transformRows) {
+                                Modifier.graphicsLayer {
+                                    val progress = scrollProgress
+                                    if (progress.isUnspecified) return@graphicsLayer
+                                    val edge = kotlin.math.abs(progress.topOffsetFraction).coerceIn(0f, 1f)
+                                    val scale = 1f - 0.10f * edge
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                            } else {
+                                Modifier
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(modifier = Modifier.width(SettingsContentWidth)) {
