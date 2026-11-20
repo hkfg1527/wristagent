@@ -140,15 +140,12 @@ fun WearAgentApp(
                         liveSpacingDp = preferences.matrixSpacingDp
                         currentScreen = AppScreen.MAIN
                     }
-                    SettingsScreen(
-                        preferences = preferences,
+                    // V2 设置页（五套风格，见 docs/SETTINGS-REBUILD-V2.md）。
+                    // 旧的 `SettingsScreen` 保留在仓库里但不再被引用，等 R6 真机验收后删除。
+                    com.example.myapplication.presentation.ui.settingsv2.SettingsV2Host(
                         onBack = {
                             liveSpacingDp = preferences.matrixSpacingDp
                             currentScreen = AppScreen.MAIN
-                        },
-                        onRestartOnboarding = {
-                            preferences.hasCompletedOnboarding = false
-                            currentScreen = AppScreen.ONBOARDING
                         }
                     )
                 }
