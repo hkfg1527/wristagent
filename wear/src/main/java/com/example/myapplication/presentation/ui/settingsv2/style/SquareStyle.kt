@@ -32,6 +32,9 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
+import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
+import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
 
 /** 方角行的测试标识。 */
 internal const val SquareRowTag = "square-row"
@@ -79,7 +82,15 @@ fun SquareSettings(
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                 val motion = SettingsV2Motions.of(SettingsV2Style.SQUARE)
                 val enter = rememberEnterProgress(rowIndex, motion)
-                    Column(modifier = Modifier.fillMaxWidth().testTag(SquareRowTag)) {
+                val edge = rememberEdgeDistance()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .enterAppearance(enter, motion)
+                            .reportEdgeDistance(edge)
+                            .edgeAppearance(edge.value, motion)
+                            .testTag(SquareRowTag)
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

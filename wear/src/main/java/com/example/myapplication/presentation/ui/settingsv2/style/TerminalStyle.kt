@@ -30,6 +30,9 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
+import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
+import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
 
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
@@ -86,10 +89,14 @@ fun TerminalSettings(
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                 val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
                 val enter = rememberEnterProgress(rowIndex, motion)
+                val edge = rememberEdgeDistance()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = identity.rowMinHeight)
+                            .enterAppearance(enter, motion)
+                            .reportEdgeDistance(edge)
+                            .edgeAppearance(edge.value, motion)
                             .padding(vertical = 4.dp)
                             .testTag(TerminalRowTag),
                         verticalAlignment = Alignment.CenterVertically,

@@ -24,7 +24,8 @@ const STYLES = [
   ['M3_LIST', 'M3_LIST', [/连得上/]],
   ['ARC', 'ARC', [/连得上/]],
   ['SQUARE', 'SQUARE', [/连得上/]],
-  // uiautomator 把 > 转义成 &gt;，校验串必须用转义形式，否则永远 MISS\n  ['TERMINAL', 'TERMINAL', ['# ', '&gt; ']],
+  // uiautomator 把 > 转义成 &gt;，校验串必须用转义形式，否则永远 MISS
+  ['TERMINAL', 'TERMINAL', ['# ', '&gt; ']],
 ];
 
 const adb = (...args) => spawnSync(ADB, ['-s', DEVICE, ...args], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
@@ -87,6 +88,7 @@ if (!enterSettings()) {
 const rows = [];
 const hashes = new Set();
 for (const [legacy, name, markers] of STYLES) {
+  try {
   const code = await setStyle(legacy);
   sleep(1100);
   let xml = dump();
@@ -101,6 +103,11 @@ for (const [legacy, name, markers] of STYLES) {
   hashes.add(hash);
   rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'} hash=${hash}`);
   console.log(rows[rows.length - 1]);
+  } catch (e) {
+    // 单套失败不应中断整轮（上一轮就是在这里静默中断，导致 report 只到 SQUARE）
+    rows.push(`${name.padEnd(9)} ERROR ${String(e && e.message || e)}`);
+    console.log(rows[rows.length - 1]);
+  }
 }
 
 const distinct = hashes.size;

@@ -30,6 +30,9 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
+import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 
 /** ARC 卡片在测试里的标识（判据要量它的边界，不靠猜）。 */
@@ -81,12 +84,15 @@ fun ArcSettings(
             itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                 val motion = SettingsV2Motions.of(SettingsV2Style.ARC)
                 val enter = rememberEnterProgress(rowIndex, motion)
+                val edge = rememberEdgeDistance()
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp)
                         .background(color = identity.surface, shape = edgeShape)
                         .enterAppearance(enter, motion)
+                        .reportEdgeDistance(edge)
+                        .edgeAppearance(edge.value, motion)
                         .testTag(ArcCardTag),
                 ) {
                     ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)

@@ -305,3 +305,15 @@
 - `ChatScreen.kt:838` 底部右侧翼按钮打开**会话抽屉**，抽屉里有设置入口（`onOpenSettings`）。
 - 从**空聊天页直接上滑不会进设置**（会被列表滚动吃掉）—— 所以纯 adb 手势截图不稳定，
   本轮改用 `node docs/tools/release-check.mjs` 的第 2 段（它自己会上机进设置页并截图），一次成功。
+
+### 边缘淡出/缩放接线后的五张对照（0.0.0.160，distinct 5/5）
+
+| 风格 | 接线前 | 接线后 | 说明 |
+|---|---|---|---|
+| M3_CARD | 33ee3a92925a | 33ee3a92925a | 走官方 `SurfaceTransformation`，不重复做边缘效果 |
+| M3_LIST | cb38ad9a045a | **a48bed062ec1** | 行进来后接 enter + edge ✅ |
+| ARC | a61368d46dc6 | **c96b911fecb0** | 贴边卡 + 边缘效果 ✅ |
+| SQUARE | f7bfa8288b4d | **714e394d0812** | 方角行 + 边缘效果 ✅ |
+| TERMINAL | bf02da38ade6 | **90c4b5537ba0** | 终端行 + 边缘效果 ✅ |
+
+`distinct = 5/5 OK`（工具内置判定），TERMINAL 的 marker 也修好了（`&gt; ` 转义）。
