@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
@@ -51,8 +53,12 @@ fun M3CardSettings(
     val identity = SettingsV2Style.M3_CARD.identity
     val shape = RoundedCornerShape(identity.cornerRadius)
     val transformationSpec = rememberTransformationSpec()
+    val state = rememberTransformingLazyColumnState()
     TransformingLazyColumn(
         modifier = modifier.fillMaxWidth(),
+        state = state,
+        // 磁滑吸附：与大卡片一起用官方 snapFling（守卫 SettingsV2ArchitectureGuardTest 会检查这条）
+        flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
         // 页边距：左右 8dp（卡自己再留 12dp 内边距），上下 12dp
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
