@@ -174,6 +174,10 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 val style = SettingsStyle.values().firstOrNull { it.name == stored }
                     ?: return ConsoleWriteResult.READ_ONLY
                 preferences.settingsStyle = style
+                // 关键：只写偏好不会让已经打开的设置页重绘 —— 界面读的是
+                // WearAppearance.style 这个内存态（Compose State）。不同步它，
+                // 控制台改完风格手表上毫无变化，必须退出重进才生效（0.0.0.143 实测）。
+                com.example.myapplication.presentation.ui.settings.WearAppearance.style = style
             }
             "memoryEnabled" -> preferences.memoryEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY

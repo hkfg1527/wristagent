@@ -17,7 +17,8 @@ const TOKEN = process.env.CONSOLE_TOKEN || '4659';
 const BASE = process.env.CONSOLE_BASE || 'http://127.0.0.1:18080';
 const OUT = path.join(ROOT, 'docs/device/s7');
 const STYLES = ['BALLOON', 'SQUARE', 'GOOGLE_CARD', 'TERMINAL', 'M3_LIST', 'M3_TRANSFORM', 'NEON', 'PAPER', 'GLASS', 'ARC'];
-const SETTINGS_TEXT = /模型与服务|全部启用|语音与唤醒|配置导入导出/;
+// 只用设置页**独有**的文本：聊天页也有「模型与服务」，用它当门禁等于没门禁（0.0.0.144 就是被这个骗的）。
+const SETTINGS_TEXT = /完成返回|配置导入导出|关于/;
 
 const adb = (...args) => spawnSync(ADB, ['-s', DEVICE, ...args], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
 const sleep = (ms) => spawnSync('powershell', ['-NoProfile', '-Command', `Start-Sleep -Milliseconds ${ms}`]);
@@ -72,12 +73,21 @@ for (const style of STYLES) {
     continue;
   }
   const code = await setStyle(style);
-  sleep(1200);
+  sleep(600);
+  // 关键：改完设置必须**离开再重新进入**设置页才会重绘
+  // （0.0.0.143 实测：连切四套，前三张截图哈希完全相同，画面还停在第一套）。
+  adb('shell', 'input', 'keyevent', '4');
+  sleep(800);
   if (!inSettings() && !enterSettings()) {
-    rows.push([style, 'SKIP', '切风格后掉出设置页']);
-    console.log(`${style.padEnd(13)} SKIP 掉出设置页`);
+    rows.push([style, 'SKIP', '切风格后没能重新进入设置页']);
+    console.log(`${style.padEnd(13)} SKIP 重进失败`);
     continue;
   }
+  sleep(600);
+  // 截图前必须先"动一下"（表冠 2 格）：静止时不刷新，screencap 会拿到上一帧
+  // —— 这是 release-check 与手工实验都能拿到新帧、而批量脚本拿到旧帧的唯一差别。
+  adb('shell', 'su', '-c', "for i in `$(seq 1 2); do sendevent /dev/input/event0 2 8 -5; sendevent /dev/input/event0 0 0 0; done");
+  sleep(700);
   const file = path.join(OUT, `${style}.png`);
   let size = shot(file);
   let hash = hashOf(file);

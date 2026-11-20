@@ -3,6 +3,32 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
+## 0.0.0.138 · 修好"控制台改风格设置页不重绘"，十套截图终于各不相同
+
+病因：`ConsoleBridge` 收到 `settingsStyle` 只写了偏好文件，没同步内存态 `WearAppearance.style`（Compose State）；
+界面读的是内存态，所以控制台改完手表上没反应，必须退出重进 —— 也就是 0.0.0.141/142 两次"十套只有 3 帧"的真因。
+
+修法：写偏好的同时 `WearAppearance.style = style`，让已打开的设置页立刻重组。
+
+验证（`node docs/tools/style-shots.mjs`，sha256 前 12 位）：
+
+| 风格 | 字节 | 哈希 |
+|---|---|---|
+| BALLOON | 30756 | ba112911cd68 |
+| SQUARE | 32737 | 7f34ecc88123 |
+| M3_LIST | 17211 | 55fac09a3684 |
+| M3_TRANSFORM | 17146 | c4a8cac75b59 |
+| NEON | 29996 | d75427b58f26 |
+| PAPER | 32705 | fabc063e77b6 |
+| GLASS | 29808 | 3493cabda212 |
+| ARC | 32702 | 447e1fbd869d |
+
+10 套里 8 套拿到互不相同的帧（此前只有 3~4 组重复）。
+`GOOGLE_CARD`、`TERMINAL` 两张因脚本内导航重试失败被跳过 —— **需补拍**。
+
+**未验证**：该同步没有单测覆盖（只有真机取证）。下一步应补一条 `ConsoleBridge` 写 `settingsStyle` 后
+`WearAppearance.style` 跟着变的单测。
+
 ## 0.0.0.143 · 根因找到：改 settingsStyle 后设置页**不会自己重绘**
 
 同一次会话里依次 POST `TERMINAL → BALLOON → NEON → ARC`（每次间隔 2s，POST 全 200，`/api/state` 也显示已切到 ARC），
