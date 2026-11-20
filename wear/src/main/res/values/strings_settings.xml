@@ -1,18 +1,9 @@
 <resources>
     <!-- Settings entry titles, sub-page titles and status text (SettingsScreen + settings/ sections). -->
-        <string name="settings_model_and_service">Models &amp; Services</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
-    <string name="settings_zone_answer">Make it answer well</string>
-    <string name="settings_zone_voice">Make it hear me</string>
-    <string name="settings_zone_act">Make it act</string>
-    <string name="settings_zone_connect">Stay connected</string>
     <string name="settings_section_models">Models</string>
-    <string name="settings_section_system">System</string>
-    <string name="settings_status_configured">Configured</string>
-    <string name="settings_status_unconfigured">Not configured</string>
-    <string name="settings_model_params">Model Parameters</string>
     <string name="settings_temperature_value">Temp %1$.1f</string>
     <string name="settings_tools_and_mcp">Tools &amp; MCP</string>
     <string name="settings_tools_all_enabled">All enabled</string>
@@ -28,14 +19,8 @@
     <string name="settings_card_meta_console_token">Token %1$s</string>
     <string name="settings_card_prompt_chars">%1$d chars</string>
     <string name="settings_card_transfer_items">%1$d portable items</string>
-    <string name="settings_card_tools_called_meta">%1$d of %2$d tools used</string>
-    <string name="settings_card_tools_pending">no tool call yet</string>
-    <string name="settings_card_console_meta">web console :%1$d</string>
-    <string name="settings_prompt_custom">Custom</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
-    <string name="settings_side_key">Bottom Bar Side Key</string>
-    <string name="settings_lux_entry_value">命令面板</string>
     <string name="settings_lux_terminal">Lux terminal</string>
     <string name="settings_lux_input">Run a command</string>
     <string name="settings_lux_free_input">Type a command…</string>
@@ -55,16 +40,12 @@
     <string name="settings_lux_empty">No commands run yet.</string>
     <string name="settings_lux_meta">timeout %1$d s</string>
     <string name="settings_security_policy">Security Policy</string>
-    <string name="settings_mode_strict">Strict confirm</string>
-    <string name="settings_mode_standard">Standard prompt</string>
-    <string name="settings_mode_auto">Auto execute</string>
     <string name="settings_asr">Speech to Text</string>
     <string name="settings_asr_off">Turned off</string>
     <string name="settings_asr_key_missing">API key missing</string>
     <string name="settings_asr_baidu">Baidu short speech</string>
     <string name="settings_asr_system">System recognizer</string>
     <string name="settings_replay_onboarding">Replay the guided tour</string>
-    <string name="settings_done_back">Done</string>
     <string name="settings_sub_model_config">Models &amp; Services</string>
     <string name="settings_sub_hyper_params">Model Parameters</string>
 
@@ -206,7 +187,6 @@
     <string name="settings_remote_console_not_running">Not running</string>
     <!-- 根页取值只放端口号本身：「Port」会把 15sp 的「Web Console」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
-    <string name="settings_remote_console_port_value">%1$d</string>
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
     <string name="settings_remote_console_port_drifted">Preferred port %1$d is busy · using %2$d</string>
     <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
@@ -364,7 +344,6 @@
     <string name="settings_netdiag_plan_all_ok_guide">Nothing to fix</string>
     <string name="settings_netdiag_action_probe">Run one real request</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
-    <string name="settings_voice_entry">Voice &amp; Wake</string>
     <string name="settings_sub_voice_entry">Voice &amp; Wake</string>
     <string name="settings_voice_switch_header">Voice</string>
     <string name="settings_voice_asr_enabled">Speech recognition</string>
@@ -384,7 +363,6 @@
     <string name="settings_voice_power_value">Needs system button mapping</string>
     <string name="settings_voice_power_hint">An app cannot receive KEYCODE_POWER; map the system button to this app in system settings</string>
 
-    <string name="settings_appearance">Appearance &amp; motion</string>
     <string name="settings_sub_appearance">Appearance &amp; motion</string>
     <string name="settings_appearance_compact">Compact mode</string>
     <string name="settings_appearance_compact_secondary">Drop secondary captions and decoration</string>
@@ -485,7 +463,6 @@
     <string name="settings_remembered_full">List is full: new "remember" calls are refused until you forget some</string>
     <string name="settings_remembered_forget">Forget all remembered commands</string>
     <string name="settings_remembered_forget_confirm">Tap again to forget them</string>
-    <string name="settings_card_tools">Tools &amp; MCP</string>
     <string name="settings_bottom_bar_auto_hide">Auto-hide bottom bar after</string>
     <string name="settings_rotary_gain_secondary">How far one crown click travels</string>
     <string name="settings_rotary_gain">Crown scroll gain</string>

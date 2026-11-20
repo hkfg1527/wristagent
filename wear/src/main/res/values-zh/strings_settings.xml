@@ -1,18 +1,9 @@
 <resources>
     <!-- 设置页入口标题、子页标题与状态文案（SettingsScreen 与 settings/ 各分区）。 -->
-        <string name="settings_model_and_service">模型与服务</string>
     <!-- 徽章宽度封顶 40dp：文案必须能在 32dp 文本区内放下，不能靠省略号收场。 -->
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
-    <string name="settings_zone_answer">让它答得好</string>
-    <string name="settings_zone_voice">让它听懂我</string>
-    <string name="settings_zone_act">让它能做事</string>
-    <string name="settings_zone_connect">连得上</string>
     <string name="settings_section_models">模型</string>
-    <string name="settings_section_system">系统</string>
-    <string name="settings_status_configured">已配置</string>
-    <string name="settings_status_unconfigured">未配置</string>
-    <string name="settings_model_params">模型参数</string>
     <string name="settings_temperature_value">温度 %1$.1f</string>
     <string name="settings_tools_and_mcp">工具与 MCP</string>
     <string name="settings_tools_all_enabled">全部启用</string>
@@ -28,14 +19,8 @@
     <string name="settings_card_meta_console_token">令牌 %1$s</string>
     <string name="settings_card_prompt_chars">%1$d 字</string>
     <string name="settings_card_transfer_items">%1$d 项可移植设置</string>
-    <string name="settings_card_tools_called_meta">已调用 %1$d / 共 %2$d</string>
-    <string name="settings_card_tools_pending">还没有工具调用</string>
-    <string name="settings_card_console_meta">网页控制台 :%1$d</string>
-    <string name="settings_prompt_custom">自定义</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
-    <string name="settings_side_key">底栏副键</string>
-    <string name="settings_lux_entry_value">命令面板</string>
     <string name="settings_lux_terminal">Lux 终端</string>
     <string name="settings_lux_input">运行命令</string>
     <string name="settings_lux_free_input">输入命令…</string>
@@ -55,16 +40,12 @@
     <string name="settings_lux_empty">还没有运行过命令。</string>
     <string name="settings_lux_meta">上限 %1$d 秒</string>
     <string name="settings_security_policy">安全策略</string>
-    <string name="settings_mode_strict">严格确认</string>
-    <string name="settings_mode_standard">标准提示</string>
-    <string name="settings_mode_auto">自动执行</string>
     <string name="settings_asr">语音转写</string>
     <string name="settings_asr_off">已关闭</string>
     <string name="settings_asr_key_missing">密钥未填写</string>
     <string name="settings_asr_baidu">百度短语音</string>
     <string name="settings_asr_system">系统识别</string>
     <string name="settings_replay_onboarding">重新观看操作引导</string>
-    <string name="settings_done_back">完成返回</string>
     <string name="settings_sub_model_config">模型与服务</string>
     <string name="settings_sub_hyper_params">模型参数</string>
 
@@ -196,7 +177,6 @@
     <string name="settings_remote_console_not_running">未运行</string>
     <!-- 根页取值只放端口号本身：「端口」两字会把 15sp 的「网页控制台」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
-    <string name="settings_remote_console_port_value">%1$d</string>
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
     <string name="settings_remote_console_port_drifted">首选 %1$d 被占用 · 已改到 %2$d</string>
     <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
@@ -354,7 +334,6 @@
     <string name="settings_netdiag_plan_all_ok_guide">无需修复</string>
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
-    <string name="settings_voice_entry">语音与唤醒</string>
     <string name="settings_sub_voice_entry">语音与唤醒</string>
     <string name="settings_voice_switch_header">语音</string>
     <string name="settings_voice_asr_enabled">启用语音识别</string>
@@ -374,7 +353,6 @@
     <string name="settings_voice_power_value">需系统按键自定义映射</string>
     <string name="settings_voice_power_hint">应用收不到 KEYCODE_POWER，需在系统设置里把长按电源键映射为本应用</string>
 
-    <string name="settings_appearance">外观与动效</string>
     <string name="settings_sub_appearance">外观与动效</string>
     <string name="settings_appearance_compact">简洁模式</string>
     <string name="settings_appearance_compact_secondary">压掉次级说明与装饰文案</string>
@@ -485,7 +463,6 @@
     <string name="settings_remembered_full">清单已满：新的「记住」不会生效，请先忘掉一部分</string>
     <string name="settings_remembered_forget">忘掉全部已记住的命令</string>
     <string name="settings_remembered_forget_confirm">再点一次确认忘掉</string>
-    <string name="settings_card_tools">工具与 MCP</string>
     <string name="settings_bottom_bar_auto_hide">底栏自动收起延时</string>
     <string name="settings_rotary_gain_secondary">表冠转一格走多远</string>
     <string name="settings_rotary_gain">表冠滚动增益</string>

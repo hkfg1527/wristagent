@@ -28,7 +28,6 @@ import com.example.myapplication.agent.AgentToolRegistry
 import com.example.myapplication.presentation.ChatViewModel
 import com.example.myapplication.presentation.ExternalPrompt
 import com.example.myapplication.presentation.ui.OnboardingScreen
-import com.example.myapplication.presentation.ui.SettingsScreen
 import com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled
 import com.example.myapplication.presentation.ui.settings.SettingsScreenVeilMs
 import androidx.compose.runtime.CompositionLocalProvider
