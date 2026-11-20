@@ -52,7 +52,7 @@ class SettingsV2ScreenTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithText("模型与服务").assertIsDisplayed()
+        compose.onNodeWithText("连得上").assertIsDisplayed()
         compose.onNodeWithText("供应商").assertIsDisplayed()
         // 懒列表只组合可见项：这里只要求"首组内容完整可见"，不去找屏外的分区
         assertTrue(
@@ -72,7 +72,7 @@ class SettingsV2ScreenTest {
             .getApplicationContext<android.app.Application>()
             .resources.displayMetrics.density
         val minHeightPx = 140f * density
-        val tall = compose.onAllNodes(androidx.compose.ui.test.hasText("模型与服务", substring = true))
+        val tall = compose.onAllNodes(androidx.compose.ui.test.hasText("连得上", substring = true))
             .fetchSemanticsNodes()
             .map { it.boundsInRoot }
             .filter { it.height >= minHeightPx }

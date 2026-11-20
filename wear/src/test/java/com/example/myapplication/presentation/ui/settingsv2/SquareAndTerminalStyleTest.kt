@@ -52,7 +52,7 @@ class SquareAndTerminalStyleTest {
 
         compose.setContent { MaterialTheme { SettingsV2Screen(style = SettingsV2Style.SQUARE) } }
         compose.waitForIdle()
-        compose.onNodeWithText("模型与服务").assertIsDisplayed()
+        compose.onNodeWithText("连得上").assertIsDisplayed()
         assertTrue(
             "方角档必须画出带 testTag 的行",
             compose.onAllNodesWithTag("square-row").fetchSemanticsNodes().isNotEmpty()

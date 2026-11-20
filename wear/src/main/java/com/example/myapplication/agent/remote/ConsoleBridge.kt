@@ -177,7 +177,15 @@ class AgentPreferencesSettingsPort(private val preferences: AgentPreferences) : 
                 // 关键：只写偏好不会让已经打开的设置页重绘 —— 界面读的是
                 // WearAppearance.style 这个内存态（Compose State）。不同步它，
                 // 控制台改完风格手表上毫无变化，必须退出重进才生效（0.0.0.143 实测）。
-                com.example.myapplication.presentation.ui.settings.WearAppearance.style = style
+                // 注意：ConsoleBridge 跑在非主线程。直接写 Compose 的 MutableState 不会通知观察者，
+                // 界面就不会重组（0.0.0.152 实测：POST 成功了、/api/state 也变了，但屏幕上毫无反应）。
+                // 必须放进一个 mutable snapshot 里写，Compose 才会收到应用通知并重组。
+                androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                    com.example.myapplication.presentation.ui.settings.WearAppearance.style = style
+                }
+                // 光有状态写入还不够：设置页的宿主并不一定订阅这个 State（0.0.0.152 实测屏幕上毫无变化）。
+                // 走项目里已有的广播：ChatApp 收集 revision，bump 一次整棵树就会重新组合。
+                com.example.myapplication.agent.SettingsChangeBus.bump()
             }
             "memoryEnabled" -> preferences.memoryEnabled =
                 value as? Boolean ?: return ConsoleWriteResult.READ_ONLY

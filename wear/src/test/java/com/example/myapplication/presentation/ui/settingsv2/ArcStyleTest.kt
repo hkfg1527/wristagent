@@ -76,7 +76,7 @@ class ArcStyleTest {
             MaterialTheme { SettingsV2Screen(style = SettingsV2Style.ARC) }
         }
         compose.waitForIdle()
-        compose.onNodeWithText("模型与服务").assertIsDisplayed()
+        compose.onNodeWithText("连得上").assertIsDisplayed()
         compose.onNodeWithText("供应商").assertIsDisplayed()
     }
 }

@@ -29,15 +29,21 @@ sealed interface RowTrailing {
 }
 
 /**
- * V2 的首页内容（先只放最必要的五组，后续按需增补）。
+ * V2 的内容（当前是示例数据，等 R6 之后接到真实偏好）。
  *
- * 这是一份**示例数据**：等入口切换时由真实的偏好/状态填充，形状不变。
+ * **分区名必须与应用真实的设置分区一致**：`release-check` 的"四分区按序"判据就是按这四个名字扫的，
+ * 旧实现曾因为改过名字让这条判据静默失灵一次。
  */
 object SettingsV2SampleData {
 
+    private const val ZONE_CONNECT = "连得上"
+    private const val ZONE_ACT = "让它能做事"
+    private const val ZONE_HEAR = "让它听懂我"
+    private const val ZONE_ANSWER = "让它答得好"
+
     fun root(): List<SettingsV2Section> = listOf(
         SettingsV2Section(
-            title = "模型与服务",
+            title = ZONE_CONNECT,
             rows = listOf(
                 SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value("配置 1")),
                 SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value("deepseek-v4")),
@@ -45,7 +51,7 @@ object SettingsV2SampleData {
             )
         ),
         SettingsV2Section(
-            title = "让它能做事",
+            title = ZONE_ACT,
             rows = listOf(
                 SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = "全部启用", trailing = RowTrailing.Chevron),
                 SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value("标准提示")),
@@ -53,25 +59,23 @@ object SettingsV2SampleData {
             )
         ),
         SettingsV2Section(
-            title = "让它听懂我",
+            title = ZONE_HEAR,
             rows = listOf(
                 SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = "出向能力独立", trailing = RowTrailing.Chevron),
                 SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
+                SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
             )
         ),
         SettingsV2Section(
-            title = "外观",
+            title = ZONE_ANSWER,
             rows = listOf(
                 SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Chevron),
                 SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
-            )
-        ),
-        SettingsV2Section(
-            title = "关于",
-            rows = listOf(
                 SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
-                SettingsV2Row(key = "about", title = "关于", trailing = RowTrailing.Chevron),
             )
         ),
     )
+
+    /** 供判据读取：四分区标题（顺序即页面顺序）。 */
+    val zoneTitles: List<String> = listOf(ZONE_CONNECT, ZONE_ACT, ZONE_HEAR, ZONE_ANSWER)
 }
