@@ -189,3 +189,41 @@ presentation/ui/settingsv2/
 - `ShapeHelper` 的公开 API 我还没 javap（下一步做），所以"官方贴边卡形状怎么构造"尚未定稿；
 - 华为文档只读到检索摘要里的 8.1.1 / 卡片规范数字，**未读全文**（`web_fetch` 在本会话仍 404）；
 - M3E 的 shape morphing 具体圆角插值曲线未查（属细节，R2 之后再说）。
+
+---
+
+## 7. 删除旧实现的范围评估（0.0.0.160 实测）
+
+`ui/settings/` 现有 **55 个文件 / 约 500 KB**，其中**不全是"旧设置页"** —— 有一部分是被全 App 共用的基础设施。
+直接整个目录删掉会立刻编译失败，必须先拆分。
+
+### 7.1 必须保留（外部引用次数，实测）
+
+| 符号 | 文件 | 外部引用 | 用途 |
+|---|---|---|---|
+| `LocalAnimationsEnabled` | `SettingsMotion.kt`(或同名文件) | **20** | 全 App 的动效总开关 |
+| `motionSpec` | 同上 | **26** | 全 App 的动效 spec |
+| `WearAppearance` | `AppearanceSettings.kt` | **20** | 字体缩放/强调色/风格的内存态（V2 与主题都读它） |
+| `SettingsStylePolicy` | `SettingsStylePolicy.kt` | 5 | 控制台/导入导出按策略读写风格 |
+| `PaperPalette` / `TerminalPalette` | stylekit | 6 / 4 | 主题与背景取色仍在用 |
+| `SettingsContentWidth` | `SettingsShared.kt` | 4 | 控制台/几何判据在用 |
+| `HapticAmplitude` | `SettingsHaptics.kt` | 3 | 偏好仓库导入导出用 |
+| `SettingsScreenVeilMs` | 动画相关 | 4 | 页面转场遮罩时长 |
+| `SettingsChangeBus` | 已在 `agent/` 包 | 7 | 设置变更广播 |
+
+### 7.2 可以删（旧十套风格的页面实现与判据）
+
+- `SettingsScreen.kt`（旧设置页根）、`SettingsBalloonGroup.kt`、`SettingsStyleCards.kt`、
+  `SettingsOfficialControls.kt`、`SettingsSliderRow.kt`、`SettingsSwitchRow.kt`、`SettingsRadioRow.kt`、
+  `SettingsRowStagger.kt`、`SettingsCardEdgeZoom.kt`、`SettingsShared.kt` 里与行渲染相关的部分；
+- `stylekit/` 里仅为旧风格服务的：`StyleMotion.kt`、`NeonPalette.kt`、`GlassPalette.kt`、`ArcPalette.kt`、`TerminalText.kt`；
+- 以及对应的 **~80 个测试文件**（`SettingsHairlineStyleTest`、`GoogleCardGranularityTest`、`StyleMotionTest` 等）。
+
+### 7.3 执行顺序（每步都要全量单测绿）
+
+1. **抽离**：把 7.1 的符号搬到一个中性包（例如 `presentation/ui/appearance/`），调用方改 import；
+2. **删页面**：删 7.2 的渲染文件与其测试，跑全量单测；
+3. **删 stylekit 残留**：确认无引用后删除，跑全量单测；
+4. **跑 `release-check` 8/8**，然后打 tag。
+
+**结论**：这是 2~3 轮的活，不是一次 `git rm -r`。本轮先把范围钉死，避免"删一半编译不过"。
