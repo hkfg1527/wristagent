@@ -665,3 +665,22 @@ GLASS 需要用项目里已有的 `FrostedGlassComponents`（毛玻璃）真正�
 ARC 需要有可见的弧形排布（例如卡片沿圆屏弧线对齐 / 弧形分隔线 / 环形进度）。
 
 这两套不是"打磨细节"，而是"从零实现特征"——按每套 1~2 轮安排。
+### GLASS 补齐（0.0.0.158）
+
+新增 `GlassPalette.isGlass()` + `GlassCardFill = 0x1AFFFFFF`（白 10%）+ `GlassCardBorder = 0x40FFFFFF`（白 25%）
++ `glassCardModifier()`（1dp 圆角描边），并把它挂到 `SettingsM3Card` 的卡片 modifier 上。
+
+| 量 | 修前 | 修后 |
+|---|---|---|
+| 卡片内部像素 | `#0D1014`（不透明深灰） | **`#1A1A1A`**（= 白 10% 叠黑，半透明感） |
+| 描边 | 无 | 中心列检出 **4 个灰边像素**（1dp = 2px × 上下两张卡） |
+
+**诚实说明**：这是"半透明填充 + 高光描边"表达的玻璃，**没有做真正的高斯背景模糊**
+（Wear 上 `Modifier.blur` 模糊的是自身内容，背景模糊需要 RenderEffect 抓 backdrop，成本高）。
+后面若要做到"背景真的被模糊透出"，需要单独评估实现路径。
+
+### 仍缺（GLASS）
+
+- 真实背景模糊；
+- 五视角截图（本轮只有一张根页 `docs/device/audit/GLASS-final.png`）；
+- 卡片内文本在浅色玻璃上的对比度未核验。

@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settings
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -60,7 +61,12 @@ internal fun SettingsM3Card(
 ) {
     // 卡片档的边缘空间缩放：每张卡按自己离屏心的距离等比缩小并淡出（只缩不放）。
     // 挂在这一层是因为英雄卡与行卡都从这里出去 —— 一处接线，两种卡都有。
-    val cardModifier = modifier.fillMaxWidth().cardEdgeZoom()
+    val cardModifier = modifier
+        .fillMaxWidth()
+        .cardEdgeZoom()
+        // 玻璃档：1dp 高光描边（半透明填充在 settingsCardSurface() 里）。
+        // 之前只改了填充色没挂描边，观感还是"平灰卡"——这次两处都接上。
+        .then(glassCardModifier())
     if (onClick != null) {
         Card(
             onClick = onClick,
@@ -317,9 +323,41 @@ internal fun SettingsBackCardRow(
  * 为什么需要单独一个函数：Wear 的 `ColorScheme` 没有 surface 这组字段（试过，编译不过），
  * 所以卡片表面只能在自己的容器色上分支。
  */
+/**
+ * 玻璃档的卡片表面：白色 10% 叠在背景上（半透明感），配合 [glassCardModifier] 的 1dp 高光描边。
+ *
+ * 背景是纯黑，所以 10% 白 ≈ `#1A1A1A` 的观感；描边让边缘"有玻璃厚度"。
+ * 真正的高斯背景模糊在 Wear 上没有低成本实现（`Modifier.blur` 模糊的是自身内容），
+ * 所以这里用"半透明 + 高光描边"表达玻璃，而不是假称做了模糊。
+ */
+internal val GlassCardFill = Color(0x1AFFFFFF)
+
+/** 玻璃档卡片的高光描边色。 */
+internal val GlassCardBorder = Color(0x40FFFFFF)
+
 @androidx.compose.runtime.Composable
+internal fun glassCardModifier(): Modifier {
+    val isGlass = com.example.myapplication.presentation.ui.settings.stylekit.GlassPalette.isGlass(
+        com.example.myapplication.presentation.ui.settings.WearAppearance.style
+    )
+    return if (isGlass) {
+        Modifier.border(
+            width = 1.dp,
+            color = GlassCardBorder,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp)
+        )
+    } else {
+        Modifier
+    }
+}
+
 internal fun settingsCardSurface(): Color =
-    if (com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
+    if (com.example.myapplication.presentation.ui.settings.stylekit.GlassPalette.isGlass(
+            com.example.myapplication.presentation.ui.settings.WearAppearance.style
+        )
+    ) {
+        GlassCardFill
+    } else if (com.example.myapplication.presentation.ui.settings.stylekit.PaperPalette.isPaper(
             com.example.myapplication.presentation.ui.settings.WearAppearance.style
         )
     ) {
