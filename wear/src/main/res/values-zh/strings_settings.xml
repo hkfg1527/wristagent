@@ -4,30 +4,15 @@
     <string name="settings_badge_configured">已设</string>
     <string name="settings_badge_unconfigured">未设</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_memory_management">会话与上下文</string>
-    <string name="settings_memory_turns">%1$d 轮</string>
-    <string name="settings_security_policy">安全策略</string>
 
     <!-- 推理参数。 -->
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
-    <string name="settings_switch_on">已开启</string>
-    <string name="settings_switch_off">已关闭</string>
     <string name="agent_reply_style_concise">回答保持精炼：先给结论，只保留关键步骤与必要风险提示，不重复问题。</string>
     <string name="agent_reply_style_balanced">回答保持平衡：先给结论，再给必要解释与可执行步骤，避免空泛铺陈。</string>
     <string name="agent_reply_style_detailed">回答保持详尽：在结论后展开关键推理、边界条件与例子，但仍避免重复和套话。</string>
 
     <!-- 记忆与安全分区。 -->
-    <string name="settings_turns_header">单会话保留轮数</string>
-    <string name="settings_memory_clear_header">记忆清理</string>
-    <string name="settings_memory_cleared">已清空当前记忆与偏好</string>
-    <string name="settings_memory_clear_all">一键清空全部记忆与偏好</string>
-    <string name="settings_security_novice_title">严格安全模式</string>
-    <string name="settings_security_novice_desc">所有敏感与系统操作均需审批（3 秒倒计时防误触）</string>
-    <string name="settings_security_standard_title">标准提示模式</string>
-    <string name="settings_security_standard_desc">只读查询自动放行，修改系统配置需滑动确认</string>
-    <string name="settings_security_expert_title">极速放行模式</string>
-    <string name="settings_security_expert_desc">除致命危险指令外，跳过所有弹窗直接执行</string>
 
     <!-- 模型配置分区。 -->
 
@@ -66,33 +51,7 @@
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
 <!-- 网络体检：九项检查 + 修复预案 -->
-    <string name="settings_netdiag_title">网络体检</string>
-    <string name="settings_netdiag_subtitle">诊断校园网等复杂网络并尝试自动修复</string>
-    <string name="settings_netdiag_checks_header">检查项</string>
-    <string name="settings_netdiag_plans_header">修复预案</string>
-    <string name="settings_netdiag_recheck">重新体检</string>
-    <string name="settings_netdiag_repair">一键修复</string>
-    <string name="settings_netdiag_copy">复制诊断报告</string>
-    <string name="settings_netdiag_copied">诊断报告已复制</string>
-    <string name="settings_netdiag_running">体检中…</string>
-    <string name="settings_netdiag_value_never">未体检</string>
-    <string name="settings_netdiag_value_ok">DNS 正常 · TLS 正常</string>
-    <string name="settings_netdiag_value_issues">%1$d 项异常</string>
-        <string name="settings_netdiag_repair_ok">已修复 · %1$s</string>
-    <string name="settings_netdiag_repair_fail">失败 · %1$s</string>
-    <string name="settings_netdiag_repair_manual">需手动 · %1$s</string>
-    <string name="settings_netdiag_root_off">无 root，网络类修复降级为手动指引</string>
-    <string name="settings_netdiag_no_plans">无预案</string>
 
-    <string name="settings_netdiag_check_dns">DNS 解析</string>
-    <string name="settings_netdiag_check_tcp">TCP 连通</string>
-    <string name="settings_netdiag_check_tls">TLS 握手</string>
-    <string name="settings_netdiag_check_response">响应分类</string>
-    <string name="settings_netdiag_check_clock">时钟偏差</string>
-    <string name="settings_netdiag_check_proxy">系统代理</string>
-    <string name="settings_netdiag_check_dualstack">双栈通道</string>
-    <string name="settings_netdiag_check_mtu">MTU 黑洞</string>
-    <string name="settings_netdiag_check_network">网络类型</string>
 
     <string name="settings_netdiag_dns_ok">解析正常 · %1$s</string>
     <string name="settings_netdiag_dns_suspicious">解析可疑 · %1$s</string>
@@ -198,7 +157,6 @@
     <string name="settings_netdiag_action_probe">跑一次真实请求</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：与 values 一一对应 -->
 
-    <string name="settings_appearance_web_only">请在手机网页修改</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
     <string name="settings_font_scale_standard">标准</string>
     <string name="settings_font_scale_large">大</string>
@@ -211,17 +169,7 @@
     <string name="settings_accent_amber">橙</string>
 
 
-    <string name="settings_memory_max_fact_length">单条记忆长度上限</string>
-    <string name="settings_memory_enabled">启用记忆</string>
-    <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
-    <string name="settings_context_compress">自动压缩上下文</string>
-    <string name="settings_context_compress_secondary">占用超过阈值后自动压缩历史</string>
-    <string name="settings_web_only_header">仅在手机网页可改</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
-    <string name="settings_web_only_badge">仅网页端可改</string>
-    <string name="settings_read_only_badge">只读</string>
-    <string name="settings_context_window_web">上下文窗口：请在手机网页修改</string>
-    <string name="settings_context_truncation_web">压缩阈值与截断策略：请在手机网页修改</string>
 
 
 
@@ -234,26 +182,9 @@
     <string name="settings_model_error_http">HTTP %1$s</string>
     <string name="settings_model_error_unknown">网络不可用</string>
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
-    <string name="settings_context_turns_secondary">每次请求带多少轮上下文</string>
-    <string name="settings_context_turns">上下文轮数</string>
-    <string name="settings_compress_threshold_secondary">历史超过多少轮开始压缩</string>
-    <string name="settings_compress_threshold">压缩阈值</string>
-    <string name="settings_context_budget">上下文预算</string>
-    <string name="settings_context_budget_value">满 %2$d 条中的 %1$d 条后开始压缩</string>
 
 
 
-    <string name="settings_sub_gesture">底栏副键</string>
-    <string name="settings_gesture_long_press">长按</string>
-    <string name="settings_gesture_double_tap">双击</string>
-    <string name="settings_gesture_side_short">侧键短按</string>
-    <string name="settings_gesture_side_long">侧键长按</string>
-    <string name="settings_gesture_none">不绑定</string>
-    <string name="settings_gesture_stop_turn">终止当前任务</string>
-    <string name="settings_gesture_switch_model">切换模型</string>
-    <string name="settings_gesture_forget_remembered">忘掉已记住的命令</string>
-    <string name="settings_gesture_bound_count">已绑定 %1$d 条</string>
-    <string name="settings_gesture_hint">每条绑定都对应一个真实动作；不绑定时行尾是灰点</string>
 
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->

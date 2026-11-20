@@ -4,30 +4,15 @@
     <string name="settings_badge_configured">Set</string>
     <string name="settings_badge_unconfigured">None</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_memory_management">Context</string>
-    <string name="settings_memory_turns">%1$d turns</string>
-    <string name="settings_security_policy">Security Policy</string>
 
     <!-- Hyper parameters. -->
     <!-- 自定义入口：与阶梯滑轨并列，说明这一行是"自己填"任意值。 -->
     <!-- 自定义输入框的区间提示：只给合法边界，两个数字由代码传入。 -->
-    <string name="settings_switch_on">On</string>
-    <string name="settings_switch_off">Off</string>
     <string name="agent_reply_style_concise">Keep replies concise: conclusion first, only essential steps and risks, no restating the question.</string>
     <string name="agent_reply_style_balanced">Keep replies balanced: conclusion first, then necessary explanation and actionable steps, no filler.</string>
     <string name="agent_reply_style_detailed">Keep replies detailed: after the conclusion, include key reasoning, edge cases and examples, without repetition or boilerplate.</string>
 
     <!-- Memory and security sections. -->
-    <string name="settings_turns_header">Turns kept per session</string>
-    <string name="settings_memory_clear_header">Memory cleanup</string>
-    <string name="settings_memory_cleared">Current memory and preferences cleared</string>
-    <string name="settings_memory_clear_all">Clear all memory and preferences</string>
-    <string name="settings_security_novice_title">Strict safety mode</string>
-    <string name="settings_security_novice_desc">Every sensitive and system action needs approval, with a 3 second countdown against mis-taps</string>
-    <string name="settings_security_standard_title">Standard prompt mode</string>
-    <string name="settings_security_standard_desc">Read-only queries run right away, changing system settings needs a slide to confirm</string>
-    <string name="settings_security_expert_title">Fast-track mode</string>
-    <string name="settings_security_expert_desc">Runs without any dialog except for fatally dangerous commands</string>
 
     <!-- Model configuration section. -->
     <string name="settings_model_error_dns">DNS lookup failed</string>
@@ -72,33 +57,7 @@
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
 <!-- 网络体检：九项检查 + 修复预案 -->
-    <string name="settings_netdiag_title">Network Check</string>
-    <string name="settings_netdiag_subtitle">Diagnose school or complex networks and try to fix them</string>
-    <string name="settings_netdiag_checks_header">Checks</string>
-    <string name="settings_netdiag_plans_header">Repair plans</string>
-    <string name="settings_netdiag_recheck">Re-check</string>
-    <string name="settings_netdiag_repair">Auto fix</string>
-    <string name="settings_netdiag_copy">Copy report</string>
-    <string name="settings_netdiag_copied">Diagnostic report copied</string>
-    <string name="settings_netdiag_running">Checking…</string>
-    <string name="settings_netdiag_value_never">Not checked</string>
-    <string name="settings_netdiag_value_ok">DNS ok · TLS ok</string>
-    <string name="settings_netdiag_value_issues">%1$d issues</string>
-        <string name="settings_netdiag_repair_ok">Fixed · %1$s</string>
-    <string name="settings_netdiag_repair_fail">Failed · %1$s</string>
-    <string name="settings_netdiag_repair_manual">Manual · %1$s</string>
-    <string name="settings_netdiag_root_off">No root: network fixes fall back to manual guidance</string>
-    <string name="settings_netdiag_no_plans">No plans</string>
 
-    <string name="settings_netdiag_check_dns">DNS lookup</string>
-    <string name="settings_netdiag_check_tcp">TCP connect</string>
-    <string name="settings_netdiag_check_tls">TLS handshake</string>
-    <string name="settings_netdiag_check_response">Response class</string>
-    <string name="settings_netdiag_check_clock">Clock skew</string>
-    <string name="settings_netdiag_check_proxy">System proxy</string>
-    <string name="settings_netdiag_check_dualstack">Dual stack</string>
-    <string name="settings_netdiag_check_mtu">MTU black hole</string>
-    <string name="settings_netdiag_check_network">Network type</string>
 
     <string name="settings_netdiag_dns_ok">Resolved · %1$s</string>
     <string name="settings_netdiag_dns_suspicious">Suspicious result · %1$s</string>
@@ -204,7 +163,6 @@
     <string name="settings_netdiag_action_probe">Run one real request</string>
     <!-- 语音入口收敛 + 手表侧 14 条新增设置项：文案与 values-zh 一一对应 -->
 
-    <string name="settings_appearance_web_only">Change this on the web console</string>
     <!-- 字号三档：档名进资源，缩放系数与百分比仍留在枚举里（数值不是文案）。 -->
     <string name="settings_font_scale_standard">Default</string>
     <string name="settings_font_scale_large">Large</string>
@@ -217,43 +175,16 @@
     <string name="settings_accent_amber">Amber</string>
 
 
-    <string name="settings_memory_max_fact_length">Max length per memory</string>
-    <string name="settings_memory_enabled">Long-term memory</string>
-    <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
-    <string name="settings_context_compress">Auto-compress context</string>
-    <string name="settings_context_compress_secondary">Compress history once occupancy passes the threshold</string>
-    <string name="settings_web_only_header">Web console only</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
-    <string name="settings_web_only_badge">Web console only</string>
-    <string name="settings_read_only_badge">Read-only</string>
-    <string name="settings_context_window_web">Context window: set on the web console</string>
-    <string name="settings_context_truncation_web">Compress threshold and truncation strategy: web console</string>
 
 
 
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
     <!-- ===== 本轮新增：上下文压缩阈值 / 审批策略 / 沙箱等级 / 手势绑定 / 配置快照 ===== -->
-    <string name="settings_context_turns_secondary">How many turns ride along in each request</string>
-    <string name="settings_context_turns">Context turns</string>
-    <string name="settings_compress_threshold_secondary">Compress history after this many turns</string>
-    <string name="settings_compress_threshold">Compress threshold</string>
-    <string name="settings_context_budget">Context budget</string>
-    <string name="settings_context_budget_value">Compress after %1$d of %2$d messages</string>
 
 
 
-    <string name="settings_sub_gesture">Bottom Bar Side Key</string>
-    <string name="settings_gesture_long_press">Long press</string>
-    <string name="settings_gesture_double_tap">Double tap</string>
-    <string name="settings_gesture_side_short">Side key short</string>
-    <string name="settings_gesture_side_long">Side key long</string>
-    <string name="settings_gesture_none">Unbound</string>
-    <string name="settings_gesture_stop_turn">Stop current turn</string>
-    <string name="settings_gesture_switch_model">Switch model</string>
-    <string name="settings_gesture_forget_remembered">Forget remembered commands</string>
-    <string name="settings_gesture_bound_count">%1$d bound</string>
-    <string name="settings_gesture_hint">Each binding maps to one real action; unbound stays a grey dot</string>
 
 
     <!-- 审批放行清单：条数必须可见（满额后新的"记住"会被静默拒绝），撤销必须二次确认 -->
