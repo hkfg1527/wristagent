@@ -95,13 +95,27 @@ const device = () => {
 
   adb('shell', 'am', 'force-stop', 'dev.ghr.wristagent');
   adb('shell', 'am', 'start', '-n', 'dev.ghr.wristagent/com.example.myapplication.presentation.MainActivity');
-  spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
+  // 等界面真的出来，而不是死等 5 秒：装完新包后首帧有时要 8~10 秒，
+  // 固定 sleep 会在慢机器上直接导致后面"进设置页"失败（0.0.0.137 起出现过多次 7/8）。
+  let uiReady = false;
+  for (let i = 0; i < 30 && !uiReady; i++) {
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 700']);
+    const texts = JSON.stringify(dumpTexts());
+    uiReady = texts.length > 40 && !/No nodes|Could not/.test(texts);
+  }
+  console.log('  界面就绪：' + (uiReady ? '是' : '超时（继续尝试进设置）'));
 
   // 进设置页
+  //
+  // 0.0.0.140 实测：长距离快滑（420→40 / 260ms）在新版聊天页上**不再触发**设置入口，
+  // 界面就绪也没用。改成台账里记的两条可靠路径按序尝试：
+  //  ①短距阻尼上滑（380→180 / 500ms）—— 审批浮层那条手势的同款参数；
+  //  ②表冠先滚到聊天顶部，再短距上滑。
   let entered = false;
-  for (let i = 0; i < 8 && !entered; i++) {
-    adb('shell', 'input', 'swipe', '233', '420', '233', '40', '260');
-    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 700']);
+  for (let i = 0; i < 6 && !entered; i++) {
+    if (i >= 3) crown(5, 40); // 后半段先把列表滚到顶
+    adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
     entered = /请求超时|全部启用|模型与服务/.test(JSON.stringify(dumpTexts()));
   }
   // 偶发失败兜底：这一段的"上滑进设置"手势偶尔不生效（0.0.0.137 那天就出现过 7/8，
