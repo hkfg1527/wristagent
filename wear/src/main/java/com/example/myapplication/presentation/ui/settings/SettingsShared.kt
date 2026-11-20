@@ -1246,7 +1246,15 @@ internal fun SettingsCardRow(
                     Modifier.size(SettingsSquareCardDp).then(selectedSemantics)
                 } else {
                     Modifier.width(SettingsContentWidth).then(selectedSemantics)
-                },
+                }.then(
+                    // 霓虹档的真正接线点：它的 rowShell 是 CARD_EACH（0.0.0.150 把代码插到
+                    // HAIRLINE_FLAT 分支里，那个分支对它永远执行不到）。
+                    if (SettingsStylePolicy.isActive(com.example.myapplication.appearance.SettingsStyle.NEON)) {
+                        Modifier.neonFrame()
+                    } else {
+                        Modifier
+                    }
+                ),
                 onClick = onClick
             ) {
                 // 内边距交给官方 Card 的 contentPadding：这里再补一层会把文字挤成两行
@@ -1264,16 +1272,6 @@ internal fun SettingsCardRow(
 
     // 霓虹档：给每一行套一圈发光描边（P7 实测发现此前只有一个深灰卡片，招牌特征没画出来）。
     // 放在 HAIRLINE_FLAT 分支之前，因为霓虹档的行外壳也是"无曲面"的，只是多了描边。
-    if (SettingsStylePolicy.isActive(com.example.myapplication.appearance.SettingsStyle.NEON)) {
-        androidx.compose.foundation.layout.Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(vertical = 3.dp)
-                .neonFrame(),
-            contentAlignment = Alignment.CenterStart
-        ) { content() }
-        return
-    }
 
     // 原来是 SQUARE 或 TERMINAL 两个 == 判断，现在读表：rowShell 槽位（两套共用发丝线外壳）
     if (SettingsStylePolicy.current().rowShell == SettingsRowShell.HAIRLINE_FLAT) {
