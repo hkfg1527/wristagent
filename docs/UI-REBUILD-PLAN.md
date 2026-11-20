@@ -169,6 +169,12 @@ fun Modifier.minimumVerticalContentPadding(...)
 3. 只在 `SettingsStyle.M3_TRANSFORM` 时加，`M3_LIST` 保持不变 —— 这是两套唯一的差别；
 4. 验收：同一页两套截图 + 像素差 **必须显著大于 0.18%**（当前实测值，见 `docs/UI-EVIDENCE.md`）。
 
+- **接线踩到的坑（0.0.0.139）**：只挂 `transformedHeight` 会把 item 高度压小、但**内容不跟着缩**，
+  于是相邻行的语义 bounds 部分重叠 2px，`SettingsCardWidthRobolectricTest` 直接红
+  （`M3_TRANSFORM：两张同宽卡片部分重叠 a=[255..344] b=[342..431]`）。
+  **必须成对**：`transformedHeight` 改布局高度 + 内容 `graphicsLayer { scaleX = scale; scaleY = scale }`
+  同比例缩放（两轴同值，禁止横向形变），或者用 `clipToBounds` 但会切字，不推荐。
+
 ## 4. 已知要顺带修掉的三件事
 
 0. **官方滑杆丢了无障碍标签（S1 拦路石，2026-11-20 实测）**：把 BALLOON 的滑杆槽位改成
