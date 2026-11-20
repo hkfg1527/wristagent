@@ -8,16 +8,10 @@
     <string name="settings_tools_and_mcp">Tools &amp; MCP</string>
     <string name="settings_tools_all_enabled">All enabled</string>
     <string name="settings_tools_enabled_count">%1$d enabled</string>
-    <string name="settings_prompt_context">Prompt &amp; memory</string>
-    <string name="settings_about">About</string>
-    <string name="settings_system_prompt">System Prompt</string>
-    <string name="settings_prompt_default">Built-in default</string>
     <string name="settings_card_meta_context">%1$d turns · %2$.1f</string>
     <string name="settings_card_meta_profiles">%1$d saved</string>
     <string name="settings_card_meta_tokens">max %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_card_meta_console_token">Token %1$s</string>
-    <string name="settings_card_prompt_chars">%1$d chars</string>
     <string name="settings_card_transfer_items">%1$d portable items</string>
     <string name="settings_memory_management">Context</string>
     <string name="settings_memory_turns">%1$d turns</string>
@@ -45,7 +39,6 @@
     <string name="settings_asr_key_missing">API key missing</string>
     <string name="settings_asr_baidu">Baidu short speech</string>
     <string name="settings_asr_system">System recognizer</string>
-    <string name="settings_replay_onboarding">Replay the guided tour</string>
     <string name="settings_sub_model_config">Models &amp; Services</string>
     <string name="settings_sub_hyper_params">Model Parameters</string>
 
@@ -116,12 +109,6 @@
     <string name="settings_model_not_in_list">Current model %1$s is not in this list</string>
 
     <!-- Prompt viewer section. -->
-    <string name="settings_prompt_presets">Preset roles</string>
-    <string name="settings_preset_minimal">Minimal assistant</string>
-    <string name="settings_preset_architect">Architect</string>
-    <string name="settings_preset_secretary">Daily assistant</string>
-    <string name="settings_preset_clear_test">Clear test</string>
-    <string name="settings_prompt_placeholder">Enter the system prompt</string>
 
     <!-- Tools and MCP section. -->
     <string name="settings_tool_device_status">Battery and temperature</string>
@@ -179,22 +166,10 @@
     <string name="settings_baidu_api_key">API Key (AK)</string>
     <string name="settings_baidu_secret_key">Secret Key (SK)</string>
     <string name="settings_temp_presets">Quick presets</string>
-    <string name="settings_console_max_failures_secondary">Lock the source after this many wrong tokens</string>
-    <string name="settings_console_max_failures">Lock after wrong tokens</string>
-    <string name="settings_remote_console_title">Web Console</string>
-    <string name="settings_remote_console_running">Running on port %1$d</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
-    <string name="settings_remote_console_not_running">Not running</string>
     <!-- 根页取值只放端口号本身：「Port」会把 15sp 的「Web Console」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
-    <string name="settings_remote_console_port_drifted">Preferred port %1$d is busy · using %2$d</string>
-    <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
-    <string name="settings_remote_console_refresh_port">Refresh port</string>
-    <string name="settings_remote_console_start">Start console</string>
-    <string name="settings_remote_console_hint">Open this address in a phone browser on the same Wi-Fi to edit every setting.</string>
-    <string name="settings_remote_console_token">Access token</string>
-    <string name="settings_remote_console_copy_hint">Tap the address to copy it</string>
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
     <string name="settings_provider_profiles">Providers</string>
@@ -386,7 +361,6 @@
     <string name="settings_web_tools_header">Web tools</string>
 
     <string name="settings_memory_max_fact_length">Max length per memory</string>
-    <string name="settings_console_lockout_minutes">Lockout window</string>
     <string name="settings_subagent_max_depth_secondary">Zero turns sub-agents off entirely</string>
     <string name="settings_subagent_max_depth">Sub-agent depth</string>
     <string name="settings_subagent_depth_off">Off</string>
@@ -407,9 +381,6 @@
     <string name="settings_model_default_thinking">Thinking on by default</string>
     <string name="settings_model_default_thinking_secondary">New sessions request reasoning</string>
 
-    <string name="settings_role_cards_web">Role cards: web console</string>
-    <string name="settings_prompt_library_web">Prompt library: web console</string>
-    <string name="settings_opening_line_web">Opening line: web console</string>
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
     <string name="settings_sub_agent">Sub-agent mode</string>

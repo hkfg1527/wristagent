@@ -8,16 +8,10 @@
     <string name="settings_tools_and_mcp">工具与 MCP</string>
     <string name="settings_tools_all_enabled">全部启用</string>
     <string name="settings_tools_enabled_count">%1$d 项启用</string>
-    <string name="settings_prompt_context">提示词与记忆</string>
-    <string name="settings_about">关于</string>
-    <string name="settings_system_prompt">系统提示词</string>
-    <string name="settings_prompt_default">预置默认</string>
     <string name="settings_card_meta_context">上下文 %1$d 轮 · 温度 %2$.1f</string>
     <string name="settings_card_meta_profiles">已存 %1$d 套</string>
     <string name="settings_card_meta_tokens">上限 %1$d tokens</string>
     <string name="settings_card_meta_privilege_root">Root %1$s</string>
-    <string name="settings_card_meta_console_token">令牌 %1$s</string>
-    <string name="settings_card_prompt_chars">%1$d 字</string>
     <string name="settings_card_transfer_items">%1$d 项可移植设置</string>
     <string name="settings_memory_management">会话与上下文</string>
     <string name="settings_memory_turns">%1$d 轮</string>
@@ -45,7 +39,6 @@
     <string name="settings_asr_key_missing">密钥未填写</string>
     <string name="settings_asr_baidu">百度短语音</string>
     <string name="settings_asr_system">系统识别</string>
-    <string name="settings_replay_onboarding">重新观看操作引导</string>
     <string name="settings_sub_model_config">模型与服务</string>
     <string name="settings_sub_hyper_params">模型参数</string>
 
@@ -106,12 +99,6 @@
     <string name="settings_probe_ready">端点就绪 • 延迟 %1$dms（%2$d 个可用模型）</string>
 
     <!-- 系统提示词分区。 -->
-    <string name="settings_prompt_presets">预设角色</string>
-    <string name="settings_preset_minimal">极简助手</string>
-    <string name="settings_preset_architect">架构师</string>
-    <string name="settings_preset_secretary">生活秘书</string>
-    <string name="settings_preset_clear_test">清空测试</string>
-    <string name="settings_prompt_placeholder">输入系统提示词</string>
 
     <!-- 端侧工具与 MCP 分区。 -->
     <string name="settings_tool_device_status">电量与温度感知</string>
@@ -169,22 +156,10 @@
     <string name="settings_baidu_api_key">百度 API Key（AK）</string>
     <string name="settings_baidu_secret_key">百度 Secret Key（SK）</string>
     <string name="settings_temp_presets">快捷预设</string>
-    <string name="settings_console_max_failures_secondary">令牌错几次就锁住这个来源</string>
-    <string name="settings_console_max_failures">令牌错误几次后锁定</string>
-    <string name="settings_remote_console_title">网页控制台</string>
-    <string name="settings_remote_console_running">运行中 · 端口 %1$d</string>
     <!-- 没在跑 = 没有端口可报：这一行只显示"未运行"，不给假端口。 -->
-    <string name="settings_remote_console_not_running">未运行</string>
     <!-- 根页取值只放端口号本身：「端口」两字会把 15sp 的「网页控制台」挤成两行；
          报的仍是真实监听端口，「端口」语义由子页 running 文案承担。 -->
     <!-- 首选端口被占用、漂到后备端口：副标题把首选与真实端口的差别讲清。 -->
-    <string name="settings_remote_console_port_drifted">首选 %1$d 被占用 · 已改到 %2$d</string>
-    <string name="settings_remote_console_port_drifted_short">%1$d → %2$d</string>
-    <string name="settings_remote_console_refresh_port">重新读取端口</string>
-    <string name="settings_remote_console_start">启动控制台</string>
-    <string name="settings_remote_console_hint">手机连同一 Wi-Fi，用浏览器打开下面的地址即可调整全部设置。</string>
-    <string name="settings_remote_console_token">访问令牌</string>
-    <string name="settings_remote_console_copy_hint">点击地址可复制</string>
 
     <!-- 多供应商 Profile 与界面动效/内测开关 -->
     <string name="settings_provider_profiles">供应商</string>
@@ -376,7 +351,6 @@
     <string name="settings_web_tools_header">网页工具</string>
 
     <string name="settings_memory_max_fact_length">单条记忆长度上限</string>
-    <string name="settings_console_lockout_minutes">锁定窗口</string>
     <string name="settings_subagent_max_depth_secondary">0 表示彻底关闭子代理</string>
     <string name="settings_subagent_max_depth">子代理层数</string>
     <string name="settings_subagent_depth_off">关闭</string>
@@ -397,9 +371,6 @@
     <string name="settings_model_default_thinking">默认启用思考</string>
     <string name="settings_model_default_thinking_secondary">新会话默认发起推理请求</string>
 
-    <string name="settings_role_cards_web">角色卡：请在手机网页修改</string>
-    <string name="settings_prompt_library_web">提示词库：请在手机网页修改</string>
-    <string name="settings_opening_line_web">开场白：请在手机网页修改</string>
 
     <!-- 子代理模式：开关可留，但只有专家模式才真正生效 -->
     <string name="settings_sub_agent">子代理模式</string>
