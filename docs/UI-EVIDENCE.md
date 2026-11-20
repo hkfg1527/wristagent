@@ -3,6 +3,27 @@
 > 用途：S/P 阶段每轮都要有"截图 + 像素/几何数字"。这里按轮次记，避免证据散在对话里。
 > 截图统一放 `docs/device/vNN/`。设备：TicWatch Pro 5，466×466，density 2.0（1dp = 2px）。
 
+## 0.0.0.138 · S7 十套取证齐了（10 张互不相同）
+
+`docs/device/s7/`，sha256 前 12 位两两不同（distinct = 10 / 10）：
+
+| 风格 | 字节 | 哈希 |
+|---|---|---|
+| BALLOON | 30756 | BA112911CD68 |
+| SQUARE | 32737 | 7F34ECC88123 |
+| GOOGLE_CARD | 66010 | 0F286B6D705D |
+| TERMINAL | 15665 | 0C1CC1B82F0D |
+| M3_LIST | 17211 | 55FAC09A3684 |
+| M3_TRANSFORM | 17146 | C4A8CAC75B59 |
+| NEON | 29996 | D75427B58F26 |
+| PAPER | 32705 | FABC063E77B6 |
+| GLASS | 29808 | 3493CABDA212 |
+| ARC | 32702 | 447E1FBD869D |
+
+采集方式：8 套用 `docs/tools/style-shots.mjs`（哈希门禁），`GOOGLE_CARD` 与 `TERMINAL` 因为脚本内导航
+重试失败，改用 `release-check` 逐套跑（它的入口动作最稳）。TERMINAL 那张与 0.0.0.136 拍的根页哈希一致
+（0C1CC1B82F0D），可交叉印证同一画面。
+
 ## 0.0.0.138 · 修好"控制台改风格设置页不重绘"，十套截图终于各不相同
 
 病因：`ConsoleBridge` 收到 `settingsStyle` 只写了偏好文件，没同步内存态 `WearAppearance.style`（Compose State）；

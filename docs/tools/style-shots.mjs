@@ -16,7 +16,9 @@ const DEVICE = process.env.DEVICE || 'C101X35122973';
 const TOKEN = process.env.CONSOLE_TOKEN || '4659';
 const BASE = process.env.CONSOLE_BASE || 'http://127.0.0.1:18080';
 const OUT = path.join(ROOT, 'docs/device/s7');
-const STYLES = ['BALLOON', 'SQUARE', 'GOOGLE_CARD', 'TERMINAL', 'M3_LIST', 'M3_TRANSFORM', 'NEON', 'PAPER', 'GLASS', 'ARC'];
+const STYLES = process.env.STYLES_ONLY
+  ? process.env.STYLES_ONLY.split(',').map((s) => s.trim()).filter(Boolean)
+  : ['BALLOON', 'SQUARE', 'GOOGLE_CARD', 'TERMINAL', 'M3_LIST', 'M3_TRANSFORM', 'NEON', 'PAPER', 'GLASS', 'ARC'];
 // 只用设置页**独有**的文本：聊天页也有「模型与服务」，用它当门禁等于没门禁（0.0.0.144 就是被这个骗的）。
 const SETTINGS_TEXT = /完成返回|配置导入导出|关于/;
 
