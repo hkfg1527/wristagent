@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -103,6 +104,8 @@ fun SquareSettings(
                                     text = row.title,
                                     color = identity.titleColor,
                                     style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 row.subtitle?.let {
                                     Text(
@@ -117,7 +120,10 @@ fun SquareSettings(
                                 is RowTrailing.Value -> Text(
                                     text = trailing.text,
                                     color = identity.subtitleColor,
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 is RowTrailing.Toggle -> SwitchButton(
                                     checked = trailing.checked,

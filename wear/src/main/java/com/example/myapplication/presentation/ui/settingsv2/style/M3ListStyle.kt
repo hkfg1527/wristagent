@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.itemsIndexed
@@ -118,7 +119,13 @@ private fun M3ListRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = row.title, color = identity.titleColor, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = row.title,
+                color = identity.titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             row.subtitle?.let {
                 Text(text = it, color = identity.subtitleColor, style = MaterialTheme.typography.labelSmall)
             }
@@ -128,7 +135,10 @@ private fun M3ListRow(
             is RowTrailing.Value -> Text(
                 text = trailing.text,
                 color = identity.subtitleColor,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
             is RowTrailing.Toggle -> SwitchButton(
                 checked = trailing.checked,
