@@ -368,7 +368,6 @@
     <string name="settings_sub_voice_entry">Voice &amp; Wake</string>
     <string name="settings_voice_switch_header">Voice</string>
     <string name="settings_voice_asr_enabled">Speech recognition</string>
-    <string name="settings_voice_asr_enabled_secondary">Off: no recording, no network request</string>
     <string name="settings_voice_auto_speak">Speak replies aloud</string>
     <string name="settings_voice_auto_speak_secondary">Output side, independent of recognition</string>
     <string name="settings_voice_live_transcript">Show words while speaking</string>
@@ -417,7 +416,6 @@
     <string name="settings_memory_enabled_secondary">Off: never read or write long-term memory</string>
     <string name="settings_context_compress">Auto-compress context</string>
     <string name="settings_context_compress_secondary">Compress history once occupancy passes the threshold</string>
-    <string name="settings_context_usage">Context usage</string>
     <string name="settings_web_only_header">Web console only</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
     <string name="settings_web_only_badge">Web console only</string>

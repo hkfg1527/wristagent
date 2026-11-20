@@ -358,7 +358,6 @@
     <string name="settings_sub_voice_entry">语音与唤醒</string>
     <string name="settings_voice_switch_header">语音</string>
     <string name="settings_voice_asr_enabled">启用语音识别</string>
-    <string name="settings_voice_asr_enabled_secondary">关闭后不录音、不发起网络请求</string>
     <string name="settings_voice_auto_speak">自动播报回答</string>
     <string name="settings_voice_auto_speak_secondary">出向能力，与识别开关互相独立</string>
     <string name="settings_voice_live_transcript">边说边显示文字</string>
@@ -407,7 +406,6 @@
     <string name="settings_memory_enabled_secondary">关闭后不读不写长期记忆库</string>
     <string name="settings_context_compress">自动压缩上下文</string>
     <string name="settings_context_compress_secondary">占用超过阈值后自动压缩历史</string>
-    <string name="settings_context_usage">上下文用量</string>
     <string name="settings_web_only_header">仅在手机网页可改</string>
     <!-- 只读行内标记：手表端改不了的字段必须当场说明。 -->
     <string name="settings_web_only_badge">仅网页端可改</string>
