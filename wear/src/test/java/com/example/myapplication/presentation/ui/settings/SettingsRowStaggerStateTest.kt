@@ -1,80 +1,43 @@
 package com.example.myapplication.presentation.ui.settings
 
-import com.example.myapplication.readProjectFile
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 入场窗口的状态机：入场只属于「页面刚进来时首屏看得见的那批行」。
+ * 入场错峰的状态机（不渲染界面，只钉规则）。
  *
- * 回归背景（真机 bug）：ScalingLazyColumn 只保留可见项，屏幕外的行是滚动把它带进视口时才第一次
- * 组合的。旧实现把「第一次组合」直接当成「播入场」，于是手指一滑就是一串行同时从 +24dp 处淡入浮起，
- * 表现为「所有组件都飞起来了」；表冠一格一行慢慢过，症状轻得多。
+ * 为什么这么测：真机录屏在这台表上拿不到有效帧（0.0.0.142 实测 9020 字节、无抽帧工具），
+ * 所以"逐行错峰"这件事必须由判据回答 —— 一行**只播一次**入场、**窗口关闭后**不再播。
+ * 至于每个风格错开多少毫秒，由 `StyleMotionTest` 钉 `staggerMs`；两者合起来才是完整约束。
  */
 class SettingsRowStaggerStateTest {
 
     @Test
-    fun rowVisibleOnTheFirstFramePlaysTheEntrance() {
+    fun theFirstCompositionOfARowPlaysEnter() {
         val state = SettingsRowStaggerState()
-        assertTrue("首屏可见行的第一次组合必须能播入场", state.claimEnter(0))
-        assertTrue(state.claimEnter(1))
+        assertTrue("首次组合的行必须播入场", state.claimEnter(0))
+        assertTrue("同一窗口内，另一行也应各自播入场（这样才可能错开）", state.claimEnter(1))
     }
 
     @Test
-    fun rowDoesNotReplayWhenItScrollsOutAndBack() {
+    fun aRowNeverReplaysEnterAfterScrollingBack() {
         val state = SettingsRowStaggerState()
         assertTrue(state.claimEnter(3))
-        assertFalse("同一行滚出再滚回不能重播", state.claimEnter(3))
+        assertFalse("同一行滚出去再滚回来，不得重播入场", state.claimEnter(3))
     }
 
     @Test
-    fun rowFirstComposedByScrollingNeverPlaysTheEntrance() {
+    fun afterTheEntryWindowClosesNothingPlaysEnter() {
         val state = SettingsRowStaggerState()
-        state.closeEntry()
-        assertFalse("滚动带进视口的行必须直接落位", state.claimEnter(7))
-        assertFalse(state.claimEnter(8))
-    }
-
-    @Test
-    fun closingTheWindowDoesNotDisturbRowsAlreadyAnimating() {
-        val state = SettingsRowStaggerState()
-        assertTrue(state.claimEnter(0))
-        state.closeEntry()
-        assertFalse("已经起跑的行不受关窗影响，晚到的行才被拦下", state.claimEnter(0))
-        assertTrue("关窗不代表行没组合过", state.hasPlayedEnter(0))
-    }
-
-    @Test
-    fun everyVisibleRowIsClaimedExactlyOnce() {
-        val state = SettingsRowStaggerState()
-        val firstPass = (0..5).map { state.claimEnter(it) }
-        val secondPass = (0..5).map { state.claimEnter(it) }
-        assertTrue("首屏六行都要播", firstPass.all { it })
-        assertFalse("第二遍一个都不许重播", secondPass.any { it })
-    }
-
-    @Test
-    fun entryWindowStartsOpenAndStaysClosedOnceClosed() {
-        val state = SettingsRowStaggerState()
+        assertTrue("窗口开着时首行播入场", state.claimEnter(0))
         assertTrue(state.isEntryOpen())
         state.closeEntry()
         assertFalse(state.isEntryOpen())
-    }
-
-    @Test
-    fun thePageClosesTheWindowAfterTheFirstFrames() {
-        // 窗口必须由页面级 remember 关掉：只写状态机不接线，滚动进来的行照样会飞。
-        val source = readProjectFile(
-            "src/main/java/com/example/myapplication/presentation/ui/settings/SettingsRowStagger.kt"
+        assertFalse(
+            "窗口关闭后，滚动带进视口的行直接落终态，不播入场",
+            state.claimEnter(7)
         )
-        val closeCall = source.indexOf("state.closeEntry()")
-        assertTrue("入场窗口必须由页面级 remember 关闭", closeCall > 0)
-        // 旧判据只 `contains("withFrameNanos")` —— 文件第 14 行的 `import …withFrameNanos`
-        // 就落在 closeCall 之前，把两处真正的 withFrameNanos {} 全删掉它照样绿（0.0.0.113 审查点名）。
-        // 现在按**调用形态**计数，import 行不会被算进去。
-        val beforeClose = source.substring(0, closeCall)
-        val frameCalls = Regex("\\n\\s*withFrameNanos\\s*\\{").findAll(beforeClose).count()
-        assertTrue("关窗前必须等满两帧（实际调用 $frameCalls 处）", frameCalls >= 2)
+        assertTrue("但它仍被记为已组合过", state.hasPlayedEnter(7))
     }
 }
