@@ -227,3 +227,24 @@ presentation/ui/settingsv2/
 4. **跑 `release-check` 8/8**，然后打 tag。
 
 **结论**：这是 2~3 轮的活，不是一次 `git rm -r`。本轮先把范围钉死，避免"删一半编译不过"。
+
+### 7.4 抽离尝试失败（0.0.0.162，已全部回退）
+
+按 7.3 第 1 步把 `SettingsMotion.kt` / `AppearanceSettings.kt` / `HapticAmplitude.kt` / `SettingsRowStaggerMath.kt`
+移到 `presentation/ui/appearance/`，然后用脚本批量改写 import。结果**连续 8 次编译失败**，全部回退：
+
+| 次数 | 失败现象 |
+|---|---|
+| 1 | 全限定名引用（`ui.settings.WearAppearance`）没被改写 |
+| 2 | 同包隐式引用断裂（`SettingsRowStagger.kt` 里的 `SettingsRowExitTotalMs` 等） |
+| 3 | 只按 `val/fun` 提取声明，漏了 `enum class`（`AccentPreset` / `FontScaleTier`） |
+| 4 | KDoc 里的 `[AppearanceBootstrap]` 也要 import |
+| 5 | 自动插入的 import 与原 import 重复 → `Conflicting import` |
+| 6 | 去重脚本过度删除，连 `androidx.compose.ui.unit.dp` 都被删掉 |
+
+**结论（写死）**：这种"批量移动 + 脚本改 import"的做法在这个仓库里**不可行** ——
+Kotlin 的同包隐式引用、全限定名、KDoc 引用、重复 import 四种情况必须一起处理，脚本很难一次做对。
+
+**改为不移动**：这 9 组共享符号**留在 `ui/settings/` 不动**（它们是基础设施，不是"旧设置页"）；
+删除时只删**页面渲染文件**（`SettingsScreen.kt`、`SettingsBalloonGroup.kt`、`SettingsStyleCards.kt`、
+`SettingsShared.kt` 等）与其测试，并用 IDE 逐个删除、每次删完立刻编译。
