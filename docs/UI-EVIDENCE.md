@@ -452,6 +452,24 @@ M3_CARD 的三个静止态分组：`{12,24}` / `{36,48,60,72,84,96,160}` / `{240
 - 上一轮遗留：判据 2 的绝对阈值（352/328px）是我按"内容列=屏宽"错估的 —— 两套都带 12dp 列内边距，
   实际内容列宽 304px。已改按**差值**表述（左右各内缩 ≥12dp），实测 12.5dp。
 
+### TERMINAL 的手势竞争与点击反馈（0.0.0.218–.219）
+
+行是 `clickable` 的，同时列表还能滚动，两者会竞争。真机复核：
+
+| 动作 | 期望 | 实测 |
+|---|---|---|
+| 从 `> 工具与 MCP` 行上滑动（位移 110px） | 不执行 | **无回显**（`# open` / `->` 都不出现） |
+| 在同一行上单击（对照） | 执行 | **出现** `# open 工具与 MCP` |
+
+结论：位移超过触摸 slop 时点击被取消，符合手势竞争预期；已用 Compose 手势注入
+（`swipeUp()` + `performClick()`）把这条钉进 `TerminalInteractionTest.swipingOnARowDoesNotExecuteIt`。
+
+另一处去 UI 化：`Modifier.clickable` 默认带 Material 涟漪（`LocalIndication`），真终端点一行不该荡出光晕。
+终端侧 4 处（行、底栏 `[ 风格 ]`、菜单条目、点空白关闭）统一改成
+`clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, …)`；
+真机复核**点击仍生效**（`# open 工具与 MCP` 正常出现），只是没有视觉指示。
+守卫 `terminalClicksHaveNoRipple` 禁止再出现裸 `.clickable {`。
+
 ### TERMINAL 改造成真终端（0.0.0.198）
 
 用户判据原话：「太像 UI 了…要那种 codex 或者 kimi 的终端版…要像真正的终端」。所以不是换字体，是换语法：

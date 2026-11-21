@@ -5,6 +5,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalRowTag
 import com.example.myapplication.presentation.ui.settingsv2.style.appendCappedEcho
@@ -85,6 +87,43 @@ class TerminalInteractionTest {
         assertEquals("最旧的被顶掉", listOf("# b -> OFF", "# c -> ON", "# d -> OFF"), echoes.toList())
         appendCappedEcho(echoes, "# e -> ON", cap = 1)
         assertEquals("cap 可注入", listOf("# e -> ON"), echoes.toList())
+    }
+
+    /**
+     * R32：**滑动不许误触发点击**（否则滑一下就执行一条命令）。
+     *
+     * 真机复核过（滑动后无回显、单击后有回显），这里用 Compose 的手势注入把它钉住：
+     * 行是 clickable 的，同时列表还能滚动 —— 两者的竞争关系必须一直是"位移超过 slop 就取消点击"。
+     */
+    @Test
+    fun swipingOnARowDoesNotExecuteIt() {
+        val sections = listOf(
+            SettingsV2Section(
+                title = "测试区",
+                rows = listOf(SettingsV2Row(key = "open", title = "跳转项", trailing = RowTrailing.Chevron)) +
+                    (1..10).map { i -> SettingsV2Row(key = "k$i", title = "行$i", trailing = RowTrailing.Value("v$i")) },
+            )
+        )
+        compose.setContent {
+            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL, sections = sections) }
+        }
+        compose.waitForIdle()
+
+        val row = compose.onAllNodes(hasTestTag(TerminalRowTag) and hasText("/open", substring = true))[0]
+        row.performTouchInput { swipeUp() }
+        compose.waitForIdle()
+        assertTrue(
+            "滑动之后不许出现回显（否则滑一下就执行命令）",
+            compose.onAllNodesWithText("# open", substring = true).fetchSemanticsNodes().isEmpty()
+        )
+
+        // 对照：单击同一样必须执行
+        compose.onAllNodes(hasTestTag(TerminalRowTag) and hasText("/open", substring = true))[0].performClick()
+        compose.waitForIdle()
+        assertTrue(
+            "单击必须执行（否则说明手势判据把点击也吞了）",
+            compose.onAllNodesWithText("# open", substring = true).fetchSemanticsNodes().isNotEmpty()
+        )
     }
 
     @Test
