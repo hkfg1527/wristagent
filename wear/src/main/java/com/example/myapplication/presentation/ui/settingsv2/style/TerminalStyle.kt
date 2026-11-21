@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,8 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,8 +47,6 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
-import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
-import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
@@ -127,6 +128,13 @@ fun TerminalSettings(
     val scope = rememberCoroutineScope()
     val linePx = with(LocalDensity.current) { TerminalLineHeight.toPx() }
     var rotaryRemainder by remember { mutableStateOf(0f) }
+    // 真终端的行是"可执行对象"：点一下就有输出。这里做本地态 + 末尾回显（最多留 3 行）。
+    val toggles = remember { mutableStateMapOf<String, Boolean>() }
+    val echoes = remember { mutableStateListOf<String>() }
+    fun pushEcho(line: String) {
+        echoes.add(line)
+        while (echoes.size > 3) echoes.removeAt(0)
+    }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Box(
@@ -163,16 +171,28 @@ fun TerminalSettings(
                         )
                     }
                 }
-                itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                    val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
-                    val enter = rememberEnterProgress(rowIndex, motion)
+                itemsIndexed(section.rows, key = { _, row -> row.key }) { _, row ->
                     val edge = rememberEdgeDistance()
+                    // 真终端的行**不淡入**：它是被"打印"出来的，不是从下往上浮进来的。
+                    // 只保留边缘反馈（滚动到屏幕边时压暗），入场动画交给"回显追加"来表达。
+                    val checked = toggles[row.key]
+                        ?: (row.trailing as? RowTrailing.Toggle)?.checked
+                        ?: false
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .enterAppearance(enter, motion)
                             .reportEdgeDistance(edge)
-                            .edgeAppearance(edge.value, motion)
+                            .edgeAppearance(edge.value, SettingsV2Motions.of(SettingsV2Style.TERMINAL))
+                            .clickable(enabled = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron) {
+                                when (val trailing = row.trailing) {
+                                    is RowTrailing.Toggle -> {
+                                        toggles[row.key] = !checked
+                                        pushEcho("# ${row.title} -> ${if (!checked) "ON" else "OFF"}")
+                                    }
+                                    is RowTrailing.Chevron -> pushEcho("# open ${row.title}")
+                                    else -> Unit
+                                }
+                            }
                             .testTag(TerminalRowTag),
                     ) {
                         TerminalGridLine {
@@ -180,6 +200,7 @@ fun TerminalSettings(
                                 row = row,
                                 lineStyle = lineStyle,
                                 dimStyle = dimStyle,
+                                toggleChecked = checked,
                             )
                         }
                         // 副标题另起一行，仍落在同一网格上：`  └ 说明`
@@ -193,6 +214,14 @@ fun TerminalSettings(
                                 )
                             }
                         }
+                    }
+                }
+            }
+            // 回显：真终端的每条命令都会在末尾留下输出，最多留 3 行
+            echoes.forEach { line ->
+                item(key = "echo-" + line) {
+                    TerminalGridLine {
+                        BasicText(text = line, style = dimStyle, maxLines = 1)
                     }
                 }
             }
@@ -247,6 +276,7 @@ private fun TerminalLine(
     row: SettingsV2Row,
     lineStyle: TextStyle,
     dimStyle: TextStyle,
+    toggleChecked: Boolean,
 ) {
     Row(
         modifier = Modifier
@@ -267,7 +297,8 @@ private fun TerminalLine(
         // 真终端里没有胶囊开关：开关是 `[ ON ] / [ OFF ]`，跳转是 `/open`
         val right: Pair<String, Boolean>? = when (val trailing = row.trailing) {
             is RowTrailing.Value -> trailing.text to false
-            is RowTrailing.Toggle -> (if (trailing.checked) "[ ON  ]" else "[ OFF ]") to false
+            // 开关状态的来源是本地态（点一下翻一次），初值取数据层
+            is RowTrailing.Toggle -> (if (toggleChecked) "[ ON  ]" else "[ OFF ]") to false
             is RowTrailing.Chevron -> "/open" to true
             RowTrailing.None -> null
         }

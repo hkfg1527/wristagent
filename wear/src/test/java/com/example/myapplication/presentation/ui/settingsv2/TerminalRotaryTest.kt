@@ -55,6 +55,23 @@ class TerminalRotaryTest {
     }
 
     /**
+     * R17：真终端的行是**打印出来的**，不是淡入的；而且行必须是"可执行对象"（点一下有输出）。
+     */
+    @Test
+    fun terminalRowsArePrintedNotFadedInAndAreExecutable() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        assertFalse(
+            "终端行不许做入场淡入（enterAppearance 是 UI 语法，终端是直接打印）",
+            src.contains("enterAppearance")
+        )
+        assertTrue("行必须可点（真终端的行是可执行对象）", src.contains(".clickable("))
+        assertTrue("点击结果必须回显到列表末尾", src.contains("pushEcho("))
+        assertTrue("开关状态必须有本地态（点一下翻一次）", src.contains("mutableStateMapOf"))
+    }
+
+    /**
      * 光标只在**有活动**时闪：静止必须常亮，否则界面永不 idle，
      * `uiautomator dump` 报 `could not get idle state`，整条真机取证链路会断（实测 release-check 掉到 6/8）。
      */

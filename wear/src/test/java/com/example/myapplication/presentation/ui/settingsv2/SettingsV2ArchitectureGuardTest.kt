@@ -76,8 +76,19 @@ class SettingsV2ArchitectureGuardTest {
             val style = expectedStyles.entries.first { it.value == file.name }.key
 
             assertTrue(
-                "$style 必须保留入场逐行错峰（rememberEnterProgress）",
-                src.contains("rememberEnterProgress")
+                if (style == SettingsV2Style.TERMINAL) {
+                    // TERMINAL 的例外是有据可依的：真终端的行是被"打印"出来的，不是从下往上淡入。
+                    // 所以它不要入场错峰，但必须保留边缘反馈（edgeAppearance）—— 换成这条**更强**的断言，
+                    // 而不是把这条守卫删掉。
+                    "$style 不做入场淡入，但必须保留边缘反馈（edgeAppearance）"
+                } else {
+                    "$style 必须保留入场逐行错峰（rememberEnterProgress）"
+                },
+                if (style == SettingsV2Style.TERMINAL) {
+                    !src.contains("rememberEnterProgress") && src.contains("edgeAppearance")
+                } else {
+                    src.contains("rememberEnterProgress")
+                }
             )
 
             // 只看**调用**，不看注释：注释里提到 snapFlingBehavior 不算接线
