@@ -90,7 +90,8 @@ fun TerminalSettings(
                 val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 val edge = rememberEdgeDistance()
-                    Row(
+                    // 终端也改两行堆叠：提示符+标题一行，右值一行（缩进 12dp 表达从属）
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = identity.rowMinHeight)
@@ -99,28 +100,27 @@ fun TerminalSettings(
                             .edgeAppearance(edge.value, motion)
                             .padding(vertical = 4.dp)
                             .testTag(TerminalRowTag),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            BasicText(text = TerminalPrompt + row.title, style = rowStyle)
-                            row.subtitle?.let {
-                                BasicText(
-                                    text = "# " + it,
-                                    style = headStyle,
-                                    modifier = Modifier.padding(start = 12.dp),
-                                )
-                            }
+                        BasicText(text = TerminalPrompt + row.title, style = rowStyle)
+                        row.subtitle?.let {
+                            BasicText(
+                                text = "# " + it,
+                                style = headStyle,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
                         }
-                        Spacer(Modifier.width(8.dp))
                         when (val trailing = row.trailing) {
                             is RowTrailing.Value -> BasicText(
                                 text = trailing.text,
                                 style = rowStyle,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp),
                             )
-                            // 终端里没有胶囊开关：状态用 [ ON ] / [ OFF ] 文本表达
                             is RowTrailing.Toggle -> BasicText(
                                 text = if (trailing.checked) "[ ON ]" else "[ OFF ]",
                                 style = rowStyle,
+                                modifier = Modifier.padding(start = 12.dp),
                             )
                             is RowTrailing.Chevron, RowTrailing.None -> Unit
                         }
