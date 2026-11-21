@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -114,32 +115,43 @@ private fun ArcRow(
     titleColor: Color,
     valueColor: Color,
 ) {
-    Row(
+    // 两行堆叠：标题一行、右值/开关一行右对齐。贴边卡更宽，但 deepseek-v4-pro 这种长值
+    // 与"模型"同行时仍会把标题挤成竖排（真机实测），所以与另外三套统一为堆叠。
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
             // 华为 8.1.1：左右 26vp 安全边距（文字不贴边，卡片本体贴边）
             .padding(start = 26.dp, end = 26.dp, top = 10.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = row.title, color = titleColor, style = MaterialTheme.typography.bodyLarge)
-            row.subtitle?.let {
-                Text(text = it, color = valueColor, style = MaterialTheme.typography.labelSmall)
-            }
+        Text(text = row.title, color = titleColor, style = MaterialTheme.typography.labelMedium)
+        row.subtitle?.let {
+            Text(
+                text = it,
+                color = valueColor,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2,
+            )
         }
-        Spacer(Modifier.width(8.dp))
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
-                color = valueColor,
-                style = MaterialTheme.typography.labelLarge,
+                color = titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.fillMaxWidth(),
             )
-            is RowTrailing.Toggle -> SwitchButton(
-                checked = trailing.checked,
-                onCheckedChange = trailing.onChange,
-                label = {},
-            )
+            is RowTrailing.Toggle -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SwitchButton(
+                    checked = trailing.checked,
+                    onCheckedChange = trailing.onChange,
+                    label = {},
+                )
+            }
             is RowTrailing.Chevron, RowTrailing.None -> Unit
         }
     }

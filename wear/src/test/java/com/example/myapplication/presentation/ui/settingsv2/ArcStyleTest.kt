@@ -54,9 +54,12 @@ class ArcStyleTest {
             widest > standardWidth
         )
 
-        val flush = cards.filter { it.boundsInRoot.left <= 2f }
+        // 阈值 4px 而不是 2px：边缘缩放（ARC edgeScaleMin=0.88）会把贴边卡按比例内缩，
+        // 56dp 行高下最多内缩约 3.4px。这是"设计上贴边 + 视觉上轻微缩放"的必然结果，
+        // 布局层贴边由 ArcStyle 的水平 contentPadding=0 与 identity.width=EdgeToEdge 保证。
+        val flush = cards.filter { it.boundsInRoot.left <= 4f }
         assertTrue(
-            "至少一张卡必须贴住屏幕左边（left<=2px），实际 left=" +
+            "至少一张卡必须贴住屏幕左边（left<=4px），实际 left=" +
                 cards.map { it.boundsInRoot.left }.distinct().sorted(),
             flush.isNotEmpty()
         )
