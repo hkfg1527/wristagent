@@ -39,7 +39,9 @@ fun SettingsV2Host(
     val style = remember(revision, preferences.settingsStyle) {
         SettingsV2Style.fromLegacy(preferences.settingsStyle)
     }
+    // 内容也随 revision 重读：控制台改完偏好会 bump，于是模型名/温度等实值行会跟着变
+    val sections = remember(revision) { SettingsV2SampleData.fromPreferences(preferences) }
     MaterialTheme {
-        SettingsV2Screen(style = style, modifier = modifier.fillMaxSize())
+        SettingsV2Screen(style = style, sections = sections, modifier = modifier.fillMaxSize())
     }
 }

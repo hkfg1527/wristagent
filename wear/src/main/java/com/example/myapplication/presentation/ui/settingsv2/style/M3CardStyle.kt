@@ -98,43 +98,50 @@ private fun M3CardRow(
     titleColor: androidx.compose.ui.graphics.Color,
     valueColor: androidx.compose.ui.graphics.Color,
 ) {
-    Row(
+    // 176dp 卡片 + 用户可能放大字号：标题与右值同一行必然互相挤（实测 deepseek… / 回复…）。
+    // 所以有值/开关时改成两行：第一行标题，第二行右值（右对齐）或开关（右对齐）。
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 40.dp)
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = 3.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = row.title,
+            color = titleColor,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        row.subtitle?.let {
             Text(
-                text = row.title,
-                color = titleColor,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
+                text = it,
+                color = valueColor,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            row.subtitle?.let {
-                Text(text = it, color = valueColor, style = MaterialTheme.typography.labelSmall)
-            }
         }
-        Spacer(Modifier.width(8.dp))
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
-                color = valueColor,
-                // 176dp 列宽下，右值降到 labelMedium，给左标题留出至少 3 个字的空间
-                style = MaterialTheme.typography.labelMedium,
-                // 右值优先按需取宽（模型名不能被截成 deepse…）；左标题用 weight 吃剩下的空间
-                maxLines = 1,
-                softWrap = false,
+                color = titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.fillMaxWidth(),
             )
-            is RowTrailing.Toggle -> SwitchButton(
-                checked = trailing.checked,
-                onCheckedChange = trailing.onChange,
-                // 标签由外部行标题承担，避免读屏重复朗读
-                label = {},
-            )
+            is RowTrailing.Toggle -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                SwitchButton(
+                    checked = trailing.checked,
+                    onCheckedChange = trailing.onChange,
+                    label = {},
+                )
+            }
             is RowTrailing.Chevron, RowTrailing.None -> Unit
         }
     }

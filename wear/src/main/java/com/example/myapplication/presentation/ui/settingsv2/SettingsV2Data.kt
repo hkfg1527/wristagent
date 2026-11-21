@@ -78,4 +78,66 @@ object SettingsV2SampleData {
 
     /** 供判据读取：四分区标题（顺序即页面顺序）。 */
     val zoneTitles: List<String> = listOf(ZONE_CONNECT, ZONE_ACT, ZONE_HEAR, ZONE_ANSWER)
+
+    /**
+     * 用**真实偏好**生成内容（R6 之后接的第一批）。
+     *
+     * 目前接实值的行只有四处（模型 / 温度 / 回复风格 / 页面风格），其余行暂时沿用示例文案 ——
+     * 这一点必须在代码里显式标注，不能让"看起来像真的"冒充"已经接好"。
+     * 接实值的方式是**每次重组时读一遍偏好**，而不是缓存快照：控制台改完偏好会 bump
+     * `SettingsChangeBus`，宿主据此重组。
+     */
+    fun fromPreferences(preferences: com.example.myapplication.agent.AgentPreferences): List<SettingsV2Section> {
+        val wiredModel = preferences.modelName.ifBlank { "未设置" }
+        val wiredTemperature = formatTemperature(preferences.temperature)
+        val wiredReplyStyle = preferences.replyStyle.ifBlank { "默认" }
+        // SettingsStyle 是 appearance 包的枚举，没有中文 label，这里用枚举名（与 /api/state 一致）
+        val wiredStyle = preferences.settingsStyle.name
+
+        return listOf(
+            SettingsV2Section(
+                title = ZONE_CONNECT,
+                rows = listOf(
+                    // 实值
+                    SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value(wiredModel)),
+                    // 实值
+                    SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value(wiredTemperature)),
+                    // 实值
+                    SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value(wiredReplyStyle)),
+                )
+            ),
+            SettingsV2Section(
+                title = ZONE_ACT,
+                rows = listOf(
+                    // 以下三行仍是示例文案（等对应偏好接好后再改成实值）
+                    SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = "全部启用", trailing = RowTrailing.Chevron),
+                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value("标准提示")),
+                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value("ROOT")),
+                )
+            ),
+            SettingsV2Section(
+                title = ZONE_HEAR,
+                rows = listOf(
+                    SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = "出向能力独立", trailing = RowTrailing.Chevron),
+                    SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
+                    SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
+                )
+            ),
+            SettingsV2Section(
+                title = ZONE_ANSWER,
+                rows = listOf(
+                    // 实值：风格名用旧枚举的中文 label，与当前生效的风格一致
+                    SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Value(wiredStyle)),
+                    SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
+                    SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
+                )
+            ),
+        )
+    }
+
+    /** 温度显示：一位小数，避免 0.7000001 这种浮点噪声上屏。 */
+    internal fun formatTemperature(value: Float): String {
+        val rounded = Math.round(value * 10f) / 10f
+        return rounded.toString()
+    }
 }
