@@ -20,7 +20,8 @@ const CHAT_OR_SETTINGS = /连得上|让它能做事|让它听懂我|让它答得
 
 /** 旧枚举值 → V2 风格名（与 SettingsV2Style.fromLegacy 一致）。 */
 const STYLES = [
-  // 接真实偏好后首卡行变成 模型/温度/回复风格，'供应商' 已不在首屏，标记改为 '模型'\n  ['BALLOON', 'M3_CARD', [/连得上/, /模型/]],
+  // 接真实偏好后首卡行变成 模型/温度/回复风格，'供应商' 已不在首屏，标记改为 '模型'
+  ['BALLOON', 'M3_CARD', [/连得上/, /模型/]],
   ['M3_LIST', 'M3_LIST', [/连得上/]],
   ['ARC', 'ARC', [/连得上/]],
   ['SQUARE', 'SQUARE', [/连得上/]],
