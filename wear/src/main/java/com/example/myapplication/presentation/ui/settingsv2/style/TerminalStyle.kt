@@ -254,11 +254,13 @@ fun TerminalSettings(
             }
             // 末行不放进列表：真终端的提示符是**钉在底部**的，不该跟着内容滚走
         }
-        // 钉在底部的状态条：`> █`（块光标），整行不透明，内容从其后方滚过。
-        // 闪烁跟着滚动状态走：滚动中闪、停下常亮
+        // 钉在底部的状态条：左 `> █`（块光标）+ 右状态段 `[2/4] 26L`，整行不透明，内容从其后方滚过。
+        // 状态段随滚动更新 —— CLI 的底栏就该告诉你"现在在哪、还有多少行"。
         TerminalPromptLine(
             lineStyle = lineStyle,
             isActive = state.isScrollInProgress,
+            statusText = "[${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}] "
+                + "${sections.sumOf { it.rows.size }}L",
             modifier = Modifier.align(Alignment.BottomStart),
         )
         TerminalScrollBar(
@@ -271,6 +273,27 @@ fun TerminalSettings(
                 .padding(top = 4.dp, bottom = 4.dp, end = 2.dp),
         )
     }
+}
+
+/**
+ * 当前锚点项落在第几个分区（1 起）。
+ *
+ * 每个分区在列表里占 `1（分区头）+ rows.size` 个项；回显追加在最后，不影响分区归属。
+ * 纯函数，便于单测（`TerminalStatusTest`）。
+ */
+internal fun zoneOfAnchor(
+    sections: List<SettingsV2Section>,
+    anchorItemIndex: Int,
+    echoCount: Int = 0,
+): Int {
+    var start = 0
+    sections.forEachIndexed { index, section ->
+        val size = 1 + section.rows.size
+        if (anchorItemIndex < start + size) return index + 1
+        start += size
+    }
+    // 锚点在回显区（或越界）时算最后一个分区
+    return sections.size.coerceAtLeast(1)
 }
 
 /**
@@ -353,6 +376,7 @@ private fun TerminalLine(
 private fun TerminalPromptLine(
     lineStyle: TextStyle,
     isActive: Boolean,
+    statusText: String,
     modifier: Modifier = Modifier,
 ) {
     var cursorOn by remember { mutableStateOf(true) }
@@ -375,13 +399,26 @@ private fun TerminalPromptLine(
             .background(SettingsV2Style.TERMINAL.identity.pageBackground)
             .testTag(TerminalPromptTag),
     ) {
-        BasicText(
-            text = TerminalPrompt + if (cursorOn) TerminalCursorBlock else " ",
-            style = lineStyle,
-            maxLines = 1,
-            // 内边距加在文字上（不是 Box 上），否则底色会被一起缩进去
-            modifier = Modifier.padding(start = 10.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BasicText(
+                text = TerminalPrompt + if (cursorOn) TerminalCursorBlock else " ",
+                style = lineStyle,
+                maxLines = 1,
+                // 内边距加在文字上（不是 Box 上），否则底色会被一起缩进去
+                modifier = Modifier.padding(start = 10.dp),
+            )
+            // 右侧状态段：`[2/4] 26L`（第几分区 / 总行数），CLI 底栏的常见信息
+            BasicText(
+                text = statusText,
+                style = lineStyle.copy(color = SettingsV2Style.TERMINAL.identity.subtitleColor),
+                maxLines = 1,
+                modifier = Modifier.padding(end = 18.dp),
+            )
+        }
     }
 }
 
