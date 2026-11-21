@@ -164,6 +164,28 @@ class SquareAndTerminalStyleTest {
     }
 
     /**
+     * R29：TERMINAL 的风格选择器必须是**字符菜单**，不是 M3 卡片面板。
+     *
+     * 点 `[ 风格 ]` 弹出卡片面板时，满屏等宽绿字突然变成 UI —— 这是整套里最破坏沉浸感的一处。
+     * 守卫两条：①该文件不许出现 M3 控件调用；②必须仍是字符语法（`# 页面风格`、`> ` 标记、规则线）。
+     */
+    @Test
+    fun terminalPickerIsACharacterMenu() {
+        // 文件在 settingsv2/ 根下，不在 style/：style/ 里的每个文件都被守卫当成"风格渲染器"
+        // （要求入场错峰、禁止硬编码 sp），选择器不属于那一类。
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/TerminalStylePicker.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/TerminalStylePicker.kt") }
+            .readText()
+        listOf("Surface(", "Card(", "Button(", "MaterialTheme.typography", "SwitchButton(").forEach { forbidden ->
+            assertFalse("终端选择器里不允许调用 $forbidden", src.contains(forbidden))
+        }
+        assertTrue("必须有字符头 `# 页面风格`", src.contains("\"# 页面风格\""))
+        assertTrue("当前项必须用 `> ` 标记", src.contains("if (style == current) \"> \" else \"  \""))
+        assertTrue("必须有规则线", src.contains("\"─\".repeat("))
+        assertTrue("必须保留既有 testTag（工具与测试不用改）", src.contains("StylePickerTag") && src.contains("StylePickerItemTagPrefix"))
+    }
+
+    /**
      * R15/R26：TERMINAL 的换风格入口必须是**字符命令**，不是胶囊按钮，而且长在终端的底栏里。
      *
      * 第一版它浮在屏幕右下角当独立控件（真机截图里一眼出戏）；R26 起收进底栏，与 `[n/4] 12L`

@@ -116,14 +116,24 @@ fun SettingsV2Screen(
         }
 
         if (pickerOpen) {
-            SettingsV2StylePicker(
-                current = style,
-                onPick = { picked ->
-                    onStyleSelected?.invoke(picked)
-                    pickerOpen = false
-                },
-                onDismiss = { pickerOpen = false },
-            )
+            // TERMINAL 用字符菜单，其余四套仍用原来的面板 —— 满屏等宽绿字里弹出 M3 卡片最出戏
+            val pick: (SettingsV2Style) -> Unit = { picked ->
+                onStyleSelected?.invoke(picked)
+                pickerOpen = false
+            }
+            if (style == SettingsV2Style.TERMINAL) {
+                TerminalStylePicker(
+                    current = style,
+                    onPick = pick,
+                    onDismiss = { pickerOpen = false },
+                )
+            } else {
+                SettingsV2StylePicker(
+                    current = style,
+                    onPick = pick,
+                    onDismiss = { pickerOpen = false },
+                )
+            }
         }
     }
 }
