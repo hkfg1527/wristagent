@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
+import com.example.myapplication.presentation.ui.settingsv2.style.absoluteItemIndex
+import com.example.myapplication.presentation.ui.settingsv2.style.focusItemIndex
 import com.example.myapplication.presentation.ui.settingsv2.style.zoneOfAnchor
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -43,5 +45,41 @@ class TerminalStatusTest {
     @Test
     fun emptySectionsDoNotCrash() {
         assertEquals(1, zoneOfAnchor(emptyList(), 0))
+    }
+
+    /**
+     * R27：焦点行（反白）靠"绝对项序号"定位，所以这个映射必须精确 ——
+     * 每分区先占 2 项（规则线 + 分区头），再排各行。
+     */
+    @Test
+    fun absoluteItemIndexCountsRulesAndHeaders() {
+        val map = absoluteItemIndex(sections)
+        assertEquals("分区1 第一行", 2, map["一-1"])
+        assertEquals("分区1 第二行", 3, map["一-2"])
+        assertEquals("分区2 第一行（前面有 2 项规则+头、2 行，再加 2 项）", 6, map["二-1"])
+        assertEquals("分区2 第二行", 7, map["二-2"])
+        assertEquals("分区3 第一行", 10, map["三-1"])
+    }
+
+    @Test
+    fun focusIsTheFirstActionableRowAfterTheAnchor() {
+        val mixed = listOf(
+            SettingsV2Section(
+                title = "一",
+                rows = listOf(
+                    SettingsV2Row("a1", "只读1", trailing = RowTrailing.Value("v")),
+                    SettingsV2Row("a2", "只读2", trailing = RowTrailing.Value("v")),
+                    SettingsV2Row("a3", "可点1", trailing = RowTrailing.Chevron),
+                ),
+            ),
+            SettingsV2Section(
+                title = "二",
+                rows = listOf(SettingsV2Row("b1", "可点2", trailing = RowTrailing.Toggle(false) {})),
+            ),
+        )
+        // 布局：规则0 头1 只读2 只读3 可点4 → 规则5 头6 可点7
+        assertEquals("锚点在顶部时，焦点是第一条可操作行", 4, focusItemIndex(mixed, 0))
+        assertEquals("锚点越过它之后，焦点移到下一条", 7, focusItemIndex(mixed, 5))
+        assertEquals("锚点在最后一条之后 → 没有焦点", null, focusItemIndex(mixed, 8))
     }
 }

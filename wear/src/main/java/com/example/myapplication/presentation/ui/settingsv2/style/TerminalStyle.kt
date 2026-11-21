@@ -122,8 +122,11 @@ fun TerminalSettings(
         lineHeight = TerminalLineHeight.value.sp,
     )
 
-    // 列表里的基础行数（分区头 + 行）。提示符是钉在底部的，**不算**列表项。
-    val baseItems = remember(sections) { sections.sumOf { 2 + it.rows.size } } // 规则线 + 分区头 + 行
+    // 列表里的基础行数（分区规则线 + 分区头 + 行）。提示符是钉在底部的，**不算**列表项。
+    val baseItems = remember(sections) { sections.sumOf { 2 + it.rows.size } }
+    // 焦点行（反白）：视口中间那一项，只对可操作行生效
+    val absIndex = remember(sections) { absoluteItemIndex(sections) }
+    val focusIndex = focusItemIndex(sections, state.anchorItemIndex) // 规则线 + 分区头 + 行
 
     // 表冠：按"行"滚动（真终端语义），不是像素级滑动
     val focusRequester = remember { FocusRequester() }
@@ -242,6 +245,8 @@ fun TerminalSettings(
                                 lineStyle = lineStyle,
                                 dimStyle = dimStyle,
                                 toggleChecked = checked,
+                                // 焦点行反白：只反白可操作行（只读信息没有"当前"概念）
+                                focused = absIndex[row.key] == focusIndex,
                             )
                         }
                         // 副标题另起一行，仍落在同一网格上：`  └ 说明`
@@ -312,6 +317,44 @@ internal fun zoneOfAnchor(
 }
 
 /**
+ * 每一行在列表里的**绝对项序号**（分区规则线 + 分区头 + 各行，按声明顺序累加）。
+ *
+ * 焦点行（反白）要按"视口中间那一项"算，所以必须能反查每行的绝对序号；纯函数便于单测。
+ */
+internal fun absoluteItemIndex(sections: List<SettingsV2Section>): Map<String, Int> = buildMap {
+    var index = 0
+    sections.forEach { section ->
+        index += 2 // 规则线 + 分区头
+        section.rows.forEach { row ->
+            put(row.key, index)
+            index++
+        }
+    }
+}
+
+/**
+ * 焦点行：**锚点之后的第一条可操作行**（TUI 里"当前可选项"的语义）。
+ *
+ * 第一版按"视口中间那一项"算，真机上中间那项是只读行（模型/温度），
+ * 于是焦点行一个都没有、屏幕上没有反白 —— 像素扫描实测 0 条亮带，才发现的。
+ */
+internal fun focusItemIndex(
+    sections: List<SettingsV2Section>,
+    anchorItemIndex: Int,
+): Int? {
+    var index = 0
+    sections.forEach { section ->
+        index += 2 // 规则线 + 分区头
+        section.rows.forEach { row ->
+            val actionable = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron
+            if (actionable && index >= anchorItemIndex) return index
+            index++
+        }
+    }
+    return null
+}
+
+/**
  * 一行字符网格：**由外层 Box 强制高度并裁剪**，不依赖字体度量。
  *
  * 为什么不是给 `BasicText` 加 `.height()`：等宽字体在 12sp 下的固有行高实测约 44px，
@@ -342,10 +385,16 @@ private fun TerminalLine(
     lineStyle: TextStyle,
     dimStyle: TextStyle,
     toggleChecked: Boolean,
+    focused: Boolean = false,
 ) {
+    val identity = SettingsV2Style.TERMINAL.identity
+    // 反白：底色亮绿、文字近黑（htop / nmtui 的"当前行"）
+    val fg = if (focused) identity.pageBackground else lineStyle.color
+    val dimFg = if (focused) identity.pageBackground else dimStyle.color
     Row(
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(if (focused) Modifier.background(identity.titleColor) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -358,7 +407,7 @@ private fun TerminalLine(
         val actionable = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron
         BasicText(
             text = (if (actionable) TerminalPrompt else "  ") + row.title,
-            style = lineStyle,
+            style = lineStyle.copy(color = fg),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
@@ -377,7 +426,7 @@ private fun TerminalLine(
                 text = right.first,
                 // BasicText 没有 textAlign 形参：对齐必须写在 TextStyle 里
                 style = (if (right.second) dimStyle else lineStyle)
-                    .copy(textAlign = TextAlign.End),
+                    .copy(textAlign = TextAlign.End, color = if (right.second) dimFg else fg),
                 maxLines = 1,
             )
         }
