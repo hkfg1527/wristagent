@@ -1,6 +1,8 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +20,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -42,6 +49,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearanc
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
@@ -113,7 +121,28 @@ fun TerminalSettings(
         sections.sumOf { 1 + it.rows.size } + 1 // +1 = 末行提示符
     }
 
-    Box(modifier = modifier.fillMaxSize().background(identity.pageBackground)) {
+    // 表冠：按"行"滚动（真终端语义），不是像素级滑动
+    val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    val linePx = with(LocalDensity.current) { TerminalLineHeight.toPx() }
+    var rotaryRemainder by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(identity.pageBackground)
+            .onRotaryScrollEvent { event ->
+                val (rest, lines) = rotaryLinesToScroll(rotaryRemainder, event.verticalScrollPixels, linePx)
+                rotaryRemainder = rest
+                if (lines != 0) {
+                    scope.launch { state.scrollBy(lines * linePx) }
+                }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+    ) {
         TransformingLazyColumn(
             state = state,
             // 无 snapFling：终端连续滚动
@@ -312,6 +341,27 @@ private fun TerminalScrollBar(
 
 /** ASCII 滚动条的测试标识。 */
 internal const val TerminalScrollBarTag = "terminal-scrollbar"
+
+/**
+ * 表冠滚动的"按行量化"：把累计像素换成整行数，余量留在累积器里。
+ *
+ * 真终端（`less` / `more`）是一行一行翻的，不是像素级滑动。表冠每转过一小段就滚**一整行**，
+ * 这样内容永远落在字符网格上，不会出现"半行悬空"。
+ *
+ * @param accumulated 上一次留下的余量（|余量| 恒 < linePx）
+ * @param delta 本次表冠给出的像素位移（正 = 向下滚）
+ * @return first = 新的余量，second = 这次要滚的行数（可为 0/正/负）
+ */
+internal fun rotaryLinesToScroll(
+    accumulated: Float,
+    delta: Float,
+    linePx: Float,
+): Pair<Float, Int> {
+    require(linePx > 0f) { "行高必须为正：$linePx" }
+    val total = accumulated + delta
+    val lines = (total / linePx).toInt() // 向零取整：不足一行不滚
+    return (total - lines * linePx) to lines
+}
 
 /** 底部提示符的测试标识。 */
 internal const val TerminalPromptTag = "terminal-prompt"

@@ -483,3 +483,21 @@ M3_CARD 的三个静止态分组：`{12,24}` / `{36,48,60,72,84,96,160}` / `{240
 
 五套哈希（0.0.0.198）：`184e41f257f6 / 98a34bcd2874 / ac8baaa3b05e / 3cacdb50ed2c / e847d11d121e`，
 `distinct 5/5`；除 TERMINAL 外四套与上一版**一字未动**。截图 `docs/device/v2five/TERMINAL.png`。
+
+### 表冠按行滚动（0.0.0.199）
+
+**实现**：`rotaryLinesToScroll(acc, delta, linePx)` 把连续像素量化成整行（余量恒 < 一行），
+`onRotaryScrollEvent` 里按 `lines × linePx` 调 `state.scrollBy`；只接在 TERMINAL 上（其余四套不抢表冠，
+有源码守卫 `onlyTerminalWiresTheRotary`）。单测 6 条：不足一行不滚、跨行取整、负向、余量不越界、行高为 0 抛错。
+
+**真机取证（部分成功）**：
+- 本机 `input` 命令**没有** `roll` 子命令（Android 13 的 input 只到 draganddrop），所以走 root 注入：
+  `getevent -pl` 显示 `/dev/input/event0`（slate-spi）提供 **REL_WHEEL**；
+  `sendevent /dev/input/event0 2 8 <n>; sendevent /dev/input/event0 0 0 0` 可注入。
+- 注入 +1 格后整屏哈希从 `BE44B920C0` 变为 `C68A317662` —— **表冠事件确实被接到并产生了滚动**。
+- 但**每一步是否恰好整行**在设备上**未验证**：
+  ①`uiautomator` 的文本节点检索在这一状态下失灵（`text="&gt; 模型"` 与 `text="[^"]*模型"` 两种正则都匹配不到，
+  而同一份 dump 的 `IndexOf('模型')` 命中 —— 仪器本身有问题，尚未定位）；
+  ②截图的文字行带测量显示 +1 格后中间若干行**整段消失**（band_tops 从 8 段变 6 段且不连续），
+  是滚动瞬间的**未完成帧**特征，不能用来算位移。
+- 结论：接线与"会滚"已验证；**按行量化只有单测证据，设备级未验证**。
