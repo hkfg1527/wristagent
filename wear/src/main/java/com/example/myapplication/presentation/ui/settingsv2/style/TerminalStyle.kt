@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -50,6 +51,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Mot
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
+import com.example.myapplication.presentation.ui.settingsv2.common.RotaryBus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -136,6 +138,20 @@ fun TerminalSettings(
         while (echoes.size > 3) echoes.removeAt(0)
     }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // 表冠：Activity 层送来的滚动（不依赖焦点）。进入本页才打开安全阀，离开立刻关掉，
+    // 免得把聊天页的表冠滚动一起吞了。
+    DisposableEffect(Unit) {
+        RotaryBus.enabled = true
+        onDispose { RotaryBus.enabled = false }
+    }
+    LaunchedEffect(Unit) {
+        RotaryBus.events.collect { delta ->
+            val (rest, lines) = rotaryLinesToScroll(rotaryRemainder, delta, linePx)
+            rotaryRemainder = rest
+            if (lines != 0) state.scrollBy(lines * linePx)
+        }
+    }
 
     Box(
         modifier = modifier

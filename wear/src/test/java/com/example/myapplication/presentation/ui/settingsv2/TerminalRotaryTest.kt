@@ -92,6 +92,33 @@ class TerminalRotaryTest {
     }
 
     /**
+     * R19：表冠必须在 **Activity 层**接，不依赖 Compose 焦点。
+     *
+     * 实测依据：注入 REL_WHEEL 后 `onRotaryScrollEvent` 一行日志都没有，但焦点确实在主 Activity ——
+     * Compose 的 rotary 回调依赖节点持有焦点，真机上不可靠。所以改在 `onGenericMotionEvent` 里接，
+     * 并用 [RotaryBus.enabled] 做安全阀（否则会把聊天页的表冠滚动一起吞掉）。
+     */
+    @Test
+    fun rotaryIsWiredAtTheActivityLevelWithoutFocus() {
+        fun read(rel: String) = File("wear/src/main/java/com/example/myapplication/presentation/$rel")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/$rel") }
+            .readText()
+        val activity = read("MainActivity.kt")
+        val terminal = read("ui/settingsv2/style/TerminalStyle.kt")
+        val bus = read("ui/settingsv2/common/RotaryBus.kt")
+
+        assertTrue("Activity 必须重写 onGenericMotionEvent", activity.contains("override fun onGenericMotionEvent"))
+        assertTrue("Activity 必须把表冠增量交给总线", activity.contains("RotaryBus.emit("))
+        assertTrue("Activity 必须先看安全阀", activity.contains("if (RotaryBus.enabled"))
+        assertTrue("终端必须订阅总线", terminal.contains("RotaryBus.events.collect"))
+        assertTrue(
+            "进入终端页必须打开安全阀、离开必须关掉",
+            terminal.contains("RotaryBus.enabled = true") && terminal.contains("RotaryBus.enabled = false")
+        )
+        assertTrue("总线必须带安全阀开关", bus.contains("var enabled"))
+    }
+
+    /**
      * 表冠只接在 TERMINAL 上：另外四套是卡片/列表 UI，表冠该由系统列表语义处理，
      * 不该被我们按行抢走（会把顺滑滑动变成一格一格跳）。
      */

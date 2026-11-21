@@ -10,7 +10,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
+import android.view.MotionEvent
+import com.example.myapplication.presentation.ui.settingsv2.common.RotaryBus
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -307,6 +310,28 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * 表冠：在 **Activity 层**接滚动事件。
+     *
+     * Compose 的 `onRotaryScrollEvent` 依赖目标节点持有焦点，真机上焦点被别处拿走时一行事件都收不到
+     * （实测：注入 REL_WHEEL 后该回调无任何日志）。这里直接接 `ACTION_SCROLL`，不依赖焦点。
+     *
+     * 安全阀：[RotaryBus.enabled] 只在终端页在栈上时为 true —— 否则会把其它页面的表冠滚动一起吞掉。
+     */
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (RotaryBus.enabled && event.action == MotionEvent.ACTION_SCROLL) {
+            val delta = event.getAxisValue(MotionEvent.AXIS_VSCROLL) +
+                event.getAxisValue(MotionEvent.AXIS_SCROLL)
+            if (delta != 0f) {
+                Log.i("TerminalRotary", "activity delta=$delta src=${event.source}")
+                // 系统语义：正向 VSCROLL = 向上滚；终端的行位移与之反向
+                RotaryBus.emit(-delta * ROTARY_PIXELS_PER_UNIT)
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
@@ -438,3 +463,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+/**
+ * 表冠一"格"折算成多少像素。
+ *
+ * 36px = TERMINAL 的行高：一格恰好一行，量化后不会出现"半行"。
+ */
+private const val ROTARY_PIXELS_PER_UNIT = 36f
