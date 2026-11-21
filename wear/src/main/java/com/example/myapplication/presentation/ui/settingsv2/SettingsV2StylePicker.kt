@@ -52,15 +52,20 @@ fun SettingsV2StylePicker(
         // 五套 + 标题在 233dp 高的圆屏上放不下，必须可滚动（否则底部两套点不到）
         Column(
             modifier = Modifier
-                .width(200.dp)
+                // 176dp：与四套 Standard 列宽一致；再宽会在圆屏右侧被裁（实测 200dp 时右侧被切）
+                .width(176.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = "页面风格",
                 color = Color(0xFFF2F4F7),
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(bottom = 4.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
             )
             SettingsV2Style.values().forEach { style ->
                 val selected = style == current
