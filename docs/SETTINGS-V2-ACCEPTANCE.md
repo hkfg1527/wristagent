@@ -22,7 +22,7 @@
 | 动效 | 实现 | 判据 | 真机/帧级证据 |
 |---|---|---|---|
 | 入场逐行错峰 | `rememberEnterProgress(index)`，参数 40/26/50/0/18ms | `SettingsV2MotionTest`（延迟 = index×stagger）、`SettingsV2ArchitectureGuardTest` | `SettingsV2StaggerFrameTest`：120ms 时第 1 行位移 > 第 2 行；2s 后间距回到稳态（<1px） |
-| 磁滑吸附 | `snapFlingBehavior`（TERMINAL 关闭） | 架构守卫：除 TERMINAL 外必须有真实调用 | 未拍帧证据（滚动惯性无法静态截图证明）——**未验证** |
+| 磁滑吸附 | `snapFlingBehavior`（TERMINAL 关闭） | 架构守卫：除 TERMINAL 外必须有真实调用 | **已量化证明**（`snap-probe.mjs`，判据 R4）：M3_CARD 12 个拖动距离（12~400px）只留 **3 个静止态**，其中 36/48/60/72/84/96/160 七个距离哈希完全相同；对照组 TERMINAL 8 个距离留 **7 个**静止态、最大共用距离数仅 2（两次空拖）。详见 §7.1 |
 | 边缘淡出 + 等比缩放 | `reportEdgeDistance` + `edgeAppearance`（`scaleX=scaleY`） | 架构守卫：四套必须有接线；M3_CARD 走官方 `SurfaceTransformation` | 接线前后哈希变化可证：M3_LIST `cb38ad9a→a48bed06`、ARC `a61368d4→c96b911f`、SQUARE `f7bfa828→714e394d`、TERMINAL `bf02da38→90c4b553` |
 
 **真机截不到的物理原因**：`adb exec-out screencap` 单次 469~555ms（均值 506ms），入场动效仅 200~300ms。
@@ -33,7 +33,7 @@
 |---|---|---|
 | 除 ARC 外同宽 176dp | `SettingsV2CardWidthTest`（4 条） | 卡宽 = 176dp；M3_CARD 一屏 1 张 + 第二张露头 |
 | ARC 贴边（允许超 176dp） | `ArcStyleTest`（卡宽 > 176dp、左缘 ≤8px、安全边距 26dp） | 左缘 3.24~7.05px |
-| 行高 ≥48dp（触控） | `SquareAndTerminalStyleTest` / `M3ListStyleTest` | SQUARE 48dp、M3_LIST 57dp、TERMINAL 46dp（等宽行，标题 40dp 容器 + 上下 4dp） |
+| 行高 ≥48dp（触控） | `SquareAndTerminalStyleTest` / `M3ListStyleTest` | SQUARE 48dp、M3_LIST 57dp、TERMINAL 48dp（0.0.0.193 前为 40dp 容器/行距 46dp，已改；实测行距 92px→**104px/52.0dp**） |
 | 华为页边距 | `ArcStyleTest`（26/20/6/40vp 常量） | 尾留白实测：末行底部距屏底 **138px = 69dp**（无尾留白时约 29dp） |
 | 不硬编码字号 | 架构守卫（除 TERMINAL 外禁止 `sp`） | 通过 |
 
@@ -64,8 +64,24 @@
 
 ## 7. 明确未验证 / 已知取舍
 
-1. **磁滑吸附的视觉证据**：无法用静态截图证明滚动惯性，只有代码级守卫。
-2. **TERMINAL 行高 46dp**：低于 48dp 触控下限（等宽行 + 4dp 上下留白），属风格取舍；若你要求统一 ≥48dp，我把行内 padding 调到 6dp。
+1. **磁滑吸附：已量化证明**（`docs/tools/snap-probe.mjs`，判据 R4，0.0.0.194 轮实测）。
+   录屏在 Wear 上拿不到有效帧，`screencap` 单次 469~555ms 又长于滚动动画，所以不用"看动画"，
+   改用**离散性**判决：慢拖（900ms，末速度≈0.04px/ms，不产生惯性）松手后，吸附生效则内容被重新
+   对齐到锚点，多个不同拖动距离会**塌陷**到同一静止态；无吸附则每个距离留下一个独立态。
+
+   | 风格 | 拖动距离(px) | 哈希静止态 | 最大共用距离数 | 结论 |
+   |---|---|---|---|---|
+   | M3_CARD（吸附开） | 12/24/36/48/60/72/84/96/160/240/320/400 | **3** | **7**（36~160 全同） | 态数≤4 且最大组≥3 → PASS |
+   | TERMINAL（吸附关，对照） | 12/24/36/48/60/72/84/96 | **7** | 2（12/24 是未过 slop 的空拖） | 态数≥4 → PASS |
+
+   - 交叉校验：marker 可见的 9 次里，`uiautomator` 坐标划分与像素哈希划分**完全一致**。
+   - 已排除"拖到底了"这个伪解释：96/160 与 240/320/400 属于**两个不同**的静止态
+     （后者首卡已滚出视野）；若只是到底，两者必然同态。
+   - 写错过的两版判据留档在工具头部：R2 假设"位移=行距"（实测 25px；卡内行距 86px 与文字高 47px
+     均不变 → `SurfaceTransformation` 是**平移**非缩放，前提不成立）；R3 拿被屏幕裁切的坐标判对照组
+     （marker 顶到 y=0 后 h 从 32 掉到 3）。
+2. **TERMINAL 行高：已修（0.0.0.193）**。40dp 容器 → 48dp，真机行距 92px/46.0dp → **104px/52.0dp**，
+   `SquareAndTerminalStyleTest` 已加 `rowMinHeight ≥ 48dp` 断言锁死，防回退。
 3. **选择器遮挡**：已在 SQUARE / TERMINAL 底层各截一张（`picker-square.png` / `picker-terminal.png`），
    据此发现覆盖层 95% 不透明时底层文字会 ghost（TERMINAL 下看到「&gt; 温度」），已改为全不透明并加源码守卫
    `thePickerBackgroundIsFullyOpaque`；**修复后已在真机确认**（`picker-opaque.png`，TERMINAL 底层打开选择器，顶部不再有 ghost 文字）。
