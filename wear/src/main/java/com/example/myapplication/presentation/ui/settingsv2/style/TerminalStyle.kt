@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
@@ -147,18 +148,20 @@ fun TerminalSettings(
             state = state,
             // 无 snapFling：终端连续滚动
             contentPadding = PaddingValues(start = 10.dp, end = 16.dp, top = 4.dp, bottom = 26.dp),
+            // 显式 0 间距：默认的 4dp(8px) 项目间距会把行网格切成 36/44 交替（真机实测：
+            // 项内 96->132 = 36px 正常，项间 132->176 = 44px）。字符网格必须是常数。
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
                     // 分区头 = 终端的注释行，用暗绿，让它看起来像输出的一部分
-                    BasicText(
-                        text = "# " + section.title,
-                        style = dimStyle,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(TerminalLineHeight),
-                    )
+                    TerminalGridLine {
+                        BasicText(
+                            text = "# " + section.title,
+                            style = dimStyle,
+                            maxLines = 1,
+                        )
+                    }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                     val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
@@ -172,22 +175,23 @@ fun TerminalSettings(
                             .edgeAppearance(edge.value, motion)
                             .testTag(TerminalRowTag),
                     ) {
-                        TerminalLine(
-                            row = row,
-                            lineStyle = lineStyle,
-                            dimStyle = dimStyle,
-                        )
+                        TerminalGridLine {
+                            TerminalLine(
+                                row = row,
+                                lineStyle = lineStyle,
+                                dimStyle = dimStyle,
+                            )
+                        }
                         // 副标题另起一行，仍落在同一网格上：`  └ 说明`
                         row.subtitle?.let {
-                            BasicText(
-                                text = "  └ $it",
-                                style = dimStyle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(TerminalLineHeight),
-                            )
+                            TerminalGridLine {
+                                BasicText(
+                                    text = "  └ $it",
+                                    style = dimStyle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
@@ -212,6 +216,25 @@ fun TerminalSettings(
 }
 
 /**
+ * 一行字符网格：**由外层 Box 强制高度并裁剪**，不依赖字体度量。
+ *
+ * 为什么不是给 `BasicText` 加 `.height()`：等宽字体在 12sp 下的固有行高实测约 44px，
+ * 比网格的 36px 高，`Row.height(36)` 压不住它（真机行距一直是 44px）。这里把高度和裁剪
+ * 放在外层，字体想多高都只能被裁在网格里 —— 终端就是这样工作的（字符格子决定一切）。
+ */
+@Composable
+private fun TerminalGridLine(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TerminalLineHeight)
+            .clipToBounds(),
+    ) {
+        content()
+    }
+}
+
+/**
  * 单行制的一行：`> 标题` 靠左，值/开关靠右对齐成同一列。
  *
  * 为什么用 `weight(1f) + TextAlign.End` 而不是"补空格到固定列"：等宽字体里中文是双宽字形，
@@ -225,8 +248,7 @@ private fun TerminalLine(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(TerminalLineHeight),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
