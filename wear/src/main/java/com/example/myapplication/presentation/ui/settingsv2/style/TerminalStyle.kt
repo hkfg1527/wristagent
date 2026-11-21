@@ -198,9 +198,11 @@ fun TerminalSettings(
             }
             // 末行不放进列表：真终端的提示符是**钉在底部**的，不该跟着内容滚走
         }
-        // 钉在底部的状态条：`> █`（块光标），整行不透明，内容从其后方滚过
+        // 钉在底部的状态条：`> █`（块光标），整行不透明，内容从其后方滚过。
+        // 闪烁跟着滚动状态走：滚动中闪、停下常亮
         TerminalPromptLine(
             lineStyle = lineStyle,
+            isActive = state.isScrollInProgress,
             modifier = Modifier.align(Alignment.BottomStart),
         )
         TerminalScrollBar(
@@ -282,25 +284,29 @@ private fun TerminalLine(
 }
 
 /**
- * 末行：`> █`，进场闪 5 次后常亮。
+ * 末行：`> █`。**有活动才闪，静止常亮。**
  *
- * **为什么不无限闪烁**：无限动画会让界面永远不进入 idle 状态，`uiautomator dump` 直接报
- * `ERROR: could not get idle state`，于是 release-check / style-shots 的取数链路全断
- * （实测 6/8，两条检查拿不到文本）。折中：进场 2.4s 内闪 5 次（有"终端刚起来"的活感），
- * 之后常亮，界面恢复 idle 可取证。
+ * 为什么不无条件闪：无限动画会让界面永远不进入 idle，`uiautomator dump` 直接报
+ * `ERROR: could not get idle state`，release-check / style-shots 的取数链路全断（实测 6/8）。
+ * 所以闪烁由 [isActive]（= 列表正在滚动，表冠或手指都算）门控：滚动时 8Hz 快闪，
+ * 停下立刻常亮 —— 既保留"活着"的信号，又把 idle 窗口还给工具链。
  */
 @Composable
 private fun TerminalPromptLine(
     lineStyle: TextStyle,
+    isActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var cursorOn by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        repeat(5) {
-            delay(480)
-            cursorOn = !cursorOn
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            while (true) {
+                delay(220)
+                cursorOn = !cursorOn
+            }
+        } else {
+            cursorOn = true
         }
-        cursorOn = true
     }
     Box(
         modifier = modifier

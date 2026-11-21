@@ -55,6 +55,26 @@ class TerminalRotaryTest {
     }
 
     /**
+     * 光标只在**有活动**时闪：静止必须常亮，否则界面永不 idle，
+     * `uiautomator dump` 报 `could not get idle state`，整条真机取证链路会断（实测 release-check 掉到 6/8）。
+     */
+    @Test
+    fun cursorBlinksOnlyWhileScrolling() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        assertTrue(
+            "闪烁必须由滚动状态门控（isActive = state.isScrollInProgress）",
+            src.contains("isActive = state.isScrollInProgress")
+        )
+        assertTrue("闪烁的副作用必须挂在 isActive 上", src.contains("LaunchedEffect(isActive)"))
+        assertFalse(
+            "静止时不许留任何周期性重绘（进场闪 5 次那版已证明会断掉 dump）",
+            src.contains("repeat(5)")
+        )
+    }
+
+    /**
      * 表冠只接在 TERMINAL 上：另外四套是卡片/列表 UI，表冠该由系统列表语义处理，
      * 不该被我们按行抢走（会把顺滑滑动变成一格一格跳）。
      */
