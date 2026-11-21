@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -63,7 +66,26 @@ fun SquareSettings(
 ) {
     val identity = SettingsV2Style.SQUARE.identity
     val state = rememberTransformingLazyColumnState()
-    Box(modifier = modifier.fillMaxWidth().background(identity.pageBackground)) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(identity.pageBackground)
+            // 方角档的签名：左右各一条 1px 竖轨，把内容框成"方框"
+            .drawWithContent {
+                drawContent()
+                val rail = 1.dp.toPx()
+                drawRect(
+                    color = SquareHairline,
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    size = androidx.compose.ui.geometry.Size(rail, size.height),
+                )
+                drawRect(
+                    color = SquareHairline,
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width - rail, 0f),
+                    size = androidx.compose.ui.geometry.Size(rail, size.height),
+                )
+            }
+    ) {
         TransformingLazyColumn(
             state = state,
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
@@ -93,44 +115,49 @@ fun SquareSettings(
                             .edgeAppearance(edge.value, motion)
                             .testTag(SquareRowTag)
                     ) {
-                        Row(
+                        // 两行堆叠：标题一行、右值/开关一行右对齐（176dp 窄列 + 放大字号下同行必互挤）
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = SquareRowMinHeight)
                                 .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = row.title,
+                                color = identity.titleColor,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            row.subtitle?.let {
                                 Text(
-                                    text = row.title,
-                                    color = identity.titleColor,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
+                                    text = it,
+                                    color = identity.subtitleColor,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                row.subtitle?.let {
-                                    Text(
-                                        text = it,
-                                        color = identity.subtitleColor,
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
                             }
-                            Spacer(Modifier.width(8.dp))
                             when (val trailing = row.trailing) {
                                 is RowTrailing.Value -> Text(
                                     text = trailing.text,
-                                    color = identity.subtitleColor,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                    softWrap = false,
+                                    color = identity.titleColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2,
+                                    textAlign = TextAlign.End,
                                     overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
-                                is RowTrailing.Toggle -> SwitchButton(
-                                    checked = trailing.checked,
-                                    onCheckedChange = trailing.onChange,
-                                    label = {},
-                                )
+                                is RowTrailing.Toggle -> Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    SwitchButton(
+                                        checked = trailing.checked,
+                                        onCheckedChange = trailing.onChange,
+                                        label = {},
+                                    )
+                                }
                                 is RowTrailing.Chevron, RowTrailing.None -> Unit
                             }
                         }
