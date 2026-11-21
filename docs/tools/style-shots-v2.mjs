@@ -87,6 +87,7 @@ if (!enterSettings()) {
 }
 
 const rows = [];
+let pitchText = '' 
 const hashes = new Set();
 for (const [legacy, name, markers] of STYLES) {
   try {
@@ -102,7 +103,21 @@ for (const [legacy, name, markers] of STYLES) {
   const file = path.join(OUT, `${name}.png`);
   const hash = shot(file);
   hashes.add(hash);
-  rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'} hash=${hash}`);
+  // 顺带量该风格的行距（先验证 marker，避免读到旧页面）：模型 -> 温度 的 top 差
+  const pitchOf = (xmlText, a, b) => {
+    const find = (label) => {
+      const re = new RegExp(`text="${label}"[^>]*bounds="\\[\\d+,(\\d+)\\]`);
+      const m = xmlText.match(re);
+      return m ? Number(m[1]) : -1;
+    };
+    const ta = find(a); const tb = find(b);
+    return (ta >= 0 && tb >= 0) ? (tb - ta) : -1;
+  };
+  // 终端行文本带 > 前缀（dump 里转义为 &gt;），普通标签匹配不到时再试带前缀的
+  const pitchPlain = pitchOf(xml, '模型', '温度');
+  const pitch = pitchPlain > 0 ? pitchPlain : pitchOf(xml, '&gt; 模型', '&gt; 温度');
+  pitchText = pitch > 0 ? `${pitch}px/${(pitch / 2).toFixed(1)}dp` : 'n/a';
+  rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'} hash=${hash} pitch=${pitchText}`);
   console.log(rows[rows.length - 1]);
   } catch (e) {
     // 单套失败不应中断整轮（上一轮就是在这里静默中断，导致 report 只到 SQUARE）
