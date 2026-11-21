@@ -121,7 +121,7 @@ fun TerminalSettings(
     )
 
     // 列表里的基础行数（分区头 + 行）。提示符是钉在底部的，**不算**列表项。
-    val baseItems = remember(sections) { sections.sumOf { 1 + it.rows.size } }
+    val baseItems = remember(sections) { sections.sumOf { 2 + it.rows.size } } // 规则线 + 分区头 + 行
 
     // 表冠：按"行"滚动（真终端语义），不是像素级滑动
     val focusRequester = remember { FocusRequester() }
@@ -188,6 +188,18 @@ fun TerminalSettings(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             sections.forEach { section ->
+                item(key = "r-" + section.title) {
+                    // ASCII 规则线：`vim` / `less` 那种 banner 式分节，用字符铺出来，不画笔。
+                    // 30 个 `─` ≈ 430px，正好铺满内容列（466 - 左右 26 - 滚动条 10）。
+                    TerminalGridLine {
+                        BasicText(
+                            text = TerminalRule.repeat(TerminalRuleCells),
+                            style = dimStyle,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
                 item(key = "h-" + section.title) {
                     // 分区头 = 终端的注释行，用暗绿，让它看起来像输出的一部分
                     TerminalGridLine {
@@ -288,7 +300,7 @@ internal fun zoneOfAnchor(
 ): Int {
     var start = 0
     sections.forEachIndexed { index, section ->
-        val size = 1 + section.rows.size
+        val size = 2 + section.rows.size // 规则线 + 分区头 + 行
         if (anchorItemIndex < start + size) return index + 1
         start += size
     }
@@ -496,3 +508,9 @@ internal const val TerminalPromptTag = "terminal-prompt"
 
 /** 表冠日志 tag（真机取证用）。 */
 internal const val TerminalRotaryTag = "TerminalRotary"
+
+/** ASCII 规则线的字符（`vim` / `less` 的 banner 分节）。 */
+internal const val TerminalRule = "─"
+
+/** 规则线的字符数：30 × ~14.4px ≈ 430px，正好铺满内容列。 */
+internal const val TerminalRuleCells = 30

@@ -17,7 +17,7 @@ class TerminalStatusTest {
         rows = (1..rows).map { SettingsV2Row(key = "$title-$it", title = "行$it", trailing = RowTrailing.Value("v")) },
     )
 
-    // 三个分区，各占 1+2=3 项：分区1 = 0..2，分区2 = 3..5，分区3 = 6..8
+    // 三个分区，各占 2+2=4 项（规则线 + 分区头 + 2 行）：分区1 = 0..3，分区2 = 4..7，分区3 = 8..11
     private val sections = listOf(section("一", 2), section("二", 2), section("三", 2))
 
     @Test
@@ -27,16 +27,16 @@ class TerminalStatusTest {
 
     @Test
     fun zoneBoundariesAreExact() {
-        assertEquals("分区1 的最后一项", 1, zoneOfAnchor(sections, 2))
-        assertEquals("分区2 的第一项", 2, zoneOfAnchor(sections, 3))
-        assertEquals("分区2 的最后一项", 2, zoneOfAnchor(sections, 5))
-        assertEquals("分区3 的第一项", 3, zoneOfAnchor(sections, 6))
-        assertEquals("分区3 的最后一项", 3, zoneOfAnchor(sections, 8))
+        assertEquals("分区1 的最后一项", 1, zoneOfAnchor(sections, 3))
+        assertEquals("分区2 的第一项", 2, zoneOfAnchor(sections, 4))
+        assertEquals("分区2 的最后一项", 2, zoneOfAnchor(sections, 7))
+        assertEquals("分区3 的第一项", 3, zoneOfAnchor(sections, 8))
+        assertEquals("分区3 的最后一项", 3, zoneOfAnchor(sections, 11))
     }
 
     @Test
     fun anchorInsideEchoAreaCountsAsLastZone() {
-        assertEquals("回显追加在最后，锚点到那儿算最后一个分区", 3, zoneOfAnchor(sections, 9))
+        assertEquals("回显追加在最后，锚点到那儿算最后一个分区", 3, zoneOfAnchor(sections, 12))
         assertEquals(3, zoneOfAnchor(sections, 999))
     }
 
