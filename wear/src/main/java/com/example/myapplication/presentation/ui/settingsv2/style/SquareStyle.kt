@@ -41,12 +41,13 @@ import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDis
 internal const val SquareRowTag = "square-row"
 
 /** 发丝线颜色（1px）。 */
-internal val SquareHairline = Color(0xFF2A2F36)
+internal val SquareHairline = Color(0xFF3A4048)
 
 /** 发丝线厚度：**1px**（density 2.0 下即 0.5dp）。 */
 internal val SquareHairlineHeight = 0.5.dp
 
 /** 方角行的最小高度。 */
+// 48dp 是触控下限，不能再小；与 M3_LIST 的区分靠居中分区头 + 更亮的发丝线
 internal val SquareRowMinHeight = 48.dp
 
 /**

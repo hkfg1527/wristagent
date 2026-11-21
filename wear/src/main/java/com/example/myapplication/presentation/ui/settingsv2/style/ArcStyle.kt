@@ -70,7 +70,7 @@ fun ArcSettings(
         contentPadding = PaddingValues(start = 0.dp, end = 0.dp, top = 20.dp, bottom = 6.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
-        sections.forEach { section ->
+        sections.forEachIndexed { sectionIndex, section ->
             item(key = "h-" + section.title) {
                 Text(
                     text = section.title,
@@ -98,9 +98,11 @@ fun ArcSettings(
                     ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
                 }
             }
-            item(key = "sp-" + section.title) {
-                // 长列表滚到底部时的额外留白（华为 40vp 规则的一部分）
-                Spacer(Modifier.heightIn(min = 8.dp))
+            if (sectionIndex == sections.lastIndex) {
+                item(key = "tail") {
+                    // 华为 8.1.1：长列表滚到底部留 40vp
+                    Spacer(Modifier.heightIn(min = ArcBottomTail))
+                }
             }
         }
     }
@@ -145,6 +147,9 @@ private fun ArcRow(
 
 /** 供测试读取：华为 8.1.1 的安全边距（vp≈dp）。 */
 internal val ArcSafeInset = 26.dp
+
+/** 长列表滚到底部时额外留白（华为 8.1.1：40vp）。 */
+internal val ArcBottomTail = 40.dp
 
 /** 供测试读取：页顶/页底留白。 */
 internal val ArcTopInset = 20.dp
