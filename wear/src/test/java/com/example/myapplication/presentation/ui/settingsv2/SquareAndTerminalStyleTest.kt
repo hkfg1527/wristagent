@@ -164,6 +164,27 @@ class SquareAndTerminalStyleTest {
     }
 
     /**
+     * R31：终端里的点击**不能有 Material 涟漪**。
+     *
+     * `Modifier.clickable` 默认用 `LocalIndication`（M3 是涟漪）。真终端点一行不会荡出一圈光晕 ——
+     * 这是"看起来像终端"和"真的是终端"之间很小但很明显的一处。所以终端侧一律 `indication = null`。
+     */
+    @Test
+    fun terminalClicksHaveNoRipple() {
+        listOf(
+            "wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt",
+            "wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/TerminalStylePicker.kt",
+        ).forEach { rel ->
+            val src = File(rel).let { if (it.exists()) it else File("../$rel") }.readText()
+            assertFalse(
+                "$rel 里不许有裸 `.clickable {`（会用默认涟漪）",
+                src.contains(".clickable {") || src.contains(".clickable(onClick")
+            )
+            assertTrue("$rel 必须显式 indication = null", src.contains("indication = null"))
+        }
+    }
+
+    /**
      * R30：选择器开着时，返回键只能关选择器。
      *
      * 真机实测（0.0.0.215）：菜单打开时按返回，整个设置页被关掉、直接回到聊天页 —— 一次返回丢了上下文。

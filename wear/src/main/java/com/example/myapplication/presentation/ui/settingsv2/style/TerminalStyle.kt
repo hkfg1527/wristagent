@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -261,7 +262,11 @@ fun TerminalSettings(
                             .fillMaxWidth()
                             .reportEdgeDistance(edge)
                             .edgeAppearance(edge.value, SettingsV2Motions.of(SettingsV2Style.TERMINAL))
-                            .clickable(enabled = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron) {
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron,
+                            ) {
                                 activate(row)
                             }
                             .testTag(TerminalRowTag),
@@ -523,7 +528,10 @@ private fun TerminalPromptLine(
                         maxLines = 1,
                         modifier = Modifier
                             .padding(start = 8.dp, end = 12.dp)
-                            .clickable { onStylePicker() }
+                            .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onStylePicker() }
                             .testTag(StyleEntryTag),
                     )
                 } else {

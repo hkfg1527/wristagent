@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -49,7 +51,11 @@ fun TerminalStylePicker(
             .fillMaxSize()
             .background(identity.pageBackground)
             .testTag(StylePickerTag)
-            .clickable(onClick = onDismiss),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -68,7 +74,10 @@ fun TerminalStylePicker(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(18.dp)
-                        .clickable { onPick(style) }
+                        .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onPick(style) }
                         .testTag(StylePickerItemTagPrefix + style.name),
                 )
             }
