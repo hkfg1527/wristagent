@@ -10,6 +10,7 @@ import com.example.myapplication.presentation.ui.settingsv2.style.ArcCardTag
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcBottomTail
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcSafeInset
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcTopInset
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
