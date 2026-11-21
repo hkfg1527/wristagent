@@ -120,10 +120,8 @@ fun TerminalSettings(
         lineHeight = TerminalLineHeight.value.sp,
     )
 
-    // 一屏行数：视口高度 / 行高（供 ASCII 滚动条算滑块位置；除不尽时取整，不追求像素级）
-    val totalItems = remember(sections) {
-        sections.sumOf { 1 + it.rows.size } + 1 // +1 = 末行提示符
-    }
+    // 列表里的基础行数（分区头 + 行）。提示符是钉在底部的，**不算**列表项。
+    val baseItems = remember(sections) { sections.sumOf { 1 + it.rows.size } }
 
     // 表冠：按"行"滚动（真终端语义），不是像素级滑动
     val focusRequester = remember { FocusRequester() }
@@ -136,6 +134,14 @@ fun TerminalSettings(
     fun pushEcho(line: String) {
         echoes.add(line)
         while (echoes.size > 3) echoes.removeAt(0)
+    }
+    // 真终端打印输出后会**跟随到底**：不跟随的话，用户点了命令却看不到结果
+    // （上一轮实测：点 /open 后要手动滑 6 次才看到 `# open …`）。
+    // 用 scrollToItem 而不是 animateScrollToItem：`tail -f` 是瞬间跳到底，不做平滑滚动。
+    LaunchedEffect(echoes.size) {
+        if (echoes.isNotEmpty()) {
+            state.scrollToItem(baseItems + echoes.size - 1)
+        }
     }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -257,7 +263,7 @@ fun TerminalSettings(
         )
         TerminalScrollBar(
             anchorIndex = state.anchorItemIndex,
-            totalItems = totalItems,
+            totalItems = baseItems + echoes.size,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()

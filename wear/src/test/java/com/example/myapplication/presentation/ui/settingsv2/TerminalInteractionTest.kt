@@ -30,6 +30,41 @@ class TerminalInteractionTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /**
+     * R22：执行一行之后必须**跟随到底**，否则用户点了命令看不到输出（真终端就是这么做的）。
+     *
+     * 视口故意压到 200dp：回显在列表末尾，不跟随就根本不会被组合 —— 这条断言因此是真的行为判据，
+     * 不是"源码里有没有那个词"。
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = "w220dp-h200dp")
+    fun terminalFollowsTheOutputAfterExecutingARow() {
+        val sections = listOf(
+            SettingsV2Section(
+                title = "测试区",
+                // 可点的 /open 放**第一行**（200dp 视口只组合前几行，放最后会点不到），
+                // 后面堆满行，让回显落在视口之外 —— 不跟随就看不到，断言才有意义
+                rows = listOf(SettingsV2Row(key = "open", title = "跳转项", trailing = RowTrailing.Chevron)) +
+                    (1..12).map { i -> SettingsV2Row(key = "k$i", title = "行$i", trailing = RowTrailing.Value("v$i")) },
+            )
+        )
+        compose.setContent {
+            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL, sections = sections) }
+        }
+        compose.waitForIdle()
+
+        val openRow = compose.onAllNodes(
+            hasTestTag(TerminalRowTag) and hasText("/open", substring = true)
+        )[0]
+        openRow.performClick()
+        compose.waitForIdle()
+
+        assertTrue(
+            "执行后必须自动跟随到底，让回显可见",
+            compose.onAllNodesWithText("# open", substring = true).fetchSemanticsNodes().isNotEmpty()
+        )
+    }
+
     @Test
     fun tappingAToggleFlipsItAndAppendsAnEchoLine() {
         // 自包含数据：只放一条 OFF 开关 + 一条 /open，不依赖示例数据里恰好有什么
