@@ -116,7 +116,9 @@ const device = () => {
     if (i >= 3) crown(5, 40); // 后半段先把列表滚到顶
     adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
     spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
-    entered = /请求超时|全部启用|模型与服务/.test(JSON.stringify(dumpTexts()));
+    // 判据文本必须跟当前设置页一致：V2 的分区名是 连得上/让它能做事/让它听懂我/让它答得好，
+    // 行里有 模型/温度/回复风格。旧判据（请求超时/全部启用/模型与服务）在 V2 上永远不会命中。
+    entered = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/.test(JSON.stringify(dumpTexts()));
   }
   // 偶发失败兜底：这一段的"上滑进设置"手势偶尔不生效（0.0.0.137 那天就出现过 7/8，
   // 报错是「进入设置页 undefined」）。失败时按同样的动作再试一轮，仍失败才算失败 ——
@@ -125,7 +127,7 @@ const device = () => {
     for (let i = 0; i < 3 && !entered; i++) {
       adb('shell', 'input', 'swipe', '233', '440', '233', '40', '240');
       spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500']);
-      entered = /请求超时|全部启用|模型与服务/.test(JSON.stringify(dumpTexts()));
+      entered = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/.test(JSON.stringify(dumpTexts()));
     }
   }
   record('进入设置页', entered);

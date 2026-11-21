@@ -4,69 +4,97 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcSettings
-import com.example.myapplication.presentation.ui.settingsv2.style.SquareSettings
-import com.example.myapplication.presentation.ui.settingsv2.style.TerminalSettings
 import com.example.myapplication.presentation.ui.settingsv2.style.M3CardSettings
 import com.example.myapplication.presentation.ui.settingsv2.style.M3ListSettings
+import com.example.myapplication.presentation.ui.settingsv2.style.SquareSettings
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalSettings
+
+/** 除 ARC 贴边外的四套：卡片/行统一宽度（dp）。 */
+val SettingsV2StandardWidth = 176.dp
 
 /**
  * 设置页 V2 的唯一入口。
  *
- * 职责只有两件：①按风格取 [StyleIdentity] 铺页面底色；②把内容交给那一套风格的渲染文件。
- * 这里**不允许**出现任何"如果风格是 X 就改成什么"的行内分支 —— 那是旧实现变成 2000 行函数的原因。
+ * 职责三件：①按风格取 [StyleIdentity] 铺页面底色；②按 `RowWidthPolicy` 决定列宽
+ * （Standard = 176dp 居中，EdgeToEdge = 满宽，只给 ARC）；③把内容交给那一套风格的渲染文件。
  *
- * 五套风格的落地顺序见 `docs/SETTINGS-REBUILD-V2.md`：
- * R1 大卡片（本文件已可用）→ R2 官方列表 → R3 贴边卡 → R4 方角 + 终端 → R5 切换入口、删旧实现。
+ * 这里**不允许**出现"如果风格是 X 就改成什么"的行内分支 —— 那是旧实现变成 2000 行函数的原因。
+ *
+ * 手表上换风格的唯一入口也在本文件：底部官方 [EdgeButton]（文案「风格」）打开
+ * [SettingsV2StylePicker] 覆盖层，选中后通过 [onStyleSelected] 回传给宿主落库。
  */
 @Composable
 fun SettingsV2Screen(
     style: SettingsV2Style,
     sections: List<SettingsV2Section> = SettingsV2SampleData.root(),
     modifier: Modifier = Modifier,
+    onStyleSelected: ((SettingsV2Style) -> Unit)? = null,
 ) {
     val identity = style.identity
+    var pickerOpen by remember { mutableStateOf(false) }
+
     // 宽度策略：Standard（其余四套）统一 176dp 居中；ARC 贴边满宽（它的辨识度就来自贴边）
     val widthModifier = when (identity.width) {
         RowWidthPolicy.Standard -> Modifier.width(SettingsV2StandardWidth)
         RowWidthPolicy.EdgeToEdge -> Modifier.fillMaxWidth()
     }
-    // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
-    // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
-    key(style) {
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(identity.pageBackground),
         contentAlignment = Alignment.TopCenter,
     ) {
+        // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
+        // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
+        key(style) {
+            // 底部留 40dp：给下缘的「风格」EdgeButton 让位，避免它盖住最后一行
+            val contentModifier = widthModifier.fillMaxSize().padding(bottom = 40.dp)
             when (style) {
-            SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = widthModifier)
-            SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = widthModifier)
-            SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = widthModifier)
-            SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = widthModifier)
-            SettingsV2Style.TERMINAL -> TerminalSettings(sections = sections, modifier = widthModifier)
-            // R2~R4 逐个补齐；在此之前明确显示"这套还没做"，而不是假装它是别的风格。
-            else -> Text(
-                text = style.label + "：渲染待实现（R2~R4）",
-                color = Color(0xFF9AA4AF),
-                style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(16.dp),
-                )
+                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier)
+                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier)
+                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier)
+                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier)
+                SettingsV2Style.TERMINAL -> TerminalSettings(sections = sections, modifier = contentModifier)
+            }
         }
+
+        // 手表上换风格的唯一入口（官方 EdgeButton 的典型用途：贴屏幕下缘的操作）
+        // 用 CompactButton 而不是 EdgeButton：EdgeButton 的尺寸是内部参数、默认太大（实测压住最后一行），
+        // CompactButton 是官方小圆按钮，作为换风格入口存在感合适。
+        CompactButton(
+            onClick = { pickerOpen = true },
+            // EdgeButton 的尺寸是内部参数（无公开 size 形参），改为给内容留 40dp 底部间距，
+            // 由内容避让按钮，而不是缩小按钮（官方组件保持默认形态）
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Text(text = "风格", style = MaterialTheme.typography.labelMedium)
+        }
+
+        if (pickerOpen) {
+            SettingsV2StylePicker(
+                current = style,
+                onPick = { picked ->
+                    onStyleSelected?.invoke(picked)
+                    pickerOpen = false
+                },
+                onDismiss = { pickerOpen = false },
+            )
         }
     }
 }
-
-/** 除 ARC 贴边外的四套：卡片/行统一宽度（dp）。 */
-val SettingsV2StandardWidth = 176.dp

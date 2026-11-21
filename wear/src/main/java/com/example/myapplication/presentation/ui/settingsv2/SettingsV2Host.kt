@@ -42,6 +42,24 @@ fun SettingsV2Host(
     // 内容也随 revision 重读：控制台改完偏好会 bump，于是模型名/温度等实值行会跟着变
     val sections = remember(revision) { SettingsV2SampleData.fromPreferences(preferences) }
     MaterialTheme {
-        SettingsV2Screen(style = style, sections = sections, modifier = modifier.fillMaxSize())
+        SettingsV2Screen(
+            style = style,
+            sections = sections,
+            modifier = modifier.fillMaxSize(),
+            onStyleSelected = { picked ->
+                // 落库 + 广播：preferences 是唯一真源，bump 之后宿主会按新风格重组
+                preferences.settingsStyle = picked.toLegacy()
+                com.example.myapplication.agent.SettingsChangeBus.bump()
+            },
+        )
     }
+}
+
+/** V2 风格 -> 旧枚举（偏好里存的是旧枚举）。 */
+fun SettingsV2Style.toLegacy(): SettingsStyle = when (this) {
+    SettingsV2Style.M3_CARD -> SettingsStyle.BALLOON
+    SettingsV2Style.M3_LIST -> SettingsStyle.M3_LIST
+    SettingsV2Style.ARC -> SettingsStyle.ARC
+    SettingsV2Style.SQUARE -> SettingsStyle.SQUARE
+    SettingsV2Style.TERMINAL -> SettingsStyle.TERMINAL
 }
