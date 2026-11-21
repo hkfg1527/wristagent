@@ -73,6 +73,11 @@ class SquareAndTerminalStyleTest {
             TerminalForeground
         )
         assertFalse("终端必须关闭磁滑吸附（连续滚动）", SettingsV2Style.TERMINAL.identity.snapScroll)
+        // 48dp 触控下限：真机实测旧值 40dp 时行距只有 46dp
+        assertTrue(
+            "终端行高必须 >=48dp（实测旧值 40dp 时行距仅 46dp）",
+            SettingsV2Style.TERMINAL.identity.rowMinHeight.value >= 48f
+        )
 
         compose.setContent { MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL) } }
         compose.waitForIdle()

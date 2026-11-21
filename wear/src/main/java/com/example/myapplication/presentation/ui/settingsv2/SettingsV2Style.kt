@@ -102,7 +102,8 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             surface = Color(0x00000000),
             titleColor = Color(0xFF3BFF9A),
             subtitleColor = Color(0xFF1E7A4E),
-            rowMinHeight = 40.dp,
+            // 48dp 是触控下限：等宽终端行原来是 40dp，真机实测行距只有 46dp（低于下限），改为 48dp
+            rowMinHeight = 48.dp,
             dividers = false,
             centeredText = false,
             snapScroll = false
