@@ -49,9 +49,21 @@ internal val SquareHairline = Color(0xFF3A4048)
 /** 发丝线厚度：**1px**（density 2.0 下即 0.5dp）。 */
 internal val SquareHairlineHeight = 0.5.dp
 
-/** 方角行的最小高度。 */
-// 48dp 是触控下限，不能再小；与 M3_LIST 的区分靠居中分区头 + 更亮的发丝线
-internal val SquareRowMinHeight = 48.dp
+/** 发丝线左右内缩（M3_LIST 是通栏线，本套内缩，两套的线性策略必须不同）。 */
+internal val SquareHairlineInset = 12.dp
+
+/**
+ * 方角行的最小高度。
+ *
+ * 48dp 只是触控下限，撑不起"与官方列表是两套东西"：M3_LIST 行距 57dp、本套曾是 56dp，
+ * 差 2px 一屏根本看不出区别。真机先试 60dp（行距 130px = 65dp，仍只差 16px < 判据的 24px），
+ * 再提到 70dp。
+ *
+ * **只有一个来源**：值取自 `SettingsV2Style.SQUARE.identity.rowMinHeight`。
+ * 曾经这里硬写 48dp、identity 里也写 48dp，改成 60dp 时只改了一处，
+ * `squareIsLooserThanM3ListByAtLeastTwelveDp` 立刻红灯（identity 仍是 48dp）。
+ */
+internal val SquareRowMinHeight = SettingsV2Style.SQUARE.identity.rowMinHeight
 
 /**
  * `SQUARE`：方角档 —— 0 圆角 + **1px 发丝线**，无卡面。
@@ -125,7 +137,8 @@ fun SquareSettings(
                             Text(
                                 text = row.title,
                                 color = identity.titleColor,
-                                style = MaterialTheme.typography.labelMedium,
+                                // titleSmall 比 M3_LIST 的 labelMedium 高一档：两套连"字级"都不同
+                                style = MaterialTheme.typography.titleSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -161,10 +174,13 @@ fun SquareSettings(
                                 is RowTrailing.Chevron, RowTrailing.None -> Unit
                             }
                         }
-                        // 1px 发丝线（0.5dp @ density 2.0）
+                        // 1px 发丝线（0.5dp @ density 2.0）。
+                        // **内缩 12dp**：M3_LIST 的线是通栏的，这一条内缩，两套的"线性"策略必须不同，
+                        // 否则同屏只剩对齐差异（判据见 SquareAndTerminalStyleTest 与 docs/UI-EVIDENCE.md）
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(horizontal = SquareHairlineInset)
                                 .height(SquareHairlineHeight)
                                 .background(SquareHairline),
                         )

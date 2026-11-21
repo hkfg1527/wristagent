@@ -83,7 +83,10 @@ enum class SettingsV2Style(val label: String, val summary: String, val identity:
             surface = Color(0x00000000),
             titleColor = Color(0xFFF2F4F7),
             subtitleColor = Color(0xFF9AA4AF),
-            rowMinHeight = 48.dp,
+            // 70dp：M3_LIST 是 48dp，两套只差 2px 时同屏分不出来。
+            // 先试 60dp（真机行距 130px = 65dp，与 M3_LIST 的 114px 只差 16px，未达 ≥24px 的判据），
+            // 故再提一档到 70dp。
+            rowMinHeight = 70.dp,
             dividers = true,
             centeredText = true,
             snapScroll = true

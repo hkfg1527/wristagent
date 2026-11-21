@@ -20,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * R4：`SQUARE` 与 `TERMINAL` 两套的判据。
@@ -56,6 +57,51 @@ class SquareAndTerminalStyleTest {
         assertTrue(
             "方角档必须画出带 testTag 的行",
             compose.onAllNodesWithTag("square-row").fetchSemanticsNodes().isNotEmpty()
+        )
+    }
+
+    /**
+     * R13：SQUARE 与 M3_LIST 必须在**行距**上就能分开，不能只靠对齐差异。
+     *
+     * 真机曾实测两套行距 112px(56.0dp) vs 114px(57.0dp) —— 差 2px，同屏无法区分。
+     * 判据：行高差 ≥12dp（真机行距差 ≈24px），且方角档不得低于 48dp 触控下限。
+     */
+    @Test
+    fun squareIsLooserThanM3ListByAtLeastTwelveDp() {
+        val square = SettingsV2Style.SQUARE.identity.rowMinHeight.value
+        val list = SettingsV2Style.M3_LIST.identity.rowMinHeight.value
+        assertTrue(
+            "方角行高必须仍是触控下限以上：$square",
+            square >= 48f
+        )
+        assertTrue(
+            "方角(${square}dp) 与官方列表(${list}dp) 的行高差必须 ≥12dp，否则一屏看不出区别",
+            square - list >= 12f
+        )
+    }
+
+    /**
+     * R13：分隔线的**策略**必须不同 —— 官方列表通栏，方角内缩。
+     *
+     * 这条用源码守卫锁住：两套的线都通栏时，同屏只剩"标题居中"一处差异（真机实测两套行距
+     * 差 2px 时就是这样）。守卫读源码，防止以后有人"统一一下"把它们改成一样。
+     */
+    @Test
+    fun squareHairlineIsInsetWhileTheOfficialListIsFullBleed() {
+        fun src(rel: String): String = sequenceOf(File("."), File("wear"), File("../wear"))
+            .map { it.absoluteFile }
+            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/$rel") }
+            .first { it.exists() }
+            .readText()
+        val square = src("SquareStyle.kt")
+        val list = src("M3ListStyle.kt")
+        assertTrue(
+            "方角发丝线必须内缩（padding(horizontal = SquareHairlineInset)）",
+            square.contains("padding(horizontal = SquareHairlineInset)")
+        )
+        assertTrue(
+            "官方列表的发丝线必须保持通栏，不能也内缩",
+            !list.contains("SquareHairlineInset")
         )
     }
 

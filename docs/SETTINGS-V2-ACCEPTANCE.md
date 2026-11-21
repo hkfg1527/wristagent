@@ -33,7 +33,8 @@
 |---|---|---|
 | 除 ARC 外同宽 176dp | `SettingsV2CardWidthTest`（4 条） | 卡宽 = 176dp；M3_CARD 一屏 1 张 + 第二张露头 |
 | ARC 贴边（允许超 176dp） | `ArcStyleTest`（卡宽 > 176dp、左缘 ≤8px、安全边距 26dp） | 左缘 3.24~7.05px |
-| 行高 ≥48dp（触控） | `SquareAndTerminalStyleTest` / `M3ListStyleTest` | SQUARE 48dp、M3_LIST 57dp、TERMINAL 48dp（0.0.0.193 前为 40dp 容器/行距 46dp，已改；实测行距 92px→**104px/52.0dp**） |
+| 行高 ≥48dp（触控） | `SquareAndTerminalStyleTest` / `M3ListStyleTest` | SQUARE **70dp**（0.0.0.195 起，原 48dp）、M3_LIST 48dp、TERMINAL 48dp（0.0.0.193 起，原 40dp 容器/行距 46dp → 实测 **104px/52.0dp**） |
+| M3_LIST vs SQUARE 可区分 | `squareIsLooserThanM3ListByAtLeastTwelveDp`（行高差 ≥12dp）+ `squareHairlineIsInsetWhileTheOfficialListIsFullBleed`（策略守卫） | 行距 114px/57dp vs **150px/75dp**（差 36px/18dp）；分隔线 304px×2px 通栏 vs **253px×1px** 内缩（每侧 25px） |
 | 华为页边距 | `ArcStyleTest`（26/20/6/40vp 常量） | 尾留白实测：末行底部距屏底 **138px = 69dp**（无尾留白时约 29dp） |
 | 不硬编码字号 | 架构守卫（除 TERMINAL 外禁止 `sp`） | 通过 |
 
