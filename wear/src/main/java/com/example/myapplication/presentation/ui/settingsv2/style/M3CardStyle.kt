@@ -75,7 +75,9 @@ fun M3CardSettings(
                     .enterAppearance(enter, motion),
                 shape = shape,
                 colors = CardDefaults.cardColors(containerColor = identity.surface),
-                contentPadding = PaddingValues(12.dp),
+                // 卡内边距 12dp -> 10dp、标题下留白 6dp -> 2dp、行竖向留白 3dp -> 2dp：
+                // 目标是让第二张卡在 466px 屏上露出更多，暗示"下面还有"（实测原卡高 205dp，屏高 233dp）
+                contentPadding = PaddingValues(10.dp),
                 transformation = SurfaceTransformation(transformationSpec),
             ) {
                 Text(
@@ -83,7 +85,7 @@ fun M3CardSettings(
                     color = identity.titleColor,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(Modifier.heightIn(min = 6.dp))
+                Spacer(Modifier.heightIn(min = 2.dp))
                 section.rows.forEach { row ->
                     M3CardRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
                 }
@@ -104,7 +106,7 @@ private fun M3CardRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 40.dp)
-            .padding(vertical = 3.dp),
+            .padding(vertical = 2.dp),
     ) {
         Text(
             text = row.title,
