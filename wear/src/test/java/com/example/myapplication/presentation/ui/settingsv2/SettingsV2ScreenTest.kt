@@ -5,12 +5,14 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.wear.compose.material3.MaterialTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * V2 第一套（`M3_CARD` 大卡片）的判据。
@@ -79,6 +81,37 @@ class SettingsV2ScreenTest {
         assertTrue(
             "大卡片档必须存在高度 ≥140dp 的卡片（Google Health 那种一屏一两张）",
             tall.isNotEmpty()
+        )
+    }
+
+    /**
+     * R14：底部为「风格」按钮让出的内边距必须是 48dp，且内容必须被裁剪。
+     *
+     * 真机实测（0.0.0.195）：按钮可点击节点 `[177,370][289,466]`（96px = 48dp 高，顶边 370）；
+     * 列表 `scrollable` 节点底边 386（= 466 - 40dp×2）；而末行右值 `BALANCED` 被画在
+     * `[90,411][376,442]` —— **超出列表边界 56px**，从按钮底下穿出来。
+     * 原因：`TransformingLazyColumn` 不裁剪，加上 40dp 内边距比按钮矮 16px。
+     */
+    @Test
+    fun bottomInsetMatchesTheStyleButtonAndContentIsClipped() {
+        assertEquals(
+            "底部内边距必须等于按钮高度 48dp（真机量得按钮 96px 高）",
+            48f,
+            SettingsV2ContentBottomInset.value,
+            0.01f
+        )
+        val src = sequenceOf(File("."), File("wear"), File("../wear"))
+            .map { it.absoluteFile }
+            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
+            .first { it.exists() }
+            .readText()
+        assertTrue(
+            "内容必须 clipToBounds()：TransformingLazyColumn 会把行画到边界之外",
+            src.contains("clipToBounds()")
+        )
+        assertTrue(
+            "底部内边距必须走 SettingsV2ContentBottomInset 常量，不许再写魔法数字 40.dp",
+            !src.contains("padding(bottom = 40.dp)")
         )
     }
 }

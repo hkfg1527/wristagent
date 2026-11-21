@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -26,6 +27,14 @@ import com.example.myapplication.presentation.ui.settingsv2.style.TerminalSettin
 
 /** 除 ARC 贴边外的四套：卡片/行统一宽度（dp）。 */
 val SettingsV2StandardWidth = 176.dp
+
+/**
+ * 底部给「风格」按钮让出的高度。
+ *
+ * 48dp 不是拍的：真机实测按钮（可点击节点）bounds 为 `[177,370][289,466]`，高 **96px = 48dp**，
+ * 顶边在 y=370。原值 40dp 让列表底落在 y=386，比按钮顶边低 16px，于是列表最后一行从按钮底下穿出来。
+ */
+val SettingsV2ContentBottomInset = 48.dp
 
 /**
  * 设置页 V2 的唯一入口。
@@ -63,8 +72,14 @@ fun SettingsV2Screen(
         // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
         // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
         key(style) {
-            // 底部留 40dp：给下缘的「风格」EdgeButton 让位，避免它盖住最后一行
-            val contentModifier = widthModifier.fillMaxSize().padding(bottom = 40.dp)
+            // 底部留 [SettingsV2ContentBottomInset]：给下缘的「风格」按钮让位。
+            // **clipToBounds 必须在 padding 之后**：修饰符按链序生效，放在 padding 之前时
+            // 裁剪点仍是整屏高度（真机实测 y=378 处照样有墨迹），放到之后才裁在 y=370。
+            // 另外 TransformingLazyColumn 会把行画到自己的边界之外，所以必须裁。
+            val contentModifier = widthModifier
+                .fillMaxSize()
+                .padding(bottom = SettingsV2ContentBottomInset)
+                .clipToBounds()
             when (style) {
                 SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier)
                 SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier)

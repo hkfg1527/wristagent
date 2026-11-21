@@ -37,6 +37,7 @@
 | M3_LIST vs SQUARE 可区分 | `squareIsLooserThanM3ListByAtLeastTwelveDp`（行高差 ≥12dp）+ `squareHairlineIsInsetWhileTheOfficialListIsFullBleed`（策略守卫） | 行距 114px/57dp vs **150px/75dp**（差 36px/18dp）；分隔线 304px×2px 通栏 vs **253px×1px** 内缩（每侧 25px） |
 | 华为页边距 | `ArcStyleTest`（26/20/6/40vp 常量） | 尾留白实测：末行底部距屏底 **138px = 69dp**（无尾留白时约 29dp） |
 | 不硬编码字号 | 架构守卫（除 TERMINAL 外禁止 `sp`） | 通过 |
+| 底部按钮不压内容 | `bottomInsetMatchesTheStyleButtonAndContentIsClipped`（常量 48dp + 源码守卫 `clipToBounds()`） | 列表底 386→**370**，与按钮顶边齐平；按钮框外亮像素 **905 → 0** |
 
 ## 4. 真实数据
 
