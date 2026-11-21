@@ -1,23 +1,31 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -33,25 +41,49 @@ import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnter
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
+import kotlinx.coroutines.delay
 
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
 
-/** 行首提示符（选中行用双尖括号由数据层决定，这里只负责单尖括号前缀）。 */
+/** 提示符：真的终端就是 `> `。 */
 internal const val TerminalPrompt = "> "
 
+/** 块光标字符（真终端的实心光标，不是 UI 下划线）。 */
+internal const val TerminalCursorBlock = "█"
+
 /** 终端等宽字号。 */
-internal val TerminalFontSize = 13.sp
+internal val TerminalFontSize = 12.sp
+
+/**
+ * 终端行高（**行网格**）。
+ *
+ * 这是"像 UI 还是像终端"的分水岭：原来每行是 `heightIn(min = 48dp)` + 上下 4dp 的卡片式留白，
+ * 真机行距 104px（52dp），一屏只放得下 4 行 —— 那是列表，不是终端。
+ * 终端是字符网格：行高 18dp（density 2.0 下 36px），一屏 12 行，字号 12sp。
+ */
+internal val TerminalLineHeight = 18.dp
+
+/** ASCII 滚动条字符（真 TUI 的滚动条是画出来的字符，不是圆角滑块）。 */
+internal const val TerminalThumbCell = "▓"
+internal const val TerminalTrackCell = "░"
 
 /** 终端背景/前景的测试常量（必须与 StyleIdentity 一致）。 */
 internal val TerminalBackground = SettingsV2Style.TERMINAL.identity.pageBackground
 internal val TerminalForeground = SettingsV2Style.TERMINAL.identity.titleColor
 
 /**
- * `TERMINAL`：近黑底 + 等宽绿字 + `> ` 前缀。
+ * `TERMINAL`：**按真终端做**，不是"长得像终端的列表"。
  *
- * 这套**不吸附**（`snapScroll = false`）：命令行是连续滚动的，逐行吸附会破坏"日志流"的感觉。
- * 所以这里不传 `snapFlingBehavior`，用 `TransformingLazyColumn` 的默认惯性。
+ * 三条硬约束（判据见 `TerminalStyleTest`）：
+ * 1. **字符行网格**：所有文本行共用 [TerminalLineHeight]，一屏 12 行，行与行之间没有"卡片留白"；
+ * 2. **单行制**：一行里 `> 标题` 与值同行（值右对齐成一列），副标题另起一行但仍在同一网格上；
+ * 3. **零 M3 控件**：不用卡片 / 胶囊开关 / 按钮 / 表面容器 —— 开关写成 `[ ON ]`，
+ *    跳转写成 `/open`，全部是等宽字符（守卫见 `terminalUsesNoMaterialComponents`）。
+ *
+ * 另外两处"终端语言"：右侧 `▓/░` ASCII 滚动条、末行 `> █` 块光标（1s 一循环闪烁）。
+ *
+ * 这套**不吸附**（TERMINAL 的 `snapScroll = false`）：终端是连续日志流，逐行吸附会破坏它。
  */
 @Composable
 fun TerminalSettings(
@@ -60,73 +92,226 @@ fun TerminalSettings(
 ) {
     val identity = SettingsV2Style.TERMINAL.identity
     val state = rememberTransformingLazyColumnState()
-    val rowStyle = TextStyle(
+
+    val lineStyle = TextStyle(
         color = identity.titleColor,
         fontFamily = FontFamily.Monospace,
         fontSize = TerminalFontSize,
+        // 必须显式给 lineHeight：等宽字体默认行高约 22sp，会把 18dp(36px) 的行撑到 44px，
+        // 真机实测行距 44px（应为 36px）。这里让它与行网格严格一致。
+        lineHeight = TerminalLineHeight.value.sp,
     )
-    val headStyle = TextStyle(
+    val dimStyle = TextStyle(
         color = identity.subtitleColor,
         fontFamily = FontFamily.Monospace,
-        fontSize = 11.sp,
+        fontSize = TerminalFontSize,
+        lineHeight = TerminalLineHeight.value.sp,
     )
+
+    // 一屏行数：视口高度 / 行高（供 ASCII 滚动条算滑块位置；除不尽时取整，不追求像素级）
+    val totalItems = remember(sections) {
+        sections.sumOf { 1 + it.rows.size } + 1 // +1 = 末行提示符
+    }
+
     Box(modifier = modifier.fillMaxSize().background(identity.pageBackground)) {
         TransformingLazyColumn(
             state = state,
-            // 无 snapFling：连续滚动
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            // 无 snapFling：终端连续滚动
+            contentPadding = PaddingValues(start = 10.dp, end = 16.dp, top = 4.dp, bottom = 26.dp),
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
+                    // 分区头 = 终端的注释行，用暗绿，让它看起来像输出的一部分
                     BasicText(
                         text = "# " + section.title,
-                        style = headStyle,
+                        style = dimStyle,
+                        maxLines = 1,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 4.dp),
+                            .height(TerminalLineHeight),
                     )
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
-                val enter = rememberEnterProgress(rowIndex, motion)
-                val edge = rememberEdgeDistance()
-                    // 终端也改两行堆叠：提示符+标题一行，右值一行（缩进 12dp 表达从属）
+                    val motion = SettingsV2Motions.of(SettingsV2Style.TERMINAL)
+                    val enter = rememberEnterProgress(rowIndex, motion)
+                    val edge = rememberEdgeDistance()
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = identity.rowMinHeight)
                             .enterAppearance(enter, motion)
                             .reportEdgeDistance(edge)
                             .edgeAppearance(edge.value, motion)
-                            .padding(vertical = 4.dp)
                             .testTag(TerminalRowTag),
                     ) {
-                        BasicText(text = TerminalPrompt + row.title, style = rowStyle)
+                        TerminalLine(
+                            row = row,
+                            lineStyle = lineStyle,
+                            dimStyle = dimStyle,
+                        )
+                        // 副标题另起一行，仍落在同一网格上：`  └ 说明`
                         row.subtitle?.let {
                             BasicText(
-                                text = "# " + it,
-                                style = headStyle,
-                                modifier = Modifier.padding(start = 12.dp),
-                            )
-                        }
-                        when (val trailing = row.trailing) {
-                            is RowTrailing.Value -> BasicText(
-                                text = trailing.text,
-                                style = rowStyle,
+                                text = "  └ $it",
+                                style = dimStyle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 12.dp),
+                                    .height(TerminalLineHeight),
                             )
-                            is RowTrailing.Toggle -> BasicText(
-                                text = if (trailing.checked) "[ ON ]" else "[ OFF ]",
-                                style = rowStyle,
-                                modifier = Modifier.padding(start = 12.dp),
-                            )
-                            is RowTrailing.Chevron, RowTrailing.None -> Unit
                         }
                     }
                 }
             }
+            // 末行不放进列表：真终端的提示符是**钉在底部**的，不该跟着内容滚走
+        }
+        // 钉在底部的状态条：`> █`（块光标），整行不透明，内容从其后方滚过
+        TerminalPromptLine(
+            lineStyle = lineStyle,
+            modifier = Modifier.align(Alignment.BottomStart),
+        )
+        TerminalScrollBar(
+            anchorIndex = state.anchorItemIndex,
+            totalItems = totalItems,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(10.dp)
+                .padding(top = 4.dp, bottom = 4.dp, end = 2.dp),
+        )
+    }
+}
+
+/**
+ * 单行制的一行：`> 标题` 靠左，值/开关靠右对齐成同一列。
+ *
+ * 为什么用 `weight(1f) + TextAlign.End` 而不是"补空格到固定列"：等宽字体里中文是双宽字形，
+ * 按字符数补空格算不准列宽；两者在真机上的效果都是"值右对齐成一条竖线"，后者更可靠。
+ */
+@Composable
+private fun TerminalLine(
+    row: SettingsV2Row,
+    lineStyle: TextStyle,
+    dimStyle: TextStyle,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TerminalLineHeight),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        // 标题占剩余宽度（超出就自己截断，别挤值列）；值取**固有宽度**，靠 SpaceBetween 推到最右。
+        // 不能用 fillMaxWidth(0.62f)：Row 里它算的是"扣掉标题后的剩余宽度"，
+        // 真机上把 deepseek-v4-pro 截成了 `deepseek-`、BALANCED 截成了 `BALANCE`。
+        BasicText(
+            text = TerminalPrompt + row.title,
+            style = lineStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        // 真终端里没有胶囊开关：开关是 `[ ON ] / [ OFF ]`，跳转是 `/open`
+        val right: Pair<String, Boolean>? = when (val trailing = row.trailing) {
+            is RowTrailing.Value -> trailing.text to false
+            is RowTrailing.Toggle -> (if (trailing.checked) "[ ON  ]" else "[ OFF ]") to false
+            is RowTrailing.Chevron -> "/open" to true
+            RowTrailing.None -> null
+        }
+        if (right != null) {
+            BasicText(
+                text = right.first,
+                // BasicText 没有 textAlign 形参：对齐必须写在 TextStyle 里
+                style = (if (right.second) dimStyle else lineStyle)
+                    .copy(textAlign = TextAlign.End),
+                maxLines = 1,
+            )
         }
     }
 }
+
+/**
+ * 末行：`> █`，进场闪 5 次后常亮。
+ *
+ * **为什么不无限闪烁**：无限动画会让界面永远不进入 idle 状态，`uiautomator dump` 直接报
+ * `ERROR: could not get idle state`，于是 release-check / style-shots 的取数链路全断
+ * （实测 6/8，两条检查拿不到文本）。折中：进场 2.4s 内闪 5 次（有"终端刚起来"的活感），
+ * 之后常亮，界面恢复 idle 可取证。
+ */
+@Composable
+private fun TerminalPromptLine(
+    lineStyle: TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    var cursorOn by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        repeat(5) {
+            delay(480)
+            cursorOn = !cursorOn
+        }
+        cursorOn = true
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(TerminalLineHeight)
+            // 整行不透明：内容从输入行后面滚过去，这是真终端的行为。
+            // 第一版只给文字铺了底色（还铺在 height 之前），结果块光标照样压在 `> 安全策略` 上。
+            .background(SettingsV2Style.TERMINAL.identity.pageBackground)
+            .testTag(TerminalPromptTag),
+    ) {
+        BasicText(
+            text = TerminalPrompt + if (cursorOn) TerminalCursorBlock else " ",
+            style = lineStyle,
+            maxLines = 1,
+            // 内边距加在文字上（不是 Box 上），否则底色会被一起缩进去
+            modifier = Modifier.padding(start = 10.dp),
+        )
+    }
+}
+
+/**
+ * 右侧 ASCII 滚动条：`▓` 是滑块、`░` 是轨道，一列字符，不画任何图形。
+ *
+ * 行数固定 12，滑块位置由锚点项在总项数中的比例决定（不求精确，求"像 TUI"）。
+ */
+@Composable
+private fun TerminalScrollBar(
+    anchorIndex: Int,
+    totalItems: Int,
+    modifier: Modifier = Modifier,
+) {
+    val cells = 12
+    val thumbSize = ((cells.toFloat() * cells) / totalItems.coerceAtLeast(cells))
+        .toInt().coerceIn(1, cells)
+    val maxStart = (cells - thumbSize).coerceAtLeast(0)
+    val progress = if (totalItems > cells) {
+        (anchorIndex.toFloat() / (totalItems - cells).toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val thumbStart = (progress * maxStart).toInt().coerceIn(0, maxStart)
+    val bar = buildString {
+        repeat(cells) { i ->
+            append(if (i in thumbStart until (thumbStart + thumbSize)) TerminalThumbCell else TerminalTrackCell)
+            if (i != cells - 1) append('\n')
+        }
+    }
+    BasicText(
+        text = bar,
+        style = TextStyle(
+            color = SettingsV2Style.TERMINAL.identity.subtitleColor,
+            fontFamily = FontFamily.Monospace,
+            fontSize = TerminalFontSize,
+            lineHeight = TerminalLineHeight.value.sp,
+        ),
+        maxLines = cells,
+        modifier = modifier.testTag(TerminalScrollBarTag),
+    )
+}
+
+/** ASCII 滚动条的测试标识。 */
+internal const val TerminalScrollBarTag = "terminal-scrollbar"
+
+/** 底部提示符的测试标识。 */
+internal const val TerminalPromptTag = "terminal-prompt"

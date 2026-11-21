@@ -10,8 +10,11 @@ import com.example.myapplication.presentation.ui.settingsv2.style.SquareHairline
 import com.example.myapplication.presentation.ui.settingsv2.style.SquareRowMinHeight
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalBackground
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalForeground
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalLineHeight
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalPrompt
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalPromptTag
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalRowTag
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalScrollBarTag
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -119,22 +122,81 @@ class SquareAndTerminalStyleTest {
             TerminalForeground
         )
         assertFalse("终端必须关闭磁滑吸附（连续滚动）", SettingsV2Style.TERMINAL.identity.snapScroll)
-        // 48dp 触控下限：真机实测旧值 40dp 时行距只有 46dp
+        // 判据换了：48dp 是"触控目标"的下限，而终端行不是触控目标（点击由滚动面上的其它入口负责）。
+        // 真终端是字符网格：行高 18dp（36px），一屏 12 行。旧口径让它退化成"一屏 4 行的列表"。
+        assertEquals(
+            "终端行高必须落在字符网格上（18dp = 36px）",
+            18f,
+            TerminalLineHeight.value,
+            0.01f
+        )
         assertTrue(
-            "终端行高必须 >=48dp（实测旧值 40dp 时行距仅 46dp）",
-            SettingsV2Style.TERMINAL.identity.rowMinHeight.value >= 48f
+            "一屏必须能放 ≥10 行（高度 466px / 36px ≈ 12 行），否则又变回列表",
+            466f / (TerminalLineHeight.value * 2f) >= 10f
+        )
+        assertTrue(
+            "终端行高不得低于 16dp（再低等宽字会挤在一起）",
+            TerminalLineHeight.value >= 16f
         )
 
         compose.setContent { MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL) } }
         compose.waitForIdle()
         assertTrue(
             "终端行必须以 '> ' 开头",
-            compose.onAllNodesWithText("> 供应商", substring = true).fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodesWithText(">", substring = true).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText(">", substring = true).fetchSemanticsNodes().isNotEmpty()
         )
         assertTrue(
             "终端必须画出带 testTag 的行",
             compose.onAllNodesWithTag(TerminalRowTag).fetchSemanticsNodes().isNotEmpty()
         )
+        assertTrue(
+            "终端必须画出 ASCII 滚动条",
+            compose.onAllNodesWithTag(TerminalScrollBarTag).fetchSemanticsNodes().isNotEmpty()
+        )
+        assertTrue(
+            "提示符必须钉在底部（独立节点，不随内容滚走）",
+            compose.onAllNodesWithTag(TerminalPromptTag).fetchSemanticsNodes().isNotEmpty()
+        )
+        assertTrue(
+            "终端的换风格入口必须存在且是同一个 tag",
+            compose.onAllNodesWithTag(StyleEntryTag).fetchSemanticsNodes().isNotEmpty()
+        )
+    }
+
+    /**
+     * R15：TERMINAL 的换风格入口必须是**字符命令**，不是胶囊按钮。
+     *
+     * 真机上第一个版本没换，那颗药丸在满屏等宽绿字里一眼就出戏。
+     */
+    @Test
+    fun terminalStyleEntryIsACharacterCommand() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
+            .readText()
+        assertTrue("终端入口必须是 `[ 风格 ]` 字符命令", src.contains("[ 风格 ]"))
+        assertTrue("终端分支必须与 style == TERMINAL 绑定", src.contains("style == SettingsV2Style.TERMINAL"))
+    }
+
+    /**
+     * R15：TERMINAL 必须**零 M3 控件**。
+     *
+     * "像终端"不是换个等宽字体就完了：胶囊开关、圆角卡片、按钮的呼吸感一出现，立刻退回"像终端的 UI"。
+     * 这条用源码守卫把它们挡在外面（真机 dump 里开关显示为 `[ ON ]` 也由 [terminalTogglesAreCharacters] 钉住）。
+     */
+    @Test
+    fun terminalUsesNoMaterialComponents() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        // 只认"调用语法"（带左括号）：否则会误伤解释性注释
+        listOf("SwitchButton(", "CompactButton(", "Card(", "Surface(", "SurfaceTransformation(").forEach { forbidden ->
+            assertFalse(
+                "终端里不允许调用 $forbidden —— 那是 UI 的语法，不是终端的语法",
+                src.contains(forbidden)
+            )
+        }
+        assertTrue("开关必须渲染成字符 [ ON  ] / [ OFF ]", src.contains("[ ON  ]") && src.contains("[ OFF ]"))
+        assertTrue("末行必须是块光标 █", src.contains("TerminalCursorBlock"))
+        assertTrue("滚动条必须是 ASCII ▓/░", src.contains("TerminalThumbCell") && src.contains("TerminalTrackCell"))
     }
 }

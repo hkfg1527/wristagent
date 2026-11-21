@@ -1,11 +1,13 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -15,7 +17,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -35,6 +41,9 @@ val SettingsV2StandardWidth = 176.dp
  * 顶边在 y=370。原值 40dp 让列表底落在 y=386，比按钮顶边低 16px，于是列表最后一行从按钮底下穿出来。
  */
 val SettingsV2ContentBottomInset = 48.dp
+
+/** 换风格入口的测试标识（四套是胶囊按钮，TERMINAL 是 `[ 风格 ]` 字符命令，同一个 tag）。 */
+const val StyleEntryTag = "style-entry"
 
 /**
  * 设置页 V2 的唯一入口。
@@ -89,16 +98,30 @@ fun SettingsV2Screen(
             }
         }
 
-        // 手表上换风格的唯一入口（官方 EdgeButton 的典型用途：贴屏幕下缘的操作）
-        // 用 CompactButton 而不是 EdgeButton：EdgeButton 的尺寸是内部参数、默认太大（实测压住最后一行），
-        // CompactButton 是官方小圆按钮，作为换风格入口存在感合适。
-        CompactButton(
-            onClick = { pickerOpen = true },
-            // EdgeButton 的尺寸是内部参数（无公开 size 形参），改为给内容留 40dp 底部间距，
-            // 由内容避让按钮，而不是缩小按钮（官方组件保持默认形态）
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Text(text = "风格", style = MaterialTheme.typography.labelMedium)
+        // 手表上换风格的唯一入口。
+        // TERMINAL 例外：真终端里不能出现胶囊按钮，改成等宽字符命令 `[ 风格 ]`（同样可点）。
+        // EdgeButton 的尺寸是内部参数（无公开 size 形参），其余四套给内容留 48dp 底部间距由内容避让。
+        if (style == SettingsV2Style.TERMINAL) {
+            BasicText(
+                text = "[ 风格 ]",
+                style = TextStyle(
+                    color = SettingsV2Style.TERMINAL.identity.titleColor,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .clickable { pickerOpen = true }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .testTag(StyleEntryTag),
+            )
+        } else {
+            CompactButton(
+                onClick = { pickerOpen = true },
+                modifier = Modifier.align(Alignment.BottomCenter).testTag(StyleEntryTag),
+            ) {
+                Text(text = "风格", style = MaterialTheme.typography.labelMedium)
+            }
         }
 
         if (pickerOpen) {
