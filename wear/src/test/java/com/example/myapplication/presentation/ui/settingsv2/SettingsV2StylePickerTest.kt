@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.wear.compose.material3.MaterialTheme
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -88,6 +89,22 @@ class SettingsV2StylePickerTest {
             "M3_CARD 落库时沿用 BALLOON（历史值，保证老用户不丢风格）",
             com.example.myapplication.appearance.SettingsStyle.BALLOON,
             SettingsV2Style.M3_CARD.toLegacy()
+        )
+    }
+
+    @Test
+    fun thePickerBackgroundIsFullyOpaque() {
+        // 真机踩过：背景用 0xF2（95% 不透明）时，底层页面文字会 ghost 到覆盖层上
+        // （TERMINAL 底层时顶部出现 > 温度）。这条守卫钉住"必须全不透明"。
+        val src = sequenceOf(File("."), File("wear"), File("../wear"))
+            .map { it.absoluteFile }
+            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2StylePicker.kt") }
+            .first { it.exists() }
+            .readText()
+        assertTrue("覆盖层背景必须是全不透明的 0xFF000000", src.contains("Color(0xFF000000)"))
+        assertTrue(
+            "不允许再出现半透明背景（0xF2 之类）",
+            !Regex("""Color\\(0x(F[0-9A-F]|E[0-9A-F])000000\\)""").containsMatchIn(src)
         )
     }
 }
