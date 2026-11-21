@@ -144,6 +144,11 @@ fun TerminalSettings(
             .onRotaryScrollEvent { event ->
                 val (rest, lines) = rotaryLinesToScroll(rotaryRemainder, event.verticalScrollPixels, linePx)
                 rotaryRemainder = rest
+                // 取证用：表冠事件是否真的到达这里（真机 dump 位移为 0 时，靠这条日志区分"没到"与"到了没滚"）
+                android.util.Log.i(
+                    TerminalRotaryTag,
+                    "delta=${event.verticalScrollPixels} rest=$rest lines=$lines",
+                )
                 if (lines != 0) {
                     scope.launch { state.scrollBy(lines * linePx) }
                 }
@@ -424,3 +429,6 @@ internal fun rotaryLinesToScroll(
 
 /** 底部提示符的测试标识。 */
 internal const val TerminalPromptTag = "terminal-prompt"
+
+/** 表冠日志 tag（真机取证用）。 */
+internal const val TerminalRotaryTag = "TerminalRotary"
