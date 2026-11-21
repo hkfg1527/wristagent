@@ -68,8 +68,7 @@
 2. **TERMINAL 行高 46dp**：低于 48dp 触控下限（等宽行 + 4dp 上下留白），属风格取舍；若你要求统一 ≥48dp，我把行内 padding 调到 6dp。
 3. **选择器遮挡**：已在 SQUARE / TERMINAL 底层各截一张（`picker-square.png` / `picker-terminal.png`），
    据此发现覆盖层 95% 不透明时底层文字会 ghost（TERMINAL 下看到「&gt; 温度」），已改为全不透明并加源码守卫
-   `thePickerBackgroundIsFullyOpaque`；**但修复后的真机截图未拍**（手表 20:35 掉线）。
+   `thePickerBackgroundIsFullyOpaque`；**修复后已在真机确认**（`picker-opaque.png`，TERMINAL 底层打开选择器，顶部不再有 ghost 文字）。
 4. **ARC 尾留白**在滚动中途的表现未拍（只拍了到底）。
-5. **设备状态**：20:35 起 TicWatch（C101X35122973）从 adb 掉线，当前只有 9D90900007505378；
-   因此 0.0.0.190 的真机验证（release-check 8/8、五套重拍、选择器不透明化）全部**未验证**，
-   恢复连接后需补跑。
+5. **设备状态**：TicWatch 曾于 20:35 掉线，21:0x 恢复；恢复后已补跑 `release-check` **8/8**（0.0.0.191 装机）
+   与五套重拍（`distinct 5/5`，哈希与 0.0.0.188 一致 —— 选择器不透明化不影响页面本身）。
