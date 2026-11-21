@@ -147,8 +147,7 @@ fun TerminalSettings(
     val toggles = remember { mutableStateMapOf<String, Boolean>() }
     val echoes = remember { mutableStateListOf<String>() }
     fun pushEcho(line: String) {
-        echoes.add(line)
-        while (echoes.size > 3) echoes.removeAt(0)
+        appendCappedEcho(echoes, line)
     }
     // 执行一行：点它、或按 Enter 执行当前焦点行，走的是同一条逻辑
     fun activate(row: SettingsV2Row) {
@@ -604,6 +603,17 @@ internal const val TerminalPromptTag = "terminal-prompt"
 
 /** 表冠日志 tag（真机取证用）。 */
 internal const val TerminalRotaryTag = "TerminalRotary"
+
+/**
+ * 追加一行回显，并把总量压在 [cap] 行以内（真终端不会无限堆输出）。
+ *
+ * 抽成纯函数是为了能直接测：UI 层的"点四次再数节点"会受是否组合、是否在视口内影响，
+ * 判不了这条规则本身。
+ */
+internal fun appendCappedEcho(target: MutableList<String>, line: String, cap: Int = 3) {
+    target.add(line)
+    while (target.size > cap) target.removeAt(0)
+}
 
 /** ASCII 规则线的字符（`vim` / `less` 的 banner 分节）。 */
 internal const val TerminalRule = "─"

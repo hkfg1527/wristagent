@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalRowTag
+import com.example.myapplication.presentation.ui.settingsv2.style.appendCappedEcho
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -63,6 +65,26 @@ class TerminalInteractionTest {
             "执行后必须自动跟随到底，让回显可见",
             compose.onAllNodesWithText("# open", substring = true).fetchSemanticsNodes().isNotEmpty()
         )
+    }
+
+    /**
+     * R30：回显最多留 3 行（旧行被顶掉）。
+     *
+     * 测的是纯函数 [appendCappedEcho]：UI 层的"连点四次再数节点"会被"是否被组合/是否在视口内"干扰，
+     * 判不了这条规则本身。真机侧已复核：连点 4 次后 dump 里回显 2 行（≤3）。
+     */
+    @Test
+    fun echoesAreCappedAtThreeLines() {
+        val echoes = mutableListOf<String>()
+        appendCappedEcho(echoes, "# a -> ON")
+        appendCappedEcho(echoes, "# b -> OFF")
+        assertEquals(2, echoes.size)
+        appendCappedEcho(echoes, "# c -> ON")
+        appendCappedEcho(echoes, "# d -> OFF")
+        assertEquals("上限 3 行", 3, echoes.size)
+        assertEquals("最旧的被顶掉", listOf("# b -> OFF", "# c -> ON", "# d -> OFF"), echoes.toList())
+        appendCappedEcho(echoes, "# e -> ON", cap = 1)
+        assertEquals("cap 可注入", listOf("# e -> ON"), echoes.toList())
     }
 
     @Test
