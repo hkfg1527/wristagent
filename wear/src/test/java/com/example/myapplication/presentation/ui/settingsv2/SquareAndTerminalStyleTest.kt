@@ -164,17 +164,24 @@ class SquareAndTerminalStyleTest {
     }
 
     /**
-     * R15：TERMINAL 的换风格入口必须是**字符命令**，不是胶囊按钮。
+     * R15/R26：TERMINAL 的换风格入口必须是**字符命令**，不是胶囊按钮，而且长在终端的底栏里。
      *
-     * 真机上第一个版本没换，那颗药丸在满屏等宽绿字里一眼就出戏。
+     * 第一版它浮在屏幕右下角当独立控件（真机截图里一眼出戏）；R26 起收进底栏，与 `[n/4] 12L`
+     * 同一行 —— 真终端的底栏就是一行。所以断言跟着挪位置，但"必须不是胶囊"这条没变。
      */
     @Test
     fun terminalStyleEntryIsACharacterCommand() {
-        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt")
-            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
+        fun src(rel: String) = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/$rel")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/$rel") }
             .readText()
-        assertTrue("终端入口必须是 `[ 风格 ]` 字符命令", src.contains("[ 风格 ]"))
-        assertTrue("终端分支必须与 style == TERMINAL 绑定", src.contains("style == SettingsV2Style.TERMINAL"))
+        val terminal = src("style/TerminalStyle.kt")
+        val screen = src("SettingsV2Screen.kt")
+        assertTrue("终端入口必须是 `[ 风格 ]` 字符命令（在终端自己的底栏里）", terminal.contains("[ 风格 ]"))
+        assertTrue("终端入口由 onStylePicker 回调驱动", terminal.contains("onStylePicker"))
+        assertTrue(
+            "四套的胶囊按钮必须排除 TERMINAL（style != TERMINAL 才画）",
+            screen.contains("if (style != SettingsV2Style.TERMINAL)")
+        )
     }
 
     /**

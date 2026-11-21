@@ -46,6 +46,7 @@ import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
+import com.example.myapplication.presentation.ui.settingsv2.StyleEntryTag
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
@@ -101,6 +102,7 @@ internal val TerminalForeground = SettingsV2Style.TERMINAL.identity.titleColor
 fun TerminalSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
+    onStylePicker: (() -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.TERMINAL.identity
     val state = rememberTransformingLazyColumnState()
@@ -273,6 +275,7 @@ fun TerminalSettings(
             isActive = state.isScrollInProgress,
             statusText = "[${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}] "
                 + "${sections.sumOf { it.rows.size }}L",
+            onStylePicker = onStylePicker,
             modifier = Modifier.align(Alignment.BottomStart),
         )
         TerminalScrollBar(
@@ -394,6 +397,7 @@ private fun TerminalPromptLine(
     lineStyle: TextStyle,
     isActive: Boolean,
     statusText: String,
+    onStylePicker: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     var cursorOn by remember { mutableStateOf(true) }
@@ -428,13 +432,28 @@ private fun TerminalPromptLine(
                 // 内边距加在文字上（不是 Box 上），否则底色会被一起缩进去
                 modifier = Modifier.padding(start = 10.dp),
             )
-            // 右侧状态段：`[2/4] 26L`（第几分区 / 总行数），CLI 底栏的常见信息
-            BasicText(
-                text = statusText,
-                style = lineStyle.copy(color = SettingsV2Style.TERMINAL.identity.subtitleColor),
-                maxLines = 1,
-                modifier = Modifier.padding(end = 18.dp),
-            )
+            // 右侧聚簇：状态段 + 换风格入口**同一行**。
+            // 不要用固定 78dp 预留位（第一版这么干，`[ 风格 ]` 被挤出屏幕、状态被截成 `[1/4]`）。
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BasicText(
+                    text = statusText,
+                    style = lineStyle.copy(color = SettingsV2Style.TERMINAL.identity.subtitleColor),
+                    maxLines = 1,
+                )
+                if (onStylePicker != null) {
+                    BasicText(
+                        text = "[ 风格 ]",
+                        style = lineStyle,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .padding(start = 8.dp, end = 12.dp)
+                            .clickable { onStylePicker() }
+                            .testTag(StyleEntryTag),
+                    )
+                } else {
+                    BasicText(text = " ", style = lineStyle, maxLines = 1, modifier = Modifier.padding(end = 12.dp))
+                }
+            }
         }
     }
 }

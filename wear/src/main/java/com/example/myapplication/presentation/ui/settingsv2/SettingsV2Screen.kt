@@ -94,28 +94,19 @@ fun SettingsV2Screen(
                 SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier)
                 SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier)
                 SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier)
-                SettingsV2Style.TERMINAL -> TerminalSettings(sections = sections, modifier = contentModifier)
+                // TERMINAL 把"换风格"收进它自己的底栏（`[ 风格 ]` 与状态段同一行），
+                // 不再浮在屏幕右下角当独立控件 —— 真终端的底栏是一整行。
+                SettingsV2Style.TERMINAL -> TerminalSettings(
+                    sections = sections,
+                    modifier = contentModifier,
+                    onStylePicker = { pickerOpen = true },
+                )
             }
         }
 
-        // 手表上换风格的唯一入口。
-        // TERMINAL 例外：真终端里不能出现胶囊按钮，改成等宽字符命令 `[ 风格 ]`（同样可点）。
-        // EdgeButton 的尺寸是内部参数（无公开 size 形参），其余四套给内容留 48dp 底部间距由内容避让。
-        if (style == SettingsV2Style.TERMINAL) {
-            BasicText(
-                text = "[ 风格 ]",
-                style = TextStyle(
-                    color = SettingsV2Style.TERMINAL.identity.titleColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .clickable { pickerOpen = true }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .testTag(StyleEntryTag),
-            )
-        } else {
+        // 手表上换风格的唯一入口（四套用官方小圆按钮；TERMINAL 的入口在它自己的底栏里）。
+        // EdgeButton 的尺寸是内部参数（无公开 size 形参），给内容留 48dp 底部间距由内容避让。
+        if (style != SettingsV2Style.TERMINAL) {
             CompactButton(
                 onClick = { pickerOpen = true },
                 modifier = Modifier.align(Alignment.BottomCenter).testTag(StyleEntryTag),
