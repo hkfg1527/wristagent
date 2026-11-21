@@ -43,7 +43,8 @@ fun SettingsV2StylePicker(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xF2000000))
+            // 必须全不透明：0xF2(95%) 时底层页面的文字会透上来（真机在 TERMINAL 下能看到 ghost 的 > 温度）
+            .background(Color(0xFF000000))
             .testTag(StylePickerTag)
             // 点空白处关闭：覆盖层自己是唯一的点击目标，不做拦截的话背景会被下层吃掉
             .clickable(onClick = onDismiss),
