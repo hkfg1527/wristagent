@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -65,6 +66,8 @@ fun SettingsV2Screen(
 ) {
     val identity = style.identity
     var pickerOpen by remember { mutableStateOf(false) }
+    // 选择器开着时，返回键只关选择器 —— 否则一次返回会把整个设置页关掉（真机实测：按返回后直接回到聊天页）
+    BackHandler(enabled = pickerOpen) { pickerOpen = false }
 
     // 宽度策略：Standard（其余四套）统一 176dp 居中；ARC 贴边满宽（它的辨识度就来自贴边）
     val widthModifier = when (identity.width) {

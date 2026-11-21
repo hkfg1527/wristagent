@@ -164,6 +164,21 @@ class SquareAndTerminalStyleTest {
     }
 
     /**
+     * R30：选择器开着时，返回键只能关选择器。
+     *
+     * 真机实测（0.0.0.215）：菜单打开时按返回，整个设置页被关掉、直接回到聊天页 —— 一次返回丢了上下文。
+     * 守卫：SettingsV2Screen 必须用 `BackHandler(enabled = pickerOpen)` 拦截。
+     */
+    @Test
+    fun backKeyClosesThePickerInsteadOfThePage() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
+            .readText()
+        assertTrue("必须用 BackHandler 拦截返回", src.contains("BackHandler(enabled = pickerOpen)"))
+        assertTrue("拦截后只关选择器", src.contains("BackHandler(enabled = pickerOpen) { pickerOpen = false }"))
+    }
+
+    /**
      * R29：TERMINAL 的风格选择器必须是**字符菜单**，不是 M3 卡片面板。
      *
      * 点 `[ 风格 ]` 弹出卡片面板时，满屏等宽绿字突然变成 UI —— 这是整套里最破坏沉浸感的一处。
