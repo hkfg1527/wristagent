@@ -317,3 +317,9 @@
 | TERMINAL | bf02da38ade6 | **90c4b5537ba0** | 终端行 + 边缘效果 ✅ |
 
 `distinct = 5/5 OK`（工具内置判定），TERMINAL 的 marker 也修好了（`&gt; ` 转义）。
+
+### ARC 滚动到底的 40vp 尾留白（0.0.0.175 实测）
+
+- 方法：切 ARC → 进设置 → 连续上滑 8 次 → uiautomator dump 取最后文本节点底部 → 与屏幕高 466px 比较
+- 结果：末行「网页控制台 / 8080」底部 y=328，**间隙 138px = 69dp**（无尾留白时约 29dp）
+- 截图：`docs/device/v2five/ARC-bottom.png`（末卡下方留白可见、左侧贴边、右侧圆角）

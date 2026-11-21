@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.core.app.ApplicationProvider
 import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcCardTag
+import com.example.myapplication.presentation.ui.settingsv2.style.ArcBottomTail
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcSafeInset
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcTopInset
 import org.junit.Assert.assertTrue
@@ -68,6 +69,13 @@ class ArcStyleTest {
             "ARC 必须走贴边宽度策略",
             SettingsV2Style.ARC.identity.width == RowWidthPolicy.EdgeToEdge
         )
+    }
+
+    @Test
+    fun arcKeepsHuaweiBottomTailOf40vp() {
+        // 华为 8.1.1：长列表滚到底部留 40vp。真机实测末行文本底部距屏幕底 69dp
+        //（无尾留白时约 29dp），这里钉住常量本身
+        assertEquals(40f, ArcBottomTail.value, 0.001f)
     }
 
     @Test
