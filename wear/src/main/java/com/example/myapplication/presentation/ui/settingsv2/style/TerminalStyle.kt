@@ -337,8 +337,12 @@ private fun TerminalLine(
         // 标题占剩余宽度（超出就自己截断，别挤值列）；值取**固有宽度**，靠 SpaceBetween 推到最右。
         // 不能用 fillMaxWidth(0.62f)：Row 里它算的是"扣掉标题后的剩余宽度"，
         // 真机上把 deepseek-v4-pro 截成了 `deepseek-`、BALANCED 截成了 `BALANCE`。
+        //
+        // `> ` 是**可交互行的提示符**，不是每条输出都加的前缀：只读信息（模型/温度）只是缩进两格，
+        // 可执行行（开关/跳转）才有 `>` —— TUI 里就是这么区分"这行能不能按"的。
+        val actionable = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron
         BasicText(
-            text = TerminalPrompt + row.title,
+            text = (if (actionable) TerminalPrompt else "  ") + row.title,
             style = lineStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -346,7 +350,8 @@ private fun TerminalLine(
         )
         // 真终端里没有胶囊开关：开关是 `[ ON ] / [ OFF ]`，跳转是 `/open`
         val right: Pair<String, Boolean>? = when (val trailing = row.trailing) {
-            is RowTrailing.Value -> trailing.text to false
+            // 只读值降成暗绿：让"你能按的"和"你只能看的"一眼分开
+            is RowTrailing.Value -> trailing.text to true
             // 开关状态的来源是本地态（点一下翻一次），初值取数据层
             is RowTrailing.Toggle -> (if (toggleChecked) "[ ON  ]" else "[ OFF ]") to false
             is RowTrailing.Chevron -> "/open" to true

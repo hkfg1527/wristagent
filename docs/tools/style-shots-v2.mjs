@@ -106,7 +106,8 @@ for (const [legacy, name, markers] of STYLES) {
   // 顺带量该风格的行距（先验证 marker，避免读到旧页面）：模型 -> 温度 的 top 差
   const pitchOf = (xmlText, a, b) => {
     const find = (label) => {
-      const re = new RegExp(`text="${label}"[^>]*bounds="\\[\\d+,(\\d+)\\]`);
+      // 前缀容忍：TERMINAL 的只读行现在缩进两格（`  模型`），可执行行仍带 `> `
+      const re = new RegExp(`text="[^"]*${label}"[^>]*bounds="\\[\\d+,(\\d+)\\]`);
       const m = xmlText.match(re);
       return m ? Number(m[1]) : -1;
     };

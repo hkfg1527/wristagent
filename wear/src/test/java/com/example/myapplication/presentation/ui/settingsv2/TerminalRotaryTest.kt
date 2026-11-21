@@ -92,6 +92,31 @@ class TerminalRotaryTest {
     }
 
     /**
+     * R24：`> ` 是**可交互行的提示符**，不是每条输出的前缀。
+     *
+     * TUI 里 `>` 表示"这行能按"；只读信息只是缩进。整页都带 `>` 会让"能按/只能看"失去区分，
+     * 也让终端看起来像给每条日志加了装饰。
+     */
+    @Test
+    fun promptMarksOnlyActionableRows() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        assertTrue(
+            "前缀必须按类型分流（可交互 `> ` / 只读两空格）",
+            src.contains("if (actionable) TerminalPrompt else \"  \"")
+        )
+        assertTrue(
+            "可交互行的判定必须只看 Toggle/Chevron",
+            src.contains("val actionable = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron")
+        )
+        assertTrue(
+            "只读值必须降成暗绿（与可交互行分开层级）",
+            src.contains("is RowTrailing.Value -> trailing.text to true")
+        )
+    }
+
+    /**
      * R19：表冠必须在 **Activity 层**接，不依赖 Compose 焦点。
      *
      * 实测依据：注入 REL_WHEEL 后 `onRotaryScrollEvent` 一行日志都没有，但焦点确实在主 Activity ——
