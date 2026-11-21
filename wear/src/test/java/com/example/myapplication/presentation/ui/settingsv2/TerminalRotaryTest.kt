@@ -116,6 +116,13 @@ class TerminalRotaryTest {
             terminal.contains("RotaryBus.enabled = true") && terminal.contains("RotaryBus.enabled = false")
         )
         assertTrue("总线必须带安全阀开关", bus.contains("var enabled"))
+        // 第二条可能通道：表冠被映射成音量键的机型（input keyevent 可注入，因此这条可端到端验证）
+        assertTrue(
+            "Activity 必须也接音量键音量通道（表冠的音量映射）",
+            activity.contains("override fun onKeyDown") &&
+                activity.contains("KEYCODE_VOLUME_DOWN") &&
+                activity.contains("RotaryBus.emit(")
+        )
     }
 
     /**

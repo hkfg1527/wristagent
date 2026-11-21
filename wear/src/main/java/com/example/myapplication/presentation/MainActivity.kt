@@ -311,6 +311,28 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * 表冠的**第二条可能通道**：不少 Wear 机型把表冠映射成音量键。
+     *
+     * 与 [onGenericMotionEvent] 同样的安全阀（只在终端页生效）。为什么两条都留：
+     * 真机实测证明 `ACTION_SCROLL` 无法用 adb 注入（两种注入方式两层日志全 0），
+     * 而 `input keyevent 24/25` 可以注入 —— 这条通道让整条链路能在设备上被验证。
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP)) {
+            // 音量下 = 往下翻（内容上移），音量上 = 往回翻
+            val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                ROTARY_PIXELS_PER_UNIT
+            } else {
+                -ROTARY_PIXELS_PER_UNIT
+            }
+            Log.i("TerminalRotary", "key delta=$delta code=$keyCode")
+            RotaryBus.emit(delta)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    /**
      * 表冠：在 **Activity 层**接滚动事件。
      *
      * Compose 的 `onRotaryScrollEvent` 依赖目标节点持有焦点，真机上焦点被别处拿走时一行事件都收不到
