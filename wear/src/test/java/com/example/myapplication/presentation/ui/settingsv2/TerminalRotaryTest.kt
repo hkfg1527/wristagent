@@ -92,6 +92,35 @@ class TerminalRotaryTest {
     }
 
     /**
+     * R28：Enter 必须执行**当前焦点行** —— TUI 的"回车运行当前项"。
+     *
+     * 位置很关键：键事件先到 View 再漏到 `Activity.onKeyDown`，而 ENTER / SPACE / DPAD_CENTER
+     * 会被 Compose 焦点系统先吃掉（真机实测 Activity 那层收不到，只有 VOLUME 键漏得过去）。
+     * 所以表冠走 Activity、Enter 走 Compose 的 `onKeyEvent` —— 这不是随意选择，是实测结论。
+     */
+    @Test
+    fun enterActivatesTheFocusedRow() {
+        fun read(rel: String) = File("wear/src/main/java/com/example/myapplication/presentation/$rel")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/$rel") }
+            .readText()
+        val terminal = read("ui/settingsv2/style/TerminalStyle.kt")
+        assertTrue("Enter 必须接在 Compose 这一层", terminal.contains(".onKeyEvent {"))
+        assertTrue(
+            "必须覆盖 Enter / NumPadEnter / DirectionCenter 三种键",
+            terminal.contains("Key.Enter") && terminal.contains("Key.NumPadEnter") && terminal.contains("Key.DirectionCenter")
+        )
+        assertTrue("点击与 Enter 必须共用同一条 activate 逻辑", terminal.contains("fun activate(row: SettingsV2Row)"))
+        assertTrue(
+            "onKeyEvent 必须执行焦点行（activate(focusedRow)）",
+            terminal.contains("activate(focusedRow)")
+        )
+        assertTrue(
+            "焦点行必须由 absoluteItemIndex + focusItemIndex 算出",
+            terminal.contains("firstOrNull { absIndex[it.key] == idx }")
+        )
+    }
+
+    /**
      * R24：`> ` 是**可交互行的提示符**，不是每条输出的前缀。
      *
      * TUI 里 `>` 表示"这行能按"；只读信息只是缩进。整页都带 `>` 会让"能按/只能看"失去区分，

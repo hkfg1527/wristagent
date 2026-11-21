@@ -25,12 +25,18 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -127,6 +133,10 @@ fun TerminalSettings(
     // 焦点行（反白）：视口中间那一项，只对可操作行生效
     val absIndex = remember(sections) { absoluteItemIndex(sections) }
     val focusIndex = focusItemIndex(sections, state.anchorItemIndex) // 规则线 + 分区头 + 行
+    // 焦点行对象：Enter 执行它（与点击共用同一条 activate）
+    val focusedRow = remember(sections, focusIndex) {
+        focusIndex?.let { idx -> sections.flatMap { it.rows }.firstOrNull { absIndex[it.key] == idx } }
+    }
 
     // 表冠：按"行"滚动（真终端语义），不是像素级滑动
     val focusRequester = remember { FocusRequester() }
@@ -139,6 +149,18 @@ fun TerminalSettings(
     fun pushEcho(line: String) {
         echoes.add(line)
         while (echoes.size > 3) echoes.removeAt(0)
+    }
+    // 执行一行：点它、或按 Enter 执行当前焦点行，走的是同一条逻辑
+    fun activate(row: SettingsV2Row) {
+        val checked = toggles[row.key] ?: (row.trailing as? RowTrailing.Toggle)?.checked ?: false
+        when (row.trailing) {
+            is RowTrailing.Toggle -> {
+                toggles[row.key] = !checked
+                pushEcho("# ${row.title} -> ${if (!checked) "ON" else "OFF"}")
+            }
+            is RowTrailing.Chevron -> pushEcho("# open ${row.title}")
+            else -> Unit
+        }
     }
     // 真终端打印输出后会**跟随到底**：不跟随的话，用户点了命令却看不到结果
     // （上一轮实测：点 /open 后要手动滑 6 次才看到 `# open …`）。
@@ -163,6 +185,7 @@ fun TerminalSettings(
             if (lines != 0) state.scrollBy(lines * linePx)
         }
     }
+    // 焦点行会随滚动变；Enter 通过 onKeyEvent 直接读它（同一帧内的最新值，无需 rememberUpdatedState）
 
     Box(
         modifier = modifier
@@ -182,7 +205,19 @@ fun TerminalSettings(
                 true
             }
             .focusRequester(focusRequester)
-            .focusable(),
+            .focusable()
+            // Enter 执行焦点行。必须接在 Compose 这一层：键事件先到 View 再漏到 Activity.onKeyDown，
+            // 而 ENTER / SPACE / DPAD_CENTER 会被 Compose 焦点系统先吃掉（真机实测 Activity 那层收不到，
+            // VOLUME 键才漏得过去 —— 这也是表冠走 Activity、Enter 走 Compose 的原因）。
+            .onKeyEvent { ev ->
+                val isEnter = ev.key == Key.Enter || ev.key == Key.NumPadEnter || ev.key == Key.DirectionCenter
+                if (ev.type == KeyEventType.KeyDown && isEnter && focusedRow != null) {
+                    activate(focusedRow)
+                    true
+                } else {
+                    false
+                }
+            },
     ) {
         TransformingLazyColumn(
             state = state,
@@ -228,14 +263,7 @@ fun TerminalSettings(
                             .reportEdgeDistance(edge)
                             .edgeAppearance(edge.value, SettingsV2Motions.of(SettingsV2Style.TERMINAL))
                             .clickable(enabled = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron) {
-                                when (val trailing = row.trailing) {
-                                    is RowTrailing.Toggle -> {
-                                        toggles[row.key] = !checked
-                                        pushEcho("# ${row.title} -> ${if (!checked) "ON" else "OFF"}")
-                                    }
-                                    is RowTrailing.Chevron -> pushEcho("# open ${row.title}")
-                                    else -> Unit
-                                }
+                                activate(row)
                             }
                             .testTag(TerminalRowTag),
                     ) {
