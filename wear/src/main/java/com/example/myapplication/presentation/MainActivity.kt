@@ -412,7 +412,7 @@ class MainActivity : ComponentActivity() {
         val isActivate = event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER
         if (RotaryBus.enabled && isActivate) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                Log.i("TerminalRotary", "activate via dispatchKeyEvent code=${event.keyCode}")
+                Log.i("TerminalRotary", "activate via dispatchKeyEvent code=${event.keyCode} enabled=${RotaryBus.enabled}")
                 RotaryBus.emitActivate()
             }
             return true

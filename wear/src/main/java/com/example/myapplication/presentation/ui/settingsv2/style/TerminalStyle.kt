@@ -158,9 +158,11 @@ fun TerminalSettings(
     var rotaryRemainder by remember { mutableStateOf(0f) }
     // 真终端的行是"可执行对象"：点一下就有输出。这里做本地态 + 末尾回显（最多留 3 行）。
     val toggles = remember { mutableStateMapOf<String, Boolean>() }
-    val echoes = remember { mutableStateListOf<String>() }
+    val echoes = remember { mutableStateListOf<EchoLine>() }
+    var echoSeq by remember { mutableStateOf(0L) }
     fun pushEcho(line: String) {
-        appendCappedEcho(echoes, line)
+        echoSeq += 1
+        appendCappedEcho(echoes, EchoLine(echoSeq, line))
     }
     // 执行一行：点它、或按 Enter 执行当前焦点行，走的是同一条逻辑
     fun activate(row: SettingsV2Row) {
@@ -182,6 +184,11 @@ fun TerminalSettings(
     val latestFocused = rememberUpdatedState(focusedRow)
     LaunchedEffect(Unit) {
         RotaryBus.activations.collect {
+            // 取证用：把三个决定成败的状态一起打出来，失败时可归因（enabled / 可见 / 焦点行）
+            android.util.Log.i(
+                TerminalRotaryTag,
+                "activation enabled=${RotaryBus.enabled} shown=${hostView.isShown} focused=${latestFocused.value?.key}",
+            )
             if (hostView.isShown) latestFocused.value?.let { activate(it) }
         }
     }
@@ -322,10 +329,10 @@ fun TerminalSettings(
                 }
             }
             // 回显：真终端的每条命令都会在末尾留下输出，最多留 3 行
-            echoes.forEach { line ->
-                item(key = "echo-" + line) {
+            echoes.forEach { echo ->
+                item(key = "echo-" + echo.id) {
                     TerminalGridLine {
-                        BasicText(text = line, style = dimStyle, maxLines = 1)
+                        BasicText(text = echo.text, style = dimStyle, maxLines = 1)
                     }
                 }
             }
@@ -646,16 +653,22 @@ internal const val TerminalPromptTag = "terminal-prompt"
 internal const val TerminalRotaryTag = "TerminalRotary"
 
 /**
+ * 回显行：**带自增 id**。
+ *
+ * 用文本当 key 会崩：执行同一条命令两次会产生两条相同文本 -> LazyColumn 报
+ * `Key "echo-# open 工具与 MCP" was already used`（真机 FATAL，直接崩溃重启）。
+ */
+internal data class EchoLine(val id: Long, val text: String)
+
+/**
  * 追加一行回显，并把总量压在 [cap] 行以内（真终端不会无限堆输出）。
  *
- * 抽成纯函数是为了能直接测：UI 层的"点四次再数节点"会受是否组合、是否在视口内影响，
- * 判不了这条规则本身。
+ * 泛型化是为了既能装 EchoLine、也能在测试里直接用字符串验证这条规则本身。
  */
-internal fun appendCappedEcho(target: MutableList<String>, line: String, cap: Int = 3) {
+internal fun <T> appendCappedEcho(target: MutableList<T>, line: T, cap: Int = 3) {
     target.add(line)
     while (target.size > cap) target.removeAt(0)
 }
-
 /** ASCII 规则线的字符（`vim` / `less` 的 banner 分节）。 */
 internal const val TerminalRule = "─"
 
