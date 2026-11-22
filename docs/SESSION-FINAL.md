@@ -6,9 +6,9 @@
 
 | 项 | 值 |
 |---|---|
-| 内部版 | `0.0.0.239`（versionCode 277） |
+| 内部版 | `0.0.0.240`（versionCode 278） |
 | 全量单测 | 1369 条，0 失败 |
-| `release-check` | **8/8**（装机 0.0.0.239） |
+| `release-check` | **8/8**（装机 0.0.0.240） |
 | `style-shots-v2` | **distinct 5/5**，`marker=ok/reset=ok` |
 | `instrument-selftest` | **INSTRUMENTS_OK**（10 项） |
 
@@ -16,13 +16,16 @@
 
 | 风格 | 哈希 | 行距 |
 |---|---|---|
-| M3_CARD | `f3fb8ee34f44` | 86px / 43.0dp |
-| M3_LIST | `846edf622f70` | 114px / 57.0dp |
-| ARC | `ca9ec540754f` | 140px / 70.0dp |
-| SQUARE | `0b45aa67d657` | 150px / 75.0dp |
-| TERMINAL | `a0e509d3b597` | 36px / 18.0dp |
+| M3_CARD | `8c81e1894430` | 86px / 43.0dp |
+| M3_LIST | `48509bfc208c` | 114px / 57.0dp |
+| ARC | `35320b308e82` | 140px / 70.0dp |
+| SQUARE | `cebcb572f650` | 150px / 75.0dp |
+| TERMINAL | `ba2aad32f53b` | 36px / 18.0dp |
 
-> **注意**：TERMINAL 的 banner 里带版本号，所以**每次升版它的哈希都会变**，其余四套不受影响。
+> **注意一**：TERMINAL 的 banner 里带版本号，所以**每次升版它的哈希都会变**。
+>
+> **注意二**：改共享示例数据的**取值**（例如把供应商从"配置 1"改成"deepseek"）会让**五套哈希全变**，
+> 但行距不变 —— 对比哈希时必须区分"布局变了"和"数据变了"。
 
 ## 二、已真机闭环的行为（TERMINAL）
 
@@ -56,6 +59,11 @@ node docs/tools/crown-check.mjs     # 清日志 -> 提示转表冠 -> 读 Termin
 ```
 
 工具已自测两条分支（无事件 → 退出码 2 + 排查指引；注入音量键 → 判为 key 通道）。
+
+## 四之补、最后一处真缺陷（0.0.0.240）
+
+供应商接实值后显示整段主机名 `api.deepseek.com`，把标题挤成 `供..`（最终截图发现）。
+改为取主机名主标签：`providerFromUrl()` -> `deepseek`；空串/非法 URL -> `未配置`。五组单测覆盖。
 
 ## 五、踩过的坑（别再踩）
 
