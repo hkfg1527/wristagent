@@ -193,3 +193,35 @@ class TerminalRotaryTest {
         }
     }
 }
+
+/**
+ * R58：表冠的三条通道必须**同时**存在，且都受阀门约束。
+ *
+ * 真机上哪条通道生效取决于机型（`ACTION_SCROLL` / 音量键映射 / 两者都没有），所以三条都接着；
+ * 这条守卫防的是"重构时悄悄删掉一条"，那会让某类手表直接失去表冠滚动，而单测仍然全绿。
+ */
+class TerminalRotaryChannelGuardTest {
+
+    private fun activitySource(): String =
+        File("wear/src/main/java/com/example/myapplication/presentation/MainActivity.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/MainActivity.kt") }
+            .readText()
+
+    @Test
+    fun allThreeCrownChannelsAreWiredAndGated() {
+        val src = activitySource()
+        assertTrue("通道 1：ACTION_SCROLL（onGenericMotionEvent）", src.contains("override fun onGenericMotionEvent"))
+        assertTrue("通道 1 必须处理 ACTION_SCROLL", src.contains("MotionEvent.ACTION_SCROLL"))
+        assertTrue("通道 2：音量键映射", src.contains("KEYCODE_VOLUME_DOWN") && src.contains("KEYCODE_VOLUME_UP"))
+        assertTrue("通道 3：dispatchKeyEvent 里的 ENTER", src.contains("override fun dispatchKeyEvent") && src.contains("KEYCODE_ENTER"))
+        // 三条都必须先看阀门，否则聊天页的表冠也会被吞
+        val gated = Regex("RotaryBus\\.enabled").findAll(src).count()
+        assertTrue("三条通道都要受 RotaryBus.enabled 约束（实际出现 $gated 次）", gated >= 3)
+        // 位移必须**按通道各发一次**：只查"存在 emit"太松（删掉一条仍会绿，本轮变异测试验证过）
+        val emits = Regex("RotaryBus\\.emit\\(").findAll(src).count()
+        assertEquals("两条位移通道（ACTION_SCROLL / 音量键）必须各发一次，实际 $emits 次", 2, emits)
+        assertTrue("Enter 通道必须发出激活", src.contains("RotaryBus.emitActivate()"))
+        assertTrue("音量键的幅度必须走可测的换算函数", src.contains("deltaForKeyRepeat(event.repeatCount"))
+        assertTrue("ACTION_SCROLL 的位移必须是反向且按 ROTARY_PIXELS_PER_UNIT 缩放", src.contains("-delta * ROTARY_PIXELS_PER_UNIT"))
+    }
+}
