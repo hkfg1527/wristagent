@@ -100,6 +100,20 @@ for (const [legacy, name, markers] of STYLES) {
     xml = dump();
   }
   const markerOk = markers.every((m) => (m instanceof RegExp ? m.test(xml) : xml.includes(m)));
+  // 截图前**复位**：离开设置页再进来，清掉"上一次操作留下的回显"与滚动位置。
+  // 不复位时哈希会受残留状态污染（实测 232/233 两轮 TERMINAL 哈希不同，却没有任何视觉改动，
+  // 无法区分"真变化"与"残影"—— 这种噪音会污染后续所有哈希对比）。
+  adb('shell', 'input', 'keyevent', '4'); // BACK：回聊天页
+  sleep(700);
+  enterSettings();
+  xml = dump();
+  if (!CHAT_OR_SETTINGS.test(xml)) {
+    adb('shell', 'input', 'keyevent', '4');
+    sleep(700);
+    enterSettings();
+    xml = dump();
+  }
+  const markerAfterReset = markers.every((m) => (m instanceof RegExp ? m.test(xml) : xml.includes(m)));
   const file = path.join(OUT, `${name}.png`);
   const hash = shot(file);
   hashes.add(hash);
@@ -118,7 +132,7 @@ for (const [legacy, name, markers] of STYLES) {
   const pitchPlain = pitchOf(xml, '模型', '温度');
   const pitch = pitchPlain > 0 ? pitchPlain : pitchOf(xml, '&gt; 模型', '&gt; 温度');
   pitchText = pitch > 0 ? `${pitch}px/${(pitch / 2).toFixed(1)}dp` : 'n/a';
-  rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'} hash=${hash} pitch=${pitchText}`);
+  rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'}/reset=${markerAfterReset ? 'ok' : 'MISS'} hash=${hash} pitch=${pitchText}`);
   console.log(rows[rows.length - 1]);
   } catch (e) {
     // 单套失败不应中断整轮（上一轮就是在这里静默中断，导致 report 只到 SQUARE）
