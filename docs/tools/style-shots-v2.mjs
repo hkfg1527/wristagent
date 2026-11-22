@@ -20,13 +20,15 @@ const CHAT_OR_SETTINGS = /连得上|让它能做事|让它听懂我|让它答得
 
 /** 旧枚举值 → V2 风格名（与 SettingsV2Style.fromLegacy 一致）。 */
 const STYLES = [
-  // 接真实偏好后首卡行变成 模型/温度/回复风格，'供应商' 已不在首屏，标记改为 '模型'
-  ['BALLOON', 'M3_CARD', [/连得上/, /模型/]],
-  ['M3_LIST', 'M3_LIST', [/连得上/]],
-  ['ARC', 'ARC', [/连得上/]],
-  ['SQUARE', 'SQUARE', [/连得上/]],
+  // 第 3 项是"用于量行距的两个相邻行标签"：必须**都在首屏**才量得到。
+  // ARC / SQUARE 的行高是 70.5 / 75dp，首屏只放得下两行多，所以用 供应商 -> 模型（相邻），
+  // 而不是 模型 -> 温度（后者会被挤出首屏，读数变成 n/a —— 不是回归，是量的对象不在屏上）。
+  ['BALLOON', 'M3_CARD', [/连得上/, /模型/], ['模型', '温度']],
+  ['M3_LIST', 'M3_LIST', [/连得上/], ['模型', '温度']],
+  ['ARC', 'ARC', [/连得上/], ['供应商', '模型']],
+  ['SQUARE', 'SQUARE', [/连得上/], ['供应商', '模型']],
   // uiautomator 把 > 转义成 &gt;，校验串必须用转义形式，否则永远 MISS
-  ['TERMINAL', 'TERMINAL', ['# ', '&gt; ']],
+  ['TERMINAL', 'TERMINAL', ['# ', '&gt; '], ['模型', '温度']],
 ];
 
 const adb = (...args) => spawnSync(ADB, ['-s', DEVICE, ...args], { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
@@ -89,7 +91,7 @@ if (!enterSettings()) {
 const rows = [];
 let pitchText = '' 
 const hashes = new Set();
-for (const [legacy, name, markers] of STYLES) {
+for (const [legacy, name, markers, pitchPair] of STYLES) {
   try {
   const code = await setStyle(legacy);
   sleep(1100);
@@ -129,8 +131,9 @@ for (const [legacy, name, markers] of STYLES) {
     return (ta >= 0 && tb >= 0) ? (tb - ta) : -1;
   };
   // 终端行文本带 > 前缀（dump 里转义为 &gt;），普通标签匹配不到时再试带前缀的
-  const pitchPlain = pitchOf(xml, '模型', '温度');
-  const pitch = pitchPlain > 0 ? pitchPlain : pitchOf(xml, '&gt; 模型', '&gt; 温度');
+  const [pa, pb] = pitchPair || ['模型', '温度'];
+  const pitchPlain = pitchOf(xml, pa, pb);
+  const pitch = pitchPlain > 0 ? pitchPlain : pitchOf(xml, `&gt; ${pa}`, `&gt; ${pb}`);
   pitchText = pitch > 0 ? `${pitch}px/${(pitch / 2).toFixed(1)}dp` : 'n/a';
   rows.push(`${name.padEnd(9)} post=${code} marker=${markerOk ? 'ok' : 'MISS'}/reset=${markerAfterReset ? 'ok' : 'MISS'} hash=${hash} pitch=${pitchText}`);
   console.log(rows[rows.length - 1]);
