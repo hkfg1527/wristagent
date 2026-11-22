@@ -11,6 +11,8 @@ import androidx.wear.compose.material3.MaterialTheme
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalRowTag
 import com.example.myapplication.presentation.ui.settingsv2.style.appendCappedEcho
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -126,9 +128,40 @@ class TerminalInteractionTest {
         )
     }
 
+    /**
+     * R41：回显项的 key 必须是**自增 id**，不能用文本。
+     *
+     * 真机 FATAL（0.0.0.224）：`Key "echo-# open 工具与 MCP" was already used` ——
+     * 执行同一条命令两次会产生两条相同文本，用文本当 LazyColumn 的 key 直接崩溃重启。
+     * 这条守卫把"key 只能用 id"钉死；下面那条纯函数测试保证"重复文本是合法输入"，
+     * 两条合起来才能说明为什么必须用 id。
+     */
     @Test
-    fun tappingAToggleFlipsItAndAppendsAnEchoLine() {
-        // 自包含数据：只放一条 OFF 开关 + 一条 /open，不依赖示例数据里恰好有什么
+    fun echoItemsAreKeyedByIdNotByText() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        assertTrue("回显 key 必须用自增 id", src.contains("item(key = \"echo-\" + echo.id)"))
+        assertFalse("不许再用文本当 key（会重复）", src.contains("item(key = \"echo-\" + line)"))
+        assertTrue("回显项必须带 id 字段", src.contains("internal data class EchoLine(val id: Long, val text: String)"))
+    }
+
+    /**
+     * 重复文本是**合法输入**（同一条命令可以执行多次），所以容量规则不能靠去重来"解决"重复 key。
+     */
+    @Test
+    fun duplicateEchoTextIsLegalInput() {
+        val echoes = mutableListOf("# open 工具与 MCP", "# open 工具与 MCP")
+        appendCappedEcho(echoes, "# open 工具与 MCP")
+        assertEquals(
+            "三条完全相同的回显必须都保留（去重会掩盖问题，真正的解是 id）",
+            listOf("# open 工具与 MCP", "# open 工具与 MCP", "# open 工具与 MCP"),
+            echoes.toList()
+        )
+    }
+
+    @Test
+    fun tappingAToggleFlipsItAndAppendsAnEchoLine() {        // 自包含数据：只放一条 OFF 开关 + 一条 /open，不依赖示例数据里恰好有什么
         val sections = listOf(
             SettingsV2Section(
                 title = "测试区",
