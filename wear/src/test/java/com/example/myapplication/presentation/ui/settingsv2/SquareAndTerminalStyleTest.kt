@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -160,6 +161,36 @@ class SquareAndTerminalStyleTest {
         assertTrue(
             "终端的换风格入口必须存在且是同一个 tag",
             compose.onAllNodesWithTag(StyleEntryTag).fetchSemanticsNodes().isNotEmpty()
+        )
+    }
+
+    /**
+     * R37：装饰字符不能进无障碍树。
+     *
+     * 规则线是 30 个 `─`、滚动条是 12 个 `▓/░`。读屏会把它们当内容念出来（"横线横线…"、
+     * "方块方块浅色方块…"），对盲用用户是纯噪声。所以这两处必须 `clearAndSetSemantics { }`，
+     * 而内容行（`# 连得上`、`> 工具与 MCP`）仍要可读。
+     */
+    @Test
+    fun decorativeGlyphsStayOutOfTheSemanticsTree() {
+        compose.setContent { MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL) } }
+        compose.waitForIdle()
+
+        val allTexts = compose.onAllNodes(hasText("", substring = true))
+            .fetchSemanticsNodes()
+            .map { it.config.toString() }
+        assertTrue("内容行必须仍可读（# 分区头）", allTexts.any { it.contains("连得上") })
+        assertTrue(
+            "装饰字符不许进语义树，实际节点=${allTexts.joinToString(" | ")}",
+            allTexts.none { it.contains("─") || it.contains("░") || it.contains("▓") }
+        )
+
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/style/TerminalStyle.kt") }
+            .readText()
+        assertTrue(
+            "两处装饰都必须 clearAndSetSemantics",
+            src.contains("text = TerminalRule.repeat(TerminalRuleCells),") && src.contains("clearAndSetSemantics")
         )
     }
 

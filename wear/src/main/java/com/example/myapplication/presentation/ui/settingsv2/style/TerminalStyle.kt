@@ -40,6 +40,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -272,6 +273,8 @@ fun TerminalSettings(
                             style = dimStyle,
                             maxLines = 1,
                             softWrap = false,
+                            // 纯装饰：别让 TalkBack 把 30 个 `─` 念出来（真机开读屏时它会当内容读）
+                            modifier = Modifier.clearAndSetSemantics { },
                         )
                     }
                 }
@@ -617,7 +620,10 @@ private fun TerminalScrollBar(
             lineHeight = TerminalLineHeight.value.sp,
         ),
         maxLines = cells,
-        modifier = modifier.testTag(TerminalScrollBarTag),
+        modifier = modifier
+            .testTag(TerminalScrollBarTag)
+            // 纯装饰：滚动条是 `▓/░` 字符，读屏念出来毫无意义（"方块方块浅色方块…"）
+            .clearAndSetSemantics { },
     )
 }
 
