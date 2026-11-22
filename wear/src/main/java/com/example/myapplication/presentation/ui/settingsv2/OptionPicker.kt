@@ -22,6 +22,12 @@ import androidx.wear.compose.material3.Text
 /** 选项选择器的测试标识。 */
 const val OptionPickerTag = "option-picker"
 
+/** 单个选项的测试标识前缀（后面接选项 value）。 */
+const val OptionPickerItemTagPrefix = "option-item-"
+
+/** 取消入口的测试标识。 */
+const val OptionPickerDismissTag = "option-dismiss"
+
 /**
  * 通用选项选择器：点开一行"从几个选项里选一个"时用。
  *
@@ -42,23 +48,13 @@ fun OptionPicker(
         modifier = modifier
             .fillMaxSize()
             .background(colors.pageBackground)
-            .testTag(OptionPickerTag)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss,
-            ),
+            .testTag(OptionPickerTag),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 24.dp)
-                .verticalScroll(rememberScrollState())
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                ),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.Start,
         ) {
             Text(
@@ -76,12 +72,27 @@ fun OptionPicker(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 10.dp)
+                        .testTag(OptionPickerItemTagPrefix + option.value)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                         ) { onPick(option.value) },
                 )
             }
+            // 取消入口：不用"整屏空白点击关闭"——那个全屏 clickable 会抢走子项命中（交互测试实测）。
+            Text(
+                text = "  取消",
+                color = colors.subtitleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 14.dp)
+                    .testTag(OptionPickerDismissTag)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onDismiss() },
+            )
         }
     }
 }
