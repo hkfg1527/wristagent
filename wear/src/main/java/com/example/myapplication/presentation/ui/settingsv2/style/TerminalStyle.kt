@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -174,10 +175,15 @@ fun TerminalSettings(
         }
     }
 
-    // Activity 层的 Enter 兜底（不依赖焦点）：Compose 的 onKeyEvent 在焦点丢失时收不到键事件
+    // Activity 层的 Enter 兜底（不依赖焦点）：Compose 的 onKeyEvent 在焦点丢失时收不到键事件。
+    // **必须校验可见性**：页面可能仍留在组合里（切到聊天页时阀门会残留为 true），
+    // 那时若不校验，隐藏的终端页会全局吞掉 ENTER（真机踩到：按 ENTER 没反应且回显不在屏上）。
+    val hostView = LocalView.current
     val latestFocused = rememberUpdatedState(focusedRow)
     LaunchedEffect(Unit) {
-        RotaryBus.activations.collect { latestFocused.value?.let { activate(it) } }
+        RotaryBus.activations.collect {
+            if (hostView.isShown) latestFocused.value?.let { activate(it) }
+        }
     }
     // 真终端打印输出后会**跟随到底**：不跟随的话，用户点了命令却看不到结果
     // （上一轮实测：点 /open 后要手动滑 6 次才看到 `# open …`）。
@@ -235,25 +241,7 @@ fun TerminalSettings(
             // Enter 执行焦点行。必须接在 Compose 这一层：键事件先到 View 再漏到 Activity.onKeyDown，
             // 而 ENTER / SPACE / DPAD_CENTER 会被 Compose 焦点系统先吃掉（真机实测 Activity 那层收不到，
             // VOLUME 键才漏得过去 —— 这也是表冠走 Activity、Enter 走 Compose 的原因）。
-            .onKeyEvent { ev ->
-                val isEnter = ev.key == Key.Enter || ev.key == Key.NumPadEnter || ev.key == Key.DirectionCenter
-                if (isEnter) {
-                    android.util.Log.i(
-                        TerminalRotaryTag,
-                        "composeKey type=${ev.type} key=${ev.key} focused=${focusedRow?.key}",
-                    )
-                }
-                if (!isEnter) {
-                    false
-                } else {
-                    // **按下与抬起都要消费**：只吃 KeyDown 时，KeyUp 会漏给系统，
-                    // 系统把它当返回动作 —— 真机实测"执行命令 + 顺手退出设置页"。
-                    if (ev.type == KeyEventType.KeyDown && focusedRow != null) {
-                        activate(focusedRow)
-                    }
-                    true
-                }
-            },
+            
     ) {
         TransformingLazyColumn(
             state = state,

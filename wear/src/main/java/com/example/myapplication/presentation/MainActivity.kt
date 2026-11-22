@@ -311,29 +311,14 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Enter 的**抬起**也要消费。只消费按下时，抬起会漏给系统，而系统把 Enter 抬起当返回动作
-     * （真机实测：执行命令后顺手退出了设置页）。
-     */
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER)) {
-            return true
-        }
-        return super.onKeyUp(keyCode, event)
-    }
-
-    /**
      * 表冠的**第二条可能通道**：不少 Wear 机型把表冠映射成音量键。
      *
      * 与 [onGenericMotionEvent] 同样的安全阀（只在终端页生效）。为什么两条都留：
      * 真机实测证明 `ACTION_SCROLL` 无法用 adb 注入（两种注入方式两层日志全 0），
      * 而 `input keyevent 24/25` 可以注入 —— 这条通道让整条链路能在设备上被验证。
      */
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER)) {
-            Log.i("TerminalRotary", "activate down code=$keyCode")
-            RotaryBus.emitActivate()
-            return true
-        }
         if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP)) {
             // 音量下 = 往下翻（内容上移），音量上 = 往回翻；
             // 单按一行、长按一屏（真终端里按住方向键会加速）
@@ -421,6 +406,17 @@ class MainActivity : ComponentActivity() {
      * 真正执行仍在 AgentDispatcher 的工具循环里，UI 层不直接执行业务动作。
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // 终端页的 Enter 优先：在视图层之前接管，不依赖 Compose 焦点
+        // （Compose 的 onKeyEvent 只在节点持有焦点时生效，滚动/切页/回前台都会丢焦点，
+        //  一丢 ENTER 就漏给系统、被当成"回桌面"——真机反复踩到）
+        val isActivate = event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+        if (RotaryBus.enabled && isActivate) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                Log.i("TerminalRotary", "activate via dispatchKeyEvent code=${event.keyCode}")
+                RotaryBus.emitActivate()
+            }
+            return true
+        }
         val source = gestureKeySourceOf(event.keyCode) ?: return super.dispatchKeyEvent(event)
         val phase = when (event.action) {
             KeyEvent.ACTION_DOWN -> {

@@ -92,40 +92,31 @@ class TerminalRotaryTest {
     }
 
     /**
-     * R28：Enter 必须执行**当前焦点行** —— TUI 的"回车运行当前项"。
+     * R28/R41：Enter 必须执行**当前焦点行**，且接在 dispatchKeyEvent 这一层。
      *
-     * 位置很关键：键事件先到 View 再漏到 `Activity.onKeyDown`，而 ENTER / SPACE / DPAD_CENTER
-     * 会被 Compose 焦点系统先吃掉（真机实测 Activity 那层收不到，只有 VOLUME 键漏得过去）。
-     * 所以表冠走 Activity、Enter 走 Compose 的 `onKeyEvent` —— 这不是随意选择，是实测结论。
+     * 位置是三次真机失败换来的结论：
+     * - Compose 的 onKeyEvent 只在节点持有焦点时生效，滚动/切页/回前台都会丢焦点；
+     * - 焦点一丢，ENTER 就漏给系统、被当成"回桌面"（执行完命令 App 被送后台）；
+     * - onKeyDown 也来不及：视图层先拿到键。
+     * 只有 dispatchKeyEvent（视图层之前）+ 按下/抬起都吞，才稳定。
      */
     @Test
     fun enterActivatesTheFocusedRow() {
         fun read(rel: String) = File("wear/src/main/java/com/example/myapplication/presentation/$rel")
             .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/$rel") }
             .readText()
+        val activity = read("MainActivity.kt")
         val terminal = read("ui/settingsv2/style/TerminalStyle.kt")
-        assertTrue("Enter 必须接在 Compose 这一层", terminal.contains(".onKeyEvent {"))
-        assertTrue(
-            "必须覆盖 Enter / NumPadEnter / DirectionCenter 三种键",
-            terminal.contains("Key.Enter") && terminal.contains("Key.NumPadEnter") && terminal.contains("Key.DirectionCenter")
-        )
-        assertTrue("点击与 Enter 必须共用同一条 activate 逻辑", terminal.contains("fun activate(row: SettingsV2Row)"))
-        assertTrue(
-            "onKeyEvent 必须执行焦点行（activate(focusedRow)）",
-            terminal.contains("activate(focusedRow)")
-        )
-        assertTrue(
-            "焦点行必须是**粘性选择**：程序化跟随到底不许改它（否则执行完命令焦点就换行）",
-            terminal.contains("programmaticScroll = true") && terminal.contains("if (state.isScrollInProgress && !programmaticScroll)")
-        )
-        assertTrue(
-            "焦点按行 key 粘住，而不是每次按锚点重算",
-            terminal.contains("focused = row.key == focusedRow?.key")
-        )
-        assertTrue(
-            "Enter 的按下**与抬起**都要消费：只吃 KeyDown 时 KeyUp 会漏给系统当成返回键（真机踩到）",
-            terminal.contains("if (ev.type == KeyEventType.KeyDown && focusedRow != null) {\n                        activate(focusedRow)\n                    }\n                    true")
-        )
+        val bus = read("ui/settingsv2/common/RotaryBus.kt")
+        assertTrue("Activity 必须在 dispatchKeyEvent 里接管 Enter", activity.contains("override fun dispatchKeyEvent"))
+        assertTrue("必须同时认 ENTER 与 DPAD_CENTER", activity.contains("KEYCODE_ENTER") && activity.contains("KEYCODE_DPAD_CENTER"))
+        assertTrue("按下沿才触发一次", activity.contains("event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0"))
+        assertTrue("必须交出激活事件", activity.contains("RotaryBus.emitActivate()"))
+        assertFalse("Compose 侧不许再处理 Enter（否则双触发）", terminal.contains(".onKeyEvent {"))
+        assertTrue("终端必须订阅激活通道", terminal.contains("RotaryBus.activations.collect"))
+        assertTrue("点击与 Enter 共用同一条 activate", terminal.contains("fun activate(row: SettingsV2Row)"))
+        assertTrue("总线必须有激活通道", bus.contains("val activations"))
+        assertTrue("焦点行必须是粘性选择", terminal.contains("programmaticScroll = true") && terminal.contains("focused = row.key == focusedRow?.key"))
     }
 
     /**
