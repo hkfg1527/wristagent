@@ -20,11 +20,27 @@ object RotaryBus {
     /** 表冠增量（像素语义，正 = 内容向上滚）。 */
     val events: SharedFlow<Float> = _events
 
+    private val _activations = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+
+    /**
+     * "执行焦点行"（TUI 的 Enter）。
+     *
+     * 为什么要有这条总线：Compose 的 `onKeyEvent` 只在节点持有焦点时生效，而从后台切回、
+     * 或焦点被别处拿走时它收不到键事件 —— 此时键会漏到系统，系统把 KeyUp 当返回动作，
+     * 真机实测"执行命令 + 顺手退出设置页"。Activity 层接一遍就不依赖焦点了。
+     */
+    val activations: SharedFlow<Unit> = _activations
+
     /** 终端页在栈上时才为 true。 */
     @Volatile
     var enabled: Boolean = false
 
     fun emit(delta: Float) {
         if (enabled) _events.tryEmit(delta)
+    }
+
+    /** 执行当前焦点行（真终端的 Enter 语义）。 */
+    fun emitActivate() {
+        if (enabled) _activations.tryEmit(Unit)
     }
 }

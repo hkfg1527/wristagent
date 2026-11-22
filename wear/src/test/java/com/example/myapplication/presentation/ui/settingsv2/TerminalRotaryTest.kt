@@ -115,8 +115,16 @@ class TerminalRotaryTest {
             terminal.contains("activate(focusedRow)")
         )
         assertTrue(
-            "焦点行必须由 absoluteItemIndex + focusItemIndex 算出",
-            terminal.contains("firstOrNull { absIndex[it.key] == idx }")
+            "焦点行必须是**粘性选择**：程序化跟随到底不许改它（否则执行完命令焦点就换行）",
+            terminal.contains("programmaticScroll = true") && terminal.contains("if (state.isScrollInProgress && !programmaticScroll)")
+        )
+        assertTrue(
+            "焦点按行 key 粘住，而不是每次按锚点重算",
+            terminal.contains("focused = row.key == focusedRow?.key")
+        )
+        assertTrue(
+            "Enter 的按下**与抬起**都要消费：只吃 KeyDown 时 KeyUp 会漏给系统当成返回键（真机踩到）",
+            terminal.contains("if (ev.type == KeyEventType.KeyDown && focusedRow != null) {\n                        activate(focusedRow)\n                    }\n                    true")
         )
     }
 

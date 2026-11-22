@@ -40,6 +40,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -133,10 +134,19 @@ fun TerminalSettings(
     val baseItems = remember(sections) { sections.sumOf { 2 + it.rows.size } }
     // 焦点行（反白）：视口中间那一项，只对可操作行生效
     val absIndex = remember(sections) { absoluteItemIndex(sections) }
-    val focusIndex = focusItemIndex(sections, state.anchorItemIndex) // 规则线 + 分区头 + 行
-    // 焦点行对象：Enter 执行它（与点击共用同一条 activate）
-    val focusedRow = remember(sections, focusIndex) {
-        focusIndex?.let { idx -> sections.flatMap { it.rows }.firstOrNull { absIndex[it.key] == idx } }
+
+    // 焦点行**粘住**：只在用户滚动时重算，程序化"跟随到底"不改变它。
+    // 否则执行一条命令后输出把列表顶到底，锚点一跳、焦点就换行，再按 Enter 执行的是另一条（真机实测）。
+    var selectedKey by remember { mutableStateOf<String?>(null) }
+    var programmaticScroll by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isScrollInProgress, state.anchorItemIndex) {
+        if (state.isScrollInProgress && !programmaticScroll) {
+            firstActionableAfter(sections, state.anchorItemIndex)?.let { selectedKey = it.key }
+        }
+    }
+    val focusedRow = remember(sections, selectedKey) {
+        selectedKey?.let { key -> sections.flatMap { it.rows }.firstOrNull { it.key == key } }
+            ?: firstActionableAfter(sections, 0)
     }
 
     // 表冠：按"行"滚动（真终端语义），不是像素级滑动
@@ -162,15 +172,30 @@ fun TerminalSettings(
             else -> Unit
         }
     }
+
+    // Activity 层的 Enter 兜底（不依赖焦点）：Compose 的 onKeyEvent 在焦点丢失时收不到键事件
+    val latestFocused = rememberUpdatedState(focusedRow)
+    LaunchedEffect(Unit) {
+        RotaryBus.activations.collect { latestFocused.value?.let { activate(it) } }
+    }
     // 真终端打印输出后会**跟随到底**：不跟随的话，用户点了命令却看不到结果
     // （上一轮实测：点 /open 后要手动滑 6 次才看到 `# open …`）。
     // 用 scrollToItem 而不是 animateScrollToItem：`tail -f` 是瞬间跳到底，不做平滑滚动。
     LaunchedEffect(echoes.size) {
         if (echoes.isNotEmpty()) {
+            // 标记成程序化滚动：这次跳转不许改动焦点行（否则执行完一条命令，焦点就换行了）
+            programmaticScroll = true
             state.scrollToItem(baseItems + echoes.size - 1)
+            programmaticScroll = false
         }
     }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // 窗口重新获得焦点时必须**重新申请**：从后台切回（或从别的页面回来）后 Compose 焦点会丢，
+    // 此时 Enter 会漏给系统、被系统当成"回桌面"处理 —— 真机实测按 ENTER 直接把 App 送到后台。
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    LaunchedEffect(windowFocused) {
+        if (windowFocused) focusRequester.requestFocus()
+    }
 
     // 表冠：Activity 层送来的滚动（不依赖焦点）。进入本页才打开安全阀，离开立刻关掉，
     // 免得把聊天页的表冠滚动一起吞了。
@@ -211,11 +236,21 @@ fun TerminalSettings(
             // VOLUME 键才漏得过去 —— 这也是表冠走 Activity、Enter 走 Compose 的原因）。
             .onKeyEvent { ev ->
                 val isEnter = ev.key == Key.Enter || ev.key == Key.NumPadEnter || ev.key == Key.DirectionCenter
-                if (ev.type == KeyEventType.KeyDown && isEnter && focusedRow != null) {
-                    activate(focusedRow)
-                    true
-                } else {
+                if (isEnter) {
+                    android.util.Log.i(
+                        TerminalRotaryTag,
+                        "composeKey type=${ev.type} key=${ev.key} focused=${focusedRow?.key}",
+                    )
+                }
+                if (!isEnter) {
                     false
+                } else {
+                    // **按下与抬起都要消费**：只吃 KeyDown 时，KeyUp 会漏给系统，
+                    // 系统把它当返回动作 —— 真机实测"执行命令 + 顺手退出设置页"。
+                    if (ev.type == KeyEventType.KeyDown && focusedRow != null) {
+                        activate(focusedRow)
+                    }
+                    true
                 }
             },
     ) {
@@ -278,7 +313,7 @@ fun TerminalSettings(
                                 dimStyle = dimStyle,
                                 toggleChecked = checked,
                                 // 焦点行反白：只反白可操作行（只读信息没有"当前"概念）
-                                focused = absIndex[row.key] == focusIndex,
+                                focused = row.key == focusedRow?.key,
                             )
                         }
                         // 副标题另起一行，仍落在同一网格上：`  └ 说明`
@@ -365,25 +400,29 @@ internal fun absoluteItemIndex(sections: List<SettingsV2Section>): Map<String, I
 }
 
 /**
- * 焦点行：**锚点之后的第一条可操作行**（TUI 里"当前可选项"的语义）。
+ * 锚点之后的第一条**可操作行**（TUI 里"当前可选项"的语义）。
  *
- * 第一版按"视口中间那一项"算，真机上中间那项是只读行（模型/温度），
- * 于是焦点行一个都没有、屏幕上没有反白 —— 像素扫描实测 0 条亮带，才发现的。
+ * 第一版按"视口中间那一项"算，真机上中间那项是只读行（模型/温度），于是焦点行一个都没有。
+ * 返回值是行对象本身：焦点要**粘住**它，而不是每次按锚点重算（否则执行命令后输出跟随到底，
+ * 锚点一跳、焦点就跑到别的行上，再按 Enter 执行的是另一条命令 —— 真机实测踩到）。
  */
-internal fun focusItemIndex(
-    sections: List<SettingsV2Section>,
-    anchorItemIndex: Int,
-): Int? {
+internal fun firstActionableAfter(sections: List<SettingsV2Section>, anchorItemIndex: Int): SettingsV2Row? {
     var index = 0
     sections.forEach { section ->
         index += 2 // 规则线 + 分区头
         section.rows.forEach { row ->
             val actionable = row.trailing is RowTrailing.Toggle || row.trailing is RowTrailing.Chevron
-            if (actionable && index >= anchorItemIndex) return index
+            if (actionable && index >= anchorItemIndex) return row
             index++
         }
     }
     return null
+}
+
+/** 兼容旧签名：返回焦点行的绝对项序号（无焦点时为 null）。 */
+internal fun focusItemIndex(sections: List<SettingsV2Section>, anchorItemIndex: Int): Int? {
+    val target = firstActionableAfter(sections, anchorItemIndex) ?: return null
+    return absoluteItemIndex(sections)[target.key]
 }
 
 /**

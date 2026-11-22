@@ -533,3 +533,20 @@ M3_CARD 的三个静止态分组：`{12,24}` / `{36,48,60,72,84,96,160}` / `{240
 复测（`uiautomator` 文本节点 top）：`44, 80, 116, 152, 188, 224, 260, 296, 332, 368` ——
 **逐段 36px，一屏 10 行 + 状态条**；`style-shots-v2` 的 pitch 从 `44px/22.0dp` 变为 **`36px/18.0dp`**。
 TERMINAL 哈希 `e847d11d121e` → **`108d499a7d68`**，其余四套未动，`distinct 5/5`。
+
+### TERMINAL 的 Enter 与焦点（0.0.0.221）
+
+三个真机才会暴露的点，都有日志/像素证据：
+
+1. **Enter 必须在 Compose 层消费，且按下与抬起都要消费。**
+   只吃 KeyDown 时 KeyUp 会漏给系统；本机系统把 Enter 抬起当"回桌面"，实测直接退出 App。
+2. **Compose 只在节点持有焦点时才收得到键事件。**
+   从后台切回后焦点会丢 -> Enter 漏给系统。修法：LocalWindowInfo.current.isWindowFocused
+   变 true 时重新 requestFocus()。
+3. **input keyevent 66 能到达 Compose**：日志 `composeKey type=KeyDown key=Key code: ... focused=tools`
+   （focused 是焦点行 key）-> 焦点与粘性选择都生效。
+
+**我自己踩的判据错误（第二次犯同类）**：判断"是否还在设置页"时用顶部标题 `连得上` 做标记 ——
+但执行命令后列表会跟到底，`连得上` 已滚出视野、不在 dump 里，于是误判成"页面被关掉"。
+**页面身份标记必须与滚动位置无关**：改用底栏 `[ 风格 ]` 或状态栏 `[n/4] NL`。改正后复测：
+`# open` 出现、底栏与状态栏都在 -> Enter 行为正确，App 未退出。

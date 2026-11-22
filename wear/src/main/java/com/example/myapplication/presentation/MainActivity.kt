@@ -311,6 +311,17 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * Enter 的**抬起**也要消费。只消费按下时，抬起会漏给系统，而系统把 Enter 抬起当返回动作
+     * （真机实测：执行命令后顺手退出了设置页）。
+     */
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER)) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    /**
      * 表冠的**第二条可能通道**：不少 Wear 机型把表冠映射成音量键。
      *
      * 与 [onGenericMotionEvent] 同样的安全阀（只在终端页生效）。为什么两条都留：
@@ -318,6 +329,11 @@ class MainActivity : ComponentActivity() {
      * 而 `input keyevent 24/25` 可以注入 —— 这条通道让整条链路能在设备上被验证。
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER)) {
+            Log.i("TerminalRotary", "activate down code=$keyCode")
+            RotaryBus.emitActivate()
+            return true
+        }
         if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP)) {
             // 音量下 = 往下翻（内容上移），音量上 = 往回翻
             val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
