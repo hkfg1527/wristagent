@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -125,44 +126,56 @@ private fun ArcRow(
     titleColor: Color,
     valueColor: Color,
 ) {
-    // 两行堆叠：标题一行、右值/开关一行右对齐。贴边卡更宽，但 deepseek-v4-pro 这种长值
-    // 与"模型"同行时仍会把标题挤成竖排（真机实测），所以与另外三套统一为堆叠。
-    Column(
+    // 单行制：标题左、值/开关右同一行。贴边卡本来就满宽，两行堆叠纯属浪费面积。
+    // 26dp 左右安全边距保留（文字不贴圆弧）；长值自己省略，不挤死标题。
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            // 华为 8.1.1：左右 26vp 安全边距（文字不贴边，卡片本体贴边）
-            .padding(start = 26.dp, end = 26.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 26.dp, end = 26.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(text = row.title, color = titleColor, style = MaterialTheme.typography.labelMedium)
-        row.subtitle?.let {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = it,
-                color = valueColor,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 2,
+                text = row.title,
+                color = titleColor,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            row.subtitle?.let {
+                Text(
+                    text = it,
+                    color = valueColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
                 color = titleColor,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
+                maxLines = 1,
                 textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                modifier = Modifier.fillMaxWidth(),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(start = 6.dp),
             )
-            is RowTrailing.Toggle -> Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                SwitchButton(
-                    checked = trailing.checked,
-                    onCheckedChange = trailing.onChange,
-                    label = {},
-                )
-            }
-            is RowTrailing.Chevron, RowTrailing.None -> Unit
+            is RowTrailing.Toggle -> SwitchButton(
+                checked = trailing.checked,
+                onCheckedChange = trailing.onChange,
+                label = {},
+            )
+            is RowTrailing.Chevron -> Text(
+                text = "›",
+                color = valueColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
+            RowTrailing.None -> Unit
         }
     }
 }

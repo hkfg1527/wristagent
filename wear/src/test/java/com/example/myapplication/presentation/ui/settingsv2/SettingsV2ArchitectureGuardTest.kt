@@ -135,4 +135,28 @@ class SettingsV2ArchitectureGuardTest {
             )
         }
     }
+
+    /**
+     * 圆屏一行制：四套 Material 风格的行必须把标题与值放**同一行**
+     * （`Arrangement.SpaceBetween` + `Alignment.CenterVertically`），不许退回两行堆叠。
+     *
+     * 两行堆叠在 466px 圆屏上首屏只剩 2~3 项，是"看着像清单、其实没法用"的根源。
+     * TERMINAL 是字符网格，不适用这条。
+     */
+    @Test
+    fun materialStylesUseSingleLineRows() {
+        listOf("M3CardStyle.kt", "M3ListStyle.kt", "ArcStyle.kt", "SquareStyle.kt")
+            .forEach { name ->
+                val src = text(File(styleDir, name))
+                assertTrue(
+                    "$name 的行必须横向排列（SpaceBetween + CenterVertically）",
+                    src.contains("horizontalArrangement = Arrangement.SpaceBetween") &&
+                        src.contains("verticalAlignment = Alignment.CenterVertically")
+                )
+                assertFalse(
+                    "$name 不许再写两行堆叠的注释（那是旧布局的标记）",
+                    src.contains("两行堆叠：")
+                )
+            }
+    }
 }

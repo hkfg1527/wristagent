@@ -137,51 +137,57 @@ fun SquareSettings(
                             )
                             .testTag(SquareRowTag)
                     ) {
-                        // 两行堆叠：标题一行、右值/开关一行右对齐（176dp 窄列 + 放大字号下同行必互挤）
-                        Column(
+                        // 单行制：标题左、值/开关右同一行。零圆角 + 内缩发丝线是这套的辨识度，
+                        // 两行堆叠不是 —— 那只会让圆屏一屏只剩 2 行。
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = SquareRowMinHeight)
                                 .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(
-                                text = row.title,
-                                color = identity.titleColor,
-                                // titleSmall 比 M3_LIST 的 labelMedium 高一档：两套连"字级"都不同
-                                style = MaterialTheme.typography.titleSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            row.subtitle?.let {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = it,
-                                    color = identity.subtitleColor,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 2,
+                                    text = row.title,
+                                    color = identity.titleColor,
+                                    // titleSmall 比 M3_LIST 的 labelMedium 高一档：两套连"字级"都不同
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                row.subtitle?.let {
+                                    Text(
+                                        text = it,
+                                        color = identity.subtitleColor,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                             when (val trailing = row.trailing) {
                                 is RowTrailing.Value -> Text(
                                     text = trailing.text,
                                     color = identity.titleColor,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     textAlign = TextAlign.End,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.weight(1f).padding(start = 6.dp),
                                 )
-                                is RowTrailing.Toggle -> Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    SwitchButton(
-                                        checked = trailing.checked,
-                                        onCheckedChange = trailing.onChange,
-                                        label = {},
-                                    )
-                                }
-                                is RowTrailing.Chevron, RowTrailing.None -> Unit
+                                is RowTrailing.Toggle -> SwitchButton(
+                                    checked = trailing.checked,
+                                    onCheckedChange = trailing.onChange,
+                                    label = {},
+                                )
+                                is RowTrailing.Chevron -> Text(
+                                    text = "›",
+                                    color = identity.subtitleColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                )
+                                RowTrailing.None -> Unit
                             }
                         }
                         // 1px 发丝线（0.5dp @ density 2.0）。

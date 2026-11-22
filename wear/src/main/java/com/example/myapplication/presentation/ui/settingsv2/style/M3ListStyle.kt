@@ -122,50 +122,56 @@ private fun M3ListRow(
     spec: androidx.wear.compose.material3.lazy.TransformationSpec,
     modifier: Modifier = Modifier,
 ) {
-    // 与 M3_CARD / SQUARE 同口径：两行堆叠（标题一行、右值/开关一行右对齐）
-    Column(
+    // 单行制：标题左、值/开关右同一行。两行堆叠时一屏只 3~4 行，
+    // 圆屏上又空又散（圆屏截图评审后统一改）。标题与值各占一半，长值自己省略。
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = identity.rowMinHeight)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = row.title,
-            color = identity.titleColor,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        row.subtitle?.let {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = it,
-                color = identity.subtitleColor,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 2,
+                text = row.title,
+                color = identity.titleColor,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            row.subtitle?.let {
+                Text(
+                    text = it,
+                    color = identity.subtitleColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
                 color = identity.titleColor,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
+                maxLines = 1,
                 textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f).padding(start = 6.dp),
             )
-            is RowTrailing.Toggle -> Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                SwitchButton(
-                    checked = trailing.checked,
-                    onCheckedChange = trailing.onChange,
-                    label = {},
-                )
-            }
-            is RowTrailing.Chevron, RowTrailing.None -> Unit
+            is RowTrailing.Toggle -> SwitchButton(
+                checked = trailing.checked,
+                onCheckedChange = trailing.onChange,
+                label = {},
+            )
+            is RowTrailing.Chevron -> Text(
+                text = "›",
+                color = identity.subtitleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
+            RowTrailing.None -> Unit
         }
     }
 }
