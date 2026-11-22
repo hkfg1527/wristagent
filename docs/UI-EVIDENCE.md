@@ -591,3 +591,23 @@ TERMINAL 哈希 `e847d11d121e` → **`108d499a7d68`**，其余四套未动，`di
 
 为什么用分区号而不是文本行 top：文本 top 依赖"该行是否还在视野内"，本会话已因此误判过三次。
 `[n/4]` 是状态栏自己算的，滚到哪都在。
+
+### Enter 端到端终于闭环：根因是回显 key 重复导致的崩溃（0.0.0.225 复验）
+
+设备回来后的复验（`0.0.0.225`，终端风格、列表在顶部）：
+
+| 检查 | 结果 |
+|---|---|
+| 两次 ENTER 后 `# open 工具与 MCP` 条数 | **2**（同一条命令执行两次） |
+| 是否留在终端页（底栏 `[ 风格 ]`） | **是** |
+| logcat `FATAL EXCEPTION` | **无** |
+| 两次激活的日志 | 都是 `enabled=true shown=true focused=tools` -> 粘性焦点生效（同一行） |
+
+前两轮"时好时坏"的解释：回显项原来用文本当 LazyColumn key，执行同一条命令两次就重复 key -> 崩溃重启
+（`Key "echo-# open 工具与 MCP" was already used`）。改成自增 id 后一切正常。
+
+**方法论教训**：我一直在 `-s TerminalRotary` 里找原因，而崩溃日志在 `AndroidRuntime` 里 ——
+排查链路失败时，第一步应该看 `logcat -d -t 300 | grep FATAL`，而不是只看自己的 tag。
+
+同期门禁：`release-check` **8/8**（装机 0.0.0.225）、五套 `distinct 5/5`（哈希与崩溃修复前一致）、
+`instrument-selftest` **INSTRUMENTS_OK**。
