@@ -90,3 +90,11 @@
 4. **ARC 尾留白**在滚动中途的表现未拍（只拍了到底）。
 5. **设备状态**：TicWatch 曾于 20:35 掉线，21:0x 恢复；恢复后已补跑 `release-check` **8/8**（0.0.0.191 装机）
    与五套重拍（`distinct 5/5`，哈希与 0.0.0.188 一致 —— 选择器不透明化不影响页面本身）。
+
+5. **物理表冠走哪条通道：未验证（但已做成一条命令）**。
+   代码里三条路都已接线：`ACTION_SCROLL`（onGenericMotionEvent）、音量键映射（onKeyDown VOLUME_UP/DOWN）、
+   Enter（onKeyDown ENTER/DPAD_CENTER，且按下与抬起都消费）。设备侧只有"音量键"这条被实测证明
+   （注入 KEYCODE_VOLUME_DOWN -> 位移 {-36, 0}，一格正好一行）。
+   `ACTION_SCROLL` 无法用 adb 注入（sendevent 的 REL_WHEEL、input roll 的 trackball 事件，两层日志全 0）。
+   判定命令：`node docs/tools/crown-check.mjs` —— 它会清日志、提示你转表冠、读回 `TerminalRotary` 并判定
+   （已自测两条分支：无事件 -> 退出码 2 + 排查指引；注入音量键 -> 判为 key 通道）。
