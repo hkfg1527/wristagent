@@ -176,4 +176,16 @@ class SettingsV2PreferencesWiringTest {
         compose.onNodeWithText("glm-4.6").assertIsDisplayed()
         compose.onNodeWithText("0.3").assertIsDisplayed()
     }
-}
+    /**
+     * R59：供应商只取**主标签**（牌子），不取整段主机名。
+     *
+     * 真机截图实测：`api.deepseek.com` 会把 `供应商` 标题挤成 `供..`。三组差异化输入验证。
+     */
+    @Test
+    fun providerIsTheBrandLabelNotTheWholeHost() {
+        assertEquals("api.deepseek.com", "deepseek", providerFromUrl("https://api.deepseek.com"))
+        assertEquals("带 www", "example", providerFromUrl("https://www.example.org/v1"))
+        assertEquals("无子域", "localhost", providerFromUrl("http://localhost:8080"))
+        assertEquals("空串兜底", "未配置", providerFromUrl(""))
+        assertEquals("非 URL 兜底", "未配置", providerFromUrl("not a url"))
+    }}

@@ -114,9 +114,7 @@ object SettingsV2SampleData {
         val wiredCompact = preferences.compactMode
         // 语音与唤醒：副标题显示真实的引擎与启用状态（此前是"出向能力独立"这种写死文案）
         // 供应商：从 baseUrl 的主机名派生（不再写死"配置 1"）
-        val wiredProvider = runCatching {
-            java.net.URI(preferences.baseUrl).host?.removePrefix("www.")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "未配置"
+        val wiredProvider = providerFromUrl(preferences.baseUrl)
         val wiredVoiceSummary = "${preferences.asrProvider} · ${if (preferences.asrEnabled) "已启用" else "未启用"}"
 
         return listOf(
@@ -169,4 +167,20 @@ object SettingsV2SampleData {
         val rounded = Math.round(value * 10f) / 10f
         return rounded.toString()
     }
+}
+
+/**
+ * 从 baseUrl 里取**供应商主标签**：`https://api.deepseek.com` -> `deepseek`。
+ *
+ * 为什么不是整段主机名：`api.deepseek.com` 有 17 个字符，把 `供应商` 这一行的标题挤成 `供..`
+ * （真机截图实测）。供应商要的是牌子，不是主机名。
+ */
+internal fun providerFromUrl(baseUrl: String): String {
+    val host = runCatching { java.net.URI(baseUrl).host }.getOrNull()?.lowercase().orEmpty()
+    if (host.isBlank()) return "未配置"
+    val labels = host.split('.').filter { it.isNotBlank() }
+    val meaningful = labels.firstOrNull { it !in setOf("www", "api", "open", "chat") }
+        ?: labels.firstOrNull()
+        ?: return "未配置"
+    return meaningful
 }
