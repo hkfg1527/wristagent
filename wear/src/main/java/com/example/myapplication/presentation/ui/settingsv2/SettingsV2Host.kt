@@ -59,14 +59,25 @@ fun SettingsV2Host(
             onRowClick = { row ->
                 when (val trailing = row.trailing) {
                     is RowTrailing.Toggle -> {
+                        // 每个开关都写回**对应的真实偏好字段**，不再只改本地 UI。
+                        // key -> setter 表：新增的 11 个开关（工具 6 + MCP + ASR 3 + 原有 2）全部有落点。
                         when (row.key) {
+                            "tool_device" -> preferences.toolDeviceStatusEnabled = !preferences.toolDeviceStatusEnabled
+                            "tool_vibrate" -> preferences.toolVibrateEnabled = !preferences.toolVibrateEnabled
+                            "tool_matrix" -> preferences.toolMatrixDensityEnabled = !preferences.toolMatrixDensityEnabled
+                            "tool_power" -> preferences.toolPowerModeEnabled = !preferences.toolPowerModeEnabled
+                            "tool_weather" -> preferences.toolWeatherEnabled = !preferences.toolWeatherEnabled
+                            "tool_web" -> preferences.toolWebSearchEnabled = !preferences.toolWebSearchEnabled
+                            "mcp" -> preferences.isMcpEnabled = !preferences.isMcpEnabled
+                            "asr_enabled" -> preferences.asrEnabled = !preferences.asrEnabled
+                            "asr_live" -> preferences.asrLiveTranscript = !preferences.asrLiveTranscript
                             "tts" -> preferences.autoSpeakReplies = !preferences.autoSpeakReplies
                             "compact" -> preferences.compactMode = !preferences.compactMode
                             else -> trailing.onChange(!trailing.checked)
                         }
                         com.example.myapplication.agent.SettingsChangeBus.bump()
                     }
-                    // V2 还没有子页（工具清单页 / 语音页在旧实现里），这里先不假装能进
+                    // V2 已无"点了没反应"的跳转行：Chevron 只剩「页面风格」（Screen 层已分流）
                     is RowTrailing.Chevron -> Unit
                     else -> row.onClick?.invoke()
                 }
@@ -78,6 +89,7 @@ fun SettingsV2Host(
                     "reply_style" -> preferences.replyStyle = value
                     "security" -> preferences.securityMode = SecurityMode.valueOf(value)
                     "root" -> preferences.sandboxLevel = SandboxLevel.fromStorage(value)
+                    "asr_lang" -> preferences.asrDevPid = value.toInt()
                 }
                 com.example.myapplication.agent.SettingsChangeBus.bump()
             },

@@ -50,165 +50,137 @@ sealed interface RowTrailing {
 fun SettingsV2Row.isActionable(): Boolean =
     onClick != null || choice != null || trailing is RowTrailing.Toggle || trailing is RowTrailing.Chevron
 
+/** 一行的数据源：把"长什么样"与"值从哪来"分开，root() 与 fromPreferences() 共用同一套骨架。 */
+data class RowSpec(
+    val key: String,
+    val title: String,
+    val subtitle: String? = null,
+    val value: String? = null,
+    val toggle: Boolean? = null,
+    val choice: RowChoice? = null,
+    val chevron: Boolean = false,
+) {
+    fun toRow(): SettingsV2Row = SettingsV2Row(
+        key = key,
+        title = title,
+        subtitle = subtitle,
+        trailing = when {
+            toggle != null -> RowTrailing.Toggle(checked = toggle, onChange = {})
+            chevron -> RowTrailing.Chevron
+            value != null -> RowTrailing.Value(value)
+            else -> RowTrailing.None
+        },
+        choice = choice,
+    )
+}
+
+/** 一行数据的来源：示例值 / 真实偏好值，但行 key 与顺序完全由同一份骨架决定。 */
+data class SettingsV2Content(
+    val connection: List<RowSpec>,
+    val action: List<RowSpec>,
+    val hear: List<RowSpec>,
+    val answer: List<RowSpec>,
+) {
+    fun toSections(): List<SettingsV2Section> = listOf(
+        SettingsV2Section("连得上", connection.map { it.toRow() }),
+        SettingsV2Section("让它能做事", action.map { it.toRow() }),
+        SettingsV2Section("让它听懂我", hear.map { it.toRow() }),
+        SettingsV2Section("让它答得好", answer.map { it.toRow() }),
+    )
+}
+
 /**
- * V2 的内容（当前是示例数据，等 R6 之后接到真实偏好）。
+ * V2 的内容。**四个分区名是硬判据**（`release-check` 的"四分区按序"按这四个名字扫），不能改。
  *
- * **分区名必须与应用真实的设置分区一致**：`release-check` 的"四分区按序"判据就是按这四个名字扫的，
- * 旧实现曾因为改过名字让这条判据静默失灵一次。
+ * 结构只有一份：[SettingsV2Content] 的四个列表。root() 与 fromPreferences() 只是往同一副骨架里
+ * 填不同的值 —— 这就从根上消灭了"两处手写行结构、改一处漏一处"的事故（本会话踩过三次）。
  */
 object SettingsV2SampleData {
 
-    private const val ZONE_CONNECT = "连得上"
-    private const val ZONE_ACT = "让它能做事"
-    private const val ZONE_HEAR = "让它听懂我"
-    private const val ZONE_ANSWER = "让它答得好"
+    val zoneTitles: List<String> = listOf("连得上", "让它能做事", "让它听懂我", "让它答得好")
 
-    fun root(): List<SettingsV2Section> = listOf(
-        SettingsV2Section(
-            title = ZONE_CONNECT,
-            rows = listOf(
-                SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value("配置 1")),
-                SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value("deepseek-v4")),
-                SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value("1.4")),
-                SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value("BALANCED")),
-            )
+    /** 示例内容（分区列表），供预览/测试/默认参数用。 */
+    fun root(): List<SettingsV2Section> = exampleContent().toSections()
+
+    /** 示例内容：所有开关按默认值，所有值用占位文案。 */
+    private fun exampleContent(): SettingsV2Content = SettingsV2Content(
+        connection = listOf(
+            RowSpec("provider", "供应商", value = "deepseek"),
+            RowSpec("model", "模型", value = "deepseek-v4"),
+            RowSpec("temperature", "温度", subtitle = "越高越发散", value = "1.4", choice = temperatureChoice("1.4")),
+            RowSpec("reply_style", "回复风格", value = "均衡", choice = replyChoice("BALANCED")),
         ),
-        SettingsV2Section(
-            title = ZONE_ACT,
-            rows = listOf(
-                SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = "全部启用", trailing = RowTrailing.Chevron),
-                SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value("标准提示")),
-                SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value("ROOT")),
-            )
+        action = listOf(
+            RowSpec("tools", "工具与 MCP", subtitle = "7/7 启用"),
+            RowSpec("tool_device", "设备状态", toggle = true),
+            RowSpec("tool_vibrate", "振动", toggle = true),
+            RowSpec("tool_matrix", "点阵密度", toggle = true),
+            RowSpec("tool_power", "省电模式", toggle = true),
+            RowSpec("tool_weather", "天气", toggle = true),
+            RowSpec("tool_web", "联网搜索", toggle = true),
+            RowSpec("mcp", "MCP", toggle = true),
+            RowSpec("security", "安全策略", value = "标准", choice = securityChoice("STANDARD")),
+            RowSpec("root", "特权执行", value = "全权限", choice = sandboxChoice("FULL")),
         ),
-        SettingsV2Section(
-            title = ZONE_HEAR,
-            rows = listOf(
-                SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = "出向能力独立", trailing = RowTrailing.Chevron),
-                SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
-                SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
-            )
+        hear = listOf(
+            RowSpec("voice", "语音与唤醒", subtitle = "SYSTEM · 未启用"),
+            RowSpec("asr_enabled", "语音识别", toggle = false),
+            RowSpec("asr_lang", "识别语言", value = "普通话", choice = asrLanguageChoice("1537")),
+            RowSpec("asr_live", "实时转写", toggle = true),
+            RowSpec("tts", "自动播报回答", toggle = false),
+            RowSpec("wake", "唤醒词", value = "关闭"),
         ),
-        SettingsV2Section(
-            title = ZONE_ANSWER,
-            rows = listOf(
-                SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Chevron),
-                SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
-                SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
-            )
+        answer = listOf(
+            RowSpec("style", "页面风格", subtitle = "BALLOON", chevron = true),
+            RowSpec("compact", "紧凑模式", toggle = false),
+            RowSpec("console", "网页控制台", value = "8080"),
         ),
     )
 
-    /** 供判据读取：四分区标题（顺序即页面顺序）。 */
-    val zoneTitles: List<String> = listOf(ZONE_CONNECT, ZONE_ACT, ZONE_HEAR, ZONE_ANSWER)
-
     /**
-     * 用**真实偏好**生成内容（R6 之后接的第一批）。
-     *
-     * 目前接实值的行（模型 / 温度 / 回复风格 / 页面风格 / 安全策略 / 特权执行 / 自动播报 / 紧凑模式 / 工具数），其余行暂时沿用示例文案 ——
-     * 这一点必须在代码里显式标注，不能让"看起来像真的"冒充"已经接好"。
-     * 接实值的方式是**每次重组时读一遍偏好**，而不是缓存快照：控制台改完偏好会 bump
-     * `SettingsChangeBus`，宿主据此重组。
+     * 用**真实偏好**生成分区列表：与 [root] 共用同一副骨架，只把值换成偏好里的真值。
+     * 每次重组时读一遍偏好（控制台改完会 bump SettingsChangeBus），不缓存快照。
      */
-    fun fromPreferences(preferences: com.example.myapplication.agent.AgentPreferences): List<SettingsV2Section> {
-        val wiredModel = preferences.modelName.ifBlank { "未设置" }
-        val wiredTemperature = formatTemperature(preferences.temperature)
-        val wiredReplyStyle = preferences.replyStyle.ifBlank { "默认" }
-        // SettingsStyle 是 appearance 包的枚举，没有中文 label，这里用枚举名（与 /api/state 一致）
-        val wiredStyle = preferences.settingsStyle.name
-        // 新增接实值的三行：安全策略 / 自动播报 / 特权执行。
-        // 都直接读偏好枚举名或布尔值，不做文案美化 —— 控制台 /api/state 里显示什么，这里就该显示什么。
-        val wiredSecurity = preferences.securityMode.name
-        val wiredTts = preferences.autoSpeakReplies
-        val wiredSandbox = preferences.sandboxLevel.name
-        // 可调项的选项组：value 是落库键（枚举 storageKey / 数值字符串），label 是给人看的。
-        val temperatureOptions = listOf("0.0", "0.3", "0.5", "0.7", "1.0", "1.3", "1.6", "2.0")
-            .map { ChoiceOption(it, it) }
-        val temperatureChoice = RowChoice(temperatureOptions, formatTemperature(preferences.temperature))
-        val replyChoice = RowChoice(
-            listOf(
-                ChoiceOption("CONCISE", "简洁"),
-                ChoiceOption("BALANCED", "均衡"),
-                ChoiceOption("DETAILED", "详细"),
-            ),
-            preferences.replyStyle.ifBlank { "BALANCED" },
-        )
-        val securityChoice = RowChoice(
-            listOf(
-                ChoiceOption("NOVICE", "严格确认"),
-                ChoiceOption("STANDARD", "标准"),
-                ChoiceOption("EXPERT", "自动执行"),
-            ),
-            preferences.securityMode.name,
-        )
-        val sandboxChoice = RowChoice(
-            listOf(
-                ChoiceOption("READ_ONLY", "只读"),
-                ChoiceOption("WORKSPACE", "工作区"),
-                ChoiceOption("FULL", "全权限"),
-            ),
-            preferences.sandboxLevel.storageKey,
-        )
-        // 工具与 MCP：派生"n/7 启用"（六个工具开关 + MCP）。这是真实的组合状态，
-        // 比"全部启用"这种写死的文案诚实 —— 文案会与开关实际状态脱节。
-        val toolFlags = listOf(
-            preferences.toolDeviceStatusEnabled,
-            preferences.toolVibrateEnabled,
-            preferences.toolMatrixDensityEnabled,
-            preferences.toolPowerModeEnabled,
-            preferences.toolWeatherEnabled,
-            preferences.toolWebSearchEnabled,
-            preferences.isMcpEnabled,
-        )
-        val wiredToolsSummary = "${toolFlags.count { it }}/${toolFlags.size} 启用"
-        val wiredCompact = preferences.compactMode
-        // 语音与唤醒：副标题显示真实的引擎与启用状态（此前是"出向能力独立"这种写死文案）
-        // 供应商：从 baseUrl 的主机名派生（不再写死"配置 1"）
-        val wiredProvider = providerFromUrl(preferences.baseUrl)
-        val wiredVoiceSummary = "${preferences.asrProvider} · ${if (preferences.asrEnabled) "已启用" else "未启用"}"
+    fun fromPreferences(p: com.example.myapplication.agent.AgentPreferences): List<SettingsV2Section> =
+        preferencesContent(p).toSections()
 
-        return listOf(
-            SettingsV2Section(
-                title = ZONE_CONNECT,
-                rows = listOf(
-                    // 实值
-                    SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value(wiredProvider)),
-                    // 实值
-                    SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value(wiredModel)),
-                    // 实值 + 可调（点开选一档）
-                    SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value(temperatureChoice.labelOfSelected()), choice = temperatureChoice),
-                    // 实值 + 可调
-                    SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value(replyChoice.labelOfSelected()), choice = replyChoice),
-                )
+    private fun preferencesContent(p: com.example.myapplication.agent.AgentPreferences): SettingsV2Content {
+        val toolFlags = listOf(
+            p.toolDeviceStatusEnabled, p.toolVibrateEnabled, p.toolMatrixDensityEnabled,
+            p.toolPowerModeEnabled, p.toolWeatherEnabled, p.toolWebSearchEnabled, p.isMcpEnabled,
+        )
+        return SettingsV2Content(
+            connection = listOf(
+                RowSpec("provider", "供应商", value = providerFromUrl(p.baseUrl)),
+                RowSpec("model", "模型", value = p.modelName.ifBlank { "未设置" }),
+                RowSpec("temperature", "温度", subtitle = "越高越发散", value = formatTemperature(p.temperature), choice = temperatureChoice(formatTemperature(p.temperature))),
+                RowSpec("reply_style", "回复风格", value = replyChoice(p.replyStyle.ifBlank { "BALANCED" }).labelOfSelected(), choice = replyChoice(p.replyStyle.ifBlank { "BALANCED" })),
             ),
-            SettingsV2Section(
-                title = ZONE_ACT,
-                rows = listOf(
-                    // 实值：n/7 启用（六个工具开关 + MCP）
-                    SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = wiredToolsSummary, trailing = RowTrailing.Chevron),
-                    // 实值 + 可调
-                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value(securityChoice.labelOfSelected()), choice = securityChoice),
-                    // 实值 + 可调
-                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value(sandboxChoice.labelOfSelected()), choice = sandboxChoice),
-                )
+            action = listOf(
+                RowSpec("tools", "工具与 MCP", subtitle = "${toolFlags.count { it }}/${toolFlags.size} 启用"),
+                RowSpec("tool_device", "设备状态", toggle = p.toolDeviceStatusEnabled),
+                RowSpec("tool_vibrate", "振动", toggle = p.toolVibrateEnabled),
+                RowSpec("tool_matrix", "点阵密度", toggle = p.toolMatrixDensityEnabled),
+                RowSpec("tool_power", "省电模式", toggle = p.toolPowerModeEnabled),
+                RowSpec("tool_weather", "天气", toggle = p.toolWeatherEnabled),
+                RowSpec("tool_web", "联网搜索", toggle = p.toolWebSearchEnabled),
+                RowSpec("mcp", "MCP", toggle = p.isMcpEnabled),
+                RowSpec("security", "安全策略", value = securityChoice(p.securityMode.name).labelOfSelected(), choice = securityChoice(p.securityMode.name)),
+                RowSpec("root", "特权执行", value = sandboxChoice(p.sandboxLevel.storageKey).labelOfSelected(), choice = sandboxChoice(p.sandboxLevel.storageKey)),
             ),
-            SettingsV2Section(
-                title = ZONE_HEAR,
-                rows = listOf(
-                    SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = wiredVoiceSummary, trailing = RowTrailing.Chevron),
-                    SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = wiredTts, onChange = {})),
-                    SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
-                )
+            hear = listOf(
+                RowSpec("voice", "语音与唤醒", subtitle = "${p.asrProvider} · ${if (p.asrEnabled) "已启用" else "未启用"}"),
+                RowSpec("asr_enabled", "语音识别", toggle = p.asrEnabled),
+                RowSpec("asr_lang", "识别语言", value = asrLanguageChoice(p.asrDevPid.toString()).labelOfSelected(), choice = asrLanguageChoice(p.asrDevPid.toString())),
+                RowSpec("asr_live", "实时转写", toggle = p.asrLiveTranscript),
+                RowSpec("tts", "自动播报回答", toggle = p.autoSpeakReplies),
+                // 唤醒词目前没有对应偏好字段，明确标注为示例值，不冒充已接好
+                RowSpec("wake", "唤醒词", value = "关闭"),
             ),
-            SettingsV2Section(
-                title = ZONE_ANSWER,
-                rows = listOf(
-                    // 实值：风格名。用 Chevron 让它可点 —— 「页面风格」行本身就是换风格入口，
-                    // 底部不再挂独立按钮（那是抢主视觉的 48dp 死重）。
-                    SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Chevron, subtitle = wiredStyle),
-                    SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = wiredCompact, onChange = {})),
-                    SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
-                )
+            answer = listOf(
+                RowSpec("style", "页面风格", subtitle = p.settingsStyle.name, chevron = true),
+                RowSpec("compact", "紧凑模式", toggle = p.compactMode),
+                RowSpec("console", "网页控制台", value = "8080"),
             ),
         )
     }
@@ -220,11 +192,40 @@ object SettingsV2SampleData {
     }
 }
 
+// ==== 选项组：value 是落库键，label 是给人看的中文 ====
+
+internal fun temperatureChoice(selected: String) = RowChoice(
+    listOf("0.0", "0.3", "0.5", "0.7", "1.0", "1.3", "1.6", "2.0").map { ChoiceOption(it, it) },
+    selected,
+)
+
+internal fun replyChoice(selected: String) = RowChoice(
+    listOf(ChoiceOption("CONCISE", "简洁"), ChoiceOption("BALANCED", "均衡"), ChoiceOption("DETAILED", "详细")),
+    selected,
+)
+
+internal fun securityChoice(selected: String) = RowChoice(
+    listOf(ChoiceOption("NOVICE", "严格确认"), ChoiceOption("STANDARD", "标准"), ChoiceOption("EXPERT", "自动执行")),
+    selected,
+)
+
+internal fun sandboxChoice(selected: String) = RowChoice(
+    listOf(ChoiceOption("READ_ONLY", "只读"), ChoiceOption("WORKSPACE", "工作区"), ChoiceOption("FULL", "全权限")),
+    selected,
+)
+
+internal fun asrLanguageChoice(selected: String) = RowChoice(
+    listOf(
+        ChoiceOption("1537", "普通话"), ChoiceOption("1737", "英语"),
+        ChoiceOption("1637", "粤语"), ChoiceOption("1837", "四川话"),
+    ),
+    selected,
+)
+
 /**
  * 从 baseUrl 里取**供应商主标签**：`https://api.deepseek.com` -> `deepseek`。
  *
- * 为什么不是整段主机名：`api.deepseek.com` 有 17 个字符，把 `供应商` 这一行的标题挤成 `供..`
- * （真机截图实测）。供应商要的是牌子，不是主机名。
+ * 整段主机名有 17 个字符，会把标题挤成 `供..`（真机截图实测）；供应商要的是牌子，不是主机名。
  */
 internal fun providerFromUrl(baseUrl: String): String {
     val host = runCatching { java.net.URI(baseUrl).host }.getOrNull()?.lowercase().orEmpty()
