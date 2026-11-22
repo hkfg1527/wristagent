@@ -11,13 +11,27 @@ data class SettingsV2Section(
     val rows: List<SettingsV2Row>,
 )
 
-/** 一行设置：标题 + 可选副标题 + 可选行尾（值/开关/箭头）。 */
+/** 一个可选项：显示用 [label]，落库用 [value]（枚举 storageKey / 数值字符串）。 */
+data class ChoiceOption(val value: String, val label: String)
+
+/** 一行"点开后从几个选项里选一个"的规格。 */
+data class RowChoice(
+    val options: List<ChoiceOption>,
+    val selectedValue: String,
+) {
+    /** 当前值对应的显示文本；值没在列表里时回退到原值本身。 */
+    fun labelOfSelected(): String =
+        options.firstOrNull { it.value == selectedValue }?.label ?: selectedValue
+}
+
+/** 一行设置：标题 + 可选副标题 + 可选行尾（值/开关/箭头），或一组可选项。 */
 data class SettingsV2Row(
     val key: String,
     val title: String,
     val subtitle: String? = null,
     val trailing: RowTrailing = RowTrailing.None,
     val onClick: (() -> Unit)? = null,
+    val choice: RowChoice? = null,
 )
 
 /** 行尾形态。渲染侧按自己的风格决定"开关画成什么样"。 */
@@ -29,12 +43,12 @@ sealed interface RowTrailing {
 }
 
 /**
- * 该行是否可点：开关与跳转可点，只读值/无行尾不可点。
+ * 该行是否可点：开关、跳转、选项组都可点，只读值/无行尾不可点。
  *
  * 五套风格共用这一条判断，避免"某个风格把只读行也做成可点、点了没反应"。
  */
 fun SettingsV2Row.isActionable(): Boolean =
-    onClick != null || trailing is RowTrailing.Toggle || trailing is RowTrailing.Chevron
+    onClick != null || choice != null || trailing is RowTrailing.Toggle || trailing is RowTrailing.Chevron
 
 /**
  * V2 的内容（当前是示例数据，等 R6 之后接到真实偏好）。
@@ -107,6 +121,34 @@ object SettingsV2SampleData {
         val wiredSecurity = preferences.securityMode.name
         val wiredTts = preferences.autoSpeakReplies
         val wiredSandbox = preferences.sandboxLevel.name
+        // 可调项的选项组：value 是落库键（枚举 storageKey / 数值字符串），label 是给人看的。
+        val temperatureOptions = listOf("0.0", "0.3", "0.5", "0.7", "1.0", "1.3", "1.6", "2.0")
+            .map { ChoiceOption(it, it) }
+        val temperatureChoice = RowChoice(temperatureOptions, formatTemperature(preferences.temperature))
+        val replyChoice = RowChoice(
+            listOf(
+                ChoiceOption("CONCISE", "简洁"),
+                ChoiceOption("BALANCED", "均衡"),
+                ChoiceOption("DETAILED", "详细"),
+            ),
+            preferences.replyStyle.ifBlank { "BALANCED" },
+        )
+        val securityChoice = RowChoice(
+            listOf(
+                ChoiceOption("NOVICE", "严格确认"),
+                ChoiceOption("STANDARD", "标准"),
+                ChoiceOption("EXPERT", "自动执行"),
+            ),
+            preferences.securityMode.name,
+        )
+        val sandboxChoice = RowChoice(
+            listOf(
+                ChoiceOption("READ_ONLY", "只读"),
+                ChoiceOption("WORKSPACE", "工作区"),
+                ChoiceOption("FULL", "全权限"),
+            ),
+            preferences.sandboxLevel.storageKey,
+        )
         // 工具与 MCP：派生"n/7 启用"（六个工具开关 + MCP）。这是真实的组合状态，
         // 比"全部启用"这种写死的文案诚实 —— 文案会与开关实际状态脱节。
         val toolFlags = listOf(
@@ -133,10 +175,10 @@ object SettingsV2SampleData {
                     SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value(wiredProvider)),
                     // 实值
                     SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value(wiredModel)),
-                    // 实值
-                    SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value(wiredTemperature)),
-                    // 实值
-                    SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value(wiredReplyStyle)),
+                    // 实值 + 可调（点开选一档）
+                    SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value(temperatureChoice.labelOfSelected()), choice = temperatureChoice),
+                    // 实值 + 可调
+                    SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value(replyChoice.labelOfSelected()), choice = replyChoice),
                 )
             ),
             SettingsV2Section(
@@ -144,10 +186,10 @@ object SettingsV2SampleData {
                 rows = listOf(
                     // 实值：n/7 启用（六个工具开关 + MCP）
                     SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = wiredToolsSummary, trailing = RowTrailing.Chevron),
-                    // 实值
-                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value(wiredSecurity)),
-                    // 实值
-                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value(wiredSandbox)),
+                    // 实值 + 可调
+                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value(securityChoice.labelOfSelected()), choice = securityChoice),
+                    // 实值 + 可调
+                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value(sandboxChoice.labelOfSelected()), choice = sandboxChoice),
                 )
             ),
             SettingsV2Section(
@@ -161,8 +203,9 @@ object SettingsV2SampleData {
             SettingsV2Section(
                 title = ZONE_ANSWER,
                 rows = listOf(
-                    // 实值：风格名用旧枚举的中文 label，与当前生效的风格一致
-                    SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Value(wiredStyle)),
+                    // 实值：风格名。用 Chevron 让它可点 —— 「页面风格」行本身就是换风格入口，
+                    // 底部不再挂独立按钮（那是抢主视觉的 48dp 死重）。
+                    SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Chevron, subtitle = wiredStyle),
                     SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = wiredCompact, onChange = {})),
                     SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
                 )

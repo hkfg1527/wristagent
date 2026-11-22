@@ -265,8 +265,8 @@ class SquareAndTerminalStyleTest {
         val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt")
             .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
             .readText()
-        assertTrue("必须用 BackHandler 拦截返回", src.contains("BackHandler(enabled = pickerOpen)"))
-        assertTrue("拦截后只关选择器", src.contains("BackHandler(enabled = pickerOpen) { pickerOpen = false }"))
+        assertTrue("必须用 BackHandler 拦截返回（选择器或选项列表开着时都只关覆盖层）", src.contains("BackHandler(enabled = pickerOpen || activeChoice != null)"))
+        assertTrue("拦截后只关覆盖层（选择器或选项列表）", src.contains("pickerOpen -> pickerOpen = false") && src.contains("activeChoice = null"))
     }
 
     /**
@@ -308,9 +308,10 @@ class SquareAndTerminalStyleTest {
         assertTrue("终端入口必须是 `[ 风格 ]` 字符命令（在终端自己的底栏里）", terminal.contains("[ 风格 ]"))
         assertTrue("终端入口由 onStylePicker 回调驱动", terminal.contains("onStylePicker"))
         assertTrue(
-            "四套的胶囊按钮必须排除 TERMINAL（style != TERMINAL 才画）",
-            screen.contains("if (style != SettingsV2Style.TERMINAL)")
+            "四套的风格入口必须收进「页面风格」行（不再有独立底部按钮）",
+            screen.contains("row.key == \"style\" -> pickerOpen = true")
         )
+        assertFalse("不许再有四套共用的胶囊按钮", screen.contains("CompactButton("))
     }
 
     /**

@@ -5,48 +5,46 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
-import androidx.wear.compose.foundation.lazy.itemsIndexed
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.SurfaceTransformation
+import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
-import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
+import com.example.myapplication.presentation.ui.settingsv2.isActionable
 
 /**
- * `M3_CARD`：谷歌健康（Google Health）式**大卡片**。
+ * `M3_CARD`：**一行一张小卡**，圆屏上把横向面积吃满。
  *
- * 规格来自 `docs/SETTINGS-REBUILD-V2.md`：
- * - 一屏 1~2 张主卡，**卡最小高度 140dp**、内边距 **12dp**、卡间距 **8dp**、圆角 **26dp**；
- * - 卡内用 M3 类型标尺两档：组标题 `titleMedium`、行标题/状态 `bodyMedium`；
- * - 走**官方** `Card(transformation = SurfaceTransformation(itemScope, spec))`：
- *   `transformationSpec` 由 `rememberTransformationSpec()` 提供，这样卡片的形状与高度会随滚动位置变化
- *   （M3E 的 shape morphing），而不是自己用 graphicsLayer 手搓缩放。
+ * 旧版把 13 个设置项塞进 4 张 140dp 大卡，首屏只 3 行，值还被压成 12px ——
+ * 那是"把清单做成海报"，不是设置页。现在：
+ * - 每个设置项一张独立卡（最小 44dp），一屏 5~6 项，信息密度翻倍；
+ * - 满宽 + 官方 `SurfaceTransformation`：中间项满宽，滚到圆弧边缘自动缩小贴合，
+ *   这才是 edge-hugging 的意义（定宽 + clipToBounds 把它废掉了）；
+ * - 分区标题降为 12px 眉标，不再与设置项争夺视觉焦点；
+ * - 「页面风格」行本身就是换风格入口，底部不再挂按钮。
  */
 @Composable
 fun M3CardSettings(
@@ -58,42 +56,57 @@ fun M3CardSettings(
     val shape = RoundedCornerShape(identity.cornerRadius)
     val transformationSpec = rememberTransformationSpec()
     val state = rememberTransformingLazyColumnState()
+
+    // 拍平成一个列表：分区眉标 + 该项一张小卡。这样一屏能同时看到更多设置项。
+    data class Item(val header: String? = null, val row: SettingsV2Row? = null, val key: String)
+    val items = buildList {
+        sections.forEach { section ->
+            add(Item(header = section.title, key = "h-" + section.title))
+            section.rows.forEach { row -> add(Item(row = row, key = row.key)) }
+        }
+    }
+
     TransformingLazyColumn(
         modifier = modifier.fillMaxWidth(),
         state = state,
-        // 磁滑吸附：与大卡片一起用官方 snapFling（守卫 SettingsV2ArchitectureGuardTest 会检查这条）
+        // 磁滑吸附（守卫 SettingsV2ArchitectureGuardTest 会检查这条）
         flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
-        // 页边距：左右 8dp（卡自己再留 12dp 内边距），上下 12dp
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        itemsIndexed(sections, key = { _, section -> section.title }) { index, section ->
+        items(items, key = { it.key }) { item ->
             val motion = SettingsV2Motions.of(SettingsV2Style.M3_CARD)
-            val enter = rememberEnterProgress(index, motion)
+            val enter = rememberEnterProgress(items.indexOf(item), motion)
+            if (item.header != null) {
+                Text(
+                    text = item.header,
+                    color = identity.subtitleColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = 6.dp, top = 6.dp, bottom = 2.dp)
+                        .enterAppearance(enter, motion),
+                )
+                return@items
+            }
+            val row = item.row ?: return@items
             Card(
-                onClick = { section.rows.firstOrNull { it.isActionable() }?.let { row -> onRowClick?.invoke(row) } },
+                onClick = { if (row.isActionable()) onRowClick?.invoke(row) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp)
-                    .testTag("m3card-section")
-                    // 入场逐行错峰：延迟 = index × staggerMs（判据见 SettingsV2MotionTest）
+                    .heightIn(min = 44.dp)
+                    .testTag("m3card-row")
                     .enterAppearance(enter, motion),
                 shape = shape,
                 colors = CardDefaults.cardColors(containerColor = identity.surface),
-                // 卡内边距 12dp -> 10dp、标题下留白 6dp -> 2dp、行竖向留白 3dp -> 2dp：
-                // 目标是让第二张卡在 466px 屏上露出更多，暗示"下面还有"（实测原卡高 205dp，屏高 233dp）
-                contentPadding = PaddingValues(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 transformation = SurfaceTransformation(transformationSpec),
             ) {
-                Text(
-                    text = section.title,
-                    color = identity.titleColor,
-                    style = MaterialTheme.typography.titleMedium,
+                M3CardRow(
+                    row = row,
+                    titleColor = identity.titleColor,
+                    valueColor = identity.subtitleColor,
                 )
-                Spacer(Modifier.heightIn(min = 2.dp))
-                section.rows.forEach { row ->
-                    M3CardRow(row = row, onRowClick = onRowClick, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
-                }
             }
         }
     }
@@ -104,27 +117,13 @@ private fun M3CardRow(
     row: SettingsV2Row,
     titleColor: androidx.compose.ui.graphics.Color,
     valueColor: androidx.compose.ui.graphics.Color,
-    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
-    // **单行制**：标题在左、值/开关在右同一行。
-    // 旧版是"标题一行、值另起一行右对齐"，在 466px 圆屏上每行占 80px+，一张卡只放得下 2 行，
-    // 又空又散（圆屏截图对比后改）。标题取剩余宽度、值取固有宽度，长值不会把标题挤成 `供..`。
+    // 单行制：标题在左、值/开关在右同一行；标题与值各占一半，长值自己省略而不挤死标题。
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 36.dp)
-            .padding(vertical = 2.dp)
-            .then(
-                if (onRowClick != null && row.isActionable()) {
-                    Modifier.clickable { onRowClick(row) }
-                } else {
-                    Modifier
-                },
-            ),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        // 标题必须**占满剩余宽度**：用 weight(fill=false) 时，长值（deepseek-v4-pro）会把标题压成 `...`
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = row.title,
@@ -151,7 +150,6 @@ private fun M3CardRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                // 标题与值**各占一半**：只给标题 weight 时，放大字号下长值仍会把标题挤成 `...`（圆屏截图实测）
                 modifier = Modifier.weight(1f).padding(start = 6.dp),
             )
             is RowTrailing.Toggle -> SwitchButton(

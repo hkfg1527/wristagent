@@ -42,12 +42,13 @@ object SettingsV2Motions {
 
     /** 五套的动效参数：数值互不相同，避免"十套风格只有一套动效"。 */
     fun of(style: SettingsV2Style): V2Motion = when (style) {
-        SettingsV2Style.M3_CARD -> V2Motion(staggerMs = 40, enterMs = 260, enterSlide = 12.dp, edgeScaleMin = 0.90f, edgeAlphaMin = 0.55f)
-        SettingsV2Style.M3_LIST -> V2Motion(staggerMs = 26, enterMs = 200, enterSlide = 8.dp, edgeScaleMin = 0.94f, edgeAlphaMin = 0.65f)
+        SettingsV2Style.M3_CARD -> V2Motion(staggerMs = 40, enterMs = 260, enterSlide = 12.dp, edgeScaleMin = 0.76f, edgeAlphaMin = 0.55f)
+        SettingsV2Style.M3_LIST -> V2Motion(staggerMs = 26, enterMs = 200, enterSlide = 8.dp, edgeScaleMin = 0.80f, edgeAlphaMin = 0.65f)
         // ARC 的 identity 是"外侧贴屏"：0.88 会把卡片缩进约 6% 宽，真机上把左缘推到了 8.05px
         // （ArcStyleTest 的门槛是 ≤8px，直接红）。缩到 0.94 后左缘回到约 4px，既保住贴边也不丢边缘反馈。
+        // 贴边卡的辨识度就是"外侧贴屏"，所以它**不参与**本轮"边缘缩放去贴合圆弧"的加强。
         SettingsV2Style.ARC -> V2Motion(staggerMs = 50, enterMs = 300, enterSlide = 16.dp, edgeScaleMin = 0.94f, edgeAlphaMin = 0.50f)
-        SettingsV2Style.SQUARE -> V2Motion(staggerMs = 0, enterMs = 160, enterSlide = 4.dp, edgeScaleMin = 0.97f, edgeAlphaMin = 0.80f)
+        SettingsV2Style.SQUARE -> V2Motion(staggerMs = 0, enterMs = 160, enterSlide = 4.dp, edgeScaleMin = 0.88f, edgeAlphaMin = 0.80f)
         SettingsV2Style.TERMINAL -> V2Motion(staggerMs = 18, enterMs = 120, enterSlide = 0.dp, edgeScaleMin = 1.00f, edgeAlphaMin = 0.90f)
     }
 

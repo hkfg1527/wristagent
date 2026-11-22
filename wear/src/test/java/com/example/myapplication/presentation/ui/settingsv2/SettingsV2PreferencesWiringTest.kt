@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
  * ④把接实值的 sections 交给真实的界面，文本能渲染出来（不是只测数据层）。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w200dp-h200dp")
+@Config(sdk = [35], qualifiers = "w220dp-h300dp")
 class SettingsV2PreferencesWiringTest {
 
     @get:Rule
@@ -101,8 +101,13 @@ class SettingsV2PreferencesWiringTest {
         val p = prefs()
         p.autoSpeakReplies = true
         val on = SettingsV2SampleData.fromPreferences(p)
-        assertEquals("安全策略接 securityMode", p.securityMode.name, valueOf(on, "security"))
-        assertEquals("特权执行接 sandboxLevel", p.sandboxLevel.name, valueOf(on, "root"))
+        val secRow = on.flatMap { it.rows }.first { it.key == "security" }
+        val sandRow = on.flatMap { it.rows }.first { it.key == "root" }
+        // 可调项现在"落库键 + 显示 label"分离：落库键仍是枚举 storageKey，给人看的是中文
+        assertEquals("安全策略落库键接 securityMode", p.securityMode.name, secRow.choice?.selectedValue)
+        assertEquals("安全策略显示中文 label", "标准", valueOf(on, "security"))
+        assertEquals("特权执行落库键接 sandboxLevel", p.sandboxLevel.storageKey, sandRow.choice?.selectedValue)
+        assertEquals("特权执行显示中文 label", "全权限", valueOf(on, "root"))
         assertTrue("自动播报接 autoSpeakReplies（true）", toggleOf(on, "tts"))
 
         p.autoSpeakReplies = false
@@ -145,7 +150,10 @@ class SettingsV2PreferencesWiringTest {
         assertEquals("qwen3-max", valueOf(sections, "model"))
         assertEquals("0.8", valueOf(sections, "temperature"))
         assertEquals("concise", valueOf(sections, "reply_style"))
-        assertEquals("ARC", valueOf(sections, "style"))
+        // 「页面风格」行现在是 Chevron（行本身就是换风格入口），当前档位放在副标题里
+        val styleRow = sections.flatMap { it.rows }.first { it.key == "style" }
+        assertEquals("ARC", styleRow.subtitle)
+        assertTrue("页面风格行必须可点", styleRow.isActionable())
     }
 
     @Test

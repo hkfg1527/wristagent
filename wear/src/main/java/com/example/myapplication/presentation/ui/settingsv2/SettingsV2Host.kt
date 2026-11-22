@@ -7,6 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.MaterialTheme
+import com.example.myapplication.agent.SandboxLevel
+import com.example.myapplication.agent.contract.SecurityMode
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
@@ -68,6 +70,16 @@ fun SettingsV2Host(
                     is RowTrailing.Chevron -> Unit
                     else -> row.onClick?.invoke()
                 }
+            },
+            // 选项行选中后写回偏好：value 是落库键（枚举 storageKey / 数值字符串）。
+            onChoiceSelected = { key, value ->
+                when (key) {
+                    "temperature" -> preferences.temperature = value.toFloat()
+                    "reply_style" -> preferences.replyStyle = value
+                    "security" -> preferences.securityMode = SecurityMode.valueOf(value)
+                    "root" -> preferences.sandboxLevel = SandboxLevel.fromStorage(value)
+                }
+                com.example.myapplication.agent.SettingsChangeBus.bump()
             },
         )
     }

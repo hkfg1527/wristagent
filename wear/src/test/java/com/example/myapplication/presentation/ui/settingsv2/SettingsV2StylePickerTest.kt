@@ -21,35 +21,56 @@ import org.robolectric.annotation.Config
  * 「手表上能换风格」的判据（V2 之前只能靠网页控制台，屏幕上没有入口）。
  *
  * 覆盖三件事：
- * ①底部「风格」按钮存在且可点开选择器；
+ * ①「页面风格」行存在且可点开选择器（独立底部按钮已删除：它抢主视觉还占 48dp）；
  * ②选择器里五套都在（每套一个条目）；
  * ③点某一套 → 回调收到对应风格、覆盖层关闭。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w200dp-h200dp")
+@Config(sdk = [35], qualifiers = "w200dp-h300dp")
 class SettingsV2StylePickerTest {
 
     @get:Rule
     val compose = createComposeRule()
 
-    @Test
-    fun theStyleButtonOpensAPickerWithAllFiveStyles() {
+    /** 视口小，用最小数据把「页面风格」行放在第一屏，避免它没被组合导致查不到。 */
+    private val sections = listOf(
+        SettingsV2Section(
+            title = "连得上",
+            rows = listOf(
+                SettingsV2Row("model", "模型", trailing = RowTrailing.Value("x")),
+                SettingsV2Row("style", "页面风格", trailing = RowTrailing.Chevron),
+            ),
+        )
+    )
+
+    private fun show(picked: ((SettingsV2Style) -> Unit)? = null) {
         compose.setContent {
-            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD) }
+            MaterialTheme {
+                SettingsV2Screen(
+                    style = SettingsV2Style.M3_CARD,
+                    sections = sections,
+                    onStyleSelected = picked,
+                )
+            }
         }
         compose.waitForIdle()
+    }
 
-        compose.onNodeWithText("风格").assertIsDisplayed()
+    @Test
+    fun theStyleButtonOpensAPickerWithAllFiveStyles() {
+        show()
+
+        compose.onNodeWithText("页面风格", substring = true).assertIsDisplayed()
         assertTrue(
             "打开前不应有选择器",
             compose.onAllNodesWithTag(StylePickerTag).fetchSemanticsNodes().isEmpty()
         )
 
-        compose.onNodeWithText("风格").performClick()
+        compose.onNodeWithText("页面风格", substring = true).performClick()
         compose.waitForIdle()
 
         compose.onNodeWithTag(StylePickerTag).assertIsDisplayed()
-        // 覆盖层可滚动：200dp 视口下先滚到目标再断言
+        // 覆盖层可滚动：视口小，先滚到目标再断言
         SettingsV2Style.values().forEach { style ->
             compose.onNodeWithTag(StylePickerItemTagPrefix + style.name).performScrollTo().assertIsDisplayed()
         }
@@ -58,17 +79,9 @@ class SettingsV2StylePickerTest {
     @Test
     fun pickingAStyleReportsItAndClosesThePicker() {
         var picked: SettingsV2Style? = null
-        compose.setContent {
-            MaterialTheme {
-                SettingsV2Screen(
-                    style = SettingsV2Style.M3_CARD,
-                    onStyleSelected = { picked = it },
-                )
-            }
-        }
-        compose.waitForIdle()
+        show { picked = it }
 
-        compose.onNodeWithText("风格").performClick()
+        compose.onNodeWithText("页面风格", substring = true).performClick()
         compose.waitForIdle()
         compose.onNodeWithTag(StylePickerItemTagPrefix + SettingsV2Style.TERMINAL.name).performScrollTo().performClick()
         compose.waitForIdle()

@@ -1,6 +1,8 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.ui.semantics.SemanticsProperties
+import org.junit.Assert.assertFalse
+import java.io.File
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -42,25 +44,34 @@ class SettingsV2CardWidthTest {
             listOf(SettingsV2Style.ARC),
             edgeToEdge
         )
-        assertEquals("同宽基准必须是 176dp", 176f, SettingsV2StandardWidth.value, 0.001f)
+        assertEquals("同宽基准必须是 192dp", 192f, SettingsV2StandardWidth.value, 0.001f)
     }
 
     @Test
-    fun standardStyleRowsStayWithinThe176dpColumn() {
+    fun contentIsFullWidthInsteadOfAClippedColumn() {
         compose.setContent {
             MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD) }
         }
         compose.waitForIdle()
 
-        val limit = SettingsV2StandardWidth.value * density
+        val src = sequenceOf(File("."), File("wear"), File("../wear"))
+            .map { it.absoluteFile }
+            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
+            .first { it.exists() }
+            .readText()
+        assertFalse(
+            "内容不许再被 Modifier.width(SettingsV2StandardWidth) 裁成定宽列（那会放弃圆屏横向面积）",
+            src.contains("Modifier.width(SettingsV2StandardWidth)")
+        )
+        assertTrue("contentModifier 必须满宽", src.contains("contentModifier = Modifier\n                .fillMaxWidth()"))
+
         val nodes = compose.onAllNodesWithText("供应商").fetchSemanticsNodes()
         assertTrue("M3_CARD 必须渲染出内容", nodes.isNotEmpty())
-        // 文本节点宽度一定小于列宽；这里同时校验列没有超出 176dp 太多（允许 1px 取整误差）
+        // 文本节点仍应落在屏幕内（不越出圆屏边界），这是对"满宽"的正向约束
         nodes.forEach { node ->
-            val width = node.boundsInRoot.width
             assertTrue(
-                "M3_CARD 的行内容宽度 ${width}px 不应超过 176dp(${limit}px) + 1px",
-                width <= limit + 1f
+                "文本节点不能溢出屏幕：left=${node.boundsInRoot.left}",
+                node.boundsInRoot.left >= 0f
             )
         }
     }

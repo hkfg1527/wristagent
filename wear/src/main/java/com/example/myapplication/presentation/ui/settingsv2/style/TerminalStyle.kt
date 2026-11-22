@@ -130,6 +130,10 @@ fun TerminalSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
     onStylePicker: (() -> Unit)? = null,
+    /** 选项行：点它或按 Enter 时交给宿主的选项列表。 */
+    onChoice: ((SettingsV2Row) -> Unit)? = null,
+    /** 开关行：把"拨了哪个开关"交给宿主写回偏好（本地 toggles 只负责即时反白）。 */
+    onToggle: ((SettingsV2Row) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.TERMINAL.identity
     val state = rememberTransformingLazyColumnState()
@@ -181,12 +185,18 @@ fun TerminalSettings(
         echoSeq += 1
         appendCappedEcho(echoes, EchoLine(echoSeq, line))
     }
-    // 执行一行：点它、或按 Enter 执行当前焦点行，走的是同一条逻辑
+    // 执行一行：点它、或按 Enter 执行当前焦点行，走的是同一条逻辑。
+    // 选项行优先交给宿主的选项列表（否则只会打印一行 # open，什么都改不了）。
     fun activate(row: SettingsV2Row) {
+        if (row.choice != null) {
+            onChoice?.invoke(row)
+            return
+        }
         val checked = toggles[row.key] ?: (row.trailing as? RowTrailing.Toggle)?.checked ?: false
         when (row.trailing) {
             is RowTrailing.Toggle -> {
                 toggles[row.key] = !checked
+                onToggle?.invoke(row)
                 pushEcho("# ${row.title} -> ${if (!checked) "ON" else "OFF"}")
             }
             is RowTrailing.Chevron -> pushEcho("# open ${row.title}")

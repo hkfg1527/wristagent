@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.wear.compose.material3.MaterialTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -64,7 +65,7 @@ class SettingsV2ScreenTest {
     }
 
     @Test
-    fun theCardStyleUsesTallCards() {
+    fun theCardStyleUsesOneSmallCardPerSetting() {
         compose.setContent {
             MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD) }
         }
@@ -73,17 +74,20 @@ class SettingsV2ScreenTest {
         val density = androidx.test.core.app.ApplicationProvider
             .getApplicationContext<android.app.Application>()
             .resources.displayMetrics.density
-        val minHeightPx = 140f * density
-        val all = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("m3card-section"))
+        // 旧判据是"存在 ≥140dp 的大卡"——那是把 13 个设置项塞进 4 张海报卡，首屏只 3 行。
+        // 新架构：一项一张小卡。判据换成**密度约束**：视口内至少组合出 4 张，
+        // 且不许再出现 ≥140dp 的稀疏大卡。
+        // 不设固定高度上限：SurfaceTransformation 会按滚动位置缩放卡片（圆屏边缘随动），
+        // 那个形变是设计本身，不是回归。
+        val heights = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("m3card-row"))
             .fetchSemanticsNodes().map { it.boundsInRoot.height }
-        val tall = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("m3card-section"))
-            .fetchSemanticsNodes()
-            .map { it.boundsInRoot }
-            .filter { it.height >= minHeightPx }
         assertTrue(
-            "大卡片档必须存在高度 ≥140dp 的卡片（Google Health 那种一屏一两张）；" +
-                "实测 heights(px)=${all.joinToString()} minHeightPx=$minHeightPx density=$density",
-            tall.isNotEmpty()
+            "M3_CARD 必须是一行一张独立小卡（视口内至少 4 张）；实测 ${heights.size} 张",
+            heights.size >= 4
+        )
+        assertTrue(
+            "不许再出现 ≥140dp 的稀疏大卡；实测 heights(px)=${heights.joinToString()}",
+            heights.all { it < 140f * density }
         )
     }
 
@@ -96,11 +100,11 @@ class SettingsV2ScreenTest {
      * 原因：`TransformingLazyColumn` 不裁剪，加上 40dp 内边距比按钮矮 16px。
      */
     @Test
-    fun bottomInsetMatchesTheStyleButtonAndContentIsClipped() {
+    fun noStyleButtonFullWidthAndChoiceEntry() {
         assertEquals(
-            "底部内边距必须等于按钮高度 48dp（真机量得按钮 96px 高）",
-            48f,
-            SettingsV2ContentBottomInset.value,
+            "去掉风格按钮后底部只留 8dp 手势区",
+            8f,
+            SettingsV2BottomInset.value,
             0.01f
         )
         val src = sequenceOf(File("."), File("wear"), File("../wear"))
@@ -108,13 +112,21 @@ class SettingsV2ScreenTest {
             .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
             .first { it.exists() }
             .readText()
-        assertTrue(
-            "内容必须 clipToBounds()：TransformingLazyColumn 会把行画到边界之外",
+        assertFalse(
+            "底部独立的「风格」按钮必须删掉（它抢主视觉、还占 48dp）",
+            src.contains("CompactButton(")
+        )
+        assertFalse(
+            "不许再 clipToBounds 把满宽内容硬裁成矩形（会废掉边缘随动）",
             src.contains("clipToBounds()")
         )
         assertTrue(
-            "底部内边距必须走 SettingsV2ContentBottomInset 常量，不许再写魔法数字 40.dp",
-            !src.contains("padding(bottom = 40.dp)")
+            "内容必须满宽，靠 SurfaceTransformation / edgeAppearance 贴合圆弧",
+            src.contains("contentModifier = Modifier\n                .fillMaxWidth()")
+        )
+        assertTrue(
+            "「页面风格」行必须本身是入口",
+            src.contains("row.key == \"style\" -> pickerOpen = true")
         )
     }
 }
