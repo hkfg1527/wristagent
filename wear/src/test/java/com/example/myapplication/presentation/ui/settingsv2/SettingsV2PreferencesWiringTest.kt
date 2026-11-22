@@ -8,6 +8,8 @@ import com.example.myapplication.agent.AgentPreferences
 import com.example.myapplication.agent.FakeSharedPreferences
 import com.example.myapplication.appearance.SettingsStyle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +39,32 @@ class SettingsV2PreferencesWiringTest {
             .first { it.key == key }
             .trailing.let { it as RowTrailing.Value }
             .text
+
+    private fun toggleOf(sections: List<SettingsV2Section>, key: String): Boolean =
+        sections.flatMap { it.rows }
+            .first { it.key == key }
+            .trailing.let { it as RowTrailing.Toggle }
+            .checked
+
+    /**
+     * R52：新增接实值的三行（安全策略 / 自动播报 / 特权执行）。
+     *
+     * 接法故意不做文案美化：控制台 `/api/state` 显示什么枚举名，设置页就显示什么 ——
+     * 这样"两处数字/枚举对不上"这类问题不会藏在翻译层里。
+     */
+    @Test
+    fun securityTtsAndSandboxFollowThePreferences() {
+        val p = prefs()
+        p.autoSpeakReplies = true
+        val on = SettingsV2SampleData.fromPreferences(p)
+        assertEquals("安全策略接 securityMode", p.securityMode.name, valueOf(on, "security"))
+        assertEquals("特权执行接 sandboxLevel", p.sandboxLevel.name, valueOf(on, "root"))
+        assertTrue("自动播报接 autoSpeakReplies（true）", toggleOf(on, "tts"))
+
+        p.autoSpeakReplies = false
+        val off = SettingsV2SampleData.fromPreferences(p)
+        assertFalse("自动播报接 autoSpeakReplies（false）", toggleOf(off, "tts"))
+    }
 
     @Test
     fun wiredRowsFollowThePreferenceValues() {

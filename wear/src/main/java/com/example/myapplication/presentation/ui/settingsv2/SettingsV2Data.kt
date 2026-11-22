@@ -93,6 +93,11 @@ object SettingsV2SampleData {
         val wiredReplyStyle = preferences.replyStyle.ifBlank { "默认" }
         // SettingsStyle 是 appearance 包的枚举，没有中文 label，这里用枚举名（与 /api/state 一致）
         val wiredStyle = preferences.settingsStyle.name
+        // 新增接实值的三行：安全策略 / 自动播报 / 特权执行。
+        // 都直接读偏好枚举名或布尔值，不做文案美化 —— 控制台 /api/state 里显示什么，这里就该显示什么。
+        val wiredSecurity = preferences.securityMode.name
+        val wiredTts = preferences.autoSpeakReplies
+        val wiredSandbox = preferences.sandboxLevel.name
 
         return listOf(
             SettingsV2Section(
@@ -109,17 +114,19 @@ object SettingsV2SampleData {
             SettingsV2Section(
                 title = ZONE_ACT,
                 rows = listOf(
-                    // 以下三行仍是示例文案（等对应偏好接好后再改成实值）
+                    // 示例文案（工具清单与偏好不是一对一，等做"工具开关页"时再接）
                     SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = "全部启用", trailing = RowTrailing.Chevron),
-                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value("标准提示")),
-                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value("ROOT")),
+                    // 实值
+                    SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value(wiredSecurity)),
+                    // 实值
+                    SettingsV2Row(key = "root", title = "特权执行", trailing = RowTrailing.Value(wiredSandbox)),
                 )
             ),
             SettingsV2Section(
                 title = ZONE_HEAR,
                 rows = listOf(
                     SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = "出向能力独立", trailing = RowTrailing.Chevron),
-                    SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
+                    SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = wiredTts, onChange = {})),
                     SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
                 )
             ),
