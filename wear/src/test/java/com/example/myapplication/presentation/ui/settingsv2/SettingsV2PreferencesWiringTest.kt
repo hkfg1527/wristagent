@@ -110,6 +110,29 @@ class SettingsV2PreferencesWiringTest {
         assertFalse("自动播报接 autoSpeakReplies（false）", toggleOf(off, "tts"))
     }
 
+    /**
+     * R54：示例数据与真实数据必须有**完全相同的行结构**（分区数 + 每行 key 集合）。
+     *
+     * 这条守卫来自一次真事故：批量替换时把 `// 实值：…` 写成带字面量 `\n` 的一行，
+     * 结果下一行 `SettingsV2Row(key = "tools" …)` 被**注释掉**，编译照样通过、
+     * 设置页少了一行 —— 只有数 key 才看得出来。
+     */
+    @Test
+    fun sampleAndWiredDataExposeTheSameRowStructure() {
+        val sample = SettingsV2SampleData.root()
+        val wired = SettingsV2SampleData.fromPreferences(prefs())
+
+        assertEquals("分区数必须一致", sample.size, wired.size)
+        sample.zip(wired).forEachIndexed { i, (s, w) ->
+            assertEquals("第 ${i + 1} 个分区的标题", s.title, w.title)
+            assertEquals(
+                "第 ${i + 1} 个分区的行 key 必须一一对应（多/少都说明有行被吞掉）",
+                s.rows.map { it.key },
+                w.rows.map { it.key },
+            )
+        }
+    }
+
     @Test
     fun wiredRowsFollowThePreferenceValues() {
         val p = prefs()

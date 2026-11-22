@@ -48,6 +48,7 @@ object SettingsV2SampleData {
                 SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value("配置 1")),
                 SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value("deepseek-v4")),
                 SettingsV2Row(key = "temperature", title = "温度", subtitle = "越高越发散", trailing = RowTrailing.Value("1.4")),
+                SettingsV2Row(key = "reply_style", title = "回复风格", trailing = RowTrailing.Value("BALANCED")),
             )
         ),
         SettingsV2Section(
@@ -111,11 +112,19 @@ object SettingsV2SampleData {
         )
         val wiredToolsSummary = "${toolFlags.count { it }}/${toolFlags.size} 启用"
         val wiredCompact = preferences.compactMode
+        // 语音与唤醒：副标题显示真实的引擎与启用状态（此前是"出向能力独立"这种写死文案）
+        // 供应商：从 baseUrl 的主机名派生（不再写死"配置 1"）
+        val wiredProvider = runCatching {
+            java.net.URI(preferences.baseUrl).host?.removePrefix("www.")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "未配置"
+        val wiredVoiceSummary = "${preferences.asrProvider} · ${if (preferences.asrEnabled) "已启用" else "未启用"}"
 
         return listOf(
             SettingsV2Section(
                 title = ZONE_CONNECT,
                 rows = listOf(
+                    // 实值
+                    SettingsV2Row(key = "provider", title = "供应商", trailing = RowTrailing.Value(wiredProvider)),
                     // 实值
                     SettingsV2Row(key = "model", title = "模型", trailing = RowTrailing.Value(wiredModel)),
                     // 实值
@@ -138,7 +147,7 @@ object SettingsV2SampleData {
             SettingsV2Section(
                 title = ZONE_HEAR,
                 rows = listOf(
-                    SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = "出向能力独立", trailing = RowTrailing.Chevron),
+                    SettingsV2Row(key = "voice", title = "语音与唤醒", subtitle = wiredVoiceSummary, trailing = RowTrailing.Chevron),
                     SettingsV2Row(key = "tts", title = "自动播报回答", trailing = RowTrailing.Toggle(checked = wiredTts, onChange = {})),
                     SettingsV2Row(key = "wake", title = "唤醒词", trailing = RowTrailing.Value("关闭")),
                 )
