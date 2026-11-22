@@ -335,13 +335,11 @@ class MainActivity : ComponentActivity() {
             return true
         }
         if (RotaryBus.enabled && (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP)) {
-            // 音量下 = 往下翻（内容上移），音量上 = 往回翻
-            val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                ROTARY_PIXELS_PER_UNIT
-            } else {
-                -ROTARY_PIXELS_PER_UNIT
-            }
-            Log.i("TerminalRotary", "key delta=$delta code=$keyCode")
+            // 音量下 = 往下翻（内容上移），音量上 = 往回翻；
+            // 单按一行、长按一屏（真终端里按住方向键会加速）
+            val magnitude = RotaryBus.deltaForKeyRepeat(event.repeatCount, ROTARY_PIXELS_PER_UNIT)
+            val delta = if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) magnitude else -magnitude
+            Log.i("TerminalRotary", "key delta=$delta repeat=${event.repeatCount} code=$keyCode")
             RotaryBus.emit(delta)
             return true
         }

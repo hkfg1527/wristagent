@@ -1,4 +1,4 @@
-﻿package com.example.myapplication.presentation.ui.settingsv2
+package com.example.myapplication.presentation.ui.settingsv2
 
 import com.example.myapplication.presentation.ui.settingsv2.common.RotaryBus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -74,5 +74,20 @@ class RotaryBusTest {
         RotaryBus.enabled = true
         // 关阀门期间的事件不该在开阀门后被"补发"：没有订阅者时也不会缓存成待投递状态
         assertTrue("阀门开关本身不影响对象可用性", RotaryBus.enabled)
+    }
+
+    /**
+     * R38：单按一行、长按一屏（`PgDn` 语义）。
+     *
+     * 真终端里按住方向键会加速滚动，一行一行挪太慢；这里用 KeyEvent.repeatCount 区分。
+     */
+    @Test
+    fun keyRepeatTurnsIntoScreenPages() {
+        assertEquals("单按 = 一行", 36f, RotaryBus.deltaForKeyRepeat(0, 36f), 0.001f)
+        assertEquals("长按 = 一屏（10 行）", 360f, RotaryBus.deltaForKeyRepeat(1, 36f), 0.001f)
+        assertEquals("重复多少次都是一屏（不叠加）", 360f, RotaryBus.deltaForKeyRepeat(9, 36f), 0.001f)
+        assertEquals("行高可注入", 720f, RotaryBus.deltaForKeyRepeat(1, 72f), 0.001f)
+        assertEquals("屏行数可注入", 180f, RotaryBus.deltaForKeyRepeat(1, 36f, pageLines = 5), 0.001f)
+        assertEquals("pageLines 非法时至少 1 行", 36f, RotaryBus.deltaForKeyRepeat(1, 36f, pageLines = 0), 0.001f)
     }
 }

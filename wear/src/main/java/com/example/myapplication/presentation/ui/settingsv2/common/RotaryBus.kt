@@ -15,6 +15,22 @@ import kotlinx.coroutines.flow.SharedFlow
  */
 object RotaryBus {
 
+    /** 一屏按多少行算（终端 36px 行网格、可视 10 行）。 */
+    const val PageLines = 10
+
+    /**
+     * 一次按键该滚多少像素：**单按一行，长按一屏**。
+     *
+     * 真终端里按住方向键会加速（`less` / `vim` 都是），一行一行挪太慢。
+     * 这里用按键重复次数（`KeyEvent.repeatCount`）区分：0 = 首次按下，>=1 = 长按重复。
+     *
+     * @param repeatCount 系统给的重复次数
+     * @param linePx 一行的像素高度（36）
+     * @param pageLines 一屏行数（默认 10）
+     */
+    fun deltaForKeyRepeat(repeatCount: Int, linePx: Float, pageLines: Int = PageLines): Float =
+        linePx * if (repeatCount <= 0) 1 else pageLines.coerceAtLeast(1)
+
     private val _events = MutableSharedFlow<Float>(extraBufferCapacity = 64)
 
     /** 表冠增量（像素语义，正 = 内容向上滚）。 */
