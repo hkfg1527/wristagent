@@ -368,7 +368,10 @@ fun TerminalSettings(
         TerminalPromptLine(
             lineStyle = lineStyle,
             isActive = state.isScrollInProgress,
-            statusText = "${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}·${sections.sumOf { it.rows.size }}L",
+            // 行数**包含回显**：回显也是行，滚动条总数早就把它算进去了（totalItems = baseItems + echoes），
+            // 标签却只数配置行 —— 两处数字对不上是真的不一致，不是取舍。
+            statusText = "${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}"
+                + "·${sections.sumOf { it.rows.size } + echoes.size}L",
             onStylePicker = onStylePicker,
             onHelp = { pushEcho(TerminalHelpLine) },
             modifier = Modifier.align(Alignment.BottomStart),
