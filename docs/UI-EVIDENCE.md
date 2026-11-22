@@ -611,3 +611,16 @@ TERMINAL 哈希 `e847d11d121e` → **`108d499a7d68`**，其余四套未动，`di
 
 同期门禁：`release-check` **8/8**（装机 0.0.0.225）、五套 `distinct 5/5`（哈希与崩溃修复前一致）、
 `instrument-selftest` **INSTRUMENTS_OK**。
+
+### 失败尝试留档：`/help` 命令（撤回，未入库）
+
+想给终端加一条可执行的 `/help`（真 TUI 都有），输出用法清单，解决"用户不知道 `[ ON ]`、`/open` 可以点"的可发现性问题。
+
+结果：**撤回**。测试红在这里：
+- 点击确实触发了（`hasTestTag(TerminalHelpTag) and hasClickAction()` 能取到节点并 performClick 成功，
+  不带 `hasClickAction` 时则是"取不到节点"——说明 tag 与 clickable 的语义层级有讲究）；
+- 但点完之后 `# 命令:` 的回显节点取不到，原因**未定位**（不是崩溃：logcat 无 FATAL）。
+
+我没有把它留在代码里：未验证的功能不入库。留档这句是为了下次（包括我自己）不重复走这段路：
+`/help` 行是列表**最后一项**，点它会在它**之后**追加回显并触发 `scrollToItem(baseItems + echoes.size - 1)`，
+怀疑是"追加项 + 程序化滚动"在 Robolectric 下的组合问题，需要在真机上用 dump 复核一次再决定怎么测。
