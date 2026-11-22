@@ -41,6 +41,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -327,7 +329,16 @@ fun TerminalSettings(
                             ) {
                                 activate(row)
                             }
-                            .testTag(TerminalRowTag),
+                            .testTag(TerminalRowTag)
+                            // 读屏语义：`> 工具与 MCP   /open` 这种字符画对 TalkBack 只是乱码，
+                            // 得说清楚"这行能干什么、现在是什么状态"。只读行不加描述（它只是信息）。
+                            .semantics {
+                                when (row.trailing) {
+                                    is RowTrailing.Chevron -> contentDescription = "${row.title}，打开"
+                                    is RowTrailing.Toggle -> contentDescription = "${row.title}，${if (checked) "开" else "关"}"
+                                    else -> Unit
+                                }
+                            },
                     ) {
                         TerminalGridLine {
                             TerminalLine(

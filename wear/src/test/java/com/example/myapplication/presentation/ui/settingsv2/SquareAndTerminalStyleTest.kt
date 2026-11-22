@@ -3,6 +3,11 @@ package com.example.myapplication.presentation.ui.settingsv2
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -200,6 +205,40 @@ class SquareAndTerminalStyleTest {
      * `Modifier.clickable` 默认用 `LocalIndication`（M3 是涟漪）。真终端点一行不会荡出一圈光晕 ——
      * 这是"看起来像终端"和"真的是终端"之间很小但很明显的一处。所以终端侧一律 `indication = null`。
      */
+    /**
+     * R55：读屏要能说清"这行能干什么、现在什么状态"。
+     *
+     * 终端是一屏字符：`> 工具与 MCP   /open`、`[ OFF ]` 对 TalkBack 只是乱码。
+     * 所以可操作行要带 contentDescription —— 跳转说"打开"，开关说"开/关"；
+     * 只读行（模型/温度）**不加**描述，它本来就只是信息。
+     */
+    @Test
+    fun actionableRowsDescribeTheirActionAndState() {
+        // 自定义最小数据：可操作行必须**在视口内**（用全量示例数据时它们在首屏之外，
+        // 没被组合就查不到语义 —— 这是本轮踩过的坑，真机 dump 里其实是有 content-desc 的）
+        val sections = listOf(
+            SettingsV2Section(
+                title = "区",
+                rows = listOf(
+                    SettingsV2Row("jump", "跳转项", trailing = RowTrailing.Chevron),
+                    SettingsV2Row("switch", "开关项", trailing = RowTrailing.Toggle(false) {}),
+                    SettingsV2Row("readonly", "只读项", trailing = RowTrailing.Value("v")),
+                ),
+            )
+        )
+        compose.setContent {
+            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.TERMINAL, sections = sections) }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("跳转项，打开", substring = true, useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("开关项，关", substring = true, useUnmergedTree = true).assertExists()
+        assertTrue(
+            "只读行不该有描述（它只是信息）",
+            compose.onAllNodesWithContentDescription("只读项", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty(),
+        )
+    }
+
     @Test
     fun terminalClicksHaveNoRipple() {
         listOf(
