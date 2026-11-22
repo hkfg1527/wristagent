@@ -47,9 +47,30 @@ object RotaryBus {
      */
     val activations: SharedFlow<Unit> = _activations
 
-    /** 终端页在栈上时才为 true。 */
-    @Volatile
-    var enabled: Boolean = false
+    /**
+     * 谁需要接管按键（终端页 / 字符菜单 …）。
+     *
+     * **为什么不是单个布尔量**：之前的选择器用"保存 previous、销毁时还原"来管理它。
+     * 切换风格时终端页与选择器同时销毁，若终端先销毁（把阀门置 false），选择器再还原 previous（true），
+     * 阀门就**永久卡在 true** —— `MainActivity.dispatchKeyEvent` 于是全局吞掉 ENTER / DPAD_CENTER，
+     * 整只表的物理确认键全部失效（真机现象：设置页"按钮点不动、什么都干不了"）。
+     * 改成按持有者计数后，销毁顺序不再影响结果。
+     */
+    private val owners = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** 只要还有持有者，就需要接管按键。 */
+    val enabled: Boolean
+        get() = owners.isNotEmpty()
+
+    /** 声明需要接管按键（幂等）。 */
+    fun acquire(owner: String) {
+        owners.add(owner)
+    }
+
+    /** 交还接管权（幂等；未持有也不报错）。 */
+    fun release(owner: String) {
+        owners.remove(owner)
+    }
 
     fun emit(delta: Float) {
         if (enabled) _events.tryEmit(delta)

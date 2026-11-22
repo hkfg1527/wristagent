@@ -29,6 +29,14 @@ sealed interface RowTrailing {
 }
 
 /**
+ * 该行是否可点：开关与跳转可点，只读值/无行尾不可点。
+ *
+ * 五套风格共用这一条判断，避免"某个风格把只读行也做成可点、点了没反应"。
+ */
+fun SettingsV2Row.isActionable(): Boolean =
+    onClick != null || trailing is RowTrailing.Toggle || trailing is RowTrailing.Chevron
+
+/**
  * V2 的内容（当前是示例数据，等 R6 之后接到真实偏好）。
  *
  * **分区名必须与应用真实的设置分区一致**：`release-check` 的"四分区按序"判据就是按这四个名字扫的，

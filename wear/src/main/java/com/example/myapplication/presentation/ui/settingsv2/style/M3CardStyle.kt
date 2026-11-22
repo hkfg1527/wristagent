@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,6 +30,7 @@ import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
@@ -49,6 +52,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnter
 fun M3CardSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
+    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.M3_CARD.identity
     val shape = RoundedCornerShape(identity.cornerRadius)
@@ -67,10 +71,11 @@ fun M3CardSettings(
             val motion = SettingsV2Motions.of(SettingsV2Style.M3_CARD)
             val enter = rememberEnterProgress(index, motion)
             Card(
-                onClick = {},
+                onClick = { section.rows.firstOrNull { it.isActionable() }?.let { row -> onRowClick?.invoke(row) } },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = identity.rowMinHeight)
+                    .heightIn(min = 140.dp)
+                    .testTag("m3card-section")
                     // 入场逐行错峰：延迟 = index × staggerMs（判据见 SettingsV2MotionTest）
                     .enterAppearance(enter, motion),
                 shape = shape,
@@ -87,7 +92,7 @@ fun M3CardSettings(
                 )
                 Spacer(Modifier.heightIn(min = 2.dp))
                 section.rows.forEach { row ->
-                    M3CardRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
+                    M3CardRow(row = row, onRowClick = onRowClick, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
                 }
             }
         }
@@ -99,52 +104,68 @@ private fun M3CardRow(
     row: SettingsV2Row,
     titleColor: androidx.compose.ui.graphics.Color,
     valueColor: androidx.compose.ui.graphics.Color,
+    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
-    // 176dp 卡片 + 用户可能放大字号：标题与右值同一行必然互相挤（实测 deepseek… / 回复…）。
-    // 所以有值/开关时改成两行：第一行标题，第二行右值（右对齐）或开关（右对齐）。
-    Column(
+    // **单行制**：标题在左、值/开关在右同一行。
+    // 旧版是"标题一行、值另起一行右对齐"，在 466px 圆屏上每行占 80px+，一张卡只放得下 2 行，
+    // 又空又散（圆屏截图对比后改）。标题取剩余宽度、值取固有宽度，长值不会把标题挤成 `供..`。
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 40.dp)
-            .padding(vertical = 2.dp),
+            .heightIn(min = 36.dp)
+            .padding(vertical = 2.dp)
+            .then(
+                if (onRowClick != null && row.isActionable()) {
+                    Modifier.clickable { onRowClick(row) }
+                } else {
+                    Modifier
+                },
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            text = row.title,
-            color = titleColor,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        row.subtitle?.let {
+        // 标题必须**占满剩余宽度**：用 weight(fill=false) 时，长值（deepseek-v4-pro）会把标题压成 `...`
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = it,
-                color = valueColor,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 2,
+                text = row.title,
+                color = titleColor,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            row.subtitle?.let {
+                Text(
+                    text = it,
+                    color = valueColor,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         when (val trailing = row.trailing) {
             is RowTrailing.Value -> Text(
                 text = trailing.text,
                 color = titleColor,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                modifier = Modifier.fillMaxWidth(),
+                // 标题与值**各占一半**：只给标题 weight 时，放大字号下长值仍会把标题挤成 `...`（圆屏截图实测）
+                modifier = Modifier.weight(1f).padding(start = 6.dp),
             )
-            is RowTrailing.Toggle -> Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                SwitchButton(
-                    checked = trailing.checked,
-                    onCheckedChange = trailing.onChange,
-                    label = {},
-                )
-            }
-            is RowTrailing.Chevron, RowTrailing.None -> Unit
+            is RowTrailing.Toggle -> SwitchButton(
+                checked = trailing.checked,
+                onCheckedChange = trailing.onChange,
+                label = {},
+            )
+            is RowTrailing.Chevron -> Text(
+                text = "›",
+                color = valueColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
+            RowTrailing.None -> Unit
         }
     }
 }

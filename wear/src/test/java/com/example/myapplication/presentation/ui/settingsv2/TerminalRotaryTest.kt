@@ -166,9 +166,13 @@ class TerminalRotaryTest {
         assertTrue("终端必须订阅总线", terminal.contains("RotaryBus.events.collect"))
         assertTrue(
             "进入终端页必须打开安全阀、离开必须关掉",
-            terminal.contains("RotaryBus.enabled = true") && terminal.contains("RotaryBus.enabled = false")
+            terminal.contains("RotaryBus.acquire(TerminalValveOwner)") && terminal.contains("RotaryBus.release(TerminalValveOwner)")
         )
-        assertTrue("总线必须带安全阀开关", bus.contains("var enabled"))
+        assertTrue(
+            "总线必须带安全阀：按持有者计数，且对外只暴露只读的 enabled，不给赋值入口（避免保存/还原式管理再次卡住）",
+            bus.contains("val enabled") && bus.contains("fun acquire(") && bus.contains("fun release(") &&
+                !bus.contains("var enabled"),
+        )
         // 第二条可能通道：表冠被映射成音量键的机型（input keyevent 可注入，因此这条可端到端验证）
         assertTrue(
             "Activity 必须也接音量键音量通道（表冠的音量映射）",

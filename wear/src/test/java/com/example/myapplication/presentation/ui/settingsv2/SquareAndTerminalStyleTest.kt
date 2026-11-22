@@ -357,6 +357,6 @@ class SquareAndTerminalStyleTest {
             .readText()
         assertTrue("必须订阅表冠事件", src.contains("RotaryBus.events.collect"))
         assertTrue("必须订阅 Enter", src.contains("RotaryBus.activations.collect"))
-        assertTrue("进入菜单要开阀门、离开要还原", src.contains("RotaryBus.enabled = true") && src.contains("onDispose { RotaryBus.enabled = previous }"))
+        assertTrue("进入菜单要声明接管、离开要交还（不能用保存/还原，否则会永久卡住）", src.contains("RotaryBus.acquire(PickerValveOwner)") && src.contains("RotaryBus.release(PickerValveOwner)"))
         assertTrue("光标移动走纯函数", src.contains("movePickerCursor(cursor, lines, size)"))
     }}

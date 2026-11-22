@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
@@ -54,6 +56,7 @@ internal const val ArcCardTag = "arc-card"
 fun ArcSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
+    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.ARC.identity
     // 外侧直角、内侧圆角
@@ -94,6 +97,13 @@ fun ArcSettings(
                         .enterAppearance(enter, motion)
                         .reportEdgeDistance(edge)
                         .edgeAppearance(edge.value, motion)
+                        .then(
+                            if (onRowClick != null && row.isActionable()) {
+                                Modifier.clickable { onRowClick(row) }
+                            } else {
+                                Modifier
+                            },
+                        )
                         .testTag(ArcCardTag),
                 ) {
                     ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)

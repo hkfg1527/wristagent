@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.wear.compose.material3.MaterialTheme
+import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.appearance.SettingsStyle
 import com.example.myapplication.presentation.ui.settings.WearAppearance
 
@@ -50,6 +51,23 @@ fun SettingsV2Host(
                 // 落库 + 广播：preferences 是唯一真源，bump 之后宿主会按新风格重组
                 preferences.settingsStyle = picked.toLegacy()
                 com.example.myapplication.agent.SettingsChangeBus.bump()
+            },
+            // 行点击：**五套风格共用**。此前只有 TERMINAL 接通，另外四套点了没反应
+            // （M3_CARD 甚至是 `onClick = {}` 的假按钮），用户看到的就是"设置页全都用不了"。
+            onRowClick = { row ->
+                when (val trailing = row.trailing) {
+                    is RowTrailing.Toggle -> {
+                        when (row.key) {
+                            "tts" -> preferences.autoSpeakReplies = !preferences.autoSpeakReplies
+                            "compact" -> preferences.compactMode = !preferences.compactMode
+                            else -> trailing.onChange(!trailing.checked)
+                        }
+                        com.example.myapplication.agent.SettingsChangeBus.bump()
+                    }
+                    // V2 还没有子页（工具清单页 / 语音页在旧实现里），这里先不假装能进
+                    is RowTrailing.Chevron -> Unit
+                    else -> row.onClick?.invoke()
+                }
             },
         )
     }

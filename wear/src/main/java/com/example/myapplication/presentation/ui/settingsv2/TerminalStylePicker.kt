@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalDensity
 /**
  * 菜单光标移动：把"当前下标"按行步进夹在合法区间内（纯函数，便于单测）。
  */
+internal const val PickerValveOwner = "style-picker"
+
 internal fun movePickerCursor(index: Int, lines: Int, size: Int): Int =
     if (size <= 0) 0 else (index + lines).coerceIn(0, size - 1)
 
@@ -70,9 +72,8 @@ fun TerminalStylePicker(
     var cursor by remember(current) { mutableStateOf(current.ordinal.coerceIn(0, size - 1)) }
     val linePx = with(LocalDensity.current) { TerminalLineHeight.toPx() }
     DisposableEffect(Unit) {
-        val previous = RotaryBus.enabled
-        RotaryBus.enabled = true
-        onDispose { RotaryBus.enabled = previous }
+        RotaryBus.acquire(PickerValveOwner)
+        onDispose { RotaryBus.release(PickerValveOwner) }
     }
     LaunchedEffect(Unit) {
         var acc = 0f

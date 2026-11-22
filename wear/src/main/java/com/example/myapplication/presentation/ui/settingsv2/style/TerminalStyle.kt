@@ -83,6 +83,7 @@ internal const val TerminalBannerTag = "terminal-banner"
  */
 internal const val TerminalHelpTag = "terminal-help"
 internal const val TerminalHelpLine = "# [ ON ] 开关 · /open"
+internal const val TerminalValveOwner = "terminal-page"
 internal const val TerminalBannerPrefix = "wristagent v"
 
 /** 提示符：真的终端就是 `> `。 */
@@ -230,8 +231,8 @@ fun TerminalSettings(
     // 表冠：Activity 层送来的滚动（不依赖焦点）。进入本页才打开安全阀，离开立刻关掉，
     // 免得把聊天页的表冠滚动一起吞了。
     DisposableEffect(Unit) {
-        RotaryBus.enabled = true
-        onDispose { RotaryBus.enabled = false }
+        RotaryBus.acquire(TerminalValveOwner)
+        onDispose { RotaryBus.release(TerminalValveOwner) }
     }
     LaunchedEffect(Unit) {
         RotaryBus.events.collect { delta ->

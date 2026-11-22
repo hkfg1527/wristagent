@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
@@ -43,6 +45,17 @@ val SettingsV2StandardWidth = 176.dp
  */
 val SettingsV2ContentBottomInset = 48.dp
 
+/**
+ * 顶部安全区：圆屏第一行必须往里收，否则会被圆弧切掉。
+ *
+ * 466px 圆屏上，y=26 处的可用宽度只有 2×√(233²−207²) ≈ 214px；y=56 处约 340px。
+ * 24dp（48px）把首行推到 y≥56，整行才进得来。
+ */
+val SettingsV2SafeInsetTop = 24.dp
+
+/** 底部渐隐高度：把"内容被切断"变成"下面还有"。 */
+val SettingsV2BottomFade = 28.dp
+
 /** 换风格入口的测试标识（四套是胶囊按钮，TERMINAL 是 `[ 风格 ]` 字符命令，同一个 tag）。 */
 const val StyleEntryTag = "style-entry"
 
@@ -63,6 +76,12 @@ fun SettingsV2Screen(
     sections: List<SettingsV2Section> = SettingsV2SampleData.root(),
     modifier: Modifier = Modifier,
     onStyleSelected: ((SettingsV2Style) -> Unit)? = null,
+    /**
+     * 行被点击。**五套风格共用这一个入口**（此前只有 TERMINAL 接通，另外四套点了没反应，
+     * M3_CARD 甚至是 `onClick = {}` 的假按钮 —— 用户实际感受就是"设置页全都用不了"）。
+     * 传 null 时不加点击（预览/测试用）。
+     */
+    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
     val identity = style.identity
     var pickerOpen by remember { mutableStateOf(false) }
@@ -88,15 +107,18 @@ fun SettingsV2Screen(
             // **clipToBounds 必须在 padding 之后**：修饰符按链序生效，放在 padding 之前时
             // 裁剪点仍是整屏高度（真机实测 y=378 处照样有墨迹），放到之后才裁在 y=370。
             // 另外 TransformingLazyColumn 会把行画到自己的边界之外，所以必须裁。
+            // 顶部必须留出**圆形安全区**：466px 圆屏在 y=26 处的可用宽度只有 ~214px，
+            // 内容从 y=8 起画（旧值）时首行会被圆弧从两侧切掉（圆屏截图实测：banner 只剩中间一截）。
+            // 24dp=48px 让首行落在 y>=56，那里可用宽度 ~340px，够放下整行。
             val contentModifier = widthModifier
                 .fillMaxSize()
-                .padding(bottom = SettingsV2ContentBottomInset)
+                .padding(top = SettingsV2SafeInsetTop, bottom = SettingsV2ContentBottomInset)
                 .clipToBounds()
             when (style) {
-                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier)
-                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier)
-                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier)
-                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier)
+                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier, onRowClick = onRowClick)
+                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier, onRowClick = onRowClick)
+                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier, onRowClick = onRowClick)
+                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier, onRowClick = onRowClick)
                 // TERMINAL 把"换风格"收进它自己的底栏（`[ 风格 ]` 与状态段同一行），
                 // 不再浮在屏幕右下角当独立控件 —— 真终端的底栏是一整行。
                 SettingsV2Style.TERMINAL -> TerminalSettings(
@@ -109,6 +131,21 @@ fun SettingsV2Screen(
 
         // 手表上换风格的唯一入口（四套用官方小圆按钮；TERMINAL 的入口在它自己的底栏里）。
         // EdgeButton 的尺寸是内部参数（无公开 size 形参），给内容留 48dp 底部间距由内容避让。
+        // 内容下边界（y≈370）会硬切一张卡/一行字，圆屏上看着像"被裁坏"。
+        // 这里加一层从透明到页面底色的渐变，读起来是"下面还有"，而不是断口。
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = SettingsV2ContentBottomInset)
+                .height(SettingsV2BottomFade)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(identity.pageBackground.copy(alpha = 0f), identity.pageBackground),
+                    ),
+                ),
+        )
+
         if (style != SettingsV2Style.TERMINAL) {
             CompactButton(
                 onClick = { pickerOpen = true },

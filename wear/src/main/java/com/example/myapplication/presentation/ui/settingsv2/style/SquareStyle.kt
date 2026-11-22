@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2.style
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
@@ -75,6 +77,7 @@ internal val SquareRowMinHeight = SettingsV2Style.SQUARE.identity.rowMinHeight
 fun SquareSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
+    onRowClick: ((SettingsV2Row) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.SQUARE.identity
     val state = rememberTransformingLazyColumnState()
@@ -125,6 +128,13 @@ fun SquareSettings(
                             .enterAppearance(enter, motion)
                             .reportEdgeDistance(edge)
                             .edgeAppearance(edge.value, motion)
+                            .then(
+                                if (onRowClick != null && row.isActionable()) {
+                                    Modifier.clickable { onRowClick(row) }
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .testTag(SquareRowTag)
                     ) {
                         // 两行堆叠：标题一行、右值/开关一行右对齐（176dp 窄列 + 放大字号下同行必互挤）

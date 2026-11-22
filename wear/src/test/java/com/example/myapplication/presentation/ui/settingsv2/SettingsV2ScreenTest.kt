@@ -23,7 +23,7 @@ import java.io.File
  * ③大卡片是"大"的：至少一张卡的高度 ≥ 140dp —— 这是 Google Health 那种一屏一两张的形态特征。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w200dp-h200dp")
+@Config(sdk = [35], qualifiers = "w200dp-h300dp")   // 视口要放得下"一张 140dp 大卡 + 上下安全区内缩"
 class SettingsV2ScreenTest {
 
     @get:Rule
@@ -74,12 +74,15 @@ class SettingsV2ScreenTest {
             .getApplicationContext<android.app.Application>()
             .resources.displayMetrics.density
         val minHeightPx = 140f * density
-        val tall = compose.onAllNodes(androidx.compose.ui.test.hasText("连得上", substring = true))
+        val all = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("m3card-section"))
+            .fetchSemanticsNodes().map { it.boundsInRoot.height }
+        val tall = compose.onAllNodes(androidx.compose.ui.test.hasTestTag("m3card-section"))
             .fetchSemanticsNodes()
             .map { it.boundsInRoot }
             .filter { it.height >= minHeightPx }
         assertTrue(
-            "大卡片档必须存在高度 ≥140dp 的卡片（Google Health 那种一屏一两张）",
+            "大卡片档必须存在高度 ≥140dp 的卡片（Google Health 那种一屏一两张）；" +
+                "实测 heights(px)=${all.joinToString()} minHeightPx=$minHeightPx density=$density",
             tall.isNotEmpty()
         )
     }
