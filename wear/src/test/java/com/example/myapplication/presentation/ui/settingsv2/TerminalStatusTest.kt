@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
 import com.example.myapplication.presentation.ui.settingsv2.style.TerminalBannerPrefix
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalHelpLine
 import com.example.myapplication.presentation.ui.settingsv2.style.absoluteItemIndex
 import com.example.myapplication.presentation.ui.settingsv2.style.focusItemIndex
 import com.example.myapplication.presentation.ui.settingsv2.style.zoneOfAnchor
@@ -101,4 +102,16 @@ class TerminalStatusTest {
             banner.length <= 26
         )
     }
-}
+    /**
+     * R48：帮助行也必须短到不换行。
+     *
+     * 第一版 `# 可点: [ ON ] 开关 · /open 打开` 在真机上被裁到 `· /`（截图可见），
+     * 和 banner 同一个坑：dump 里文本完整，只有截图能发现。这里卡 20 字符。
+     */
+    @Test
+    fun helpLineFitsOnOneLine() {
+        assertTrue(
+            "帮助行必须 <=20 字符（否则真机被裁），实际 ${TerminalHelpLine.length}：$TerminalHelpLine",
+            TerminalHelpLine.length <= 20
+        )
+    }}

@@ -79,6 +79,8 @@ internal const val TerminalBannerTag = "terminal-banner"
  * 现在 12 字符 + 版本号（共 21），12sp 等宽下约 300px，内容列约 394px 放得下；
  * 守卫 `bannerFitsOnOneLine` 把上限定在 26 字符（实测可容纳约 27）。
  */
+internal const val TerminalHelpTag = "terminal-help"
+internal const val TerminalHelpLine = "# [ ON ] 开关 · /open"
 internal const val TerminalBannerPrefix = "wristagent v"
 
 /** 提示符：真的终端就是 `> `。 */
@@ -366,9 +368,9 @@ fun TerminalSettings(
         TerminalPromptLine(
             lineStyle = lineStyle,
             isActive = state.isScrollInProgress,
-            statusText = "[${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}] "
-                + "${sections.sumOf { it.rows.size }}L",
+            statusText = "${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}·${sections.sumOf { it.rows.size }}L",
             onStylePicker = onStylePicker,
+            onHelp = { pushEcho(TerminalHelpLine) },
             modifier = Modifier.align(Alignment.BottomStart),
         )
         TerminalScrollBar(
@@ -540,6 +542,7 @@ private fun TerminalPromptLine(
     isActive: Boolean,
     statusText: String,
     onStylePicker: (() -> Unit)?,
+    onHelp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     var cursorOn by remember { mutableStateOf(true) }
@@ -577,10 +580,25 @@ private fun TerminalPromptLine(
             // 右侧聚簇：状态段 + 换风格入口**同一行**。
             // 不要用固定 78dp 预留位（第一版这么干，`[ 风格 ]` 被挤出屏幕、状态被截成 `[1/4]`）。
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 状态段本身就是帮助入口（点它打印"哪些东西可点"）——不额外占宽度，
+                // 因为底栏已经放不下第四个元素（加 `[ ? ]` 后 `[ 风格 ]` 被裁成 `[`，真机截图可见）
                 BasicText(
                     text = statusText,
                     style = lineStyle.copy(color = SettingsV2Style.TERMINAL.identity.subtitleColor),
                     maxLines = 1,
+                    modifier = Modifier
+                        .then(
+                            if (onHelp != null) {
+                                Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                    ) { onHelp() }
+                                    .testTag(TerminalHelpTag)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
                 if (onStylePicker != null) {
                     BasicText(
