@@ -69,6 +69,17 @@ import kotlinx.coroutines.launch
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
 internal const val TerminalValueTag = "terminal-value"
+internal const val TerminalBannerTag = "terminal-banner"
+
+/**
+ * banner 前缀：**必须短到不换行**。
+ *
+ * 第一版是 `wristagent · TERMINAL · v`（27 字符前缀 + 版本号），实测被屏幕宽度截断成
+ * `wristagent · TERMINAL▨` —— version 完全看不见（dump 里文本仍是完整的，所以截图才看得见问题）。
+ * 现在 12 字符 + 版本号（共 21），12sp 等宽下约 300px，内容列约 394px 放得下；
+ * 守卫 `bannerFitsOnOneLine` 把上限定在 26 字符（实测可容纳约 27）。
+ */
+internal const val TerminalBannerPrefix = "wristagent v"
 
 /** 提示符：真的终端就是 `> `。 */
 internal const val TerminalPrompt = "> "
@@ -134,7 +145,7 @@ fun TerminalSettings(
     )
 
     // 列表里的基础行数（分区规则线 + 分区头 + 行）。提示符是钉在底部的，**不算**列表项。
-    val baseItems = remember(sections) { sections.sumOf { 2 + it.rows.size } }
+    val baseItems = remember(sections) { 1 + sections.sumOf { 2 + it.rows.size } } // +1 = banner
     // 焦点行（反白）：视口中间那一项，只对可操作行生效
     val absIndex = remember(sections) { absoluteItemIndex(sections) }
 
@@ -259,6 +270,17 @@ fun TerminalSettings(
             // 项内 96->132 = 36px 正常，项间 132->176 = 44px）。字符网格必须是常数。
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
+            // 开机 banner：真终端进来先打一行身份（这也是终端里唯一能看到版本号的地方）
+            item(key = "banner") {
+                TerminalGridLine {
+                    BasicText(
+                        text = TerminalBannerPrefix + com.example.myapplication.BuildConfig.VERSION_NAME,
+                        style = dimStyle,
+                        maxLines = 1,
+                        modifier = Modifier.testTag(TerminalBannerTag),
+                    )
+                }
+            }
             sections.forEach { section ->
                 item(key = "r-" + section.title) {
                     // ASCII 规则线：`vim` / `less` 那种 banner 式分节，用字符铺出来，不画笔。
@@ -372,7 +394,7 @@ internal fun zoneOfAnchor(
     anchorItemIndex: Int,
     echoCount: Int = 0,
 ): Int {
-    var start = 0
+    var start = 1 // banner 占首位
     sections.forEachIndexed { index, section ->
         val size = 2 + section.rows.size // 规则线 + 分区头 + 行
         if (anchorItemIndex < start + size) return index + 1
@@ -388,7 +410,7 @@ internal fun zoneOfAnchor(
  * 焦点行（反白）要按"视口中间那一项"算，所以必须能反查每行的绝对序号；纯函数便于单测。
  */
 internal fun absoluteItemIndex(sections: List<SettingsV2Section>): Map<String, Int> = buildMap {
-    var index = 0
+    var index = 1 // banner 占首位
     sections.forEach { section ->
         index += 2 // 规则线 + 分区头
         section.rows.forEach { row ->
@@ -406,7 +428,7 @@ internal fun absoluteItemIndex(sections: List<SettingsV2Section>): Map<String, I
  * 锚点一跳、焦点就跑到别的行上，再按 Enter 执行的是另一条命令 —— 真机实测踩到）。
  */
 internal fun firstActionableAfter(sections: List<SettingsV2Section>, anchorItemIndex: Int): SettingsV2Row? {
-    var index = 0
+    var index = 1 // banner 占首位
     sections.forEach { section ->
         index += 2 // 规则线 + 分区头
         section.rows.forEach { row ->
