@@ -68,6 +68,7 @@ import kotlinx.coroutines.launch
 
 /** 终端行的测试标识。 */
 internal const val TerminalRowTag = "terminal-row"
+internal const val TerminalValueTag = "terminal-value"
 
 /** 提示符：真的终端就是 `> `。 */
 internal const val TerminalPrompt = "> "
@@ -493,6 +494,7 @@ private fun TerminalLine(
         if (right != null) {
             BasicText(
                 text = right.first,
+                modifier = Modifier.testTag(TerminalValueTag),
                 // BasicText 没有 textAlign 形参：对齐必须写在 TextStyle 里
                 style = (if (right.second) dimStyle else lineStyle)
                     .copy(textAlign = TextAlign.End, color = if (right.second) dimFg else fg),
