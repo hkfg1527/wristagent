@@ -40,6 +40,10 @@ class SettingsV2PreferencesWiringTest {
             .trailing.let { it as RowTrailing.Value }
             .text
 
+
+    private fun subtitleOf(sections: List<SettingsV2Section>, key: String): String =
+        sections.flatMap { it.rows }.first { it.key == key }.subtitle ?: ""
+
     private fun toggleOf(sections: List<SettingsV2Section>, key: String): Boolean =
         sections.flatMap { it.rows }
             .first { it.key == key }
@@ -47,7 +51,47 @@ class SettingsV2PreferencesWiringTest {
             .checked
 
     /**
-     * R52：新增接实值的三行（安全策略 / 自动播报 / 特权执行）。
+     * R53：工具副标题是**派生值**（n/7 启用），必须随六个工具开关 + MCP 变化。
+     *
+     * 用三组数据（全关 / 混合 / 全开）验证，避免"恰好等于 7/7"这种巧合通过。
+     */
+    @Test
+    fun toolsSummaryCountsEnabledFlags() {
+        val p = prefs()
+        p.toolDeviceStatusEnabled = false
+        p.toolVibrateEnabled = false
+        p.toolMatrixDensityEnabled = false
+        p.toolPowerModeEnabled = false
+        p.toolWeatherEnabled = false
+        p.toolWebSearchEnabled = false
+        p.isMcpEnabled = false
+        assertEquals("全关", "0/7 启用", subtitleOf(SettingsV2SampleData.fromPreferences(p), "tools"))
+
+        p.toolWeatherEnabled = true
+        p.isMcpEnabled = true
+        p.toolVibrateEnabled = true
+        assertEquals("混合", "3/7 启用", subtitleOf(SettingsV2SampleData.fromPreferences(p), "tools"))
+
+        listOf(true).forEach { _ ->
+            p.toolDeviceStatusEnabled = true
+            p.toolMatrixDensityEnabled = true
+            p.toolPowerModeEnabled = true
+            p.toolWebSearchEnabled = true
+        }
+        assertEquals("全开", "7/7 启用", subtitleOf(SettingsV2SampleData.fromPreferences(p), "tools"))
+    }
+
+    /** 紧凑模式也接实值（两态）。 */
+    @Test
+    fun compactModeFollowsThePreference() {
+        val p = prefs()
+        p.compactMode = true
+        assertTrue(toggleOf(SettingsV2SampleData.fromPreferences(p), "compact"))
+        p.compactMode = false
+        assertFalse(toggleOf(SettingsV2SampleData.fromPreferences(p), "compact"))
+    }
+    /**
+     * R52：安全策略 / 自动播报 / 特权执行三行接实值。
      *
      * 接法故意不做文案美化：控制台 `/api/state` 显示什么枚举名，设置页就显示什么 ——
      * 这样"两处数字/枚举对不上"这类问题不会藏在翻译层里。

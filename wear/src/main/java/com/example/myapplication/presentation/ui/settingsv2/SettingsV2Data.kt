@@ -82,7 +82,7 @@ object SettingsV2SampleData {
     /**
      * 用**真实偏好**生成内容（R6 之后接的第一批）。
      *
-     * 目前接实值的行只有四处（模型 / 温度 / 回复风格 / 页面风格），其余行暂时沿用示例文案 ——
+     * 目前接实值的行（模型 / 温度 / 回复风格 / 页面风格 / 安全策略 / 特权执行 / 自动播报 / 紧凑模式 / 工具数），其余行暂时沿用示例文案 ——
      * 这一点必须在代码里显式标注，不能让"看起来像真的"冒充"已经接好"。
      * 接实值的方式是**每次重组时读一遍偏好**，而不是缓存快照：控制台改完偏好会 bump
      * `SettingsChangeBus`，宿主据此重组。
@@ -98,6 +98,19 @@ object SettingsV2SampleData {
         val wiredSecurity = preferences.securityMode.name
         val wiredTts = preferences.autoSpeakReplies
         val wiredSandbox = preferences.sandboxLevel.name
+        // 工具与 MCP：派生"n/7 启用"（六个工具开关 + MCP）。这是真实的组合状态，
+        // 比"全部启用"这种写死的文案诚实 —— 文案会与开关实际状态脱节。
+        val toolFlags = listOf(
+            preferences.toolDeviceStatusEnabled,
+            preferences.toolVibrateEnabled,
+            preferences.toolMatrixDensityEnabled,
+            preferences.toolPowerModeEnabled,
+            preferences.toolWeatherEnabled,
+            preferences.toolWebSearchEnabled,
+            preferences.isMcpEnabled,
+        )
+        val wiredToolsSummary = "${toolFlags.count { it }}/${toolFlags.size} 启用"
+        val wiredCompact = preferences.compactMode
 
         return listOf(
             SettingsV2Section(
@@ -114,8 +127,8 @@ object SettingsV2SampleData {
             SettingsV2Section(
                 title = ZONE_ACT,
                 rows = listOf(
-                    // 示例文案（工具清单与偏好不是一对一，等做"工具开关页"时再接）
-                    SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = "全部启用", trailing = RowTrailing.Chevron),
+                    // 实值：n/7 启用（六个工具开关 + MCP）
+                    SettingsV2Row(key = "tools", title = "工具与 MCP", subtitle = wiredToolsSummary, trailing = RowTrailing.Chevron),
                     // 实值
                     SettingsV2Row(key = "security", title = "安全策略", trailing = RowTrailing.Value(wiredSecurity)),
                     // 实值
@@ -135,7 +148,7 @@ object SettingsV2SampleData {
                 rows = listOf(
                     // 实值：风格名用旧枚举的中文 label，与当前生效的风格一致
                     SettingsV2Row(key = "style", title = "页面风格", trailing = RowTrailing.Value(wiredStyle)),
-                    SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = false, onChange = {})),
+                    SettingsV2Row(key = "compact", title = "紧凑模式", trailing = RowTrailing.Toggle(checked = wiredCompact, onChange = {})),
                     SettingsV2Row(key = "console", title = "网页控制台", trailing = RowTrailing.Value("8080")),
                 )
             ),
