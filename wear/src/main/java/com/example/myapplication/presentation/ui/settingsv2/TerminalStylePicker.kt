@@ -13,13 +13,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.presentation.ui.settingsv2.common.RotaryBus
+import com.example.myapplication.presentation.ui.settingsv2.style.TerminalLineHeight
+import com.example.myapplication.presentation.ui.settingsv2.style.rotaryLinesToScroll
+import androidx.compose.ui.platform.LocalDensity
+
+/**
+ * 菜单光标移动：把"当前下标"按行步进夹在合法区间内（纯函数，便于单测）。
+ */
+internal fun movePickerCursor(index: Int, lines: Int, size: Int): Int =
+    if (size <= 0) 0 else (index + lines).coerceIn(0, size - 1)
 
 /**
  * TERMINAL 专用的风格选择器：**字符菜单**，不是卡片面板。
@@ -46,6 +61,32 @@ fun TerminalStylePicker(
         lineHeight = 18.sp,
     )
     val dimStyle = lineStyle.copy(color = identity.subtitleColor)
+
+    // 表冠 / Enter 也必须能用在这个菜单上。
+    //
+    // 真机实测过的漏洞：菜单打开后音量键被 Activity 吞掉（阀门是终端页打开的），但菜单本身不订阅，
+    // 于是"按了没反应"，而 Enter 反而落到菜单背后的终端上去执行行。所以这里自己接管两条通道。
+    val size = SettingsV2Style.entries.size
+    var cursor by remember(current) { mutableStateOf(current.ordinal.coerceIn(0, size - 1)) }
+    val linePx = with(LocalDensity.current) { TerminalLineHeight.toPx() }
+    DisposableEffect(Unit) {
+        val previous = RotaryBus.enabled
+        RotaryBus.enabled = true
+        onDispose { RotaryBus.enabled = previous }
+    }
+    LaunchedEffect(Unit) {
+        var acc = 0f
+        RotaryBus.events.collect { delta ->
+            val (next, lines) = rotaryLinesToScroll(acc, delta, linePx)
+            acc = next
+            if (lines != 0) cursor = movePickerCursor(cursor, lines, size)
+        }
+    }
+    LaunchedEffect(Unit) {
+        RotaryBus.activations.collect {
+            SettingsV2Style.entries.getOrNull(cursor)?.let(onPick)
+        }
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -66,10 +107,13 @@ fun TerminalStylePicker(
             BasicText(text = "# 页面风格", style = dimStyle, maxLines = 1)
             BasicText(text = "─".repeat(30), style = dimStyle, maxLines = 1, softWrap = false)
             SettingsV2Style.entries.forEachIndexed { index, style ->
-                val mark = if (style == current) "> " else "  "
+                // `>` 跟着**光标**走（表冠可移动），当前生效的风格用尾部 `*` 标注 ——
+                // 两者是不同概念：光标是"你正指着哪一项"，`*` 是"现在用的是哪一项"。
+                val mark = if (index == cursor) "> " else "  "
+                val currentMark = if (style == current) " *" else ""
                 BasicText(
-                    text = "$mark${index + 1} ${style.label}",
-                    style = lineStyle,
+                    text = "$mark${index + 1} ${style.label}$currentMark",
+                    style = if (index == cursor) lineStyle.copy(color = identity.pageBackground, background = identity.titleColor) else lineStyle,
                     maxLines = 1,
                     modifier = Modifier
                         .fillMaxWidth()

@@ -32,8 +32,8 @@ android {
         minSdk = compatMinSdk ?: 33
         targetSdk = 37
         manifestPlaceholders["wearableLibRequired"] = (compatMinSdk == null).toString()
-        versionCode = 276
-        versionName = "0.0.0.238"
+        versionCode = 277
+        versionName = "0.0.0.239"
         // 任何密钥都不参与构建：API key 只能由用户在应用设置里填，进 SharedPreferences。
         buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
     }

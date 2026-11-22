@@ -286,7 +286,8 @@ class SquareAndTerminalStyleTest {
             assertFalse("终端选择器里不允许调用 $forbidden", src.contains(forbidden))
         }
         assertTrue("必须有字符头 `# 页面风格`", src.contains("\"# 页面风格\""))
-        assertTrue("当前项必须用 `> ` 标记", src.contains("if (style == current) \"> \" else \"  \""))
+        assertTrue("`> ` 必须跟着**光标**走（可被表冠移动）", src.contains("if (index == cursor) \"> \" else \"  \""))
+        assertTrue("当前生效的风格必须有独立标记 `*`（与光标是两件事）", src.contains("if (style == current) \" *\" else \"\""))
         assertTrue("必须有规则线", src.contains("\"─\".repeat("))
         assertTrue("必须保留既有 testTag（工具与测试不用改）", src.contains("StylePickerTag") && src.contains("StylePickerItemTagPrefix"))
     }
@@ -334,4 +335,28 @@ class SquareAndTerminalStyleTest {
         assertTrue("末行必须是块光标 █", src.contains("TerminalCursorBlock"))
         assertTrue("滚动条必须是 ASCII ▓/░", src.contains("TerminalThumbCell") && src.contains("TerminalTrackCell"))
     }
-}
+    /**
+     * R56：菜单光标必须能被表冠/音量键移动，且夹在合法区间内。
+     *
+     * 真机漏洞：菜单打开后音量键被吞但光标不动（菜单没订阅通道），Enter 反而落到背后的终端上。
+     */
+    @Test
+    fun pickerCursorMovesAndClamps() {
+        assertEquals("右移一格", 3, movePickerCursor(2, 1, 5))
+        assertEquals("左移一格", 1, movePickerCursor(2, -1, 5))
+        assertEquals("顶部不能越过 0", 0, movePickerCursor(0, -3, 5))
+        assertEquals("底部不能越过最后一个", 4, movePickerCursor(4, 9, 5))
+        assertEquals("空菜单兜底", 0, movePickerCursor(2, 1, 0))
+    }
+
+    /** 菜单必须自己订阅两条通道（否则按键被吞、无效果）。 */
+    @Test
+    fun pickerSubscribesToRotaryAndEnter() {
+        val src = File("wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/TerminalStylePicker.kt")
+            .let { if (it.exists()) it else File("../wear/src/main/java/com/example/myapplication/presentation/ui/settingsv2/TerminalStylePicker.kt") }
+            .readText()
+        assertTrue("必须订阅表冠事件", src.contains("RotaryBus.events.collect"))
+        assertTrue("必须订阅 Enter", src.contains("RotaryBus.activations.collect"))
+        assertTrue("进入菜单要开阀门、离开要还原", src.contains("RotaryBus.enabled = true") && src.contains("onDispose { RotaryBus.enabled = previous }"))
+        assertTrue("光标移动走纯函数", src.contains("movePickerCursor(cursor, lines, size)"))
+    }}
