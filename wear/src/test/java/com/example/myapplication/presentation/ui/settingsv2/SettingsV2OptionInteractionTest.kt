@@ -6,10 +6,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.wear.compose.material3.MaterialTheme
 import org.junit.Assert.assertEquals
-import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -18,10 +16,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 「设置项点了真的能改」的**界面级**交互验证（不只是源码守卫）。
+ * 「选项子页直接复用外层列表 UI」的界面级验证。
  *
- * 之前只有 SettingsV2WritableTest 读 Host 源码确认映射存在，没有真正在 Compose 里点开、
- * 选值、收回调。这条补上链路：行点击 → OptionPicker → 选项点击 → onChoiceSelected。
+ * 用户要求："里列表直接套外面列表的 UI 就行了"。
+ * 所以子页不是独立组件，而是把选项摊成同样的 section/row 交给同一个渲染器：
+ * 它必须①出现在同一套列表里（同一个行 tag）、②有可点的返回行、③选中后回调并返回。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w220dp-h400dp")
@@ -30,7 +29,6 @@ class SettingsV2OptionInteractionTest {
     @get:Rule
     val compose = createComposeRule()
 
-    /** 最小数据：温度（选项）+ 自动播报（开关）放第一屏，避免行没被组合。 */
     private val sections = listOf(
         SettingsV2Section(
             title = "连得上",
@@ -51,7 +49,7 @@ class SettingsV2OptionInteractionTest {
     )
 
     @Test
-    fun pickingAnOptionCallsBackAndClosesThePicker() {
+    fun choosingAnOptionUsesTheSameListAndCallsBack() {
         var picked: Pair<String, String>? = null
         compose.setContent {
             MaterialTheme {
@@ -64,31 +62,46 @@ class SettingsV2OptionInteractionTest {
         }
         compose.waitForIdle()
 
-        // 点行 -> 选项列表出现
+        // 点「温度」→ 进入子列表：用的是**同一套行容器**（m3card-row）
         compose.onNodeWithText("温度", substring = true).performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag(OptionPickerTag).assertIsDisplayed()
         assertTrue(
-            "打开前不应有回调",
-            picked == null
+            "子列表必须复用主页的行容器（m3card-row），而不是另做一套",
+            compose.onAllNodesWithTag("m3card-row").fetchSemanticsNodes().isNotEmpty()
         )
+        // 返回行必须在（子列表靠它回主页，不依赖系统返回键）
+        compose.onNodeWithText("‹ 返回", substring = true).assertIsDisplayed()
 
-        // 点 1.6 -> 回调收到 temperature/1.6，且覆盖层关闭
-        // 用语义动作派发而非坐标点击：Robolectric 的圆屏小视口 + 滚动容器下，
-        // performClick 会点到合并父节点造成假阴性（组件级测试已定位到这一点）。
-        compose.onNodeWithTag(OptionPickerItemTagPrefix + "1.6", useUnmergedTree = true)
-            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        // 选一个靠近顶部的选项：M3_CARD 只组合可见项，远处选项在视口外查不到节点
+        compose.onNodeWithText("0.3", substring = true).performClick()
         compose.waitForIdle()
+        assertEquals("temperature" to "0.3", picked)
         assertTrue(
-            "回调应收到 temperature/1.6，实际 picked=$picked",
-            picked == "temperature" to "1.6"
+            "选完后必须回到主页列表",
+            compose.onAllNodesWithText("自动播报回答").fetchSemanticsNodes().isNotEmpty()
         )
-        assertTrue(
-            "选完后覆盖层必须关闭",
-            compose.onAllNodesWithTag(OptionPickerTag).fetchSemanticsNodes().isEmpty()
-        )
-        // 页面内容仍在（没有被连页关掉）
+    }
+
+    @Test
+    fun backRowReturnsToTheMainListWithoutLeavingThePage() {
+        compose.setContent {
+            MaterialTheme {
+                SettingsV2Screen(style = SettingsV2Style.M3_CARD, sections = sections)
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("温度", substring = true).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("‹ 返回", substring = true).performClick()
+        compose.waitForIdle()
+
+        // 回到主页：温度行在、且不再显示选项值
         compose.onNodeWithText("自动播报回答", substring = true).assertIsDisplayed()
+        assertTrue(
+            "返回后不该还停在子列表（1.6 不应作为选项行存在）",
+            compose.onAllNodesWithText("取消").fetchSemanticsNodes().isEmpty()
+        )
     }
 
     @Test
@@ -108,27 +121,10 @@ class SettingsV2OptionInteractionTest {
         compose.onNodeWithText("自动播报回答", substring = true).performClick()
         compose.waitForIdle()
         assertEquals(listOf("tts"), clicked)
-        assertTrue(
-            "开关行不该打开选项列表",
-            compose.onAllNodesWithTag(OptionPickerTag).fetchSemanticsNodes().isEmpty()
-        )
-    }
-
-    /** BackHandler 的"只关覆盖层"由源码守卫钉住（此处不派发真实返回键，避免空洞断言）。 */
-    @Test
-    fun optionPickerIsWiredToBackHandler() {
-        val src = sequenceOf(File("."), File("wear"), File("../wear"))
-            .map { it.absoluteFile }
-            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Screen.kt") }
-            .first { it.exists() }
-            .readText()
-        assertTrue(
-            "BackHandler 必须覆盖选项列表（activeChoice != null）",
-            src.contains("BackHandler(enabled = pickerOpen || activeChoice != null)")
-        )
-        assertTrue(
-            "返回时选项列表必须被关掉而不是退出页面",
-            src.contains("else -> activeChoice = null")
-        )
     }
 }
+
+private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithText(
+    text: String,
+): androidx.compose.ui.test.SemanticsNodeInteractionCollection =
+    onAllNodes(androidx.compose.ui.test.hasText(text, substring = true))

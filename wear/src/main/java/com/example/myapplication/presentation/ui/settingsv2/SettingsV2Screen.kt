@@ -37,6 +37,10 @@ val SettingsV2StandardWidth = 192.dp
  */
 const val StyleEntryTag = "style-entry"
 
+/** 子列表行的 key 前缀：`choice:<选项 value>`；返回行是 `choice:__back`。 */
+internal const val CHOICE_PREFIX = "choice:"
+internal const val CHOICE_BACK = "__back"
+
 /**
  * 设置页 V2 的唯一入口。
  *
@@ -95,14 +99,61 @@ fun SettingsV2Screen(
         }
     }
 
-    // 行点击先在这里分流：页面风格行开风格选择器，选项行开选项列表，其余转发给宿主。
+    // 行点击先在这里分流：页面风格行开风格选择器，选项行进入子列表，其余转发给宿主。
     val handleRowClick: (SettingsV2Row) -> Unit = { row ->
         when {
             row.key == "style" -> pickerOpen = true
+            // 子列表里的行：返回 / 选中
+            row.key.startsWith(CHOICE_PREFIX) -> {
+                val payload = row.key.removePrefix(CHOICE_PREFIX)
+                if (payload == CHOICE_BACK) {
+                    activeChoice = null
+                } else {
+                    activeChoice?.let { parent ->
+                        onChoiceSelected?.invoke(parent.key, payload)
+                        activeChoice = null
+                    }
+                }
+            }
             row.choice != null -> activeChoice = row
             else -> onRowClick?.invoke(row)
         }
     }
+
+    // **子列表就是外层列表**：把选项摊成同样的 SettingsV2Section/SettingsV2Row，
+    // 交给同一个渲染器。子页与主页共用同一套行组件、圆角、密度、圆屏收边 —— 风格天然一致，
+    // 不需要第二份实现（用户原话："里列表直接套外面列表的 UI 就行了"）。
+    val shownSections: List<SettingsV2Section> = activeChoice?.let { row ->
+        val choice = row.choice
+        if (choice == null) {
+            sections
+        } else {
+            listOf(
+                SettingsV2Section(
+                    title = row.title,
+                    rows = buildList {
+                        add(SettingsV2Row(CHOICE_PREFIX + CHOICE_BACK, "‹ 返回", trailing = RowTrailing.Chevron, onClick = {}))
+                        choice.options.forEach { option ->
+                            add(
+                                SettingsV2Row(
+                                    key = CHOICE_PREFIX + option.value,
+                                    title = option.label,
+                                    // onClick 非空才让 isActionable() 为真；真正的动作按 key 在 handleRowClick 里分流
+                                    onClick = {},
+                                    // 当前值用行尾 ✓ 表达，与主页的值列同一位置
+                                    trailing = if (option.value == choice.selectedValue) {
+                                        RowTrailing.Value("✓")
+                                    } else {
+                                        RowTrailing.None
+                                    },
+                                )
+                            )
+                        }
+                    },
+                )
+            )
+        }
+    } ?: sections
 
     // **满宽**：圆屏中间那一屏的可用弦长就是整宽，定宽 176/192dp 等于主动放弃横向面积。
     // 边缘项靠各风格自己的 SurfaceTransformation / edgeAppearance 随滚动缩小贴合圆弧，
@@ -116,7 +167,7 @@ fun SettingsV2Screen(
     ) {
         // 风格变了必须**重建**整棵子树：五套的列表/卡片结构完全不同，
         // 只靠参数变化让 Compose 复用旧的 item 结构并不可靠（真机上出现过"改了风格画面不动"）。
-        key(style) {
+        key(style, activeChoice?.key) {
             // 只留竖向安全区：顶部避开圆弧、底部避开系统手势区。
             // **不再 clipToBounds**：TransformingLazyColumn 本来就会把行画到边界之外，
             // 交给官方 SurfaceTransformation / edgeAppearance 按距屏幕中心的比例缩小，
@@ -126,10 +177,10 @@ fun SettingsV2Screen(
                 .fillMaxSize()
                 .padding(top = SettingsV2SafeInsetTop, bottom = SettingsV2BottomInset)
             when (style) {
-                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.M3_CARD -> M3CardSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.M3_LIST -> M3ListSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.ARC -> ArcSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.SQUARE -> SquareSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
                 // TERMINAL 把"换风格"收进它自己的底栏（`[ 风格 ]` 与状态段同一行），
                 // 不再浮在屏幕右下角当独立控件 —— 真终端的底栏是一整行。
                 SettingsV2Style.TERMINAL -> TerminalSettings(
@@ -170,19 +221,5 @@ fun SettingsV2Screen(
             }
         }
 
-        // 温度 / 回复风格 / 安全策略 / 特权执行 等可调项：点行 → 选项列表 → 写回偏好。
-        activeChoice?.let { row ->
-            val choice = row.choice ?: return@let
-            OptionPicker(
-                title = row.title,
-                choice = choice,
-                style = style,
-                onPick = { value ->
-                    onChoiceSelected?.invoke(row.key, value)
-                    activeChoice = null
-                },
-                onDismiss = { activeChoice = null },
-            )
-        }
     }
 }
