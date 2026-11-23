@@ -28,7 +28,7 @@ class OptionPickerComponentTest {
                 OptionPicker(
                     title = "温度",
                     choice = temperatureChoice("0.7"),
-                    colors = SettingsV2Style.M3_CARD.identity,
+                    style = SettingsV2Style.M3_CARD,
                     onPick = { picked = it },
                     onDismiss = {},
                 )

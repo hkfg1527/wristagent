@@ -176,7 +176,7 @@ fun SettingsV2Screen(
             OptionPicker(
                 title = row.title,
                 choice = choice,
-                colors = identity,
+                style = style,
                 onPick = { value ->
                     onChoiceSelected?.invoke(row.key, value)
                     activeChoice = null
