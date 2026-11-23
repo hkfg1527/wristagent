@@ -83,9 +83,11 @@ function shot(file) {
 fs.mkdirSync(OUT, { recursive: true });
 foreground();
 wake();
-if (!enterSettings()) {
-  console.log('STOP: 进不去设置页（12 次滑动都没扫到 V2 分区文本）');
-  process.exit(2);
+const enteredUpFront = enterSettings();
+// 进不去设置页时不提前 exit：让五套各自跑并各自失败，末尾统一输出
+// `distinct=0/5 INVALID` + exit=1。提前 exit=2 会让"判据是否执行"无法被自检区分。
+if (!enteredUpFront) {
+  console.log('WARN: 进不去设置页（12 次滑动都没扫到 V2 分区文本）→ 五套将全部判红');
 }
 
 const rows = [];
@@ -145,6 +147,10 @@ for (const [legacy, name, markers, pitchPair] of STYLES) {
 }
 
 const distinct = hashes.size;
-console.log(`distinct=${distinct}/5 ${distinct === 5 ? 'OK' : 'INVALID（少于 5 个不同哈希 = 有截图不是该风格）'}`);
+const ok = distinct === 5;
+console.log(`distinct=${distinct}/5 ${ok ? 'OK' : 'INVALID（少于 5 个不同哈希 = 有截图不是该风格/设备不可用）'}`);
 fs.writeFileSync(path.join(OUT, 'report.txt'), rows.join('\n') + `\ndistinct=${distinct}/5\n`);
+// 设备掉线时每套都会抛错 -> distinct=0/5。以前只打印 INVALID 却返回 0，
+// 调用方（含定时任务）会把它当成通过。必须给非零退出码，避免"没验过却报绿"。
+if (!ok) process.exit(1);
 process.exit(distinct === 5 ? 0 : 3);

@@ -280,6 +280,20 @@ const consoleE2E = () => {
 const main = () => {
   console.log('release-check · 版本 ' + versionName());
   if (!skipBuild) build();
+  if (!skipDevice || !skipConsole) {
+    // 设备不在时必须**整体判红**：此前 adb 掉线时 device()/geometry() 里每步拿空结果，
+    // 最后还能凑出"8/8 通过"的假象（本会话踩过：adb devices 为空却仍走完全程）。
+    const listed = run(ADB, ['devices']).stdout || '';
+    const online = /C101X35122973\s+device/.test(listed);
+    if (!online) {
+      record('设备在线', false, 'adb devices 里没有 C101X35122973（真机走查与控制台 E2E 全部未验证）');
+      const failed = results.filter((r) => !r.ok);
+      console.log('\n=== 结果：' + (results.length - failed.length) + '/' + results.length + ' 通过 ===');
+      failed.forEach((f) => console.log('  失败：' + f.name + ' ' + f.detail));
+      process.exit(1);
+    }
+    record('设备在线', true);
+  }
   if (!skipDevice) { device(); geometry(); }
   if (!skipConsole) consoleE2E();
   const failed = results.filter((r) => !r.ok);
