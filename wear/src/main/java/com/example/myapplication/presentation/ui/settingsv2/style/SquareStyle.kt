@@ -31,6 +31,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
@@ -78,6 +79,8 @@ fun SquareSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
+    /** 滑块连续回调：key + 新值（写回偏好后重组）。 */
+    onSlider: ((String, Float) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.SQUARE.identity
     val state = rememberTransformingLazyColumnState()
@@ -187,6 +190,8 @@ fun SquareSettings(
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                 )
+                                // 连续量用官方滑块（M3E 控件），不是开关。
+                                is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, identity.titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
                                 RowTrailing.None -> Unit
                             }
                         }

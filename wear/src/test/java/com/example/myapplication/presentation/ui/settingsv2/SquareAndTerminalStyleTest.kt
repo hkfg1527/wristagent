@@ -163,9 +163,11 @@ class SquareAndTerminalStyleTest {
             "提示符必须钉在底部（独立节点，不随内容滚走）",
             compose.onAllNodesWithTag(TerminalPromptTag).fetchSemanticsNodes().isNotEmpty()
         )
+        // 用户明确要求：风格按钮从终端底栏移除（"藏在子项里就行"）。
+        // 入口现在是「页面风格」行，所以底栏不该再有 StyleEntryTag 节点。
         assertTrue(
-            "终端的换风格入口必须存在且是同一个 tag",
-            compose.onAllNodesWithTag(StyleEntryTag).fetchSemanticsNodes().isNotEmpty()
+            "终端的换风格入口已移到「页面风格」行，底栏不应再出现 StyleEntryTag",
+            compose.onAllNodesWithTag(StyleEntryTag).fetchSemanticsNodes().isEmpty()
         )
     }
 

@@ -60,6 +60,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.StyleEntryTag
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
+import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
@@ -385,19 +386,21 @@ fun TerminalSettings(
             }
             // 末行不放进列表：真终端的提示符是**钉在底部**的，不该跟着内容滚走
         }
-        // 钉在底部的状态条：左 `> █`（块光标）+ 右状态段 `[2/4] 26L`，整行不透明，内容从其后方滚过。
-        // 状态段随滚动更新 —— CLI 的底栏就该告诉你"现在在哪、还有多少行"。
-        TerminalPromptLine(
-            lineStyle = lineStyle,
-            isActive = state.isScrollInProgress,
-            // 行数**包含回显**：回显也是行，滚动条总数早就把它算进去了（totalItems = baseItems + echoes），
-            // 标签却只数配置行 —— 两处数字对不上是真的不一致，不是取舍。
-            statusText = "${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}"
-                + "·${sections.sumOf { it.rows.size } + echoes.size}L",
-            onStylePicker = onStylePicker,
-            onHelp = { pushEcho(TerminalHelpLine) },
-            modifier = Modifier.align(Alignment.BottomStart),
-        )
+        // 钉在底部的状态条：左 `> █`（块光标）+ 状态段 `[2/4]·26L`，整行不透明。
+        // 外面套 CircleFit：底栏在圆屏最下端，可用弦长只有 ~218px，不收边会把 `[ 风格 ]` 切掉。
+        CircleFit(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            TerminalPromptLine(
+                lineStyle = lineStyle,
+                isActive = state.isScrollInProgress,
+                // 行数**包含回显**：回显也是行，滚动条总数早就把它算进去了（totalItems = baseItems + echoes），
+                // 标签却只数配置行 —— 两处数字对不上是真的不一致，不是取舍。
+                statusText = "${zoneOfAnchor(sections, state.anchorItemIndex, echoes.size)}/${sections.size}"
+                    + "·${sections.sumOf { it.rows.size } + echoes.size}L",
+                onStylePicker = onStylePicker,
+                onHelp = { pushEcho(TerminalHelpLine) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         TerminalScrollBar(
             anchorIndex = state.anchorItemIndex,
             totalItems = baseItems + echoes.size,
@@ -405,7 +408,8 @@ fun TerminalSettings(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(10.dp)
-                .padding(top = 4.dp, bottom = 4.dp, end = 2.dp),
+                // 滚动条贴右缘会被圆弧切掉：上下各留出圆屏收边量，右侧再让出 22dp
+                .padding(top = 30.dp, bottom = 44.dp, end = 22.dp),
         )
     }
 }
@@ -482,13 +486,17 @@ internal fun focusItemIndex(sections: List<SettingsV2Section>, anchorItemIndex: 
  */
 @Composable
 private fun TerminalGridLine(content: @Composable () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(TerminalLineHeight)
-            .clipToBounds(),
-    ) {
-        content()
+    // 每行过 CircleFit：终端是满宽字符网格，圆屏上下两端的行会被圆弧切掉
+    // （真机截图：banner 被切成 `1stagent`）。收边后每行按自己所在高度的弦长内缩，字符永远完整。
+    CircleFit(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TerminalLineHeight)
+                .clipToBounds(),
+        ) {
+            content()
+        }
     }
 }
 
@@ -538,6 +546,14 @@ private fun TerminalLine(
             // 开关状态的来源是本地态（点一下翻一次），初值取数据层
             is RowTrailing.Toggle -> (if (toggleChecked) "[ ON  ]" else "[ OFF ]") to false
             is RowTrailing.Chevron -> "/open" to true
+            // 连续量在终端里画成字符进度条（真终端没有滑杆控件），值仍可调。
+            is RowTrailing.Slider -> {
+                val span = trailing.range.endInclusive - trailing.range.start
+                val frac = if (span <= 0f) 0f else ((trailing.value - trailing.range.start) / span).coerceIn(0f, 1f)
+                val filled = (frac * 5).toInt().coerceIn(0, 5)
+                ("[" + "■".repeat(filled) + "□".repeat(5 - filled) + "] " +
+                    (row.sliderText ?: trailing.value.toInt().toString())) to false
+            }
             RowTrailing.None -> null
         }
         if (right != null) {
@@ -625,22 +641,9 @@ private fun TerminalPromptLine(
                             },
                         ),
                 )
-                if (onStylePicker != null) {
-                    BasicText(
-                        text = "[ 风格 ]",
-                        style = lineStyle,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .padding(start = 8.dp, end = 12.dp)
-                            .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onStylePicker() }
-                            .testTag(StyleEntryTag),
-                    )
-                } else {
-                    BasicText(text = " ", style = lineStyle, maxLines = 1, modifier = Modifier.padding(end = 12.dp))
-                }
+                // 风格入口不再放底栏：用户明确要求"风格按钮去掉，藏在子项里"。
+                // 现在只走「页面风格」行（Screen 层分流到选择器），底栏只显示状态。
+                BasicText(text = " ", style = lineStyle, maxLines = 1, modifier = Modifier.padding(end = 8.dp))
             }
         }
     }

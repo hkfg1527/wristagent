@@ -81,6 +81,8 @@ fun SettingsV2Screen(
      * 参数是 `(row.key, 选中项 value)`，由宿主写回偏好。
      */
     onChoiceSelected: ((String, String) -> Unit)? = null,
+    /** 滑块连续回调：行 key + 新值。 */
+    onSliderChange: ((String, Float) -> Unit)? = null,
 ) {
     val identity = style.identity
     var pickerOpen by remember { mutableStateOf(false) }
@@ -124,10 +126,10 @@ fun SettingsV2Screen(
                 .fillMaxSize()
                 .padding(top = SettingsV2SafeInsetTop, bottom = SettingsV2BottomInset)
             when (style) {
-                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick)
-                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick)
-                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick)
-                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick)
+                SettingsV2Style.M3_CARD -> M3CardSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.M3_LIST -> M3ListSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.ARC -> ArcSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.SQUARE -> SquareSettings(sections = sections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
                 // TERMINAL 把"换风格"收进它自己的底栏（`[ 风格 ]` 与状态段同一行），
                 // 不再浮在屏幕右下角当独立控件 —— 真终端的底栏是一整行。
                 SettingsV2Style.TERMINAL -> TerminalSettings(

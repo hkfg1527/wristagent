@@ -32,6 +32,8 @@ data class SettingsV2Row(
     val trailing: RowTrailing = RowTrailing.None,
     val onClick: (() -> Unit)? = null,
     val choice: RowChoice? = null,
+    /** 滑块行右侧显示的当前值文本（如 "16dp"）。 */
+    val sliderText: String? = null,
 )
 
 /** 行尾形态。渲染侧按自己的风格决定"开关画成什么样"。 */
@@ -40,6 +42,20 @@ sealed interface RowTrailing {
     data class Value(val text: String) : RowTrailing
     data class Toggle(val checked: Boolean, val onChange: (Boolean) -> Unit) : RowTrailing
     data object Chevron : RowTrailing
+
+    /**
+     * 连续量（点阵密度、语速…）用**滑块**，不是开关。
+     *
+     * 用户原话："点阵密度你给个开关，不应该是官方那种进度条控件吗"。
+     * 开关只有两态，而 matrixSpacingDp 是 0..64 的连续值 —— 用开关等于把可调范围压成 0/1，
+     * 是语义错误，不只是不好看。
+     */
+    data class Slider(
+        val value: Float,
+        val range: ClosedFloatingPointRange<Float>,
+        val steps: Int,
+        val onChange: (Float) -> Unit,
+    ) : RowTrailing
 }
 
 /**
@@ -48,7 +64,8 @@ sealed interface RowTrailing {
  * 五套风格共用这一条判断，避免"某个风格把只读行也做成可点、点了没反应"。
  */
 fun SettingsV2Row.isActionable(): Boolean =
-    onClick != null || choice != null || trailing is RowTrailing.Toggle || trailing is RowTrailing.Chevron
+    onClick != null || choice != null || trailing is RowTrailing.Toggle ||
+        trailing is RowTrailing.Chevron || trailing is RowTrailing.Slider
 
 /** 一行的数据源：把"长什么样"与"值从哪来"分开，root() 与 fromPreferences() 共用同一套骨架。 */
 data class RowSpec(
@@ -59,18 +76,25 @@ data class RowSpec(
     val toggle: Boolean? = null,
     val choice: RowChoice? = null,
     val chevron: Boolean = false,
+    /** 滑块：非 null 时这一行画成滑块而不是开关/文本。 */
+    val slider: Float? = null,
+    val sliderRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    val sliderSteps: Int = 0,
+    val sliderFormat: (Float) -> String = { it.toString() },
 ) {
     fun toRow(): SettingsV2Row = SettingsV2Row(
         key = key,
         title = title,
         subtitle = subtitle,
         trailing = when {
+            slider != null -> RowTrailing.Slider(slider, sliderRange, sliderSteps, {})
             toggle != null -> RowTrailing.Toggle(checked = toggle, onChange = {})
             chevron -> RowTrailing.Chevron
             value != null -> RowTrailing.Value(value)
             else -> RowTrailing.None
         },
         choice = choice,
+        sliderText = slider?.let { sliderFormat(it) },
     )
 }
 
@@ -114,7 +138,7 @@ object SettingsV2SampleData {
             RowSpec("tools", "工具与 MCP", subtitle = "7/7 启用"),
             RowSpec("tool_device", "设备状态", toggle = true),
             RowSpec("tool_vibrate", "振动", toggle = true),
-            RowSpec("tool_matrix", "点阵密度", toggle = true),
+            RowSpec("tool_matrix", "点阵密度", slider = 16f, sliderRange = 0f..32f, sliderSteps = 7, sliderFormat = { "${it.toInt()}dp" }),
             RowSpec("tool_power", "省电模式", toggle = true),
             RowSpec("tool_weather", "天气", toggle = true),
             RowSpec("tool_web", "联网搜索", toggle = true),
@@ -168,7 +192,15 @@ object SettingsV2SampleData {
                 RowSpec("tools", "工具与 MCP", subtitle = "${toolFlags.count { it }}/${toolFlags.size} 启用"),
                 RowSpec("tool_device", "设备状态", toggle = p.toolDeviceStatusEnabled),
                 RowSpec("tool_vibrate", "振动", toggle = p.toolVibrateEnabled),
-                RowSpec("tool_matrix", "点阵密度", toggle = p.toolMatrixDensityEnabled),
+                // 点阵密度是**连续量**（matrixSpacingDp，0..64），必须用滑块而不是开关。
+                // 开关只有两态，会把整个可调范围压成 0/1 —— 这是语义错误，不只是不好看。
+                RowSpec(
+                    "tool_matrix", "点阵密度",
+                    slider = p.matrixSpacingDp,
+                    sliderRange = 0f..32f,
+                    sliderSteps = 7,   // 0/4/8/…/32，每档 4dp
+                    sliderFormat = { "${it.toInt()}dp" },
+                ),
                 RowSpec("tool_power", "省电模式", toggle = p.toolPowerModeEnabled),
                 RowSpec("tool_weather", "天气", toggle = p.toolWeatherEnabled),
                 RowSpec("tool_web", "联网搜索", toggle = p.toolWebSearchEnabled),

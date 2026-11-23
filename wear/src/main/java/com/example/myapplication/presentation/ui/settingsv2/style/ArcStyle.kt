@@ -28,6 +28,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
@@ -58,6 +59,7 @@ fun ArcSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
+    onSlider: ((String, Float) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.ARC.identity
     // 外侧直角、内侧圆角
@@ -107,7 +109,7 @@ fun ArcSettings(
                         )
                         .testTag(ArcCardTag),
                 ) {
-                    ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor)
+                    ArcRow(row = row, titleColor = identity.titleColor, valueColor = identity.subtitleColor, onSlider = onSlider)
                 }
             }
             if (sectionIndex == sections.lastIndex) {
@@ -125,6 +127,7 @@ private fun ArcRow(
     row: SettingsV2Row,
     titleColor: Color,
     valueColor: Color,
+    onSlider: ((String, Float) -> Unit)? = null,
 ) {
     // 单行制：标题左、值/开关右同一行。贴边卡本来就满宽，两行堆叠纯属浪费面积。
     // 26dp 左右安全边距保留（文字不贴圆弧）；长值自己省略，不挤死标题。
@@ -175,6 +178,8 @@ private fun ArcRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
+            // 连续量用官方滑块（M3E 控件），不是开关 —— 开关会把 0..64 的可调范围压成 0/1。
+            is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
             RowTrailing.None -> Unit
         }
     }

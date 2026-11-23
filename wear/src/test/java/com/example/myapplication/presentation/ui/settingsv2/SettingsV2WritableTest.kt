@@ -66,7 +66,7 @@ class SettingsV2WritableTest {
             .flatMap { it.rows }
             .filter { it.trailing is RowTrailing.Toggle }
             .map { it.key }
-        assertEquals("开关行数必须与预期一致", 11, toggleKeys.size)
+        assertEquals("开关行数必须与预期一致（点阵密度已改滑块，不计入）", 10, toggleKeys.size)
 
         toggleKeys.forEach { key ->
             val line = host.lines().firstOrNull { it.contains("\"$key\" ->") }

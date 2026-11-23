@@ -29,6 +29,7 @@ import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
@@ -52,6 +53,7 @@ fun M3ListSettings(
     sections: List<SettingsV2Section>,
     modifier: Modifier = Modifier,
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
+    onSlider: ((String, Float) -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.M3_LIST.identity
     val state = rememberTransformingLazyColumnState()
@@ -88,6 +90,7 @@ fun M3ListSettings(
                             row = row,
                             identity = identity,
                             spec = transformationSpec,
+                            onSlider = onSlider,
                             modifier = Modifier
                                 .enterAppearance(enter, motion)
                                 .reportEdgeDistance(edge)
@@ -121,6 +124,7 @@ private fun M3ListRow(
     identity: com.example.myapplication.presentation.ui.settingsv2.StyleIdentity,
     spec: androidx.wear.compose.material3.lazy.TransformationSpec,
     modifier: Modifier = Modifier,
+    onSlider: ((String, Float) -> Unit)? = null,
 ) {
     // 单行制：标题左、值/开关右同一行。两行堆叠时一屏只 3~4 行，
     // 圆屏上又空又散（圆屏截图评审后统一改）。标题与值各占一半，长值自己省略。
@@ -171,6 +175,8 @@ private fun M3ListRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
+            // 连续量用官方滑块（M3E 控件），不是开关 —— 开关会把 0..64 的可调范围压成 0/1。
+            is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, identity.titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
             RowTrailing.None -> Unit
         }
     }
