@@ -105,8 +105,8 @@ object SettingsV2SampleData {
     /** 示例内容：所有开关按默认值，所有值用占位文案。 */
     private fun exampleContent(): SettingsV2Content = SettingsV2Content(
         connection = listOf(
-            RowSpec("provider", "供应商", value = "deepseek"),
-            RowSpec("model", "模型", value = "deepseek-v4"),
+            RowSpec("provider", "供应商", value = "deepseek", choice = providerChoiceSample()),
+            RowSpec("model", "模型", value = "deepseek-v4", choice = modelChoice("deepseek-chat,deepseek-reasoner", "deepseek-v4")),
             RowSpec("temperature", "温度", subtitle = "越高越发散", value = "1.4", choice = temperatureChoice("1.4")),
             RowSpec("reply_style", "回复风格", value = "均衡", choice = replyChoice("BALANCED")),
         ),
@@ -151,8 +151,16 @@ object SettingsV2SampleData {
         )
         return SettingsV2Content(
             connection = listOf(
-                RowSpec("provider", "供应商", value = providerFromUrl(p.baseUrl)),
-                RowSpec("model", "模型", value = p.modelName.ifBlank { "未设置" }),
+                RowSpec(
+                    "provider", "供应商",
+                    value = p.providerProfiles().active()?.name ?: "当前配置",
+                    choice = providerChoice(p.providerProfiles(), p.providerProfiles().activeProfileId),
+                ),
+                RowSpec(
+                    "model", "模型",
+                    value = p.modelName.ifBlank { "未设置" },
+                    choice = modelChoice(p.cachedRemoteModels, p.modelName),
+                ),
                 RowSpec("temperature", "温度", subtitle = "越高越发散", value = formatTemperature(p.temperature), choice = temperatureChoice(formatTemperature(p.temperature))),
                 RowSpec("reply_style", "回复风格", value = replyChoice(p.replyStyle.ifBlank { "BALANCED" }).labelOfSelected(), choice = replyChoice(p.replyStyle.ifBlank { "BALANCED" })),
             ),
@@ -193,6 +201,29 @@ object SettingsV2SampleData {
 }
 
 // ==== 选项组：value 是落库键，label 是给人看的中文 ====
+
+/** 模型选项：从偏好里的缓存清单取，兜底两个内置默认名；当前值一定在列表里（哪怕不在缓存里）。 */
+internal fun modelChoice(cached: String, selected: String): RowChoice {
+    val ids = cached.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    val defaults = listOf("deepseek-chat", "deepseek-reasoner")
+    val options = (ids.ifEmpty { defaults } + listOf(selected))
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase() }
+        .map { ChoiceOption(it, it) }
+    return RowChoice(options, selected)
+}
+
+/** 供应商（Profile）选项：value 是 profile id，选中后由 Host 调 applyProviderProfile。 */
+internal fun providerChoice(book: com.example.myapplication.agent.ProviderProfileBook, selectedId: String?): RowChoice {
+    val current = book.profiles.map { ChoiceOption(it.id, it.name) }
+    // 没有 Profile 时给一条"当前配置"，避免空列表让选项页什么都没有
+    val options = current.ifEmpty { listOf(ChoiceOption("", "当前配置")) }
+    return RowChoice(options, selectedId.orEmpty())
+}
+
+/** 示例数据的供应商选项（无真实 Profile，只给一条占位）。 */
+internal fun providerChoiceSample(): RowChoice =
+    RowChoice(listOf(ChoiceOption("", "当前配置")), "")
 
 internal fun temperatureChoice(selected: String) = RowChoice(
     listOf("0.0", "0.3", "0.5", "0.7", "1.0", "1.3", "1.6", "2.0").map { ChoiceOption(it, it) },

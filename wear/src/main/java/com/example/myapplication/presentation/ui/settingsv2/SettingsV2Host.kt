@@ -90,6 +90,9 @@ fun SettingsV2Host(
                     "security" -> preferences.securityMode = SecurityMode.valueOf(value)
                     "root" -> preferences.sandboxLevel = SandboxLevel.fromStorage(value)
                     "asr_lang" -> preferences.asrDevPid = value.toInt()
+                    "model" -> preferences.modelName = value
+                    // 供应商选项的 value 是 Profile id；空串是"当前配置"占位，不套用
+                    "provider" -> if (value.isNotBlank()) preferences.applyProviderProfile(value)
                 }
                 com.example.myapplication.agent.SettingsChangeBus.bump()
             },

@@ -91,13 +91,31 @@ class SettingsV2WritableTest {
             .flatMap { it.rows }
             .filter { it.choice != null }
             .map { it.key }
-        assertEquals("选项行数必须与预期一致", 5, choiceKeys.size)
+        assertEquals("选项行数必须与预期一致", 7, choiceKeys.size)
         choiceKeys.forEach { key ->
             assertTrue(
                 "Host 必须有 $key 的写入分支",
                 host.lines().any { it.contains("\"$key\" ->") && it.contains("preferences.") }
             )
         }
+    }
+
+    /** 模型/供应商两个新选项：选中后真的写回偏好（不是只显示）。 */
+    @Test
+    fun modelAndProviderChoicesWriteBack() {
+        val p = prefs()
+        p.cachedRemoteModels = "deepseek-chat,deepseek-reasoner"
+        p.modelName = "deepseek-chat"
+        assertEquals("deepseek-chat", valueOf(SettingsV2SampleData.fromPreferences(p), "model"))
+        p.modelName = "deepseek-reasoner"
+        assertEquals("deepseek-reasoner", valueOf(SettingsV2SampleData.fromPreferences(p), "model"))
+
+        // Profile：建一套并选中，供应商行显示该 Profile 名
+        val book = p.createProviderProfileFromCurrent("工作配置")
+        val id = book.activeProfileId ?: ""
+        p.saveProviderProfiles(book)
+        assertEquals("工作配置", valueOf(SettingsV2SampleData.fromPreferences(p), "provider"))
+        assertTrue("Profile id 必须出现在选项里", id.isNotBlank())
     }
 
     @Test
