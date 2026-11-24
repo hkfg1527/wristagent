@@ -110,26 +110,30 @@ const device = () => {
   // 0.0.0.140 实测：长距离快滑（420→40 / 260ms）在新版聊天页上**不再触发**设置入口，
   // 界面就绪也没用。改成台账里记的两条可靠路径按序尝试：
   //  ①短距阻尼上滑（380→180 / 500ms）—— 审批浮层那条手势的同款参数；
-  //  ②表冠先滚到聊天顶部，再短距上滑。
-  let entered = false;
-  for (let i = 0; i < 6 && !entered; i++) {
-    if (i >= 3) crown(5, 40); // 后半段先把列表滚到顶
-    adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
-    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
-    // 判据文本必须跟当前设置页一致：V2 的分区名是 连得上/让它能做事/让它听懂我/让它答得好，
-    // 行里有 模型/温度/回复风格。旧判据（请求超时/全部启用/模型与服务）在 V2 上永远不会命中。
-    entered = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/.test(JSON.stringify(dumpTexts()));
-  }
-  // 偶发失败兜底：这一段的"上滑进设置"手势偶尔不生效（0.0.0.137 那天就出现过 7/8，
-  // 报错是「进入设置页 undefined」）。失败时按同样的动作再试一轮，仍失败才算失败 ——
-  // 不重试的话，发布判断会被一次手势抖动带偏。
-  if (!entered) {
-    for (let i = 0; i < 3 && !entered; i++) {
+  //  ②更长的一段（440→40 / 240ms）兜底。
+  //
+  // 0.0.0.261 更正：原来的"②表冠先滚到列表顶部"是**空操作** —— `crown()` 把 REL_WHEEL 注进
+  // /dev/input/event0（这台的 `qpnp_pon` 电源键），而带 REL_WHEEL 的是 event1（`slate-spi`）；
+  // 项目自己的 `RotaryBus.kt` 也记着"注入 REL_WHEEL 后 onRotaryScrollEvent 一行日志都没有"。
+  // 死代码已删（行为不变：它从来没起过作用）。
+  const SETTINGS_RE = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/;
+  const enterSettings = () => {
+    for (let i = 0; i < 6; i++) {
+      adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
+      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
+      // 判据文本必须跟当前设置页一致：V2 的分区名是 连得上/让它能做事/让它听懂我/让它答得好，
+      // 行里有 模型/温度/回复风格。旧判据（请求超时/全部启用/模型与服务）在 V2 上永远不会命中。
+      if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
+    }
+    // 偶发失败兜底：这一段的手势偶尔不生效（0.0.0.137 出现过 7/8，报「进入设置页 undefined」）
+    for (let i = 0; i < 3; i++) {
       adb('shell', 'input', 'swipe', '233', '440', '233', '40', '240');
       spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500']);
-      entered = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/.test(JSON.stringify(dumpTexts()));
+      if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
     }
-  }
+    return false;
+  };
+  const entered = enterSettings();
   record('进入设置页', entered);
 
   // 四分区按序 —— 判据是"一次连续扫描收集到的顺序 == 规范顺序（或它的精确倒序）"。
@@ -142,37 +146,49 @@ const device = () => {
   // 现在：先朝一个方向一路滚到尽头（内容不再变化即到端点），再朝反方向连续扫描收集；
   // 只要收集顺序是规范顺序或它的精确倒序（从底部往上扫就是倒序，属正常），就算按序。
   // 结构被打乱（例如 A C B D）会两种都不匹配而红。
+  //
+  // 0.0.0.261 更正：上面 ③ 提到的"表冠"其实**从未真的滚动过列表** ——
+  //   `crown()` 注的是 /dev/input/event0（qpnp_pon 电源键），本机带 REL_WHEEL 的是 event1；
+  //   项目自己的 `RotaryBus.kt` 也记着"注入 REL_WHEEL 后 onRotaryScrollEvent 一行日志都没有"。
+  //   这条判据以前能过，靠的是**存档风格恰好是 TERMINAL**（36px 字格，一屏 10 行，
+  //   四个分区同屏都在），而不是真的滚过。一旦存档风格是 SQUARE/M3_CARD 就必红
+  //   （0.0.0.261 实测：只收集到「连得上」）。
+  //   改用**手指滑动**：它对任何风格都有效，而且与"顺序"这条判据本身无关（判据没有被放松）。
+  //   方向：先退出再进入设置页把列表复位到顶（**不能用下拉**：下拉是系统退出手势，会把页面关掉），
+  //   然后一路向上扫，收集到的顺序应当恰好是规范顺序的倒序。
   const zones = ['让它答得好', '让它听懂我', '让它能做事', '连得上'];
   const sleep = (ms) => spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds ' + ms]);
-  const settle = (delta) => {
-    let prev = null;
-    for (let i = 0; i < 24; i++) {
-      crown(delta, 25);
-      sleep(1200);
-      const now = dumpTexts().join('|');
-      if (prev !== null && now === prev) return true;
-      prev = now;
-    }
-    return false;
-  };
-  const reachedEnd = settle(-5);
+  // 复位到页首：先按 BACK 直到真的离开设置页（子页开着时一次 BACK 只关子页），再重新进入。
+  // 不看一眼就重进的话，`enterSettings()` 会因为"页面上已经有设置文案"直接返回 true，
+  // 列表停在中途，收集顺序就不可信了。
+  for (let i = 0; i < 3; i++) {
+    adb('shell', 'input', 'keyevent', '4');
+    sleep(900);
+    if (!SETTINGS_RE.test(JSON.stringify(dumpTexts()))) break;
+  }
+  enterSettings();
   const found = [];
-  for (let step = 0; step < 30 && found.length < 4; step++) {
+  let lastTexts = null;
+  let reachedEnd = false;
+  for (let step = 0; step < 40 && found.length < 4; step++) {
     const t = dumpTexts();
     for (const z of zones) {
       // 用包含匹配：终端档的分区标题带 `> ` 前缀（`> 让它能做事`），全等匹配会漏。
       if (t.some((x) => x.includes(z)) && !found.includes(z)) found.push(z);
     }
     if (found.length === 4) break;
-    crown(5, 18);
-    sleep(1800);
+    const joined = t.join('|');
+    if (lastTexts === joined) { reachedEnd = true; break; }
+    lastTexts = joined;
+    adb('shell', 'input', 'swipe', '233', '390', '233', '170', '350');
+    sleep(900);
   }
   const canonical = found.length === 4 && found.join('|') === zones.join('|');
   const reversed = found.length === 4 && found.join('|') === zones.slice().reverse().join('|');
   record(
     '四分区按序',
     canonical || reversed,
-    '收集=' + found.join(' → ') + (reversed ? '（自底向上，倒序读取，正常）' : '') +
+    '收集=' + found.join(' → ') + (reversed ? '（自顶向下，倒序读取，正常）' : '') +
       ' · 端点=' + (reachedEnd ? '已确认' : '未确认')
   );
   // 子页证据（不计分，只落盘）：进设置后点进目标页并截图。
