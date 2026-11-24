@@ -16,7 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.TimeText
 import com.example.myapplication.presentation.ui.settingsv2.style.ArcSettings
 import com.example.myapplication.presentation.ui.settingsv2.style.M3CardSettings
 import com.example.myapplication.presentation.ui.settingsv2.style.M3ListSettings
@@ -40,6 +42,50 @@ const val StyleEntryTag = "style-entry"
 /** 子列表行的 key 前缀：`choice:<选项 value>`；返回行是 `choice:__back`。 */
 internal const val CHOICE_PREFIX = "choice:"
 internal const val CHOICE_BACK = "__back"
+
+/**
+ * 把一行「选项」摊成与主页**同一副骨架**的子列表。
+ *
+ * 为什么抽成纯函数：返回行在首、选中项带 `✓`、行 key 前缀这三件事是**逻辑**，不是样式。
+ * 留在 composable 里只能靠界面点选去验，抽出来就能直接断言（`SettingsV2OptionInteractionTest`）。
+ *
+ * 返回行的 `trailing` 必须是 [RowTrailing.None]：真机 0.0.0.260 上它是 `‹ 返回 ›`，
+ * 左箭头说后退、右箭头说前进，同一行自相矛盾，看着像坏掉的一行。
+ */
+internal fun choiceSubSections(row: SettingsV2Row): List<SettingsV2Section> {
+    val choice = row.choice ?: return emptyList()
+    return listOf(
+        SettingsV2Section(
+            title = row.title,
+            rows = buildList {
+                add(
+                    SettingsV2Row(
+                        key = CHOICE_PREFIX + CHOICE_BACK,
+                        title = "‹ 返回",
+                        trailing = RowTrailing.None,
+                        // onClick 非空才让 isActionable() 为真；真正的动作按 key 在 handleRowClick 里分流
+                        onClick = {},
+                    )
+                )
+                choice.options.forEach { option ->
+                    add(
+                        SettingsV2Row(
+                            key = CHOICE_PREFIX + option.value,
+                            title = option.label,
+                            onClick = {},
+                            // 当前值用行尾 ✓ 表达，与主页的值列同一位置
+                            trailing = if (option.value == choice.selectedValue) {
+                                RowTrailing.Value("✓")
+                            } else {
+                                RowTrailing.None
+                            },
+                        )
+                    )
+                }
+            },
+        )
+    )
+}
 
 /**
  * 设置页 V2 的唯一入口。
@@ -67,6 +113,17 @@ val SettingsV2SafeInsetTop = 24.dp
 
 /** 底部渐隐高度：把"内容被切断"变成"下面还有"。 */
 val SettingsV2BottomFade = 28.dp
+
+/**
+ * 顶部钟带高度：内容滚到这一带下面时淡出，而不是与时钟叠字。
+ *
+ * 官方 `ScreenScaffold` 用 `ScreenScaffoldDefaults.ContentPadding`（屏高 10% = 24dp）留出这条带，
+ * 上面再压一层渐变；V2 重写时**整层漏掉了**（旧设置页有），首屏顶部就是一条空黑带。
+ */
+val SettingsV2TopFade = 28.dp
+
+/** 曲面时钟的测试标识（`SettingsV2ClockChromeTest` 钉住"每套都有钟"）。 */
+const val SettingsV2ClockTag = "settings-v2-clock"
 
 @Composable
 fun SettingsV2Screen(
@@ -124,35 +181,8 @@ fun SettingsV2Screen(
     // 交给同一个渲染器。子页与主页共用同一套行组件、圆角、密度、圆屏收边 —— 风格天然一致，
     // 不需要第二份实现（用户原话："里列表直接套外面列表的 UI 就行了"）。
     val shownSections: List<SettingsV2Section> = activeChoice?.let { row ->
-        val choice = row.choice
-        if (choice == null) {
-            sections
-        } else {
-            listOf(
-                SettingsV2Section(
-                    title = row.title,
-                    rows = buildList {
-                        add(SettingsV2Row(CHOICE_PREFIX + CHOICE_BACK, "‹ 返回", trailing = RowTrailing.Chevron, onClick = {}))
-                        choice.options.forEach { option ->
-                            add(
-                                SettingsV2Row(
-                                    key = CHOICE_PREFIX + option.value,
-                                    title = option.label,
-                                    // onClick 非空才让 isActionable() 为真；真正的动作按 key 在 handleRowClick 里分流
-                                    onClick = {},
-                                    // 当前值用行尾 ✓ 表达，与主页的值列同一位置
-                                    trailing = if (option.value == choice.selectedValue) {
-                                        RowTrailing.Value("✓")
-                                    } else {
-                                        RowTrailing.None
-                                    },
-                                )
-                            )
-                        }
-                    },
-                )
-            )
-        }
+        // 子列表与主页共用同一套行组件、圆角、密度、圆屏收边（用户原话："里列表直接套外面列表的 UI"）。
+        choiceSubSections(row).ifEmpty { sections }
     } ?: sections
 
     // **满宽**：圆屏中间那一屏的可用弦长就是整宽，定宽 176/192dp 等于主动放弃横向面积。
@@ -190,6 +220,35 @@ fun SettingsV2Screen(
                     onChoice = { row -> activeChoice = row },
                     onToggle = { row -> onRowClick?.invoke(row) },
                 )
+            }
+        }
+
+        // 顶部钟带：渐变遮罩 + 官方 `TimeText`。
+        //
+        // 为什么是显式叠层：本项目没有 `AppScaffold`，`ScreenScaffold` 的 `timeText` 槽位只把内容登记进
+        // `LocalScaffoldState`、由 `AppScaffold` 负责绘制，往槽里传等于没传（旧设置页踩过，见
+        // `SettingsShared.kt` 的注释）。所以这里和旧页一样直接画在 Box 顶层。
+        //
+        // TERMINAL 不放钟：它顶部是 `wristagent` banner + 状态栏，那条带已经是它的"身份区"，
+        // 再压一个钟会和 banner 抢同一条 y 轴（真机 466×466 上两者相距不足 1dp）。
+        if (style != SettingsV2Style.TERMINAL) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(SettingsV2TopFade)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(identity.pageBackground, identity.pageBackground.copy(alpha = 0f)),
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .testTag(SettingsV2ClockTag),
+            ) {
+                TimeText()
             }
         }
 

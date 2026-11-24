@@ -27,6 +27,28 @@
 
 **真机截不到的物理原因**：`adb exec-out screencap` 单次 469~555ms（均值 506ms），入场动效仅 200~300ms。
 
+## 2.5 页面骨架：顶部钟带（曲面时钟）· 0.0.0.261 补回
+
+V2 重写时这一层**整层漏掉**（旧设置页有）。真机 466×466 实测：补之前首屏 y=0..48 无任何语义节点。
+
+| 风格 | 有钟 | 补前哈希 | 补后哈希 |
+|---|---|---|---|
+| M3_CARD | ✅ 12:57 显示 | `bf0f400e7ebb` | `8839243043c0` |
+| M3_LIST | ✅ | `eaf9f0d1657c` | `b1dc7d48ff0f` |
+| ARC | ✅ | `9fd061bb8326` | `0f0f74c74684` |
+| SQUARE | ✅ | `f8a8ee7bda80` | `e21a4e7cb75e` |
+| TERMINAL | ❌ 有意不放 | `a3b8dd07dae4` | `a3b8dd07dae4`（**未变**，证明只有钟带那一层被动过） |
+
+判据 `SettingsV2ClockChromeTest` 5 条：四套各钉「钟带存在 + 贴顶（≤8dp）+ 水平居中（≤1dp）」，
+终端钉「必须没有」。**变异验证**：把 `style != TERMINAL` 改成 `false` → 4 条红
+（`component with TestTag = 'settings-v2-clock' is not displayed`），终端那条仍绿（正是设计意图）。
+
+- 位置：`SettingsV2Screen` 里「顶部渐隐 28dp + `TimeText`」显式叠层，**不走 `ScreenScaffold` 的
+  `timeText` 槽**（那个槽只登记进 `LocalScaffoldState`，本项目没有 `AppScaffold`，传了不画）。
+- 滚动验证：SQUARE 上滑后内容在钟带下方淡出，不与时钟叠字（`s260-…`/`v261-square-scrolled` 截图）。
+- **判据边界**：Robolectric 下 `TimeText` 的文本节点是空的（语义树里 5×18px、无 `Text` 属性），
+  平台时间格式化器在影子环境给不出字符串。所以 JVM 只钉结构与几何，**时间真的显示只由真机截图证明**。
+
 ## 3. 几何与排版约束
 
 | 约束 | 判据 | 实测 |

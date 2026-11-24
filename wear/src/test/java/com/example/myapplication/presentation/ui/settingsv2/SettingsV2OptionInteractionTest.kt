@@ -105,6 +105,37 @@ class SettingsV2OptionInteractionTest {
     }
 
     @Test
+    fun theChoiceSubListStartsWithABackRowWithoutAForwardChevron() {
+        // 真机 0.0.0.260：返回行右边挂着 `›`，与左边的 `‹ 返回` 自相矛盾。
+        // 子列表结构是逻辑（不是样式），所以直接断言数据，不靠点界面猜。
+        val row = SettingsV2Row(
+            key = "temperature",
+            title = "温度",
+            trailing = RowTrailing.Value("0.7"),
+            choice = temperatureChoice("0.7"),
+        )
+        val sub = choiceSubSections(row)
+
+        assertEquals("一行选项只摊成一个分区", 1, sub.size)
+        assertEquals("子列表标题必须沿用父行标题", "温度", sub[0].title)
+
+        val back = sub[0].rows.first()
+        assertEquals("首行必须是返回行", CHOICE_PREFIX + CHOICE_BACK, back.key)
+        assertEquals("‹ 返回", back.title)
+        assertEquals("返回行不得挂右向箭头（‹ 与 › 同时出现是自相矛盾）", RowTrailing.None, back.trailing)
+        assertTrue("返回行必须可点（isActionable），否则点了没反应", back.isActionable())
+
+        assertEquals(
+            "选项行数 = 选项数 + 1 个返回行",
+            temperatureChoice("0.7").options.size + 1,
+            sub[0].rows.size,
+        )
+        val checked = sub[0].rows.filter { it.trailing == RowTrailing.Value("✓") }
+        assertEquals("只有当前值带勾", 1, checked.size)
+        assertEquals("勾必须落在当前值 0.7 上", "0.7", checked.single().title)
+    }
+
+    @Test
     fun toggleRowReportsItselfToHost() {
         val clicked = mutableListOf<String>()
         compose.setContent {
