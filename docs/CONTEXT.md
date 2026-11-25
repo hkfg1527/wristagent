@@ -67,6 +67,12 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.270 追加 · 换风格「重启仍在」真机端到端验证**
+- 历史上这条坏过（Host 注释：真机上怎么切都不变、重启回默认档，因为读的是内存态）。
+- 复验链路：选择器点「贴边卡」→ `settingsStyle=ARC` → `am force-stop` → 重启 → 仍 `ARC`
+  → 渲染复核 `供应商` left=54px、卡片 x=[2,464]（贴边）。三步都对，验完已还原 BALLOON。
+- 记进 `docs/SETTINGS-V2-ACCEPTANCE.md` §5.1。
+
 **0.0.0.270 追加 · 一屏可见项测量工具 + D6 结论自我更正**
 - 新工具 `docs/tools/card-density.mjs`：进设置页 → dump → 按**圆方程**判每个文本节点的矩形
   是否完整落在半径 233 的圆内（四角 + 四边中点），输出"完整可见 / 被弧切"并写 `build-logs/card-density.json`。

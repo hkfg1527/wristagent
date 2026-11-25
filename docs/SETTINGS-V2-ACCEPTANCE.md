@@ -117,6 +117,21 @@ ARC `78b80feddd5f` / SQUARE `bf31647f1317` / TERMINAL `f7b6b16a7354`（终端哈
 | 选中即切换 | 同上（回调断言） | 点「终端」→ 页面立刻变终端形态（`after-pick.png`），无需重启 |
 | V2 → 旧枚举落库 | 同上（五套映射互不相同） | `preferences.settingsStyle` 写入 + `SettingsChangeBus.bump()` |
 
+### 5.1 换风格后**重启仍在**（2026-11-26 真机端到端验证）
+
+历史上这条坏过：`SettingsV2Host` 的注释写着"真机上怎么切都不变，重启后仍是默认档"
+（因为当时读的是内存态而不是偏好）。这次走完整链路复验：
+
+| 步骤 | 实测 |
+|---|---|
+| 选择器里点「贴边卡」 | `settings.settingsStyle` = **ARC** |
+| `am force-stop` → 重新启动 | `settings.settingsStyle` 仍 = **ARC** |
+| 渲染复核 | `供应商` 文字 left=**54px**（≈26dp 安全边距）；卡片 x=[**2**,464] 贴边 |
+
+三步都对得上，说明"选 → 落库 → 重启读回 → 按新风格渲染"这条链是通的。
+（验完已把设备风格还原成 BALLOON。）
+
+
 ## 6. 旧实现清理
 
 | 项 | 结论 |
