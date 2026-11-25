@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.271` / versionCode = 309；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.272` / versionCode = 310；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1408 条 / 219 套件全绿**（2026-11-26 05:20 实测）。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -53,7 +53,7 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-25 00:55
 
 **版本与基线**
-- 内部版 `0.0.0.271`（versionCode = 309）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.272`（versionCode = 310）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1408** 条 / **219** 套件全绿（2026-11-26 05:20 实测 `:wear:testDebugUnitTest`；此前文档写过 1416/220、1382/215，都是过期数，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 9 条判据**；控制台页面 E2E **72 条**断言。
 
@@ -66,6 +66,18 @@
   （`` `scaleX = scale * 1.1f` 找不到同值的 `scaleY`（横向形变） ``），已回退。
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
+
+**0.0.0.272 · 底部安全边距改回官方值 24dp（D8 的根因）**
+- 事实（`javap` 读 1.7.1 的 `compose-material3-1.7.1.aar`）：
+  `PaddingDefaults.verticalContentPaddingPercentage = 10.0f`、
+  `ScreenScaffoldDefaults.ContentPadding = PaddingValues(horizontal = 5.2%, vertical = 10%)`，上下各一份。
+  233dp 屏上 ≈ 23.3dp ≈ **24dp**。我们的顶部是 24dp（对），**底部只有 8dp**（错）。
+- 后果正是 D8：末行落进屏幕底部约 40px 不吃点击的带（真机 `y=412` 可点、`y≥425` 无反应）。
+  24dp = 48px > 那条带。
+- 改动：`SettingsV2BottomInset` 8dp → **24dp**（不是拍脑袋的 44dp，是官方值）。
+  判据：`SettingsV2ArchitectureGuardTest.theBottomInsetIsTheOfficialTenPercent`（≥24dp 且 ≤32dp），
+  以及 `SettingsV2ScreenTest` 里原本钉 8dp 的断言改成 24dp（改的是**有出处的期望**，不是放宽）。
+- **未验证**：设备自 06:10 起 adb 离线，**没有真机实测"末行现在能点开"**。上机第一件事就是验这个。
 
 **0.0.0.271 追加 · 发现「屏幕底部约 40px 不吃点击」**
 - 现象（真机实测，同一行 特权执行）：`tap y=412` → 正常打开子页（`特权执行 | ‹ 返回 | 只读 | 工作区 | 全权限 ✓`）；

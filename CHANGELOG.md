@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 修复：列表最后一行点不动（底部安全边距用回了官方值）
+屏幕底部约 40px 不接收点击（真机实测：同一行 `y=412` 能打开子页、`y≥425` 毫无反应），
+而底部安全边距只有 8dp，最后一行刚好卡进那条带。
+
+- 官方值来自 `javap` 读 1.7.1：`PaddingDefaults.verticalContentPaddingPercentage = 10.0f`，
+  `ScreenScaffoldDefaults.ContentPadding` 上下各取 10% 屏高 —— 233dp 屏上约 24dp。
+- `SettingsV2BottomInset`：8dp → **24dp**。
+- 判据：新增守卫（不得 < 24dp、> 32dp），并把原先钉 8dp 的断言改到 24dp。
+- **未验证**：改动期间手表 adb 离线，尚未真机确认末行可点。
+
 ### 修复：「关掉动效」此前对设置页完全无效
 `animationsEnabled` 只在主界面那一支被投进 `LocalAnimationsEnabled`，设置页拿到的是默认值 `true`；
 而设置页 V2 的动效代码也从没读过这个开关 —— 用户关掉动效后，这一页照样逐行入场。

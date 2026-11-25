@@ -111,9 +111,12 @@ class SettingsV2ScreenTest {
      */
     @Test
     fun noStyleButtonFullWidthAndChoiceEntry() {
+        // 0.0.0.272 起改回官方值 24dp（= 屏高 10%，见 SettingsV2BottomInset 的 KDoc）。
+        // 此前钉的是 8dp —— 那个值让列表最后一行落进屏幕底部约 40px 不吃点击的带里，
+        // 真机实测末行 y=412 可点、y>=425 无反应（D8）。这不是放宽断言，是把期望改到有出处的值上。
         assertEquals(
-            "去掉风格按钮后底部只留 8dp 手势区",
-            8f,
+            "底部安全边距应为官方 10% 屏高（24dp）；小于它会压进底部手势带",
+            24f,
             SettingsV2BottomInset.value,
             0.01f
         )

@@ -101,10 +101,19 @@ internal fun choiceSubSections(row: SettingsV2Row): List<SettingsV2Section> {
  */
 
 /**
- * 底部内边距：去掉「风格」按钮后不再需要 48dp 让位，只留系统手势区。
- * 内容由此多出约 40dp 竖向面积（圆屏上就是多显示一整项）。
+ * 底部安全边距。
+ *
+ * **改成官方值（0.0.0.272）**：`javap` 读 1.7.1 的 `androidx.wear.compose.material3.PaddingDefaults` 与
+ * `ScreenScaffoldDefaults`，实测常量是
+ * `verticalContentPaddingPercentage = 10.0f`、`ContentPadding = PaddingValues(horizontal = 5.2%, vertical = 10%)`
+ * 且上下各一份 —— 233dp 屏上 ≈ 23.3dp ≈ **24dp**。
+ *
+ * 此前这里是 **8dp**（只给顶部用了官方值）。去掉「风格」按钮后曾把底部压到 8dp 换取面积，
+ * 后果是**列表最后一行掉进屏幕底部那条约 40px 不吃点击的带**：真机实测同一行
+ * `tap y=412` 能开子页、`y≥425` 无反应（见 docs/DECISIONS-PENDING.md D8）。
+ * 24dp = 48px > 那条带，末行才能被完整点到。
  */
-val SettingsV2BottomInset = 8.dp
+val SettingsV2BottomInset = 24.dp
 
 /**
  * 顶部安全区：圆屏第一行必须往里收，否则会被圆弧切掉。

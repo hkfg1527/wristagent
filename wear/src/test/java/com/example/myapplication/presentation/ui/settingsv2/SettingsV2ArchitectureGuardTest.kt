@@ -3,6 +3,7 @@ package com.example.myapplication.presentation.ui.settingsv2
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -222,6 +223,25 @@ class SettingsV2ArchitectureGuardTest {
             .substringBefore("AppScreen.MAIN ->")
         assertTrue("SETTINGS 分支里必须提供 LocalAnimationsEnabled", settingsBranch.contains("LocalAnimationsEnabled provides"))
         assertTrue("提供后必须真的包住 SettingsV2Host", settingsBranch.contains("SettingsV2Host("))
+    }
+
+    /**
+     * 底部安全边距必须是官方值（屏高 10% ≈ 24dp），不能为了多放一行压到 8dp 这种小于手势带的值。
+     *
+     * 事实来源：`javap` 读 1.7.1 `PaddingDefaults.verticalContentPaddingPercentage = 10.0f`，
+     * `ScreenScaffoldDefaults.ContentPadding = PaddingValues(horizontal = 5.2%, vertical = 10%)`，上下各一份。
+     *
+     * 为什么钉住：屏幕底部约 40px 不接收点击（真机实测 `y=412` 可点、`y≥425` 无反应），
+     * 8dp（16px）让末行刚好卡进那条带 —— 用户点末行会以为"点了没反应"。
+     */
+    @Test
+    fun theBottomInsetIsTheOfficialTenPercent() {
+        val screen = File(v2Dir, "SettingsV2Screen.kt").readText()
+        val decl = Regex("""val SettingsV2BottomInset = ([\d.]+)\.dp""").find(screen)
+        assertNotNull("SettingsV2BottomInset 声明被改掉了？", decl)
+        val dp = decl!!.groupValues[1].toFloat()
+        assertTrue("底部内边距 $dp dp 不能小于 24dp（官方 10% 屏高；小于它末行会落进不吃点击的底部带）", dp >= 24f)
+        assertTrue("底部内边距 $dp dp 也不能大到把可见区压掉一整行（>32dp）", dp <= 32f)
     }
 
     @Test

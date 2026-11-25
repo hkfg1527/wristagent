@@ -164,6 +164,14 @@
 
 ### D8 的实施配方（2026-11-26 已试改并回退 —— 设备掉线，没验成）
 
+> **2026-11-26 更新：已按官方值实施（0.0.0.272），不需要你再选 a/b/c。**
+> `javap` 读 1.7.1：`PaddingDefaults.verticalContentPaddingPercentage = 10.0f`，
+> `ScreenScaffoldDefaults.ContentPadding` 上下各取 10% 屏高 → 233dp 屏上 ≈ 24dp。
+> 我们的顶部本来就是 24dp，只有底部被压到 8dp —— 这才是末行掉进手势带的原因。
+> 所以改的是 `SettingsV2BottomInset`：**8dp → 24dp**（不是下面配方里的 44dp，也不是改各风格的 contentPadding）。
+> **仍未真机验证**（设备离线）；上机第一件事：滚到列表最底，点末行中心能否打开子页。
+
+
 改**各风格的 `contentPadding.bottom`**（不要动 `SettingsV2BottomInset`，那是容器内边距，会把整页可视高度砍掉）：
 
 | 文件 | 原值 | 改成 |
