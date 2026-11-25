@@ -317,6 +317,19 @@ const consoleE2E = () => {
 
 const main = () => {
   console.log('release-check · 版本 ' + versionName());
+  // 跳过必须**显式记名**：此前用 --skip-device 时只跑 5 条，末尾却打印"5/5 通过"，
+  // 读的人无法知道有 4 条没跑（属于"报告与事实不一致"）。现在跳过项单独记账、单列一行，
+  // 且只要有跳过就退出码 2（0=全跑全绿，1=有红，2=不完整）。
+  const skipped = [];
+  const skip = (name, why) => {
+    skipped.push({ name, why });
+    console.log('  skip ' + name + '  ' + why);
+  };
+  if (skipBuild) {
+    skip('构建成功', '--skip-build');
+    skip('单测全绿', '--skip-build');
+    skip('APK 产出', '--skip-build');
+  }
   if (!skipBuild) build();
   if (!skipDevice || !skipConsole) {
     // 设备不在时必须**整体判红**：此前 adb 掉线时 device()/geometry() 里每步拿空结果，
@@ -333,10 +346,28 @@ const main = () => {
     record('设备在线', true);
   }
   if (!skipDevice) { device(); geometry(); }
+  else {
+    skip('真机安装与走查', '--skip-device');
+    skip('卡片几何', '--skip-device');
+  }
   if (!skipConsole) consoleE2E();
+  else skip('控制台页面 E2E', '--skip-console');
+
   const failed = results.filter((r) => !r.ok);
-  console.log('\n=== 结果：' + (results.length - failed.length) + '/' + results.length + ' 通过 ===');
-  if (failed.length) { failed.forEach((f) => console.log('  失败：' + f.name + ' ' + f.detail)); process.exit(1); }
+  const total = results.length + skipped.length;
+  console.log(
+    '\n=== 结果：' + (results.length - failed.length) + '/' + total + ' 通过' +
+      (skipped.length ? '，' + skipped.length + ' 条跳过（不算通过）' : '') + ' ===',
+  );
+  skipped.forEach((s) => console.log('  跳过：' + s.name + '（' + s.why + '）'));
+  if (failed.length) {
+    failed.forEach((f) => console.log('  失败：' + f.name + ' ' + f.detail));
+    process.exit(1);
+  }
+  if (skipped.length) {
+    console.log('  注意：本次不完整，不能当作发布门禁通过。');
+    process.exit(2);
+  }
 };
 
 main();

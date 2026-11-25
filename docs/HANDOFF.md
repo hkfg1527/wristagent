@@ -80,7 +80,7 @@ git log --oneline -5; git status --porcelain
 | 诊断日志 | **release 构建会把 `Log.d` 整段删掉**（`proguard-rules.pro` 的 `-assumenosideeffects class android.util.Log`）。排查真机问题用 `println`，它不会被 R8 删除；用 Log 得到的"没有日志"是假证据 |
 | 中文写文件 | **不要用 `Set-Content -Encoding UTF8`**（会造成 mojibake）；用 `write` / `edit` 工具，或 `Out-File -Encoding utf8NoBOM` |
 | 导航自动化 | `docs/tools/nav.mjs`：`tapRow` 点完会检查有没有弹层；**点了不算成功，要验证效果** |
-| 发布自检 | `node docs/tools/release-check.mjs`，4 段共 **9 条判据**（构建/单测/APK/设备在线/安装/进入设置页/四分区/几何/控制台 E2E） |
+| 发布自检 | `node docs/tools/release-check.mjs`，4 段共 **9 条判据**（构建/单测/APK/设备在线/安装/进入设置页/四分区/几何/控制台 E2E）。**退出码：0=全跑全绿；1=有红；2=不完整（有跳过，不能当门禁通过）**，跳过项会单列名字 |
 
 ---
 
