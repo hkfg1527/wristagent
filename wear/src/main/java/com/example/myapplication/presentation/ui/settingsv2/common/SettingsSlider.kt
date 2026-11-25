@@ -1,6 +1,8 @@
 package com.example.myapplication.presentation.ui.settingsv2.common
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -9,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
@@ -33,6 +37,14 @@ fun SettingsSlider(
     modifier: Modifier = Modifier,
     /** 打在**内部 Slider** 上的测试标识（`SetProgress` 在 Slider 节点上，不在外层 Row 上）。 */
     sliderTag: String? = null,
+    /**
+     * 读屏用的行名（如「温度」）。
+     *
+     * 官方 `Slider` 自带区间语义，但**标签不在那个节点上** —— 不加这个，读屏只会念 "0.7"。
+     * 语义必须挂在 `Slider` **自己的 modifier** 上：外层 `Box + mergeDescendants` 试过，不行
+     * （合并只搬属性，`SetProgress` 是动作，留在子节点，父节点仍然没有它 —— 旧页踩过，见 CONTEXT）。
+     */
+    label: String? = null,
     onChange: (Float) -> Unit = trailing.onChange,
 ) {
     Row(
@@ -45,7 +57,10 @@ fun SettingsSlider(
             onValueChange = onChange,
             valueRange = trailing.range,
             steps = trailing.steps,
-            modifier = Modifier.weight(1f).then(if (sliderTag != null) Modifier.testTag(sliderTag) else Modifier),
+            modifier = Modifier
+                .weight(1f)
+                .then(if (sliderTag != null) Modifier.testTag(sliderTag) else Modifier)
+                .then(if (label != null) Modifier.semantics { contentDescription = label } else Modifier),
         )
         // text 为 null 时不在这行重复显示数值（第一行右侧已经显示）
         if (text != null) {

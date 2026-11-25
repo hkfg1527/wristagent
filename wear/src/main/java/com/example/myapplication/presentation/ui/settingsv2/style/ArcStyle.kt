@@ -220,6 +220,7 @@ private fun ArcRow(
                 width = null,
                 modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 8.dp),
                 sliderTag = com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix + row.key,
+                label = row.title,
                 onChange = { v -> onSlider?.invoke(row.key, v) },
             )
         }

@@ -224,6 +224,7 @@ private fun M3ListRow(
                 color = identity.titleColor,
                 width = null,
                 sliderTag = com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix + row.key,
+                label = row.title,
                 onChange = { v -> onSlider?.invoke(row.key, v) },
             )
         }

@@ -284,6 +284,7 @@ private fun M3CardRow(
                 width = null,
                 modifier = Modifier.padding(top = 4.dp),
                 sliderTag = SettingsV2SliderTagPrefix + row.key,
+                label = row.title,
                 onChange = { v -> onSlider?.invoke(row.key, v) },
             )
         }

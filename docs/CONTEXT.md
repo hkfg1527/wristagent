@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.267` / versionCode = 305；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.268` / versionCode = 306；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382 条 / 215 套件全绿**。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -53,9 +53,21 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-25 00:55
 
 **版本与基线**
-- 内部版 `0.0.0.267`（versionCode = 305）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.268`（versionCode = 306）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382** 条 / **215** 套件全绿（2026-11-25 00:34 实测 `:wear:testDebugUnitTest`；文档此前写的 1416/220 是错的，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
+
+**0.0.0.268 · 滑块补无障碍名字（行名挂到 Slider 上）**
+- 缺口：V2 的滑块**没有可读名字** —— 读屏只念 "0.7"，不知道是哪一项。旧设置页为同一个问题写过
+  `OfficialSliderAccessibilityTest`，V2 重写时漏了。
+- 修法：`SettingsSlider` 增 `label` 参数，挂在 **`Slider` 自己的 modifier** 上（`contentDescription = row.title`），
+  四套风格都传 `row.title`。判据 `SettingsV2SliderWriteTest.theTemperatureSliderCarriesItsRowTitleAsContentDescription`
+  （先红后绿：`expected:<[温度]> but was:<[]>`）。
+- **真机 a11y 树的诚实结论**：名字落在**另一个同尺寸的 `android.view.View`** 上，
+  `android.widget.SeekBar` 节点自己的 `content-desc` 仍是空 —— 读屏是"先念温度、再念 0.7"两站，不是一站。
+  试过包一层 `semantics(mergeDescendants = true)` 想把它们并起来，**真机仍不合并**
+  （Slider 内部语义节点不会被父层吸收），已回退。要真正一站，需要官方 Slider 暴露 label 参数，
+  当前组件版本没有。
 
 **0.0.0.267 · 风格选择器换成官方 Card（最后几处手搓件之一）**
 - 目标里写着"禁止手搓仿真件"，而选择器的每一行原来是 `background + clickable` 手搓表面。

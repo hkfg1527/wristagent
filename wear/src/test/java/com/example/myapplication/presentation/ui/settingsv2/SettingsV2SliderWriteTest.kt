@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
@@ -61,5 +62,33 @@ class SettingsV2SliderWriteTest {
         compose.waitForIdle()
 
         assertEquals("0.7499 必须量化成 0.7", 0.7f, p.temperature, 1e-6f)
+    }
+
+    /**
+     * 读屏能不能念出「这是哪一项」。
+     *
+     * 官方 `Slider` 自带区间语义，但**标签不在那个节点上** —— 读屏只会念 "0.7"，不会念 "温度"。
+     * 旧设置页踩过同一个坑（`OfficialSliderAccessibilityTest` 就是为它写的），V2 这次要钉住同样的要求。
+     */
+    @Test
+    fun theTemperatureSliderCarriesItsRowTitleAsContentDescription() {
+        val p = AgentPreferences(FakeSharedPreferences())
+        p.temperature = 0.7f
+
+        compose.setContent {
+            SettingsV2Host(preferences = p, onBack = {})
+        }
+        compose.waitForIdle()
+
+        val node = compose.onNodeWithTag(SettingsV2SliderTagPrefix + "temperature", useUnmergedTree = true)
+            .fetchSemanticsNode()
+        val descriptions = node.config
+            .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)
+            .orEmpty()
+        assertEquals(
+            "滑块必须能念出所属行名（否则读屏只说 0.7，不知道是哪一项）",
+            listOf("温度"),
+            descriptions,
+        )
     }
 }

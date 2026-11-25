@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 修复：滑块读不出「这是哪一项」
+V2 的滑块没有可读名字，读屏只念当前值（"0.7"）。旧设置页为同一个问题写过专门的守卫测试，
+V2 重写时漏了。
+
+- `SettingsSlider` 增 `label` 参数，挂在 `Slider` 自己的 modifier 上（`contentDescription = row.title`），
+  四套风格都传 `row.title`。
+- 判据：`SettingsV2SliderWriteTest` 新增一条（先红后绿）。
+- **限制（真机实测）**：名字落在另一个同尺寸的 `android.view.View` 上，`SeekBar` 节点自己仍为空名字 ——
+  读屏是"先念温度、再念 0.7"两站。试过 `mergeDescendants = true` 合并，真机不生效，已回退。
+
 ### 变更：风格选择器的每一行改用官方 `Card`
 选择器里每项原先是 `background + clickable` 的手搓表面 —— 目标里明确写着"禁止手搓仿真件"。
 
