@@ -239,9 +239,6 @@ private fun M3ListRow(
     }
 }
 
-/** 供测试用的常量：列表行底色必须等于页面底色（无卡面）。 */
-internal val M3ListPageBackground: Color = SettingsV2Style.M3_LIST.identity.pageBackground
-
 /** 供测试用的常量：列表行表面必须完全透明（没有卡片容器）。 */
 internal val M3ListSurfaceAlpha: Float = SettingsV2Style.M3_LIST.identity.surface.alpha
 

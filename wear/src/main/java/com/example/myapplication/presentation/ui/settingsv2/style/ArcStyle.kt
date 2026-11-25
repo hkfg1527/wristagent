@@ -241,6 +241,5 @@ internal val ArcSafeInset = 26.dp
 /** 长列表滚到底部时额外留白（华为 8.1.1：40vp）。 */
 internal val ArcBottomTail = 40.dp
 
-/** 供测试读取：页顶/页底留白。 */
+/** 供测试读取：页顶留白。 */
 internal val ArcTopInset = 20.dp
-internal val ArcBottomInset = 6.dp
