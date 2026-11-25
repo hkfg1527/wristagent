@@ -168,18 +168,26 @@ const device = () => {
   }
   enterSettings();
   const found = [];
-  let lastTexts = null;
+  let lastKeys = null;
   let reachedEnd = false;
   for (let step = 0; step < 40 && found.length < 4; step++) {
-    const t = dumpTexts();
-    for (const z of zones) {
-      // 用包含匹配：终端档的分区标题带 `> ` 前缀（`> 让它能做事`），全等匹配会漏。
-      if (t.some((x) => x.includes(z)) && !found.includes(z)) found.push(z);
-    }
+    const nodes = dumpNodes();
+    // 同一帧里可能同时出现多个分区标题（M3_CARD 一屏 3 张卡、终端一屏 10 行），
+    // 所以**必须按屏幕 y 从小到大**决定先后，不能按 `zones` 数组的固定顺序追加 ——
+    // 0.0.0.262 实测踩到过：一次 dump 同时命中「让它能做事」和「连得上」，
+    // 按数组顺序追加得到 `让它能做事 → 连得上` 的倒序，判据假红。
+    const hits = zones
+      .map((z) => {
+        const hit = nodes.find((n) => n.text.includes(z));
+        return hit ? { zone: z, top: hit.top } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.top - b.top);
+    for (const h of hits) if (!found.includes(h.zone)) found.push(h.zone);
     if (found.length === 4) break;
-    const joined = t.join('|');
-    if (lastTexts === joined) { reachedEnd = true; break; }
-    lastTexts = joined;
+    const key = nodes.map((n) => n.text + '@' + n.top).join('|');
+    if (lastKeys === key) { reachedEnd = true; break; }
+    lastKeys = key;
     adb('shell', 'input', 'swipe', '233', '390', '233', '170', '350');
     sleep(900);
   }

@@ -5,9 +5,9 @@
 // （release-check 的 subpageShot 结尾会按 back 退回聊天页）。所以这里每一步都先校验页面：
 // 只有 dump 里出现 V2 的分区文本，才允许截图；风格是否真的换了，用该风格的**特征标记**判定。
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { regionHash } from './png-region.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const ADB = process.env.ADB || 'E:\\apkkkk\\platform-tools\\adb.exe';
@@ -77,7 +77,11 @@ function shot(file) {
     cwd: ROOT, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 120000,
   });
   fs.writeFileSync(file, png.stdout || Buffer.alloc(0));
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 12);
+  // 哈希**排除顶部 60px 钟带**：0.0.0.261 起页面顶部有曲面时钟，整屏哈希会把"当前几点"
+  // 算进去 —— 同一份代码在 10:55 与 12:57 得到不同哈希，跨版本对比直接失效
+  // （实测：M3_CARD 源码没动，升版后整屏哈希从 480b72e5 变成 6d5ba611）。
+  // 其余像素逐字节参与哈希，判据没有被放松；解析失败直接抛错，不退回整屏哈希糊过去。
+  return regionHash(fs.readFileSync(file), 60);
 }
 
 fs.mkdirSync(OUT, { recursive: true });
