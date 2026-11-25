@@ -787,6 +787,18 @@ JVM 侧的 `SetProgress` 两条判据**始终是绿的**（`SettingsV2SliderWrit
 **下一轮第一件事**：在滑块行加 `Modifier.pointerInput` 探针，打印 down/move 是否到达该层，
 判定是被列表手势、`SurfaceTransformation` 的层变换、还是 `TransformingLazyColumn` 的旋转手势吃掉。
 
+#### 0.0.0.265 追加：诊断结论更正（2026-11-26 03:50）
+
+| 结论 | 依据 |
+|---|---|
+| 上一轮"日志没输出 ⇒ 回调没触发"**作废** | `proguard-rules.pro` 的 `-assumenosideeffects class android.util.Log` 会把 release 构建里的 `Log.d` 整段删掉 |
+| 指针事件**确实到达 Slider** | `println` 探针：`Initial` 通道 `Press consumed=false`；`Main` 通道 `Press consumed=true`（被 Slider 内部吃掉） |
+| `adb input swipe` **不是可靠仪器** | 同一手法：有时 1.4→0、有时不动；左→右的拖拽反而把值变成 0 |
+| JVM 手势注入**也不是** | Robolectric 里 `performTouchInput` 拖"裸滑块"（无列表/卡片）也不动，`steps=0` 与 `steps=14` 都一样 |
+
+**当前状态：滑块拖动能力未验证。** 只能由人在表上拖一次确认；自动化两条路都走不通（已删掉那两条
+会永远红的用例，避免把夹具限制当成产品缺陷）。
+
 
 
 
