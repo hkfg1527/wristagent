@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
@@ -134,8 +135,6 @@ fun M3CardSettings(
                             .heightIn(min = 40.dp)
                             .testTag("m3card-row")
                             .enterAppearance(enter, motion)
-                            // 选项子页的当前项：读屏要能念出"已选择"（✓ 只是一个字符，读屏不认）
-                            .then(if (row.selected) Modifier.semantics { selected = true } else Modifier)
                         val content: @Composable () -> Unit = {
                             M3CardRow(
                                 row = row,
@@ -153,6 +152,21 @@ fun M3CardSettings(
                             // 而同一滑块在 M3_LIST 里能拖。根因未定位，见 docs/CONTEXT.md §0.5 的待办。
                             Card(
                                 modifier = cardModifier,
+                                shape = shape,
+                                colors = CardDefaults.cardColors(containerColor = identity.surface),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                transformation = SurfaceTransformation(transformationSpec),
+                            ) { content() }
+                        } else if (row.choiceOption) {
+                            // 选项行：用 Modifier.selectable 而不是 Card(onClick) + 外层 semantics。
+                            // 真机 a11y 树里 `selectable` 会投影成 **checkable=true / checked=true**（实测），
+                            // 而外层补的 `selected` 属性根本不进投影。
+                            Card(
+                                modifier = cardModifier.selectable(
+                                    selected = row.selected,
+                                    role = androidx.compose.ui.semantics.Role.RadioButton,
+                                    onClick = { onRowClick?.invoke(row) },
+                                ),
                                 shape = shape,
                                 colors = CardDefaults.cardColors(containerColor = identity.surface),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),

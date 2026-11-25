@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -120,12 +121,15 @@ fun ArcSettings(
                         .reportEdgeDistance(edge)
                         .edgeAppearance(edge.value, motion)
                         .then(
-                            if (onRowClick != null && row.isActionable()) {
-                                Modifier.clickable { onRowClick(row) }
-                                        .then(if (row.selected) Modifier.semantics { selected = true } else Modifier)
-                            } else {
-                                Modifier
-                            },
+                            when {
+                                        row.choiceOption -> Modifier.selectable(
+                                            selected = row.selected,
+                                            role = androidx.compose.ui.semantics.Role.RadioButton,
+                                            onClick = { onRowClick?.invoke(row) },
+                                        )
+                                        onRowClick != null && row.isActionable() -> Modifier.clickable { onRowClick(row) }
+                                        else -> Modifier
+                                    },
                         )
                         .testTag(ArcCardTag),
                 ) {

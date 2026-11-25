@@ -43,6 +43,14 @@ data class SettingsV2Row(
      * 所以选中状态必须走 `SemanticsProperties.Selected`，不能靠一个字符。
      */
     val selected: Boolean = false,
+    /**
+     * 这一行是「选项子页里的一个候选」。
+     *
+     * 用途：渲染侧据此用 `Modifier.selectable(...)` 而不是 `clickable` —— 前者由 Compose
+     * 自己生成 selected/role 语义（真机无障碍树里才有 `selected="true"`），后者只能靠外层补丁，
+     * 实测补丁进不了投影。
+     */
+    val choiceOption: Boolean = false,
 )
 
 /** 行尾形态。渲染侧按自己的风格决定"开关画成什么样"。 */

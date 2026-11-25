@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.269` / versionCode = 307；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.270` / versionCode = 308；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382 条 / 215 套件全绿**。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -53,9 +53,20 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-25 00:55
 
 **版本与基线**
-- 内部版 `0.0.0.269`（versionCode = 307）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.270`（versionCode = 308）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382** 条 / **215** 套件全绿（2026-11-25 00:34 实测 `:wear:testDebugUnitTest`；文档此前写的 1416/220 是错的，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
+
+**0.0.0.270 · 「已选中」改成 `Modifier.selectable` —— 真机已验证（改成 checkable/checked 投影）**
+- 上一轮（0.0.0.269）说"真机未生效"，**是我的判据错了**：`selectable` 在无障碍树里投影成
+  **`checkable="true"` + `checked="true"`**，不是 `selected="true"`。我按 `selected` 去 grep，当然为 0。
+- 现在的实现：选项行用 `Modifier.selectable(selected = row.selected, role = Role.RadioButton, onClick = …)`，
+  四套风格都接（M3_CARD 走"不可点 Card + selectable"，其余三套替掉 clickable）。
+- **真机实测**（M3_CARD 与 M3_LIST 各验一次，dump 同一个子页）：
+  `checkable="true" checked="false"`（未选中项）与 `checkable="true" checked="true"`（当前项）成对出现。
+- 判据：`SettingsV2OptionInteractionTest.theSelectedOptionIsAnnouncedAsSelected`。
+- **教训**：验证无障碍别猜属性名 —— 先 dump 一次看框架到底投影成什么（`checked` vs `selected` vs
+  `content-desc`），再写判据。滑块那条（标签落在兄弟节点）仍然是两站，未解决。
 
 **0.0.0.269 · 选项子页的「已选中」语义（Compose 有、真机投影没有）**
 - 缺口：子页当前项只画了一个 `✓` 字符 —— 读屏不会把 "✓" 念成"已选中"。

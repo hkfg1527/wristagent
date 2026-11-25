@@ -81,6 +81,7 @@ internal fun choiceSubSections(row: SettingsV2Row): List<SettingsV2Section> {
                                 RowTrailing.None
                             },
                             selected = option.value == choice.selectedValue,
+                            choiceOption = true,
                         )
                     )
                 }
