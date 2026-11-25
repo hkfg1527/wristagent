@@ -62,7 +62,8 @@
   `screenrecord` 抽不出帧。改用 Compose 测试时钟 40ms 采样。
 - 实测表（M3_LIST）：40ms 时第一行 3.4px、第二行 **0.0px**；80ms 第二行 4.5px；200ms 后两行都在 **8.0px**
   （= enterSlide 4dp × density 2.0）。断言：40ms 第二行为 0、位移单调不减、终态相等。
-- **只覆盖 M3_LIST**。另外四套 stagger 参数不同（40/50/18ms），⑤要全部跑一遍才算收口。
+- **五套已全量覆盖（⑤ 收口）**：M3_CARD/ARC 在 `stagger+10ms` 时第二行仍为 0；SQUARE（stagger=0）
+  两行每个采样点相等；TERMINAL（enterSlide=0dp）全程为 0。明细表见 `docs/UI-EVIDENCE.md`。
 
 **0.0.0.266 · 选项子页返回后滚回原行（真机已验证）**
 - 真机缺陷：在「安全策略」里选中「自动执行」后，列表被**弹回第一屏**「连得上」，

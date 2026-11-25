@@ -30,7 +30,7 @@ class SettingsV2StaggerFrameTest {
     val compose = createComposeRule()
 
     private fun yOf(text: String): Float =
-        compose.onNodeWithText(text).fetchSemanticsNode().boundsInRoot.top
+        compose.onNodeWithText(text, substring = true).fetchSemanticsNode().boundsInRoot.top
 
     @Test
     fun theFirstRowMovesBeforeTheSecondOne() {
@@ -105,5 +105,65 @@ class SettingsV2StaggerFrameTest {
             last.third,
             0.5f,
         )
+    }
+
+    // ==== 另外四套：按各自的设计意图各钉一条 ====
+    //
+    // 参数（SettingsV2Motions.of）：M3_CARD 40ms/12dp、M3_LIST 26ms/8dp、ARC 50ms/16dp、
+    // SQUARE **stagger=0**（不错峰，所有行一起动）、TERMINAL **slide=0dp 且不进场**（位置根本不变）。
+
+    private fun sampleDisplacement(style: SettingsV2Style, stepMs: Long = 10L, steps: Int = 33):
+        List<Triple<Long, Float, Float>> {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MaterialTheme { SettingsV2Screen(style = style) }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val baseFirst = yOf("模型")
+        val baseSecond = yOf("温度")
+        val out = mutableListOf(Triple(0L, 0f, 0f))
+        var elapsed = 0L
+        repeat(steps) {
+            compose.mainClock.advanceTimeBy(stepMs)
+            elapsed += stepMs
+            out += Triple(elapsed, baseFirst - yOf("模型"), baseSecond - yOf("温度"))
+        }
+        println("=== $style displacement table (px) ===")
+        out.forEach { (t, a, b) -> println("$t\t${"%.1f".format(a)}\t${"%.1f".format(b)}") }
+        return out
+    }
+
+    @Test
+    fun m3CardStaggersItsRows() {
+        val table = sampleDisplacement(SettingsV2Style.M3_CARD)
+        val at = table.first { it.first == 50L }
+        assertTrue("M3_CARD 50ms 时第一行应已动：${at.second}", at.second > 0f)
+        assertEquals("M3_CARD 50ms 时第二行还没起步（stagger=40ms）：${at.third}", 0f, at.third, 0.5f)
+    }
+
+    @Test
+    fun arcStaggersItsRows() {
+        val table = sampleDisplacement(SettingsV2Style.ARC)
+        val at = table.first { it.first == 60L }
+        assertTrue("ARC 60ms 时第一行应已动：${at.second}", at.second > 0f)
+        assertEquals("ARC 60ms 时第二行还没起步（stagger=50ms）：${at.third}", 0f, at.third, 0.5f)
+    }
+
+    @Test
+    fun squareMovesAllRowsTogetherBecauseItsStaggerIsZero() {
+        val table = sampleDisplacement(SettingsV2Style.SQUARE)
+        table.drop(1).forEach { (t, a, b) ->
+            assertEquals("SQUARE 的 stagger=0，$t ms 时两行位移应相同", a, b, 0.5f)
+        }
+        assertTrue("SQUARE 也需要有可见入场位移", table.last().second > 0f)
+    }
+
+    @Test
+    fun terminalDoesNotSlideItsRowsAtAll() {
+        val table = sampleDisplacement(SettingsV2Style.TERMINAL)
+        table.forEach { (t, a, b) ->
+            assertEquals("TERMINAL 的 enterSlide=0dp，$t ms 时第一行不该有位移", 0f, a, 0.5f)
+            assertEquals("TERMINAL 的 enterSlide=0dp，$t ms 时第二行不该有位移", 0f, b, 0.5f)
+        }
     }
 }
