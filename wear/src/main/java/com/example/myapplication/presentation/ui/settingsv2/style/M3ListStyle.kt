@@ -26,6 +26,7 @@ import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
@@ -67,7 +68,9 @@ fun M3ListSettings(
             state = state,
             // 磁滑：官方吸附惯性（松手吸附到某项居中），不自己算 snapOffset
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            // 右缘留 20dp 而不是 12dp：给官方指示器让车道（实测指示器占 x=445..459，
+            // 12dp 时行值右沿到 x=440，只差 5px）。
+            contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 20.dp, bottom = 8.dp),
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
@@ -115,6 +118,8 @@ fun M3ListSettings(
                 }
             }
         }
+        // 右缘位置指示器：官方 `ScrollIndicator` 的 `TransformingLazyColumnState` 重载
+        ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
     }
 }
 

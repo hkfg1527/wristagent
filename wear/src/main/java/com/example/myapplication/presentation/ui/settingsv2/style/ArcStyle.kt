@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
@@ -70,12 +72,14 @@ fun ArcSettings(
         bottomEnd = identity.cornerRadius,
     )
     val state = rememberTransformingLazyColumnState()
+    // Box 只为给「右缘位置指示器」一个对齐容器：列表本身仍占满全屏。
+    Box(modifier = modifier.fillMaxSize()) {
     TransformingLazyColumn(
         state = state,
         flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
         // 页边距照华为：顶部 20dp；水平方向不留给卡片（卡片贴边），底部 6dp + 长列表底部 40dp
         contentPadding = PaddingValues(start = 0.dp, end = 0.dp, top = 20.dp, bottom = 6.dp),
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
     ) {
         sections.forEachIndexed { sectionIndex, section ->
             item(key = "h-" + section.title) {
@@ -119,6 +123,10 @@ fun ArcSettings(
                 }
             }
         }
+    }
+        // 右缘位置指示器：官方 `ScrollIndicator` 的 `TransformingLazyColumnState` 重载。
+        // ARC 的卡片贴左屏、右侧留圆角，指示器落在圆角外侧的空白带上，不压字。
+        ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
     }
 }
 

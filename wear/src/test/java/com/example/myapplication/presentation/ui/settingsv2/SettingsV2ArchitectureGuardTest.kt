@@ -119,6 +119,29 @@ class SettingsV2ArchitectureGuardTest {
         }
     }
 
+    /**
+     * 右缘位置指示器（`ScrollIndicator`）：官方 Wear 的第二个"一眼认出"的信号。
+     *
+     * 四套列表/卡片风格都必须是**真实调用**（`state =` 有传），不是注释里提到；
+     * TERMINAL 明确不接 —— 它自己有 `▓/░` ASCII 滚动条，再叠一个官方指示器就是两套刻度打架。
+     */
+    @Test
+    fun everyStyleButTerminalWiresTheOfficialScrollIndicator() {
+        styleFiles().forEach { file ->
+            val src = text(file)
+            val style = expectedStyles.entries.first { it.value == file.name }.key
+            val wired = Regex("""ScrollIndicator\(\s*state\s*=""").containsMatchIn(src)
+            if (style == SettingsV2Style.TERMINAL) {
+                assertFalse(
+                    "TERMINAL 已有 ASCII 滚动条，不允许再接官方 ScrollIndicator（两套刻度会打架）",
+                    wired
+                )
+            } else {
+                assertTrue("$style 必须接官方 ScrollIndicator(state = …)", wired)
+            }
+        }
+    }
+
     @Test
     fun stylesUseTypeScaleInsteadOfHardCodedSp() {
         styleFiles().forEach { file ->

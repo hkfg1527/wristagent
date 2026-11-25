@@ -29,6 +29,7 @@ import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
@@ -107,7 +108,9 @@ fun SquareSettings(
         TransformingLazyColumn(
             state = state,
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            // 右缘留 20dp 而不是 12dp：官方指示器占 x=445..459（466px 屏实测），
+            // 12dp 时行值右沿到 x=440，两者只差 5px，读起来像粘在一起。20dp 让出 16px 车道。
+            contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 20.dp, bottom = 8.dp),
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
@@ -209,5 +212,7 @@ fun SquareSettings(
                 }
             }
         }
+        // 右缘位置指示器：官方 `ScrollIndicator` 的 `TransformingLazyColumnState` 重载
+        ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
     }
 }

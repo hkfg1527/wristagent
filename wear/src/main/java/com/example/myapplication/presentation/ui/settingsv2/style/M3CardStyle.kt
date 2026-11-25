@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.SwitchButton
+import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
@@ -78,8 +80,10 @@ fun M3CardSettings(
         }
     }
 
+    // Box 只为给「右缘位置指示器」一个对齐容器：列表本身仍占满全屏。
+    Box(modifier = modifier.fillMaxSize()) {
     TransformingLazyColumn(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
         state = state,
         // 磁滑吸附（守卫 SettingsV2ArchitectureGuardTest 会检查这条）
         flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
@@ -129,6 +133,10 @@ fun M3CardSettings(
                 }
             }
         }
+    }
+        // 右缘位置指示器：官方 `ScrollIndicator` 的 `TransformingLazyColumnState` 重载
+        // （1.7.1 里确实有这个重载，不是把 ScalingLazyListState 硬塞进来）。
+        ScrollIndicator(state = state, modifier = Modifier.align(Alignment.CenterEnd))
     }
 }
 
