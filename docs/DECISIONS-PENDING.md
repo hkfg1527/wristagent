@@ -162,3 +162,22 @@
 
 我倾向 **D8-a**：它是一次纯功能修复（末行可点），代价只是列表末尾的空白。
 
+### D8 的实施配方（2026-11-26 已试改并回退 —— 设备掉线，没验成）
+
+改**各风格的 `contentPadding.bottom`**（不要动 `SettingsV2BottomInset`，那是容器内边距，会把整页可视高度砍掉）：
+
+| 文件 | 原值 | 改成 |
+|---|---|---|
+| `M3CardStyle.kt` | `PaddingValues(horizontal = 10.dp, vertical = 4.dp)` | `PaddingValues(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 44.dp)` |
+| `M3ListStyle.kt` | `… bottom = 8.dp` | `… bottom = 44.dp` |
+| `SquareStyle.kt` | `… bottom = 8.dp` | `… bottom = 44.dp` |
+| `ArcStyle.kt` | `… bottom = 6.dp` | `… bottom = 44.dp` |
+
+**验证步骤**（必须真机）：
+1. 滚到列表最底，dump 末行卡片 bounds —— 卡底应 ≤ **378**（= 466 − 88），当前是 **466**；
+2. 点末行**中心**——应能打开子页（当前 `y≥425` 无反应）；
+3. 首屏不受影响（`contentPadding.bottom` 只影响末尾滚动范围）。
+
+**当前状态**：改动已回退（工作区干净），等设备重新连上再做。
+
+
