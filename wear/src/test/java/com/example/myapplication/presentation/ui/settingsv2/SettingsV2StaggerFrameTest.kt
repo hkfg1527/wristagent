@@ -3,6 +3,7 @@ package com.example.myapplication.presentation.ui.settingsv2
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.wear.compose.material3.MaterialTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -57,22 +58,52 @@ class SettingsV2StaggerFrameTest {
         assertTrue("第一行在 120ms 内必须产生可见位移：$firstMoved", firstMoved > 0f)
     }
 
+    /**
+     * **量化**的帧级证据：按 40ms 步长采样两行的位移，输出一张表，并断言三件事：
+     * ①第一行先动（t=40ms 时它已动、第二行还没动）；②每行位移随时间单调不减；③800ms 后都停住。
+     *
+     * 这张表就是"错峰"的证据 —— 比"看着像错峰"可核对。
+     */
     @Test
-    fun bothRowsEventuallyReachTheSameRestingDelta() {
+    fun theStaggerProducesAMeasurableFrameByFrameTable() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_LIST) }
         }
         compose.mainClock.advanceTimeByFrame()
-        val startDelta = yOf("温度") - yOf("模型")
 
-        // 推进到所有入场动画结束（M3_LIST：stagger 26ms×行数 + 200ms + 余量）
-        compose.mainClock.advanceTimeBy(2_000L)
-        val endDelta = yOf("温度") - yOf("模型")
+        val baseFirst = yOf("模型")
+        val baseSecond = yOf("温度")
+        val samples = mutableListOf<Triple<Long, Float, Float>>()
+        var elapsed = 0L
+        samples += Triple(0L, 0f, 0f)
+        repeat(10) {
+            compose.mainClock.advanceTimeBy(40L)
+            elapsed += 40L
+            samples += Triple(elapsed, baseFirst - yOf("模型"), baseSecond - yOf("温度"))
+        }
+        compose.mainClock.advanceTimeBy(800L)
+        samples += Triple(elapsed + 800L, baseFirst - yOf("模型"), baseSecond - yOf("温度"))
 
-        assertTrue(
-            "动画结束后两行应回到同一套布局间距（差值应收敛）：start=$startDelta end=$endDelta",
-            kotlin.math.abs(endDelta - startDelta) < 1f
+        println("=== STAGGER FRAME TABLE (M3_LIST, px) ===")
+        println("t(ms)\trow1(模型)\trow2(温度)")
+        samples.forEach { (t, a, b) -> println("$t\t${"%.1f".format(a)}\t${"%.1f".format(b)}") }
+
+        val at40 = samples.first { it.first == 40L }
+        assertTrue("40ms 时第一行必须已经动了：${at40.second}", at40.second > 0f)
+        assertEquals("40ms 时第二行必须还没动（错峰）：${at40.third}", 0f, at40.third, 0.5f)
+
+        samples.zipWithNext().forEach { (prev, next) ->
+            assertTrue("第一行位移必须单调不减：$prev -> $next", next.second >= prev.second - 0.01f)
+            assertTrue("第二行位移必须单调不减：$prev -> $next", next.third >= prev.third - 0.01f)
+        }
+
+        val last = samples.last()
+        assertEquals(
+            "动画结束后两行位移必须相同（都归位）：first=${last.second} second=${last.third}",
+            last.second,
+            last.third,
+            0.5f,
         )
     }
 }

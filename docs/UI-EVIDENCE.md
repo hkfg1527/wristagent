@@ -813,6 +813,27 @@ JVM 侧的 `SetProgress` 两条判据**始终是绿的**（`SettingsV2SliderWrit
 **方法教训**：`input swipe` 一次滑太远会和 `snapFlingBehavior` 打架，连滑七八次都停不到目标行；
 改成"每滑 150px 就 dump 一次、命中即停"（本次第 10 步命中）。
 
+### 动效帧级证据（测试时钟采样，M3_LIST · 0.0.0.266）
+
+真机抽帧不可行：单次 `screencap` 往返 **469–555ms**，入场动画只有 200–300ms；这台机器也没有
+ffmpeg，`screenrecord` 的 mp4 抽不出帧。所以用 Compose 测试时钟按 **40ms 步长**采样两行的位移
+（`SettingsV2StaggerFrameTest.theStaggerProducesAMeasurableFrameByFrameTable`）：
+
+| t (ms) | 第一行（模型）位移 px | 第二行（温度）位移 px |
+|---|---|---|
+| 0 | 0.0 | 0.0 |
+| 40 | **3.4** | **0.0** |
+| 80 | 6.0 | 4.5 |
+| 120 | 7.4 | 6.6 |
+| 160 | 7.9 | 7.6 |
+| 200 | 8.0 | 8.0 |
+| 240…1200 | 8.0 | 8.0 |
+
+- 错峰可核对：**40ms 时第一行已动 3.4px、第二行仍是 0.0**；到 80ms 第二行才起步。
+- 落位一致：200ms 后两行都停在 **8.0px**（= `enterSlide` 4dp × density 2.0），此后不再变化。
+- 断言三条：40ms 时第二行位移为 0；两行位移单调不减；终态相等。
+- **只覆盖 M3_LIST**：另外四套的 stagger 参数不同（40/50/18ms），要逐套跑一遍才算⑤收口。
+
 
 
 
