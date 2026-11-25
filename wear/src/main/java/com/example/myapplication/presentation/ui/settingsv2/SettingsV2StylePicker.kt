@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.Card
+import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 
@@ -70,16 +73,19 @@ fun SettingsV2StylePicker(
             )
             SettingsV2Style.values().forEach { style ->
                 val selected = style == current
-                Column(
+                // 官方 `Card` 而不是"background + clickable"手搓表面：
+                // ①按压反馈、涟漪、语义（读屏念成按钮）都是官方给的；
+                // ②目标里写着"禁止手搓仿真件"，这里之前是最后几处之一。
+                Card(
+                    onClick = { onPick(style) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            color = if (selected) Color(0xFF2A313C) else Color(0xFF16191E),
-                            shape = RoundedCornerShape(12.dp),
-                        )
-                        .clickable { onPick(style) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .testTag(StylePickerItemTagPrefix + style.name),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (selected) Color(0xFF2A313C) else Color(0xFF16191E),
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
                         text = if (selected) "● " + style.label else style.label,
