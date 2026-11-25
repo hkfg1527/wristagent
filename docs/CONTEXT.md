@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.268` / versionCode = 306；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.269` / versionCode = 307；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382 条 / 215 套件全绿**。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -53,9 +53,21 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-25 00:55
 
 **版本与基线**
-- 内部版 `0.0.0.268`（versionCode = 306）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.269`（versionCode = 307）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1382** 条 / **215** 套件全绿（2026-11-25 00:34 实测 `:wear:testDebugUnitTest`；文档此前写的 1416/220 是错的，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
+
+**0.0.0.269 · 选项子页的「已选中」语义（Compose 有、真机投影没有）**
+- 缺口：子页当前项只画了一个 `✓` 字符 —— 读屏不会把 "✓" 念成"已选中"。
+- 改法：`SettingsV2Row` 增 `selected` 字段；`choiceSubSections` 给当前值打上；四套风格把
+  `Modifier.semantics { selected = true }` 挂在行/卡的 modifier 上。
+- 判据：`SettingsV2OptionInteractionTest.theSelectedOptionIsAnnouncedAsSelected`（`hasText("标准") and isSelected()`）。
+- **真机未生效**：dump 里 `selected="true"` 计数为 **0**，而文字 `✓` 在。即
+  **Compose 语义树里有（JVM 绿），uiautomator 投影里没有** —— 与滑块 label 同一类墙：
+  我们加的语义挂在"组件外层"，被组件自己的合并节点吃掉了。
+- **下一步（下轮）**：改用 `Modifier.selectable(selected = …, role = Role.RadioButton, onClick = …)`
+  替掉"clickable + semantics"—— 这是 Compose 为单选行准备的正规 API，语义由它自己生成，
+  不靠外层补丁。**在真机 dump 出现 `selected="true"` 之前，这条算未修好。**
 
 **0.0.0.268 · 滑块补无障碍名字（行名挂到 Slider 上）**
 - 缺口：V2 的滑块**没有可读名字** —— 读屏只念 "0.7"，不知道是哪一项。旧设置页为同一个问题写过

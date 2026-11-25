@@ -36,6 +36,13 @@ data class SettingsV2Row(
     val choice: RowChoice? = null,
     /** 滑块行右侧显示的当前值文本（如 "16dp"）。 */
     val sliderText: String? = null,
+    /**
+     * 选项子页里"当前选中项"的语义标记 —— 读屏会念"已选择"。
+     *
+     * 视觉上的 `✓` 只是给眼睛看的：英文/中文读屏都不会把 "✓" 念成"已选中"，
+     * 所以选中状态必须走 `SemanticsProperties.Selected`，不能靠一个字符。
+     */
+    val selected: Boolean = false,
 )
 
 /** 行尾形态。渲染侧按自己的风格决定"开关画成什么样"。 */

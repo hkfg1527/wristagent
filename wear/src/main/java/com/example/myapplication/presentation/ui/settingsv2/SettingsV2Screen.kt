@@ -73,12 +73,14 @@ internal fun choiceSubSections(row: SettingsV2Row): List<SettingsV2Section> {
                             key = CHOICE_PREFIX + option.value,
                             title = option.label,
                             onClick = {},
-                            // 当前值用行尾 ✓ 表达，与主页的值列同一位置
+                            // 当前值用行尾 ✓ 表达，与主页的值列同一位置；
+                            // 但读屏不认 "✓"，所以同时打上 selected 语义（见 SettingsV2Row.selected）
                             trailing = if (option.value == choice.selectedValue) {
                                 RowTrailing.Value("✓")
                             } else {
                                 RowTrailing.None
                             },
+                            selected = option.value == choice.selectedValue,
                         )
                     )
                 }

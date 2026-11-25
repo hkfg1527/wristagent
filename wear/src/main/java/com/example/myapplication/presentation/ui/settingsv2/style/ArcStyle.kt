@@ -21,6 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnDefaults
@@ -120,6 +122,7 @@ fun ArcSettings(
                         .then(
                             if (onRowClick != null && row.isActionable()) {
                                 Modifier.clickable { onRowClick(row) }
+                                        .then(if (row.selected) Modifier.semantics { selected = true } else Modifier)
                             } else {
                                 Modifier
                             },

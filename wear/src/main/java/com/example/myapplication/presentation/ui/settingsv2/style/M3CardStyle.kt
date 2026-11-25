@@ -24,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -132,6 +134,8 @@ fun M3CardSettings(
                             .heightIn(min = 40.dp)
                             .testTag("m3card-row")
                             .enterAppearance(enter, motion)
+                            // 选项子页的当前项：读屏要能念出"已选择"（✓ 只是一个字符，读屏不认）
+                            .then(if (row.selected) Modifier.semantics { selected = true } else Modifier)
                         val content: @Composable () -> Unit = {
                             M3CardRow(
                                 row = row,

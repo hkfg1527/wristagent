@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +123,7 @@ fun M3ListSettings(
                                 .then(
                                     if (onRowClick != null && row.isActionable()) {
                                         Modifier.clickable { onRowClick(row) }
+                                        .then(if (row.selected) Modifier.semantics { selected = true } else Modifier)
                                     } else {
                                         Modifier
                                     },

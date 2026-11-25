@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -104,6 +105,27 @@ class SettingsV2OptionInteractionTest {
             "返回后不该还停在子列表（选项「极度宽松」不应存在）",
             compose.onAllNodesWithText("自动执行").fetchSemanticsNodes().isEmpty()
         )
+    }
+
+    /**
+     * 读屏要能念出"已选择"。
+     *
+     * 视觉上当前项只画了一个 `✓` 字符 —— 读屏不会把 "✓" 念成"已选中"。
+     * 所以选中状态必须走 `SemanticsProperties.Selected`。
+     */
+    @Test
+    fun theSelectedOptionIsAnnouncedAsSelected() {
+        compose.setContent {
+            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD, sections = sections) }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("安全策略", substring = true).performClick()
+        compose.waitForIdle()
+
+        compose.onNode(
+            androidx.compose.ui.test.hasText("标准") and androidx.compose.ui.test.isSelected(),
+        ).assertExists()
     }
 
     @Test

@@ -13,6 +13,14 @@
 
 ## [未发布]
 
+### 无障碍：选项子页的「已选中」语义（真机未生效）
+子页里当前项只画了 `✓` 字符，读屏不会把它念成"已选中"。
+
+- `SettingsV2Row` 增 `selected` 字段，当前值打上；四套风格挂 `Modifier.semantics { selected = true }`。
+- 判据：`SettingsV2OptionInteractionTest`（`hasText and isSelected`）通过。
+- **但真机 `uiautomator` dump 里 `selected="true"` 计数为 0** —— Compose 语义树有、无障碍投影没有。
+  下轮改用 `Modifier.selectable(...)`（Compose 给单选行的正规 API）再验；**在此之前这条算未修好**。
+
 ### 修复：滑块读不出「这是哪一项」
 V2 的滑块没有可读名字，读屏只念当前值（"0.7"）。旧设置页为同一个问题写过专门的守卫测试，
 V2 重写时漏了。
