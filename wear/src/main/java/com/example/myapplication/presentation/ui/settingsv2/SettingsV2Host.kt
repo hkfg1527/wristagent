@@ -57,10 +57,13 @@ fun SettingsV2Host(
             // 行点击：**五套风格共用**。此前只有 TERMINAL 接通，另外四套点了没反应
             // （M3_CARD 甚至是 `onClick = {}` 的假按钮），用户看到的就是"设置页全都用不了"。
             onSliderChange = { key, value ->
-                if (key == "tool_matrix") {
-                    preferences.matrixSpacingDp = value
-                    com.example.myapplication.agent.SettingsChangeBus.bump()
+                when (key) {
+                    "tool_matrix" -> preferences.matrixSpacingDp = value
+                    // 温度：量化到 0.1 再落库（与旧设置页同一套 `SettingsValueMath`，值不会出现 0.7000001）
+                    "temperature" -> preferences.temperature =
+                        com.example.myapplication.presentation.ui.settings.SettingsValueMath.quantizeTemperature(value)
                 }
+                com.example.myapplication.agent.SettingsChangeBus.bump()
             },
             onRowClick = { row ->
                 when (val trailing = row.trailing) {

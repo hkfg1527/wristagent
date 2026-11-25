@@ -145,6 +145,9 @@ fun SquareSettings(
                     ) {
                         // 单行制：标题左、值/开关右同一行。零圆角 + 内缩发丝线是这套的辨识度，
                         // 两行堆叠不是 —— 那只会让圆屏一屏只剩 2 行。
+                        // 滑块行：值留在第一行右侧，滑块独占第二行（塞行尾会把标题挤没，0.0.0.263 实测）
+                        val slider = row.trailing as? RowTrailing.Slider
+                        Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -193,10 +196,26 @@ fun SquareSettings(
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                 )
-                                // 连续量用官方滑块（M3E 控件），不是开关。
-                                is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, identity.titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
+                                // 滑块行：值先占第一行右侧，滑块画在下一行
+                                is RowTrailing.Slider -> Text(
+                                    text = row.sliderText ?: "",
+                                    color = identity.titleColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                )
                                 RowTrailing.None -> Unit
                             }
+                        }
+                        if (slider != null) {
+                            SettingsSlider(
+                                trailing = slider,
+                                text = null,
+                                color = identity.titleColor,
+                                width = null,
+                                sliderTag = com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix + row.key,
+                                onChange = { v -> onSlider?.invoke(row.key, v) },
+                            )
+                        }
                         }
                         // 1px 发丝线（0.5dp @ density 2.0）。
                         // **内缩 12dp**：M3_LIST 的线是通栏的，这一条内缩，两套的"线性"策略必须不同，

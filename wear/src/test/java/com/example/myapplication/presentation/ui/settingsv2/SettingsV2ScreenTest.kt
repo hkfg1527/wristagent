@@ -66,8 +66,18 @@ class SettingsV2ScreenTest {
 
     @Test
     fun theCardStyleUsesOneSmallCardPerSetting() {
+        // 用**纯文本行**的夹具，不用 `SettingsV2SampleData.root()`：0.0.0.263 起温度是滑块行，
+        // 它天然比普通行高（标题一行 + 整宽滑块一行），会在 300dp 视口里把卡片数从 4 压到 3。
+        // 这条判据问的是"普通设置项有没有被做成大海报卡"，所以夹具里不该混进滑块行 ——
+        // 否则改数据（加一个滑块）就会让一条与数据无关的布局守卫变红。
+        val plainRows = listOf(
+            SettingsV2Section(
+                title = "连得上",
+                rows = (1..6).map { SettingsV2Row("r$it", "项目 $it", trailing = RowTrailing.Value("$it")) },
+            )
+        )
         compose.setContent {
-            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD) }
+            MaterialTheme { SettingsV2Screen(style = SettingsV2Style.M3_CARD, sections = plainRows) }
         }
         compose.waitForIdle()
 

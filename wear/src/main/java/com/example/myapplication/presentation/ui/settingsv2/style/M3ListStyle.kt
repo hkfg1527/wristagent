@@ -133,8 +133,14 @@ private fun M3ListRow(
 ) {
     // 单行制：标题左、值/开关右同一行。两行堆叠时一屏只 3~4 行，
     // 圆屏上又空又散（圆屏截图评审后统一改）。标题与值各占一半，长值自己省略。
+    //
+    // 滑块行例外：值留在第一行右侧，滑块单独占第二行（塞行尾会把标题挤成「温…」，0.0.0.263 真机实测）。
+    val slider = row.trailing as? RowTrailing.Slider
+    // Column 只负责"给滑块留第二行"；高度约束与内边距**仍然挂在 Row 上**，
+    // 顺序保持 `heightIn(min) → padding`（反过来会让每行多出 8dp，实测行距 92px 变 103px）。
+    Column(modifier = modifier.fillMaxWidth()) {
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = identity.rowMinHeight)
             .padding(vertical = 4.dp),
@@ -180,9 +186,25 @@ private fun M3ListRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
-            // 连续量用官方滑块（M3E 控件），不是开关 —— 开关会把 0..64 的可调范围压成 0/1。
-            is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, identity.titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
+            // 滑块行：值先占第一行右侧，滑块在第二行（见上）
+            is RowTrailing.Slider -> Text(
+                text = row.sliderText ?: "",
+                color = identity.titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
             RowTrailing.None -> Unit
+        }
+    }
+        if (slider != null) {
+            SettingsSlider(
+                trailing = slider,
+                text = null,
+                color = identity.titleColor,
+                width = null,
+                sliderTag = com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix + row.key,
+                onChange = { v -> onSlider?.invoke(row.key, v) },
+            )
         }
     }
 }

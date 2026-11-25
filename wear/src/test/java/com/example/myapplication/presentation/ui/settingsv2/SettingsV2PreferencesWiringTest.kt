@@ -41,6 +41,10 @@ class SettingsV2PreferencesWiringTest {
             .text
 
 
+    /** 滑块行：读它显示的当前值（温度已改成滑块，行尾不再是 Value）。 */
+    private fun sliderTextOf(sections: List<SettingsV2Section>, key: String): String =
+        sections.flatMap { it.rows }.first { it.key == key }.sliderText ?: ""
+
     private fun subtitleOf(sections: List<SettingsV2Section>, key: String): String =
         sections.flatMap { it.rows }.first { it.key == key }.subtitle ?: ""
 
@@ -148,7 +152,7 @@ class SettingsV2PreferencesWiringTest {
 
         val sections = SettingsV2SampleData.fromPreferences(p)
         assertEquals("qwen3-max", valueOf(sections, "model"))
-        assertEquals("0.8", valueOf(sections, "temperature"))
+        assertEquals("0.8", sliderTextOf(sections, "temperature"))
         assertEquals("concise", valueOf(sections, "reply_style"))
         // 「页面风格」行现在是 Chevron（行本身就是换风格入口），当前档位放在副标题里
         val styleRow = sections.flatMap { it.rows }.first { it.key == "style" }
@@ -164,7 +168,7 @@ class SettingsV2PreferencesWiringTest {
 
         val sections = SettingsV2SampleData.fromPreferences(p)
         assertEquals("未设置", valueOf(sections, "model"))
-        assertEquals("1.0", valueOf(sections, "temperature"))
+        assertEquals("1.0", sliderTextOf(sections, "temperature"))
         assertEquals("1.0", SettingsV2SampleData.formatTemperature(1.0f))
         assertEquals("0.0", SettingsV2SampleData.formatTemperature(0.04f))
     }

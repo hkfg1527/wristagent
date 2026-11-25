@@ -33,11 +33,13 @@ class SettingsV2OptionInteractionTest {
         SettingsV2Section(
             title = "连得上",
             rows = listOf(
+                // 用「安全策略」当选项行的样本：温度已改成滑块（数值项不再开子菜单），
+                // 拿它当选项样本会与真实数据形状不一致。
                 SettingsV2Row(
-                    key = "temperature",
-                    title = "温度",
-                    trailing = RowTrailing.Value("0.7"),
-                    choice = temperatureChoice("0.7"),
+                    key = "security",
+                    title = "安全策略",
+                    trailing = RowTrailing.Value("标准"),
+                    choice = securityChoice("STANDARD"),
                 ),
                 SettingsV2Row(
                     key = "tts",
@@ -62,8 +64,8 @@ class SettingsV2OptionInteractionTest {
         }
         compose.waitForIdle()
 
-        // 点「温度」→ 进入子列表：用的是**同一套行容器**（m3card-row）
-        compose.onNodeWithText("温度", substring = true).performClick()
+        // 点「安全策略」→ 进入子列表：用的是**同一套行容器**（m3card-row）
+        compose.onNodeWithText("安全策略", substring = true).performClick()
         compose.waitForIdle()
         assertTrue(
             "子列表必须复用主页的行容器（m3card-row），而不是另做一套",
@@ -73,9 +75,9 @@ class SettingsV2OptionInteractionTest {
         compose.onNodeWithText("‹ 返回", substring = true).assertIsDisplayed()
 
         // 选一个靠近顶部的选项：M3_CARD 只组合可见项，远处选项在视口外查不到节点
-        compose.onNodeWithText("0.3", substring = true).performClick()
+        compose.onNodeWithText("自动执行", substring = true).performClick()
         compose.waitForIdle()
-        assertEquals("temperature" to "0.3", picked)
+        assertEquals("security" to "EXPERT", picked)
         assertTrue(
             "选完后必须回到主页列表",
             compose.onAllNodesWithText("自动播报回答").fetchSemanticsNodes().isNotEmpty()
@@ -91,7 +93,7 @@ class SettingsV2OptionInteractionTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithText("温度", substring = true).performClick()
+        compose.onNodeWithText("安全策略", substring = true).performClick()
         compose.waitForIdle()
         compose.onNodeWithText("‹ 返回", substring = true).performClick()
         compose.waitForIdle()
@@ -99,8 +101,8 @@ class SettingsV2OptionInteractionTest {
         // 回到主页：温度行在、且不再显示选项值
         compose.onNodeWithText("自动播报回答", substring = true).assertIsDisplayed()
         assertTrue(
-            "返回后不该还停在子列表（1.6 不应作为选项行存在）",
-            compose.onAllNodesWithText("取消").fetchSemanticsNodes().isEmpty()
+            "返回后不该还停在子列表（选项「极度宽松」不应存在）",
+            compose.onAllNodesWithText("自动执行").fetchSemanticsNodes().isEmpty()
         )
     }
 
@@ -109,15 +111,15 @@ class SettingsV2OptionInteractionTest {
         // 真机 0.0.0.260：返回行右边挂着 `›`，与左边的 `‹ 返回` 自相矛盾。
         // 子列表结构是逻辑（不是样式），所以直接断言数据，不靠点界面猜。
         val row = SettingsV2Row(
-            key = "temperature",
-            title = "温度",
-            trailing = RowTrailing.Value("0.7"),
-            choice = temperatureChoice("0.7"),
+            key = "security",
+            title = "安全策略",
+            trailing = RowTrailing.Value("标准"),
+            choice = securityChoice("STANDARD"),
         )
         val sub = choiceSubSections(row)
 
         assertEquals("一行选项只摊成一个分区", 1, sub.size)
-        assertEquals("子列表标题必须沿用父行标题", "温度", sub[0].title)
+        assertEquals("子列表标题必须沿用父行标题", "安全策略", sub[0].title)
 
         val back = sub[0].rows.first()
         assertEquals("首行必须是返回行", CHOICE_PREFIX + CHOICE_BACK, back.key)
@@ -127,12 +129,12 @@ class SettingsV2OptionInteractionTest {
 
         assertEquals(
             "选项行数 = 选项数 + 1 个返回行",
-            temperatureChoice("0.7").options.size + 1,
+            securityChoice("STANDARD").options.size + 1,
             sub[0].rows.size,
         )
         val checked = sub[0].rows.filter { it.trailing == RowTrailing.Value("✓") }
         assertEquals("只有当前值带勾", 1, checked.size)
-        assertEquals("勾必须落在当前值 0.7 上", "0.7", checked.single().title)
+        assertEquals("勾必须落在当前值「标准」上", "标准", checked.single().title)
     }
 
     @Test

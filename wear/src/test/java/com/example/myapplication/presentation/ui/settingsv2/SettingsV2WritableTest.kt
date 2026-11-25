@@ -91,7 +91,7 @@ class SettingsV2WritableTest {
             .flatMap { it.rows }
             .filter { it.choice != null }
             .map { it.key }
-        assertEquals("选项行数必须与预期一致", 7, choiceKeys.size)
+        assertEquals("选项行数必须与预期一致（温度已改滑块，不再计入）", 6, choiceKeys.size)
         choiceKeys.forEach { key ->
             assertTrue(
                 "Host 必须有 $key 的写入分支",
@@ -121,10 +121,6 @@ class SettingsV2WritableTest {
     @Test
     fun choiceKeysWriteBackToPreferences() {
         val p = prefs()
-        p.temperature = 0.3f
-        assertEquals("0.3", valueOf(SettingsV2SampleData.fromPreferences(p), "temperature"))
-        p.temperature = 1.6f
-        assertEquals("1.6", valueOf(SettingsV2SampleData.fromPreferences(p), "temperature"))
 
         p.securityMode = SecurityMode.EXPERT
         assertEquals("自动执行", valueOf(SettingsV2SampleData.fromPreferences(p), "security"))
@@ -135,6 +131,51 @@ class SettingsV2WritableTest {
         assertEquals("英语", valueOf(SettingsV2SampleData.fromPreferences(p), "asr_lang"))
         p.asrDevPid = 1637
         assertEquals("粤语", valueOf(SettingsV2SampleData.fromPreferences(p), "asr_lang"))
+    }
+
+    /**
+     * 数值项必须是**滑块**，而且滑块真的写回偏好。
+     *
+     * 用户原话："很多数值的拿那玩意（滑块）不就行了。为什么要再整个子菜单？"
+     * 这里钉四件事：①温度行尾是 Slider（不是选项组、不再是 Value 文本）；
+     * ②区间/步进取既有 `SettingsValueMath`（0..1.5，0.1 一档 = 14 个中间台阶）；
+     * ③实值行显示一位小数；④Host 的 `onSliderChange` 有 temperature 分支且真的赋值。
+     */
+    @Test
+    fun temperatureIsASliderAndTheHostWritesItBack() {
+        val row = SettingsV2SampleData.root().flatMap { it.rows }.first { it.key == "temperature" }
+        assertTrue("温度必须是滑块，不允许再开子菜单", row.trailing is RowTrailing.Slider)
+        assertTrue("温度不应再挂选项组", row.choice == null)
+        val slider = row.trailing as RowTrailing.Slider
+        assertEquals("下界取既有常量", 0f, slider.range.start, 1e-6f)
+        assertEquals("上界取既有常量（旧选项表里的 1.6/2.0 超出了应用上限）", 1.5f, slider.range.endInclusive, 1e-6f)
+        assertEquals(
+            "必须是连续滑块（steps=0）：steps>0 时官方 Slider 画成 −/+ 步进器，标题会被挤没",
+            0,
+            slider.steps,
+        )
+
+        // 实值路径：0.75 上屏一位小数；越界值被夹回 1.5（不给 Slider 传越界 value）
+        val p = prefs()
+        p.temperature = 0.75f
+        val wired = SettingsV2SampleData.fromPreferences(p).flatMap { it.rows }.first { it.key == "temperature" }
+        assertEquals("0.8", wired.sliderText)
+        p.temperature = 2.0f
+        val clamped = SettingsV2SampleData.fromPreferences(p).flatMap { it.rows }.first { it.key == "temperature" }
+        assertEquals("越界值必须夹回上界", 1.5f, (clamped.trailing as RowTrailing.Slider).value, 1e-6f)
+
+        val host = sequenceOf(File("."), File("wear"), File("../wear"))
+            .map { it.absoluteFile }
+            .map { File(it, "src/main/java/com/example/myapplication/presentation/ui/settingsv2/SettingsV2Host.kt") }
+            .first { it.exists() }
+            .readText()
+        val lines = host.lines()
+        val branch = lines.indexOfFirst { it.contains("\"temperature\" ->") }
+        assertTrue("Host 的 onSliderChange 必须有 temperature 分支", branch >= 0)
+        // 分支体可能写成一行或多行，所以看"分支开始后的三行窗口"，而不是死盯同一行
+        val body = lines.subList(branch, minOf(branch + 3, lines.size)).joinToString("\n")
+        assertTrue("必须真的写 preferences.temperature", body.contains("preferences.temperature ="))
+        assertTrue("落库前必须量化（否则 0.7000001 会进偏好）", body.contains("quantizeTemperature"))
     }
 
     /** 假跳转行必须消失：只剩「页面风格」一个 Chevron，且它在 Screen 层已分流到选择器。 */

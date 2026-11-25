@@ -39,6 +39,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
+import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
@@ -166,7 +167,11 @@ private fun M3CardRow(
     valueColor: androidx.compose.ui.graphics.Color,
     onSlider: ((String, Float) -> Unit)? = null,
 ) {
-    // 单行制 + 彩色圆标（视觉中心）：图标 = 分区强调色的圆，内放一个汉字。
+    val slider = row.trailing as? RowTrailing.Slider
+    // 滑块行分两行画：第一行仍是「图标 + 标题/副标题 + 当前值」，第二行才是滑块。
+    // 之前滑块塞在行尾（104dp = 208px），把 176dp 卡片里的标题和副标题挤成「温…」「越…」——
+    // 真机 0.0.0.263 截图可见。滑块本身需要宽度，标题也需要宽度，只能分两行。
+    Column(modifier = Modifier.fillMaxWidth()) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -226,9 +231,27 @@ private fun M3CardRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
-            // 连续量用官方滑块（M3E 控件），不是开关。
-            is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
+            // 滑块行：值先占第一行右侧，滑块挪到下一行（见上）
+            is RowTrailing.Slider -> Text(
+                text = row.sliderText ?: "",
+                color = titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
             RowTrailing.None -> Unit
+        }
+    }
+        if (slider != null) {
+            // 全宽滑块：官方 `Slider`（连续量不用 −/+ 步进器，用户要的是"进度条那种"）
+            SettingsSlider(
+                trailing = slider,
+                text = null,
+                color = titleColor,
+                width = null,
+                modifier = Modifier.padding(top = 4.dp),
+                sliderTag = SettingsV2SliderTagPrefix + row.key,
+                onChange = { v -> onSlider?.invoke(row.key, v) },
+            )
         }
     }
 }

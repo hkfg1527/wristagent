@@ -97,6 +97,7 @@ if (!enteredUpFront) {
 const rows = [];
 let pitchText = '' 
 const hashes = new Set();
+const savedFiles = [];
 for (const [legacy, name, markers, pitchPair] of STYLES) {
   try {
   const code = await setStyle(legacy);
@@ -124,6 +125,7 @@ for (const [legacy, name, markers, pitchPair] of STYLES) {
   const markerAfterReset = markers.every((m) => (m instanceof RegExp ? m.test(xml) : xml.includes(m)));
   const file = path.join(OUT, `${name}.png`);
   const hash = shot(file);
+  savedFiles.push(file);
   hashes.add(hash);
   // 顺带量该风格的行距（先验证 marker，避免读到旧页面）：模型 -> 温度 的 top 差
   const pitchOf = (xmlText, a, b) => {
@@ -153,6 +155,20 @@ for (const [legacy, name, markers, pitchPair] of STYLES) {
 const distinct = hashes.size;
 const ok = distinct === 5;
 console.log(`distinct=${distinct}/5 ${ok ? 'OK' : 'INVALID（少于 5 个不同哈希 = 有截图不是该风格/设备不可用）'}`);
+
+// 证据图必须按**圆屏**看：466×466 方图的四个角在物理屏上根本不存在。
+// 只看方图会做两类错判：把"角落空白"当成设计留白、把贴边内容被圆弧切掉当成正常。
+// （用户已经提醒过一次，所以这一步自动做，不靠下次记得。）
+if (savedFiles.length) {
+  const crop = spawnSync('python', ['docs/tools/circle-shot.py', '--out', path.join(OUT, 'circle'), ...savedFiles], {
+    cwd: ROOT, encoding: 'utf8', timeout: 120000,
+  });
+  if (crop.status === 0) {
+    console.log('圆形证据图：' + path.join(OUT, 'circle') + '（' + (crop.stdout || '').trim().split('\n').pop() + '）');
+  } else {
+    console.log('WARN: 圆屏裁剪失败（python + Pillow 不可用？）：' + ((crop.stderr || '').trim().slice(0, 200) || 'no stderr'));
+  }
+}
 fs.writeFileSync(path.join(OUT, 'report.txt'), rows.join('\n') + `\ndistinct=${distinct}/5\n`);
 // 设备掉线时每套都会抛错 -> distinct=0/5。以前只打印 INVALID 却返回 0，
 // 调用方（含定时任务）会把它当成通过。必须给非零退出码，避免"没验过却报绿"。

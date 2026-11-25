@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
+import com.example.myapplication.presentation.ui.settings.SettingsValueMath
+
 /**
  * 设置页 V2 的内容模型：**纯数据，不含任何渲染**。
  *
@@ -131,7 +133,15 @@ object SettingsV2SampleData {
         connection = listOf(
             RowSpec("provider", "供应商", value = "deepseek", choice = providerChoiceSample()),
             RowSpec("model", "模型", value = "deepseek-v4", choice = modelChoice("deepseek-chat,deepseek-reasoner", "deepseek-v4")),
-            RowSpec("temperature", "温度", subtitle = "越高越发散", value = "1.4", choice = temperatureChoice("1.4")),
+            // 数值项在示例里也是滑块（不是选项表），与实值路径保持同一形状
+            RowSpec(
+                "temperature", "温度",
+                subtitle = "越高越发散",
+                slider = 0.7f,
+                sliderRange = SettingsValueMath.TemperatureMin..SettingsValueMath.TemperatureMax,
+                sliderSteps = 0,
+                sliderFormat = { formatTemperature(it) },
+            ),
             RowSpec("reply_style", "回复风格", value = "均衡", choice = replyChoice("BALANCED")),
         ),
         action = listOf(
@@ -185,7 +195,24 @@ object SettingsV2SampleData {
                     value = p.modelName.ifBlank { "未设置" },
                     choice = modelChoice(p.cachedRemoteModels, p.modelName),
                 ),
-                RowSpec("temperature", "温度", subtitle = "越高越发散", value = formatTemperature(p.temperature), choice = temperatureChoice(formatTemperature(p.temperature))),
+                // 温度是**连续量**，直接用官方滑块，不再开一层子菜单。
+                // 用户原话："很多数值的拿那玩意（滑块）不就行了。为什么要再整个子菜单？"
+                // 区间与量化复用既有 `SettingsValueMath`：0..1.5、步进 0.1，与旧设置页逐位一致；
+                // 顺带消灭旧选项表里 1.6 / 2.0 两个**超出应用上限**的档位（控制台阈值就是 0..1.5）。
+                RowSpec(
+                    "temperature", "温度",
+                    subtitle = "越高越发散",
+                    slider = p.temperature.coerceIn(
+                        SettingsValueMath.TemperatureMin,
+                        SettingsValueMath.TemperatureMax,
+                    ),
+                    sliderRange = SettingsValueMath.TemperatureMin..SettingsValueMath.TemperatureMax,
+                    // steps = 0 → 连续滑块（"进度条那种"）。Wear 的官方 Slider 只要 steps > 0 就画成
+                    // −/+ 分段步进器，标题会被挤没；0.1 的量化在落库前做（quantizeTemperature），
+                    // 所以连续拖动也不会把 0.7000001 写进偏好。
+                    sliderSteps = 0,
+                    sliderFormat = { formatTemperature(it) },
+                ),
                 RowSpec("reply_style", "回复风格", value = replyChoice(p.replyStyle.ifBlank { "BALANCED" }).labelOfSelected(), choice = replyChoice(p.replyStyle.ifBlank { "BALANCED" })),
             ),
             action = listOf(
@@ -256,11 +283,6 @@ internal fun providerChoice(book: com.example.myapplication.agent.ProviderProfil
 /** 示例数据的供应商选项（无真实 Profile，只给一条占位）。 */
 internal fun providerChoiceSample(): RowChoice =
     RowChoice(listOf(ChoiceOption("", "当前配置")), "")
-
-internal fun temperatureChoice(selected: String) = RowChoice(
-    listOf("0.0", "0.3", "0.5", "0.7", "1.0", "1.3", "1.6", "2.0").map { ChoiceOption(it, it) },
-    selected,
-)
 
 internal fun replyChoice(selected: String) = RowChoice(
     listOf(ChoiceOption("CONCISE", "简洁"), ChoiceOption("BALANCED", "均衡"), ChoiceOption("DETAILED", "详细")),

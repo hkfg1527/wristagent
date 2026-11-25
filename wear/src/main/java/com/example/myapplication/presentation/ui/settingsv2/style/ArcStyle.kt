@@ -139,6 +139,9 @@ private fun ArcRow(
 ) {
     // 单行制：标题左、值/开关右同一行。贴边卡本来就满宽，两行堆叠纯属浪费面积。
     // 26dp 左右安全边距保留（文字不贴圆弧）；长值自己省略，不挤死标题。
+    // 滑块行例外：值留第一行，滑块独占第二行（塞行尾会把标题挤没，0.0.0.263 实测）。
+    val slider = row.trailing as? RowTrailing.Slider
+    Column(modifier = Modifier.fillMaxWidth()) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,9 +189,26 @@ private fun ArcRow(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
-            // 连续量用官方滑块（M3E 控件），不是开关 —— 开关会把 0..64 的可调范围压成 0/1。
-            is RowTrailing.Slider -> SettingsSlider(trailing, row.sliderText, titleColor, onChange = { v -> onSlider?.invoke(row.key, v) })
+            // 滑块行：值先占第一行右侧，滑块画在第二行
+            is RowTrailing.Slider -> Text(
+                text = row.sliderText ?: "",
+                color = titleColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
             RowTrailing.None -> Unit
+        }
+    }
+        if (slider != null) {
+            SettingsSlider(
+                trailing = slider,
+                text = null,
+                color = titleColor,
+                width = null,
+                modifier = Modifier.padding(start = 26.dp, end = 26.dp, bottom = 8.dp),
+                sliderTag = com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix + row.key,
+                onChange = { v -> onSlider?.invoke(row.key, v) },
+            )
         }
     }
 }

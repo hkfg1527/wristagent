@@ -1,12 +1,14 @@
 package com.example.myapplication.presentation.ui.settingsv2.common
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
@@ -26,12 +28,16 @@ fun SettingsSlider(
     trailing: RowTrailing.Slider,
     text: String?,
     color: Color,
-    width: Dp = 104.dp,
+    /** `null` = 占满给它的整行（滑块独占一行时用），否则定宽挂行尾。 */
+    width: Dp? = 104.dp,
     modifier: Modifier = Modifier,
+    /** 打在**内部 Slider** 上的测试标识（`SetProgress` 在 Slider 节点上，不在外层 Row 上）。 */
+    sliderTag: String? = null,
     onChange: (Float) -> Unit = trailing.onChange,
 ) {
     Row(
-        modifier = modifier.width(width),
+        // 定宽挂行尾时标题只剩一半；独占一行时铺满卡片（真机 0.0.0.263 实测：塞行尾会把标题挤成「温…」）
+        modifier = modifier.then(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Slider(
@@ -39,14 +45,20 @@ fun SettingsSlider(
             onValueChange = onChange,
             valueRange = trailing.range,
             steps = trailing.steps,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).then(if (sliderTag != null) Modifier.testTag(sliderTag) else Modifier),
         )
-        Text(
-            text = text ?: trailing.value.toInt().toString(),
-            color = color,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            modifier = Modifier.padding(start = 4.dp),
-        )
+        // text 为 null 时不在这行重复显示数值（第一行右侧已经显示）
+        if (text != null) {
+            Text(
+                text = text,
+                color = color,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
     }
 }
+
+/** 滑块测试标识前缀：v2-slider-<row key>。一页有多个滑块时，SetProgress 必须精确落到某一个。 */
+const val SettingsV2SliderTagPrefix = "v2-slider-"
