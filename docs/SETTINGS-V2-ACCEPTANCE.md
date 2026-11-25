@@ -101,9 +101,19 @@ ARC `78b80feddd5f` / SQUARE `bf31647f1317` / TERMINAL `f7b6b16a7354`（终端哈
 | ARC 贴边（允许超 176dp） | `ArcStyleTest`（卡宽 > 176dp、左缘 ≤8px、安全边距 26dp） | 左缘 3.24~7.05px |
 | 行高 ≥48dp（触控） | `SquareAndTerminalStyleTest` / `M3ListStyleTest` | SQUARE **70dp**（0.0.0.195 起，原 48dp）、M3_LIST 48dp、TERMINAL 48dp（0.0.0.193 起，原 40dp 容器/行距 46dp → 实测 **104px/52.0dp**） |
 | M3_LIST vs SQUARE 可区分 | `squareIsLooserThanM3ListByAtLeastTwelveDp`（行高差 ≥12dp）+ `squareHairlineIsInsetWhileTheOfficialListIsFullBleed`（策略守卫） | 行距 114px/57dp vs **150px/75dp**（差 36px/18dp）；分隔线 304px×2px 通栏 vs **253px×1px** 内缩（每侧 25px） |
-| 华为页边距 | `ArcStyleTest`（26/20/6/40vp 常量） | 尾留白复测（0.0.0.221，确认真到底）：末行底边 y=244，距屏底 **222px = 111dp**；其中内容区内 126px（≈63dp）、全局底部内边距 48dp。旧记录的 138px 是**未滚到底**时量的，已作废 |
+| 华为页边距 | `ArcStyleTest`（26/20/6/40vp 常量） | 尾留白复测（0.0.0.221，确认真到底）：末行底边 y=244，距屏底 **222px = 111dp**；其中内容区内 126px（≈63dp）、**全局底部安全边距 24dp**（0.0.0.272 起；此前 48dp 是"给风格按钮让位"时代的数，按钮已并进列表） |
 | 不硬编码字号 | 架构守卫（除 TERMINAL 外禁止 `sp`） | 通过 |
-| 底部按钮不压内容 | `bottomInsetMatchesTheStyleButtonAndContentIsClipped`（常量 48dp + 源码守卫 `clipToBounds()`） | 列表底 386→**370**，与按钮顶边齐平；按钮框外亮像素 **905 → 0** |
+| 底部安全边距 | `theBottomInsetIsTheOfficialTenPercent`（≥24 且 ≤32dp） | **24dp**（官方 10% 屏高；见 §3.6）。~~旧判据 `bottomInsetMatchesTheStyleButtonAndContentIsClipped` 已随"风格按钮并进列表"删除~~ |
+
+### 3.6 底部安全边距（0.0.0.272 起）
+
+| 项 | 数值 | 出处 |
+|---|---|---|
+| 官方 `PaddingDefaults.verticalContentPaddingPercentage` | `10.0f` | `javap` 读 `compose-material3-1.7.1.aar` |
+| 官方 `ScreenScaffoldDefaults.ContentPadding` | 上下各 10% 屏高 | 同上 |
+| 233dp 屏换算 | ≈23.3dp ≈ **24dp** | 计算 |
+| 本项目 | **24dp**（顶部 24dp 早已对齐，底部 0.0.0.271 前是 8dp） | `SettingsV2BottomInset` |
+| 为什么不能小于 24dp | 屏幕底部约 40px 不接收点击；8dp=16px 时末行卡进那条带，出现"点了没反应" | 真机实测，见 `DECISIONS-PENDING.md` D8 |
 
 ## 3.5 V2 设置页巡检（0.0.0.271 真机，逐行点进去再返回）
 
