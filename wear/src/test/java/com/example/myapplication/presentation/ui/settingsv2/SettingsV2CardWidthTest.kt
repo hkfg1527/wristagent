@@ -5,6 +5,12 @@ import org.junit.Assert.assertFalse
 import java.io.File
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ApplicationProvider
 import androidx.wear.compose.material3.MaterialTheme
@@ -107,4 +113,5 @@ class SettingsV2CardWidthTest {
             )
         }
     }
+
 }

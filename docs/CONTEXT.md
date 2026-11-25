@@ -67,6 +67,15 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.273 追加 · 试过给"底部边距"加 JVM 判据，但没有鉴别力，已删**
+- 想法：渲染 → `performScrollToNode(末行)` → 断言末行底边 ≤ 视口高 − 24dp，用字面量 24f 而不是常量。
+- **变异验证失败**：把 `SettingsV2BottomInset` 改回 8dp，`--rerun-tasks` 强跑（1m2s，确实执行了），
+  测试**仍然绿** —— 因为滚到位时末行并不落在视口底边，两种边距下都满足断言。
+- 结论：这条**只能真机验**（系统手势带是设备属性，Robolectric 里不存在）。测试已删除，
+  不留没有鉴别力的守卫（"不要为了让测试变绿而放宽断言"同样适用于"不要留证明不了东西的测试"）。
+- 附带教训：Gradle 有时把 `:wear:testDebugUnitTest` 判成 UP-TO-DATE（改主源后仍 2s 返回），
+  做变异验证必须加 `--rerun-tasks`，否则会得到"改了也没红"的假结论。
+
 **0.0.0.273 · 卡间距对齐官方默认；把剩下的官方差异算清楚**
 - 官方 `TransformingLazyColumn` 默认 `verticalArrangement = Arrangement.spacedBy(4.dp)`；
   M3_CARD 之前自写 **6dp**（无谓偏离），已对齐 4dp。
