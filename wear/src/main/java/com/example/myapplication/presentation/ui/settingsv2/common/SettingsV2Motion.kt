@@ -124,3 +124,18 @@ fun Modifier.reportEdgeDistance(state: MutableState<Float>): Modifier = this.onG
         state.value = (kotlin.math.abs(centerY - half) / half).coerceIn(0f, 1f)
     }
 }
+
+/**
+ * 取该风格的动效参数，**尊重系统的"关掉动效"**。
+ *
+ * 为什么需要：`AgentPreferences.animationsEnabled` 原来只在主界面那一支被投进
+ * `LocalAnimationsEnabled`，设置页拿到的是默认值 true —— 用户关掉动效后，这一页照样逐行入场
+ * （0.0.0.270 查明）。这里把三件事归零：错峰、时长、位移；`edgeAppearance`（随滚动缩放的
+ * "圆屏收边"）不算动画，保留。
+ */
+@Composable
+fun rememberStyleMotion(style: SettingsV2Style): V2Motion {
+    val enabled = com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled.current
+    val base = remember(style) { SettingsV2Motions.of(style) }
+    return if (enabled) base else base.copy(staggerMs = 0, enterMs = 0, enterSlide = 0.dp)
+}

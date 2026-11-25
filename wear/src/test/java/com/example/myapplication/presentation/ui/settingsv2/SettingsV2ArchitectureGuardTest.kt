@@ -204,6 +204,26 @@ class SettingsV2ArchitectureGuardTest {
         }
     }
 
+    /**
+     * 「关掉动效」必须真的覆盖到设置页。
+     *
+     * 缺陷背景（0.0.0.270）：`LocalAnimationsEnabled` 只在 `AppScreen.MAIN` 分支提供，
+     * 设置页拿到的是默认值 true —— 用户关掉动效，这一页照样逐行入场。
+     *
+     * JVM 只能验"设置页读到开关"（`SettingsV2StaggerFrameTest.withAnimationsDisabledRowsDoNotSlide`），
+     * "谁来提供这个开关"发生在 `ChatApp` 的 SETTINGS 分支，这里用源码守卫钉住。
+     */
+    @Test
+    fun theAnimationsToggleIsProvidedToTheSettingsScreen() {
+        val chatApp = File(moduleDir, "src/main/java/com/example/myapplication/presentation/ui/chat/ChatApp.kt")
+        assertTrue("找不到 ChatApp.kt", chatApp.exists())
+        val src = chatApp.readText()
+        val settingsBranch = src.substringAfter("AppScreen.SETTINGS ->", "")
+            .substringBefore("AppScreen.MAIN ->")
+        assertTrue("SETTINGS 分支里必须提供 LocalAnimationsEnabled", settingsBranch.contains("LocalAnimationsEnabled provides"))
+        assertTrue("提供后必须真的包住 SettingsV2Host", settingsBranch.contains("SettingsV2Host("))
+    }
+
     @Test
     fun stylesUseTypeScaleInsteadOfHardCodedSp() {
         styleFiles().forEach { file ->

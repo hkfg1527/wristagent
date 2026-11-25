@@ -62,6 +62,7 @@ import com.example.myapplication.presentation.ui.settingsv2.StyleEntryTag
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberStyleMotion
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
 import com.example.myapplication.presentation.ui.settingsv2.common.reportEdgeDistance
@@ -333,7 +334,7 @@ fun TerminalSettings(
                         modifier = Modifier
                             .fillMaxWidth()
                             .reportEdgeDistance(edge)
-                            .edgeAppearance(edge.value, SettingsV2Motions.of(SettingsV2Style.TERMINAL))
+                            .edgeAppearance(edge.value, rememberStyleMotion(SettingsV2Style.TERMINAL))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,

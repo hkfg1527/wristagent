@@ -41,6 +41,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberStyleMotion
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
@@ -109,7 +110,7 @@ fun ArcSettings(
                 )
             }
             itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = SettingsV2Motions.of(SettingsV2Style.ARC)
+                val motion = rememberStyleMotion(SettingsV2Style.ARC)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 val edge = rememberEdgeDistance()
                 Box(

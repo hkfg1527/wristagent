@@ -44,6 +44,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberStyleMotion
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
@@ -145,7 +146,7 @@ fun SquareSettings(
                     }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = SettingsV2Motions.of(SettingsV2Style.SQUARE)
+                val motion = rememberStyleMotion(SettingsV2Style.SQUARE)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 val edge = rememberEdgeDistance()
                     CircleFit(modifier = Modifier.fillMaxWidth()) {

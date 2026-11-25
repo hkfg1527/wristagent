@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settingsv2
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.wear.compose.material3.MaterialTheme
@@ -111,6 +112,37 @@ class SettingsV2StaggerFrameTest {
     //
     // 参数（SettingsV2Motions.of）：M3_CARD 40ms/12dp、M3_LIST 26ms/8dp、ARC 50ms/16dp、
     // SQUARE **stagger=0**（不错峰，所有行一起动）、TERMINAL **slide=0dp 且不进场**（位置根本不变）。
+
+    /**
+     * 关掉动效后**不许再有入场位移**。
+     *
+     * 缺陷背景（0.0.0.270）：`animationsEnabled` 原来只在主界面那一支被投进
+     * `LocalAnimationsEnabled`，设置页拿到的是默认值 true —— 用户关掉动效，这一页照样逐行入场。
+     * 这条同时钉住"设置页真的读了这个开关"。
+     */
+    @Test
+    fun withAnimationsDisabledRowsDoNotSlide() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(
+                    com.example.myapplication.presentation.ui.settings.LocalAnimationsEnabled provides false,
+                ) {
+                    SettingsV2Screen(style = SettingsV2Style.M3_LIST)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val start = yOf("模型")
+        compose.mainClock.advanceTimeBy(120L)
+        val after = yOf("模型")
+        assertEquals(
+            "关掉动效后不应有入场位移（start=$start after=$after）",
+            0f,
+            start - after,
+            0.5f,
+        )
+    }
 
     private fun sampleDisplacement(style: SettingsV2Style, stepMs: Long = 10L, steps: Int = 33):
         List<Triple<Long, Float, Float>> {

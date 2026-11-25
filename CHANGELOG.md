@@ -13,6 +13,16 @@
 
 ## [未发布]
 
+### 修复：「关掉动效」此前对设置页完全无效
+`animationsEnabled` 只在主界面那一支被投进 `LocalAnimationsEnabled`，设置页拿到的是默认值 `true`；
+而设置页 V2 的动效代码也从没读过这个开关 —— 用户关掉动效后，这一页照样逐行入场。
+
+- `ChatApp` 的 SETTINGS 分支也提供 `LocalAnimationsEnabled`；
+- 新增 `rememberStyleMotion(style)`：开关关掉时把错峰/时长/位移归零，五套风格都改用它。
+  （`edgeAppearance` 是随滚动收边、不是动画，保留。）
+- 判据：关掉后 120ms 内位移必须为 0（变异验证：忽略开关 → 立刻红，实测 7.03px 位移）；
+  另有架构守卫钉住"谁提供这个开关"。
+
 ### 无障碍：选项子页的「已选中」改用 `Modifier.selectable`（真机已验证）
 上一版给它补的是外层 `semantics { selected = true }`，真机树里没有该属性。改用 Compose 为单选行准备的
 正规 API 后，投影变成 **`checkable="true"` + 当前项 `checked="true"`** —— M3_CARD 与 M3_LIST 各在真机上验过。

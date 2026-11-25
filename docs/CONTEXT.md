@@ -11,7 +11,7 @@
 **报告必须和事实一致**——说修好了就是真机上修好了，说没验证就不假装验证过。
 
 **现在在哪**（截至 2026-11-20 03:20）：
-- 内部版 `0.0.0.270` / versionCode = 308；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.271` / versionCode = 309；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1408 条 / 219 套件全绿**（2026-11-26 05:20 实测）。
 - **S1 已跨过拦路石**：官方滑杆的标签与区间现在挂在同一个可调节节点上（`OfficialSliderAccessibilityTest` 钉住），
   BALLOON 已切到官方 `SwitchButton` / `Slider(segmented)` / `RadioButton`。
@@ -53,7 +53,7 @@
 ## 0.5 运行中状态（每轮覆盖这一段，别追加）· 最后更新 2026-11-25 00:55
 
 **版本与基线**
-- 内部版 `0.0.0.270`（versionCode = 308）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
+- 内部版 `0.0.0.271`（versionCode = 309）；`v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag 并推送。
 - 单测基线 **1408** 条 / **219** 套件全绿（2026-11-26 05:20 实测 `:wear:testDebugUnitTest`；此前文档写过 1416/220、1382/215，都是过期数，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 9 条判据**；控制台页面 E2E **72 条**断言。
 
@@ -66,6 +66,20 @@
   （`` `scaleX = scale * 1.1f` 找不到同值的 `scaleY`（横向形变） ``），已回退。
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
+
+**0.0.0.271 · 「关掉动效」现在真的覆盖设置页（此前完全无效）**
+- 缺陷：`AgentPreferences.animationsEnabled` 只在 `AppScreen.MAIN` 分支被投进 `LocalAnimationsEnabled`，
+  设置页拿到的是默认值 true；而且 V2 的动效代码**从没读过这个开关**。
+  所以用户关掉动效后，设置页照样逐行入场 —— 与"关掉动效是一件全局的事"的承诺相悖。
+- 两处修复：①`ChatApp` 的 SETTINGS 分支也提供 `LocalAnimationsEnabled`；
+  ②新增 `rememberStyleMotion(style)`：开关关掉时把 `staggerMs/enterMs/enterSlide` 归零
+  （`edgeAppearance` 是随滚动的收边、不是动画，保留），五套风格都改用它。
+- 判据两条：`SettingsV2StaggerFrameTest.withAnimationsDisabledRowsDoNotSlide`（关掉后 120ms 内位移必须为 0）；
+  架构守卫 `theAnimationsToggleIsProvidedToTheSettingsScreen`（ChatApp 的 SETTINGS 分支必须 provide 且包住 Host）。
+- **变异验证**：把 `return if (enabled) base else …` 改成 `return base` → 立刻红
+  （`start=151.8 after=144.77`，7.03px 位移），已回退。
+- 未验证：真机上"关掉动效后肉眼看不出入场"没有录屏证据（动效 <300ms，screencap 抓不到），
+  只有 JVM 位移判据 + 源码接线守卫。
 
 **0.0.0.270 追加 · 修好"子页证据永远取不到"（工具缺陷，连红多轮）**
 - 现象：`release-check` 每次报「子页证据：未取得（目标行没在 16 步内出现）」，等于每次发布都少一张证据。

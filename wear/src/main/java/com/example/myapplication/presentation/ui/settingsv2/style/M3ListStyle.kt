@@ -41,6 +41,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberStyleMotion
 import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
@@ -106,7 +107,7 @@ fun M3ListSettings(
                     }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = SettingsV2Motions.of(SettingsV2Style.M3_LIST)
+                val motion = rememberStyleMotion(SettingsV2Style.M3_LIST)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 // 边缘淡出/缩放：行自己上报离屏幕中心的比例（不用官方 scrollProgress，理由见 common 层注释）
                 val edge = rememberEdgeDistance()

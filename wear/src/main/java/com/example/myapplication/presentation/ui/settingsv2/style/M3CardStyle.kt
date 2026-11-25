@@ -49,6 +49,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.rememberStyleMotion
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEnterProgress
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
@@ -109,7 +110,7 @@ fun M3CardSettings(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         items(items, key = { it.key }) { item ->
-            val motion = SettingsV2Motions.of(SettingsV2Style.M3_CARD)
+            val motion = rememberStyleMotion(SettingsV2Style.M3_CARD)
             val enter = rememberEnterProgress(items.indexOf(item), motion)
             // 每一项都过 CircleFit：中间吃满圆屏弦长，滚到上下两端自动收边，
             // 不再被圆弧切掉（真机截图里 banner/底栏被切就是这个原因）。
