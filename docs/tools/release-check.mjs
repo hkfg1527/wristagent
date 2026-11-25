@@ -85,6 +85,21 @@ const dumpNodes = () => {
 const crown = (delta, n) =>
   adb('shell', "su -c 'for i in $(seq 1 " + n + "); do sendevent /dev/input/event0 2 8 " + delta + "; sendevent /dev/input/event0 0 0 0; done'");
 
+// 这两个放在模块级：`device()` 与 `geometry()` 都要用（后者原来引用不到，会 ReferenceError）。
+const SETTINGS_RE = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/;
+const enterSettings = () => {
+  for (let i = 0; i < 6; i++) {
+    adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
+    if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
+  }
+  for (let i = 0; i < 3; i++) {
+    adb('shell', 'input', 'swipe', '233', '440', '233', '40', '240');
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500']);
+    if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
+  }
+  return false;
+};
 const device = () => {
   console.log('\n[2/4] 真机安装与走查');
   adb('start-server');
@@ -116,23 +131,7 @@ const device = () => {
   // /dev/input/event0（这台的 `qpnp_pon` 电源键），而带 REL_WHEEL 的是 event1（`slate-spi`）；
   // 项目自己的 `RotaryBus.kt` 也记着"注入 REL_WHEEL 后 onRotaryScrollEvent 一行日志都没有"。
   // 死代码已删（行为不变：它从来没起过作用）。
-  const SETTINGS_RE = /连得上|让它能做事|让它听懂我|让它答得好|回复风格/;
-  const enterSettings = () => {
-    for (let i = 0; i < 6; i++) {
-      adb('shell', 'input', 'swipe', '233', '380', '233', '180', '500');
-      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
-      // 判据文本必须跟当前设置页一致：V2 的分区名是 连得上/让它能做事/让它听懂我/让它答得好，
-      // 行里有 模型/温度/回复风格。旧判据（请求超时/全部启用/模型与服务）在 V2 上永远不会命中。
-      if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
-    }
-    // 偶发失败兜底：这一段的手势偶尔不生效（0.0.0.137 出现过 7/8，报「进入设置页 undefined」）
-    for (let i = 0; i < 3; i++) {
-      adb('shell', 'input', 'swipe', '233', '440', '233', '40', '240');
-      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1500']);
-      if (SETTINGS_RE.test(JSON.stringify(dumpTexts()))) return true;
-    }
-    return false;
-  };
+
   const entered = enterSettings();
   record('进入设置页', entered);
 
@@ -207,9 +206,18 @@ const device = () => {
       adb('shell', 'uiautomator', 'dump', '/sdcard/sub.xml');
       return (adb('shell', 'cat', '/sdcard/sub.xml').stdout || '');
     };
-    crown(5, 200);
-    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 4']);
-    for (let i = 0; i < 16; i++) {
+    // 回到列表顶部：退出再重新进入（不用下拉 —— 那是系统退出手势，会把页面关掉）
+    for (let i = 0; i < 3; i++) {
+      adb('shell', 'input', 'keyevent', '4');
+      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
+      if (!SETTINGS_RE.test(JSON.stringify(dumpTexts()))) break;
+    }
+    enterSettings();
+    // **小步滑动 + 每步 dump**，而不是原来的 `crown(...)`：
+    // ①`crown()` 把 REL_WHEEL 注进 /dev/input/event0（电源键），这个通道到不了应用
+    //   （0.0.0.261 已查明），所以旧实现在原地 dump 16 次、必然"未取得"；
+    // ②一次滑太远会和 snapFlingBehavior 打架（0.0.0.264 实测），所以每步只滑 150px。
+    for (let i = 0; i < 20; i++) {
       const raw = xml();
       // 终端档的标签带 `> ` 前缀（`> 语音与唤醒`），所以匹配要放宽成「包含目标文本」
       const m = raw.match(new RegExp('text="[^"]*' + target + '[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"'));
@@ -218,8 +226,6 @@ const device = () => {
         const cy = Math.round((Number(m[2]) + Number(m[4])) / 2);
         adb('shell', 'input', 'tap', String(cx), String(cy));
         spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 3']);
-        // 文件名带上当前风格，否则下一次跑会把上一套风格的证据覆盖掉（0.0.0.137 就发生过一次）
-        const styleNow = (adb('shell', 'cat', '/sdcard/ui.xml').stdout || '').length >= 0 ? '' : '';
         const out = path.join(ROOT, 'docs/device/subpages/' + fileName);
         fs.mkdirSync(path.dirname(out), { recursive: true });
         const png = spawnSync(ADB, ['-s', DEVICE, 'exec-out', 'screencap', '-p'], {
@@ -230,25 +236,33 @@ const device = () => {
         spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 2']);
         return 'docs/device/subpages/' + fileName;
       }
-      crown(-5, 16);
-      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 1']);
+      adb('shell', 'input', 'swipe', '233', '380', '233', '230', '600');
+      spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 1300']);
     }
     return '';
   };
+  // 顺序有讲究：先拍**首屏就能点**的「模型」（选项子页），再拍要滚一段的「语音与唤醒」。
+  // 反过来的话，第二次要先把列表复位再滚回去，实测拿不到（0.0.0.270：第二次报"未取得"）。
+  const shotChoice = subpageShot('模型', 'subpage-choice.png');
+  console.log('  选项子页证据：' + (shotChoice ? shotChoice : '未取得'));
   const shot = subpageShot('语音与唤醒', 'subpage.png');
-  console.log('  子页证据：' + (shot ? shot : '未取得（目标行没在 16 步内出现）'));
-  // 第二个子页：网络与请求（含滑杆 —— 终端档要看到 `[■■□□] 50%` 数值条）
-  const shot2 = subpageShot('网络与请求', 'subpage-slider.png');
-  console.log('  滑杆页证据：' + (shot2 ? shot2 : '未取得'));
+  console.log('  子页证据：' + (shot ? shot : '未取得（目标行没在 20 步内出现）'));
 
   return found;
 };
 
 const geometry = () => {
   console.log('\n[3/4] 卡片几何（同屏宽度 + 不重叠）');
-  // 先滚到顶（-5 是往上），否则采到的是页面底部那一屏，采样区间跟"根页首屏"没有可比性
-  crown(-5, 200);
-  spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 5']);
+  // 真的回到列表顶部再采样：原来这里是 `crown(-5, 200)`（把 REL_WHEEL 注进电源键设备，
+  // 根本滚不动），所以"先滚到顶"一直是个假前提，采到的可能是页面底部那一屏。
+  // 现在用"退出再进入"复位，与 subpageShot 同一套做法。
+  for (let i = 0; i < 3; i++) {
+    adb('shell', 'input', 'keyevent', '4');
+    spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Milliseconds 900']);
+    if (!SETTINGS_RE.test(JSON.stringify(dumpTexts()))) break;
+  }
+  enterSettings();
+  spawnSync('powershell', ['-NoProfile', '-Command', 'Start-Sleep -Seconds 2']);
   const shot = path.join(ROOT, 'docs/device/v11/release-check.png');
   const png = spawnSync(ADB, ['-s', DEVICE, 'exec-out', 'screencap', '-p'], { cwd: ROOT, encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 120000 });
   fs.writeFileSync(shot, png.stdout || '');

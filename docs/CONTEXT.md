@@ -67,6 +67,16 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.270 追加 · 修好"子页证据永远取不到"（工具缺陷，连红多轮）**
+- 现象：`release-check` 每次报「子页证据：未取得（目标行没在 16 步内出现）」，等于每次发布都少一张证据。
+- 根因两条：①`subpageShot` 用 **`crown()`** 滚动 —— 那个注入到不了应用（0.0.0.261 已查明），
+  整段等于"原地 dump 16 次"；②第二个目标写的是「网络与请求」，**这页在 IA 改版后已不存在**。
+- 修法：改成"小步滑动 150px + 每步 dump"（一次滑太远会和 snapFling 打架）；第二个目标换成首屏就能点的「模型」
+  （选项子页，顺带把 `checkable/checked` 语义拍进证据）；两次顺序调换 —— 先拍首屏的、再拍要滚的。
+- 顺手修：`geometry()` 里的"先滚到顶"原来也是 `crown(-5,200)`（同一条死路），现在改成"退出再进入"真复位；
+  并把 `SETTINGS_RE` / `enterSettings` 提到模块级（否则 `geometry()` 引用不到，会 ReferenceError）。
+- 实测：两条证据都取到了（`docs/device/subpages/subpage-choice.png` / `subpage.png`），门禁 9/9。
+
 **0.0.0.270 追加 · 换风格「重启仍在」真机端到端验证**
 - 历史上这条坏过（Host 注释：真机上怎么切都不变、重启回默认档，因为读的是内存态）。
 - 复验链路：选择器点「贴边卡」→ `settingsStyle=ARC` → `am force-stop` → 重启 → 仍 `ARC`
