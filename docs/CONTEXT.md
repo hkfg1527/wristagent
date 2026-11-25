@@ -67,6 +67,16 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.271 追加 · 发现「屏幕底部约 40px 不吃点击」**
+- 现象（真机实测，同一行 特权执行）：`tap y=412` → 正常打开子页（`特权执行 | ‹ 返回 | 只读 | 工作区 | 全权限 ✓`）；
+  `tap y=425 / 430 / 437` → **毫无反应**。单元格本身 clickable 且 bounds 覆盖到 y=466。
+- 结论：屏幕最底下一条带（约 40px ≈ 20dp）不接收触摸 —— 最可能是系统手势区。
+  后果：**列表最后一行永远有一部分点不动**，而内容区底部内边距只有 `SettingsV2BottomInset = 8dp`，
+  最后一行没法滚出这条带。
+- 已记为 `docs/DECISIONS-PENDING.md` 的 **D8**（要不要把底部内边距提到 40dp 让末行能滚干净）。
+- 顺带做了一次 V2 设置页巡检：供应商 / 模型 / 回复风格 / 安全策略 四行
+  **打开 ✓ + 子页标题与行名一致 ✓ + 有返回行 ✓**；识别语言仍需更深滚动才能取到（本轮未验）。
+
 **0.0.0.271 · 「关掉动效」现在真的覆盖设置页（此前完全无效）**
 - 缺陷：`AgentPreferences.animationsEnabled` 只在 `AppScreen.MAIN` 分支被投进 `LocalAnimationsEnabled`，
   设置页拿到的是默认值 true；而且 V2 的动效代码**从没读过这个开关**。
