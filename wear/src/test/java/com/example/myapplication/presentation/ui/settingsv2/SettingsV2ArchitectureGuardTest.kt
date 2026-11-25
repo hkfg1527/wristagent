@@ -142,6 +142,27 @@ class SettingsV2ArchitectureGuardTest {
         }
     }
 
+    /**
+     * 圆屏收边：列表风格必须按弦长内缩，否则靠近上下两端的内容会被圆弧切掉。
+     *
+     * 证据（0.0.0.263 圆图）：`M3_LIST` 的分区标题「连得上」左侧缺一块 ——
+     * y=100 处圆内可见区从 x≈42 起，而行内边距只有 12dp=24px。
+     * ARC 例外：它的卡片本来就贴边（那是这套的辨识度），文字另有 26dp 安全边距。
+     */
+    @Test
+    fun listStylesFitTheCircleInsteadOfLettingTheArcCutThem() {
+        listOf("M3CardStyle.kt", "M3ListStyle.kt", "SquareStyle.kt").forEach { name ->
+            assertTrue(
+                "$name 必须接 CircleFit（按该项竖直中心算弦长内缩），否则分区标题会被圆弧切字",
+                text(File(styleDir, name)).contains("CircleFit(")
+            )
+        }
+        assertFalse(
+            "ARC 不该包 CircleFit：贴边卡是这套的形态，包了就不是贴边了",
+            text(File(styleDir, "ArcStyle.kt")).contains("CircleFit(")
+        )
+    }
+
     @Test
     fun stylesUseTypeScaleInsteadOfHardCodedSp() {
         styleFiles().forEach { file ->

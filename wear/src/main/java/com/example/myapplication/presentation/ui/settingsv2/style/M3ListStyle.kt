@@ -36,6 +36,7 @@ import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
+import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.edgeAppearance
 import com.example.myapplication.presentation.ui.settingsv2.common.rememberEdgeDistance
@@ -74,20 +75,26 @@ fun M3ListSettings(
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
-                    Text(
-                        text = section.title,
-                        color = identity.subtitleColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 4.dp),
-                    )
+                    // 圆屏收边：分区标题在靠近上下两端时会被圆弧切掉半个字
+                    // （0.0.0.263 圆图实测：「连得上」左侧缺一块；y=100 处可见区从 x≈42 起，
+                    //  而行内边距只有 12dp=24px）。按该项的竖直中心算弦长内缩。
+                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = section.title,
+                            color = identity.subtitleColor,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp, bottom = 4.dp),
+                        )
+                    }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                 val motion = SettingsV2Motions.of(SettingsV2Style.M3_LIST)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 // 边缘淡出/缩放：行自己上报离屏幕中心的比例（不用官方 scrollProgress，理由见 common 层注释）
                 val edge = rememberEdgeDistance()
+                    CircleFit(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         M3ListRow(
                             row = row,
@@ -114,6 +121,7 @@ fun M3ListSettings(
                                     .background(Color(0xFF23282E)),
                             )
                         }
+                    }
                     }
                 }
             }

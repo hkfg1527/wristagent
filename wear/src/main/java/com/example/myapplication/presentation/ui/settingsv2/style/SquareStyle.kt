@@ -33,6 +33,7 @@ import androidx.wear.compose.material3.ScrollIndicator
 import androidx.wear.compose.material3.Text
 import com.example.myapplication.presentation.ui.settingsv2.RowTrailing
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlider
+import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
@@ -114,20 +115,24 @@ fun SquareSettings(
         ) {
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
-                    Text(
-                        text = section.title,
-                        color = identity.subtitleColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 6.dp),
-                    )
+                    // 圆屏收边：分区标题靠近上下两端时会被圆弧切字（0.0.0.263 圆图实测）
+                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = section.title,
+                            color = identity.subtitleColor,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp, bottom = 6.dp),
+                        )
+                    }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
                 val motion = SettingsV2Motions.of(SettingsV2Style.SQUARE)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 val edge = rememberEdgeDistance()
+                    CircleFit(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -227,6 +232,7 @@ fun SquareSettings(
                                 .height(SquareHairlineHeight)
                                 .background(SquareHairline),
                         )
+                    }
                     }
                 }
             }
