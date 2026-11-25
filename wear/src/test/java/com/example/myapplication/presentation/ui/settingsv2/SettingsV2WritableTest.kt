@@ -146,6 +146,11 @@ class SettingsV2WritableTest {
         val row = SettingsV2SampleData.root().flatMap { it.rows }.first { it.key == "temperature" }
         assertTrue("温度必须是滑块，不允许再开子菜单", row.trailing is RowTrailing.Slider)
         assertTrue("温度不应再挂选项组", row.choice == null)
+        // 滑块行**不算可点行**：整行再挂一层 clickable 对拖动没有好处，语义上也讲不通。
+        assertFalse(
+            "滑块行不能被当作可点行（否则整行会挂 clickable/涟漪，点一下无事发生）",
+            row.isActionable()
+        )
         val slider = row.trailing as RowTrailing.Slider
         assertEquals("下界取既有常量", 0f, slider.range.start, 1e-6f)
         assertEquals("上界取既有常量（旧选项表里的 1.6/2.0 超出了应用上限）", 1.5f, slider.range.endInclusive, 1e-6f)

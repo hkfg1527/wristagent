@@ -764,5 +764,29 @@ TERMINAL 哈希 `c408b5c355af`（= 基线），说明回滚干净。
 - 几何判据（`CircleFitMathTest`）：正中内缩 0；`y=100` → `233−√(233²−133²)=41.65px`（实测值，容差 0.5）；
   越靠边内缩越大；上下对称；`dy ≥ 半径` 时退化为半径 233。
 
+### 0.0.0.265 · 滑块触摸定位（真机）· 结论：M3_CARD 收不到，根因未定
+
+| 风格 | 拖动温度滑块 | 证据 |
+|---|---|---|
+| M3_LIST | **有效**：`1.4 → 0` | `input swipe` 后 `/api/state.settings.temperature` 立即变化 |
+| M3_CARD | **无效** | `onSliderChange` 里临时打的 `V2SLIDER` 日志**一次都没有输出** |
+
+排除法（每种都重新装机 + 拖动验证，全部不动）：
+
+1. `Card(onClick=…)` → 换不可点 `Card`；
+2. 去掉 `SurfaceTransformation`；
+3. 换成同外观普通 `Box`（`.clip().background().padding()`）；
+4. 去掉 `CircleFit` 收边。
+
+JVM 侧的 `SetProgress` 两条判据**始终是绿的**（`SettingsV2SliderWriteTest`），说明写回链路没问题，
+问题只在"触摸有没有到 `Slider`"。
+
+本轮只落下语义修正（并有用例钉住）：`isActionable()` 不再把 `Slider` 算作可点行 ——
+整行挂 clickable/涟漪对拖动没有好处，点一下也不该发生任何事。
+
+**下一轮第一件事**：在滑块行加 `Modifier.pointerInput` 探针，打印 down/move 是否到达该层，
+判定是被列表手势、`SurfaceTransformation` 的层变换、还是 `TransformingLazyColumn` 的旋转手势吃掉。
+
+
 
 

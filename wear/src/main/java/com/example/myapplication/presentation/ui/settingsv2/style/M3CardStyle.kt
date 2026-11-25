@@ -110,18 +110,15 @@ fun M3CardSettings(
                 } else {
                     val row = item.row
                     if (row != null) {
-                        Card(
-                            onClick = { if (row.isActionable()) onRowClick?.invoke(row) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 40.dp)
-                                .testTag("m3card-row")
-                                .enterAppearance(enter, motion),
-                            shape = shape,
-                            colors = CardDefaults.cardColors(containerColor = identity.surface),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            transformation = SurfaceTransformation(transformationSpec),
-                        ) {
+                        // 滑块行**不能**用可点 Card：`Card(onClick=…)` 会在整张卡上挂一层 clickable，
+                        // 抢走滑块的拖动（真机 0.0.0.264：点/左拖/右拖都不动；JVM 的 SetProgress 却是通的）。
+                        // 滑块行本来也没有"点一下"的语义，所以换成不带 onClick 的 Card。
+                        val cardModifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 40.dp)
+                            .testTag("m3card-row")
+                            .enterAppearance(enter, motion)
+                        val content: @Composable () -> Unit = {
                             M3CardRow(
                                 row = row,
                                 sectionTitle = sections.firstOrNull { s -> s.rows.any { it.key == row.key } }?.title,
@@ -129,6 +126,29 @@ fun M3CardSettings(
                                 titleColor = identity.titleColor,
                                 valueColor = identity.subtitleColor,
                             )
+                        }
+                        if (row.trailing is RowTrailing.Slider) {
+                            // 滑块行不用可点 Card：整卡挂 clickable 对"拖动"没有好处，语义上也讲不通
+                            // （点一下这行不该发生任何事）。**注意**：真机 0.0.0.264 实测，
+                            // 即便换成不可点 Card / 去掉 SurfaceTransformation / 换成普通 Box /
+                            // 去掉 CircleFit，M3_CARD 的滑块仍然收不到拖动（onSliderChange 一次都不触发），
+                            // 而同一滑块在 M3_LIST 里能拖。根因未定位，见 docs/CONTEXT.md §0.5 的待办。
+                            Card(
+                                modifier = cardModifier,
+                                shape = shape,
+                                colors = CardDefaults.cardColors(containerColor = identity.surface),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                transformation = SurfaceTransformation(transformationSpec),
+                            ) { content() }
+                        } else {
+                            Card(
+                                onClick = { if (row.isActionable()) onRowClick?.invoke(row) },
+                                modifier = cardModifier,
+                                shape = shape,
+                                colors = CardDefaults.cardColors(containerColor = identity.surface),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                transformation = SurfaceTransformation(transformationSpec),
+                            ) { content() }
                         }
                     }
                 }

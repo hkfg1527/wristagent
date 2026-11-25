@@ -13,6 +13,22 @@
 
 ## [未发布]
 
+### 修复：滑块行不再算"可点行"
+`isActionable()` 原来把 `RowTrailing.Slider` 也算作可点，于是整行（M3_CARD 里是整张卡）
+挂上了 clickable/涟漪 —— 对拖动没有好处，语义上也不通（点一下这行不该发生任何事）。
+
+- `isActionable()` 去掉 `Slider`；M3_CARD 的滑块行改为**不可点** `Card`。
+- 判据：`SettingsV2WritableTest.temperatureIsASliderAndTheHostWritesItBack` 增一条断言。
+
+### 已知缺陷（未修复）：M3_CARD 里拖不动滑块
+真机实测：同一个温度滑块在 **M3_LIST 能拖（1.4 → 0）**，在 **M3_CARD 完全不动**；
+`onSliderChange` 里的诊断日志一次都没有输出 —— 触摸根本没到 `Slider`。
+
+排除法（每种都重新装机验证）：可点 Card → 不可点 Card → 去掉 `SurfaceTransformation` →
+换普通 Box → 去掉 `CircleFit`，**全都不动**。JVM 的 `SetProgress` 判据始终为绿，写回链路正常。
+
+**在根因查清前不要声称"滑块可用"。** 下一步：给滑块行加 `pointerInput` 探针定位触摸被谁消费。
+
 ### 修复：M3_LIST / SQUARE 的分区标题被圆弧切字
 圆图实测（0.0.0.263）：`连得上` 左侧缺一块 —— 该行 y≈84..123，y=100 处圆内可见区从 **x≈42** 起，
 而行内边距只有 12dp=**24px**。`M3_CARD` 早有 `CircleFit`，这两个列表风格没有。

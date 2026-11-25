@@ -63,11 +63,13 @@ sealed interface RowTrailing {
 /**
  * 该行是否可点：开关、跳转、选项组都可点，只读值/无行尾不可点。
  *
- * 五套风格共用这一条判断，避免"某个风格把只读行也做成可点、点了没反应"。
+ * **滑块行不算"可点"**：它靠拖动滑块交互，整行再挂一层 clickable 会把拖动抢走 ——
+ * 真机 0.0.0.264 实测：点/左拖/右拖滑块，温度一秒都不动；而 JVM 的 `SetProgress` 是通的，
+ * 差别就在"有没有人替它拦住触摸"。语义上也讲不通：点一下这行没有任何意义。
  */
 fun SettingsV2Row.isActionable(): Boolean =
     onClick != null || choice != null || trailing is RowTrailing.Toggle ||
-        trailing is RowTrailing.Chevron || trailing is RowTrailing.Slider
+        trailing is RowTrailing.Chevron
 
 /** 一行的数据源：把"长什么样"与"值从哪来"分开，root() 与 fromPreferences() 共用同一套骨架。 */
 data class RowSpec(
