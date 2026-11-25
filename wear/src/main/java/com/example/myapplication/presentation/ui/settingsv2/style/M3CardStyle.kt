@@ -107,7 +107,9 @@ fun M3CardSettings(
         // 磁滑吸附（守卫 SettingsV2ArchitectureGuardTest 会检查这条）
         flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        // 官方 TransformingLazyColumn 的默认间距就是 Arrangement.spacedBy(4.dp)；
+        // 这里原来自写 6dp（0.0.0.272 前），属于无谓偏离，已对齐官方默认。
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(items, key = { it.key }) { item ->
             val motion = rememberStyleMotion(SettingsV2Style.M3_CARD)
