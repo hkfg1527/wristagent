@@ -57,18 +57,18 @@
 - 单测基线 **1382** 条 / **215** 套件全绿（2026-11-25 00:34 实测 `:wear:testDebugUnitTest`；文档此前写的 1416/220 是错的，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
 
-**0.0.0.265 · 滑块行不再算"可点行"；M3_CARD 滑块真机拖不动（未定位）**
-- 真机实测（TicWatch Pro 5 / 0.0.0.264）：**同一个温度滑块，在 M3_LIST 能拖（1.4 → 0），
-  在 M3_CARD 完全不动**。`onSliderChange` 里临时打的 `V2SLIDER` 日志**一次都没有输出** ——
-  说明触摸根本没到 `Slider`，不是写回路径的问题（JVM 的 `SetProgress` 两条判据一直是绿的）。
-- 排除法（每一种都重新装机验过，都不动）：可点 `Card` → 不可点 `Card` → 去掉
-  `SurfaceTransformation` → 换成普通 `Box` → 去掉 `CircleFit`。所以不是这几个容器。
-- 本轮落下的是**语义修正**：`isActionable()` 去掉 `Slider`（整行不该挂 clickable/涟漪，
-  点一下无事发生），M3_CARD 的滑块行用不可点 `Card`。判据
-  `SettingsV2WritableTest.temperatureIsASliderAndTheHostWritesItBack` 增一条"滑块行不算可点行"。
-- **下一步（优先级最高）**：给滑块行加 `Modifier.pointerInput` 探针，打印 down/move 有没有到这一层，
-  看是被列表的手势、`SurfaceTransformation` 的层变换、还是 `TransformingLazyColumn` 的
-  `rotaryScrollable` 吃掉。**在查清之前不要声称"滑块能用"。**
+**0.0.0.265 · 滑块行不再算"可点行"；滑块可用性仍未验证（上一轮的结论已作废）**
+- 落下的修正：`isActionable()` 去掉 `Slider` —— 整行不再挂 clickable/涟漪（语义正确，也少一个"提前消费 down"的来源）；
+  M3_CARD 的滑块行用不可点 `Card`。判据 `SettingsV2WritableTest.temperatureIsASliderAndTheHostWritesItBack` 增一条。
+- **上一轮的"根因未定"结论作废，原因是我用错了仪器**：`proguard-rules.pro` 里有
+  `-assumenosideeffects class android.util.Log` —— **release 构建会把所有 `Log.d` 整个删掉**，
+  所以"onSliderChange 一次都没打日志"根本不是证据。诊断必须用 `println`（不会被 R8 删）。
+- 换 `println` 重测：指针事件**确实到达 Slider**（`PointerEventPass.Initial` 里 `consumed=false`，
+  `Main` 里 `consumed=true`）—— 即"按下"是被 Slider 自己的内部手势吃掉的，但 `onValueChange` 没触发。
+- 用干净构建（无探针）做对照：`adb input swipe` 有时把 1.4 改成 0、有时完全不动，**连方向都不一致**
+  （左→右的拖拽把值变成 0）。结论：**adb 注入不是可靠仪器**，不能拿它判定滑块可用性。
+- **滑块到底能不能拖：未验证。** 需要人手在表上拖一次（或用 `injectEvents` 发完整 MotionEvent 序列）。
+  在此之前不要写"滑块已可用"。
 
 **0.0.0.264 · 圆屏收边接到 M3_LIST / SQUARE（分区标题不再被圆弧切字）**
 - 上一轮用圆图当场发现：`M3_LIST` 的「连得上」左侧缺一块 —— y=100 处圆内可见区从 **x≈42** 起，

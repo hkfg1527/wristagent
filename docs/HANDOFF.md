@@ -76,7 +76,8 @@ git log --oneline -5; git status --porcelain
 | Gradle | 必须给全 env：`JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`、`GRADLE_USER_HOME=D:\gradle-home`；命令 `cmd /c gradlew.bat --console=plain :wear:testDebugUnitTest` |
 | ADB | `E:\apkkkk\platform-tools\adb.exe`，设备序列号 `C101X35122973`（466×466 / density 320） |
 | 表冠注入 | 走 `su -c 'for i in $(seq 1 N); do sendevent /dev/input/event0 2 8 ±5; ...'`；**每次 su 都弹 Magisk toast，把连续滚动合并成一次调用，等 6 秒再截图** |
-| `git push` | 常断，用 `-c http.curloptResolve=github.com:443:<ip>` 轮换 `140.82.112/113/114/116.4` |
+| `git push` | 常断，用 `-c http.curloptResolve=github.com:443:<ip>` 轮换 `140.82.112/113/114/116.4`（近期实测 `121.3/121.4` 也有时可用） |
+| 诊断日志 | **release 构建会把 `Log.d` 整段删掉**（`proguard-rules.pro` 的 `-assumenosideeffects class android.util.Log`）。排查真机问题用 `println`，它不会被 R8 删除；用 Log 得到的"没有日志"是假证据 |
 | 中文写文件 | **不要用 `Set-Content -Encoding UTF8`**（会造成 mojibake）；用 `write` / `edit` 工具，或 `Out-File -Encoding utf8NoBOM` |
 | 导航自动化 | `docs/tools/nav.mjs`：`tapRow` 点完会检查有没有弹层；**点了不算成功，要验证效果** |
 | 发布自检 | `node docs/tools/release-check.mjs`，4 段共 **8 条判据**（构建/单测/APK/安装/进入设置页/四分区/几何/控制台 E2E） |

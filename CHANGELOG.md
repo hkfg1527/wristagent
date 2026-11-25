@@ -29,6 +29,12 @@
 
 **在根因查清前不要声称"滑块可用"。** 下一步：给滑块行加 `pointerInput` 探针定位触摸被谁消费。
 
+> **2026-11-26 更正**：上面这段的"日志一次都没输出"是**无效证据** —— `proguard-rules.pro` 里有
+> `-assumenosideeffects class android.util.Log`，release 构建把所有 `Log.d` 删掉了。
+> 改用 `println` 重测后：指针事件确实到达 `Slider`（Initial 未消费、Main 已消费），但 `onValueChange` 未触发；
+> 而 `adb input swipe` 的行为**不可重复**（有时 1.4→0、有时不动，方向也不一致）。
+> 结论改为：**滑块可用性未验证**，adb 注入不是可靠仪器。详见 `docs/CONTEXT.md` §0.5 · 0.0.0.265。
+
 ### 修复：M3_LIST / SQUARE 的分区标题被圆弧切字
 圆图实测（0.0.0.263）：`连得上` 左侧缺一块 —— 该行 y≈84..123，y=100 处圆内可见区从 **x≈42** 起，
 而行内边距只有 12dp=**24px**。`M3_CARD` 早有 `CircleFit`，这两个列表风格没有。
