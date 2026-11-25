@@ -57,6 +57,16 @@
 - 单测基线 **1382** 条 / **215** 套件全绿（2026-11-25 00:34 实测 `:wear:testDebugUnitTest`；文档此前写的 1416/220 是错的，已按实测改写）。
 - 发布自检 `node docs/tools/release-check.mjs` = **4 段 8 条判据**；控制台页面 E2E **72 条**断言。
 
+**0.0.0.270 追加 · 「禁止横向形变」补上 V2 守卫**
+- 事实：V2 里只有一处设缩放（`SettingsV2Motion.kt` 的 `scaleX = scale` / `scaleY = scale`），
+  但**此前没有测试防住"以后只改一轴"** —— 旧设置页有 `SettingsDotRuleTest` 守着，V2 重写后这条没跟过来。
+- 新增 `SettingsV2ArchitectureGuardTest.settingsNeverDistortLaterally`：扫全部 V2 源文件，
+  要求每个 `scaleX = 表达式` 都有**同表达式**的 `scaleY`（反向也查），且禁止 `translationX`。
+- **变异验证**：把 `scaleX = scale` 改成 `scale = scale * 1.1f` → 立刻红
+  （`` `scaleX = scale * 1.1f` 找不到同值的 `scaleY`（横向形变） ``），已回退。
+- 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
+  icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
+
 **0.0.0.270 · 「已选中」改成 `Modifier.selectable` —— 真机已验证（改成 checkable/checked 投影）**
 - 上一轮（0.0.0.269）说"真机未生效"，**是我的判据错了**：`selectable` 在无障碍树里投影成
   **`checkable="true"` + `checked="true"`**，不是 `selected="true"`。我按 `selected` 去 grep，当然为 0。

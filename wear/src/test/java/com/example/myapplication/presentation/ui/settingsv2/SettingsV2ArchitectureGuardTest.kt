@@ -163,6 +163,47 @@ class SettingsV2ArchitectureGuardTest {
         )
     }
 
+    /**
+     * 硬约束「禁止任何横向拉伸 / 横向形变」的守卫。
+     *
+     * 现状（实测）：V2 里只有一处设缩放 —— `SettingsV2Motion.kt` 的
+     * `scaleX = scale` / `scaleY = scale`，两轴同值。但**此前没有任何测试防住"以后只改一轴"**：
+     * 旧设置页有 `SettingsDotRuleTest` 守着，V2 重写后这条没跟过来。
+     *
+     * 判据三条：
+     * ①每个 `scaleX = 表达式` 必须能找到**同表达式**的 `scaleY = 表达式`；
+     * ②每个 `scaleY` 也要有对应的 `scaleX`（单向漏写同样破坏等比）；
+     * ③不允许 `translationX`（横向位移会让圆屏左右不对称）。
+     */
+    @Test
+    fun settingsNeverDistortLaterally() {
+        val files = v2Dir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue("应该扫到 V2 的源文件，实际 ${files.size} 个", files.size >= 10)
+
+        files.forEach { file ->
+            val src = file.readText()
+            val xs = Regex("""scaleX\s*=\s*([^\r\n]+)""").findAll(src).map { it.groupValues[1].trim() }.toList()
+            val ys = Regex("""scaleY\s*=\s*([^\r\n]+)""").findAll(src).map { it.groupValues[1].trim() }.toList()
+
+            xs.forEach { expr ->
+                assertTrue(
+                    "${file.name}: `scaleX = $expr` 找不到同值的 `scaleY`（横向形变）",
+                    ys.contains(expr),
+                )
+            }
+            ys.forEach { expr ->
+                assertTrue(
+                    "${file.name}: `scaleY = $expr` 找不到同值的 `scaleX`（纵向形变）",
+                    xs.contains(expr),
+                )
+            }
+            assertFalse(
+                "${file.name}: 不允许 translationX（横向位移破坏圆屏对称）",
+                Regex("""translationX\s*=""").containsMatchIn(src),
+            )
+        }
+    }
+
     @Test
     fun stylesUseTypeScaleInsteadOfHardCodedSp() {
         styleFiles().forEach { file ->
