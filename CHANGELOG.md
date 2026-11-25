@@ -20,8 +20,8 @@
 - 设置页记住"从哪一行进的子页"，返回时按该行的扁平下标 `requestScrollToItem()` 滚回去；
   索引换算抽成纯函数 `flatRowIndex()`（分区标题也占一项，不能只数行）。
 - 判据：`FlatRowIndexTest` 3 条。
-- **未验证**：真机复现没做成（当次设备停在列表末尾，`input swipe` 与 snapFling 打架，
-  几次都没停到「安全策略」那一屏）。下一轮先补这条真机验证。
+- **真机已验证**：选「严格确认」后列表仍停在「安全策略」那一行（`MCP | 安全策略/严格确认 | 特权执行`），
+  `security: STANDARD → NOVICE` 同时落库。
 
 ### 修复：滑块行不再算"可点行"
 `isActionable()` 原来把 `RowTrailing.Slider` 也算作可点，于是整行（M3_CARD 里是整张卡）

@@ -63,8 +63,11 @@
 - 改法：`SettingsV2Screen` 记住父行 key，四套风格接 `scrollToKey` + `LaunchedEffect` 调
   `state.requestScrollToItem(flatRowIndex(sections, key))`；索引换算抽成纯函数 `flatRowIndex()`。
 - 判据：`FlatRowIndexTest` 3 条（首行紧跟分区标题、标题占一项、找不到返回 -1）。
-- **未验证**：真机复现没做成 —— 当次设备停在列表末尾，`input swipe` 与 snapFling 打架，
-  滚了几次都没停到「安全策略」那一屏。**下轮第一件事：进设置后逐屏找该行并复现"选中后是否留在原处"。**
+- **真机已验证（2026-11-26 03:19）**：小步滑动到「安全策略」→ 点开 → 选「严格确认」→ 返回后列表
+  **仍停在该行**（`AFTER: MCP | 安全策略 | 严格确认 | 特权执行`），不再弹回「连得上」；
+  `security: STANDARD → NOVICE` 同时落库。证据图 `docs/device/v2five/circle/restore-after-select-circle.png`。
+  **教训**：`input swipe` 一次滑太远会和 snapFling 打架、连滑七八次都停不到目标行；
+  改成"每滑 150px 就 dump 一次、命中即停"（这次第 10 步命中）才稳定。
 
 **0.0.0.265 · 滑块行不再算"可点行"；滑块可用性仍未验证（上一轮的结论已作废）**
 - 落下的修正：`isActionable()` 去掉 `Slider` —— 整行不再挂 clickable/涟漪（语义正确，也少一个"提前消费 down"的来源）；
