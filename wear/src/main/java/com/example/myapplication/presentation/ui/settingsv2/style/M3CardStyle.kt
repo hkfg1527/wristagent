@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,6 +43,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlide
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2SliderTagPrefix
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
+import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
@@ -66,11 +68,23 @@ fun M3CardSettings(
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
     /** 滑块连续回调：key + 新值（写回偏好后重组）。 */
     onSlider: ((String, Float) -> Unit)? = null,
+    /** 从选项子页返回时要滚回的行 key（null = 不用滚）。 */
+    scrollToKey: String? = null,
+    onScrollConsumed: (() -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.M3_CARD.identity
     val shape = RoundedCornerShape(identity.cornerRadius)
     val transformationSpec = rememberTransformationSpec()
     val state = rememberTransformingLazyColumnState()
+    // 从子页返回：滚回原来那一行（不做的话会被弹回顶部）
+    LaunchedEffect(scrollToKey) {
+        val target = scrollToKey ?: return@LaunchedEffect
+        val index = flatRowIndex(sections, target)
+        if (index >= 0) {
+            state.requestScrollToItem(index)
+            onScrollConsumed?.invoke()
+        }
+    }
 
     // 拍平成一个列表：分区眉标 + 该项一张小卡。这样一屏能同时看到更多设置项。
     data class Item(val header: String? = null, val row: SettingsV2Row? = null, val key: String)

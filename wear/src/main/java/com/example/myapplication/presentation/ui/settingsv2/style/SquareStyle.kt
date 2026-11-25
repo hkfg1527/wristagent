@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -37,6 +38,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
+import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.enterAppearance
@@ -83,9 +85,20 @@ fun SquareSettings(
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
     /** 滑块连续回调：key + 新值（写回偏好后重组）。 */
     onSlider: ((String, Float) -> Unit)? = null,
+    /** 从选项子页返回时要滚回的行 key（null = 不用滚）。 */
+    scrollToKey: String? = null,
+    onScrollConsumed: (() -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.SQUARE.identity
     val state = rememberTransformingLazyColumnState()
+    LaunchedEffect(scrollToKey) {
+        val target = scrollToKey ?: return@LaunchedEffect
+        val index = flatRowIndex(sections, target)
+        if (index >= 0) {
+            state.requestScrollToItem(index)
+            onScrollConsumed?.invoke()
+        }
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()

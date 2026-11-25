@@ -102,8 +102,7 @@ data class RowSpec(
     )
 }
 
-/** 一行数据的来源：示例值 / 真实偏好值，但行 key 与顺序完全由同一份骨架决定。 */
-data class SettingsV2Content(
+/** 一行数据的来源：示例值 / 真实偏好值，但行 key 与顺序完全由同一份骨架决定。 */data class SettingsV2Content(
     val connection: List<RowSpec>,
     val action: List<RowSpec>,
     val hear: List<RowSpec>,
@@ -322,4 +321,24 @@ internal fun providerFromUrl(baseUrl: String): String {
         ?: labels.firstOrNull()
         ?: return "未配置"
     return meaningful
+}
+
+/**
+ * 四套风格的列表都是「分区标题 + 行」扁平化排列，这里算出某个行 key 的**扁平下标**。
+ *
+ * 用途：从选项子页返回时把列表滚回原来那一行。没有它，选完一项会被弹回顶部
+ * （真机 0.0.0.265 实测：在「安全策略」里选中「自动执行」，列表跳回第一屏「连得上」）。
+ *
+ * 返回 -1 表示没找到（此时调用方不要滚）。
+ */
+internal fun flatRowIndex(sections: List<SettingsV2Section>, key: String): Int {
+    var index = 0
+    sections.forEach { section ->
+        index += 1 // 分区标题各占一项
+        section.rows.forEach { row ->
+            if (row.key == key) return index
+            index += 1
+        }
+    }
+    return -1
 }

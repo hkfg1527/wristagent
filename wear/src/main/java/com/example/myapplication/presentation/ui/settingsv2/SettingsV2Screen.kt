@@ -148,6 +148,8 @@ fun SettingsV2Screen(
     val identity = style.identity
     var pickerOpen by remember { mutableStateOf(false) }
     var activeChoice by remember { mutableStateOf<SettingsV2Row?>(null) }
+    // 从选项子页返回时要滚回的那一行（真机实测：不记住就会弹回顶部）
+    var restoreKey by remember { mutableStateOf<String?>(null) }
     // 选择器/选项列表开着时，返回键只关它 —— 否则一次返回会把整个设置页关掉（真机实测：按返回后直接回到聊天页）
     BackHandler(enabled = pickerOpen || activeChoice != null) {
         when {
@@ -164,10 +166,13 @@ fun SettingsV2Screen(
             row.key.startsWith(CHOICE_PREFIX) -> {
                 val payload = row.key.removePrefix(CHOICE_PREFIX)
                 if (payload == CHOICE_BACK) {
+                    // 记住父行：返回后要滚回它，不然会被弹回列表顶部
+                    restoreKey = activeChoice?.key
                     activeChoice = null
                 } else {
                     activeChoice?.let { parent ->
                         onChoiceSelected?.invoke(parent.key, payload)
+                        restoreKey = parent.key
                         activeChoice = null
                     }
                 }
@@ -207,10 +212,10 @@ fun SettingsV2Screen(
                 .fillMaxSize()
                 .padding(top = SettingsV2SafeInsetTop, bottom = SettingsV2BottomInset)
             when (style) {
-                SettingsV2Style.M3_CARD -> M3CardSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.M3_LIST -> M3ListSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.ARC -> ArcSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
-                SettingsV2Style.SQUARE -> SquareSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange)
+                SettingsV2Style.M3_CARD -> M3CardSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange, scrollToKey = restoreKey, onScrollConsumed = { restoreKey = null })
+                SettingsV2Style.M3_LIST -> M3ListSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange, scrollToKey = restoreKey, onScrollConsumed = { restoreKey = null })
+                SettingsV2Style.ARC -> ArcSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange, scrollToKey = restoreKey, onScrollConsumed = { restoreKey = null })
+                SettingsV2Style.SQUARE -> SquareSettings(sections = shownSections, modifier = contentModifier, onRowClick = handleRowClick, onSlider = onSliderChange, scrollToKey = restoreKey, onScrollConsumed = { restoreKey = null })
                 // TERMINAL 把"换风格"收进它自己的底栏（`[ 风格 ]` 与状态段同一行），
                 // 不再浮在屏幕右下角当独立控件 —— 真终端的底栏是一整行。
                 SettingsV2Style.TERMINAL -> TerminalSettings(

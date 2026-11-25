@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +35,7 @@ import com.example.myapplication.presentation.ui.settingsv2.common.SettingsSlide
 import com.example.myapplication.presentation.ui.settingsv2.isActionable
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Row
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Section
+import com.example.myapplication.presentation.ui.settingsv2.flatRowIndex
 import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import com.example.myapplication.presentation.ui.settingsv2.common.SettingsV2Motions
 import com.example.myapplication.presentation.ui.settingsv2.common.CircleFit
@@ -56,9 +58,20 @@ fun M3ListSettings(
     modifier: Modifier = Modifier,
     onRowClick: ((SettingsV2Row) -> Unit)? = null,
     onSlider: ((String, Float) -> Unit)? = null,
+    /** 从选项子页返回时要滚回的行 key（null = 不用滚）。 */
+    scrollToKey: String? = null,
+    onScrollConsumed: (() -> Unit)? = null,
 ) {
     val identity = SettingsV2Style.M3_LIST.identity
     val state = rememberTransformingLazyColumnState()
+    LaunchedEffect(scrollToKey) {
+        val target = scrollToKey ?: return@LaunchedEffect
+        val index = flatRowIndex(sections, target)
+        if (index >= 0) {
+            state.requestScrollToItem(index)
+            onScrollConsumed?.invoke()
+        }
+    }
     val transformationSpec = rememberTransformationSpec()
     Box(
         modifier = modifier
