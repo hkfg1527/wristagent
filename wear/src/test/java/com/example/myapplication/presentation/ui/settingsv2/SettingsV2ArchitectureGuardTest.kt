@@ -244,6 +244,28 @@ class SettingsV2ArchitectureGuardTest {
         assertTrue("底部内边距 $dp dp 也不能大到把可见区压掉一整行（>32dp）", dp <= 32f)
     }
 
+    /**
+     * 列表项间距必须等于官方默认 `Arrangement.spacedBy(4.dp)`（或干脆不写，用默认）。
+     *
+     * 事实来源：1.5.6 sources 的 `TransformingLazyColumn` 签名，`verticalArrangement` 默认即
+     * `Arrangement.spacedBy(space = 4.dp, alignment = Alignment.Top)`。
+     *
+     * 例外：`TERMINAL` 用 0dp —— 字符界面是连续行，行间留白会破坏它的形态，这是有意的。
+     */
+    @Test
+    fun listSpacingStaysAtTheOfficialFourDp() {
+        val styleDir = File(v2Dir, "style")
+        val offenders = styleDir.listFiles { f -> f.extension == "kt" }!!.mapNotNull { f ->
+            val src = f.readText()
+            val m = Regex("""verticalArrangement = Arrangement\.spacedBy\(([\d.]+)\.dp""").find(src)
+            if (m == null) return@mapNotNull null
+            val dp = m.groupValues[1].toFloat()
+            val allowed = if (f.name == "TerminalStyle.kt") setOf(0f, 4f) else setOf(4f)
+            if (dp in allowed) null else "${f.name}: spacedBy($dp.dp)"
+        }
+        assertTrue("列表项间距偏离官方默认 4dp：$offenders", offenders.isEmpty())
+    }
+
     @Test
     fun stylesUseTypeScaleInsteadOfHardCodedSp() {
         styleFiles().forEach { file ->
