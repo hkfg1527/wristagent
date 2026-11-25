@@ -67,6 +67,16 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.270 追加 · 一屏可见项测量工具 + D6 结论自我更正**
+- 新工具 `docs/tools/card-density.mjs`：进设置页 → dump → 按**圆方程**判每个文本节点的矩形
+  是否完整落在半径 233 的圆内（四角 + 四边中点），输出"完整可见 / 被弧切"并写 `build-logs/card-density.json`。
+  `--all` 会依次切五套风格再还原。
+- 基线（0.0.0.270 实测）：M3_CARD **9/9 完整**、M3_LIST 5/6、ARC 4/5、SQUARE 5/5、TERMINAL 16/22。
+- **据此推翻我上一轮对 D6 的推荐**：`M3_CARD` 首屏一个文本都没被弧切，
+  所以"第三张卡副标题被截"不成立 —— 两张对比图是不同滚动/缩放状态下拍的，不能比。
+  D6 的真实差异只剩"第三张卡标题上移 19px"。已把 `DECISIONS-PENDING.md` 的 D6 推荐改回 **a（保持现状）**。
+- 教训：**视觉对比图必须同一滚动位置、同一缩放状态**，否则拍的是两件不同的东西。
+
 **0.0.0.270 · 「已选中」改成 `Modifier.selectable` —— 真机已验证（改成 checkable/checked 投影）**
 - 上一轮（0.0.0.269）说"真机未生效"，**是我的判据错了**：`selectable` 在无障碍树里投影成
   **`checkable="true"` + `checked="true"`**，不是 `selected="true"`。我按 `selected` 去 grep，当然为 0。
