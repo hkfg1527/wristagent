@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import com.example.myapplication.readProjectFile
+import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -47,6 +48,33 @@ class ContextDocFreshnessGuardTest {
         val versionLine = running.lines().firstOrNull { it.trimStart().startsWith("- 内部版") }.orEmpty()
         assertTrue("§0.5 缺少版本行（应以「- 内部版」开头）", versionLine.isNotBlank())
         assertTrue("§0.5 的版本行没写当前版本：$versionLine", versionLine.contains(versionName))
+    }
+
+    /**
+     * 一页纸交接（`docs/SESSION-*.md`）也必须写当前版本。
+     *
+     * 为什么：这类文档写给"下一次接手的会话"看，最容易过期 —— 版本升了、它还在描述上一版的状态，
+     * 就会把下一个人带偏。没有交接文档时不强制（避免删文档即报错）。
+     */
+    @Test
+    fun theLatestSessionHandoffMentionsTheCurrentVersionName() {
+        // Gradle 跑测试时 cwd 是 `wear` 模块目录，所以 docs 在 `../docs`
+        // （与 `readProjectFile("../docs/CONTEXT.md")` 同一套约定）。
+        val docs = sequenceOf(File("../docs"), File("docs"), File("wear/docs"))
+            .map { it.absoluteFile }
+            .firstOrNull { it.isDirectory } ?: error("找不到 docs 目录（cwd=" + File(".").absolutePath + "）")
+        val handoffs = docs.listFiles { f -> f.isFile && f.name.startsWith("SESSION-") && f.extension == "md" }
+            ?.toList().orEmpty()
+        if (handoffs.isEmpty()) return
+        val versionName = currentVersionName()
+        // 只要求"至少有一份写着当前版本"，不去改历史交接（SESSION-FINAL / SESSION-STATE 是当时的事实记录，
+        // 让它们跟着升版才是造假）。这条钉的是：升版本后**没有**任何一份交接提到新版本。
+        val current = handoffs.filter { it.readText().contains(versionName) }.map { it.name }
+        assertTrue(
+            "没有任何一份 docs/SESSION-*.md 写当前版本 $versionName（现有：" +
+                handoffs.joinToString { it.name } + "）—— 升版本后请新建或更新一份交接",
+            current.isNotEmpty(),
+        )
     }
 
     /**
