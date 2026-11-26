@@ -12,7 +12,7 @@
 |---|---|
 | 项目在哪 | `D:\AndroidProjects\MyApplication`（**不是** `C:\Users\GHR\AndroidStudioProjects\...`，那是搬走后留下的空壳） |
 | 现在什么版本 | `0.0.0.270` / versionCode 308；发布点 `v0.0.0.10` / `.20` / `.30` / `.40` / `.50` / `.80` / `.90` / `.100` / `.200` 已打 tag |
-| 单测基线 | **1408 条 / 219 套件全绿**（2026-11-26 05:20 实测 `:wear:testDebugUnitTest`；改任何东西前先跑一遍确认） |
+| 单测基线 | **1413 条 / 219 套件全绿**（2026-11-26 22:19 实测 `:wear:testDebugUnitTest`；改任何东西前先跑一遍确认） |
 | 下一个里程碑 | 内部版满 100 时的整十发布点；每个整十都要跑 `node docs/tools/release-check.mjs`（当前 4 段 9 条判据，全绿=9/9） |
 | 主线状态 | 设置页 V2（五套风格、官方组件）已成型；当前主线是**无障碍语义**与**证据工具化**（`docs/tools/` 下新增 `card-density.mjs` / `indicator-probe.py` / `png-region.mjs`） |
 
@@ -58,7 +58,7 @@
 # 1) 工作区状态
 git log --oneline -5; git status --porcelain
 
-# 2) 单测基线（约 2 分钟；必须是 1377 条 / 209 套件 / 0 失败）
+# 2) 单测基线（约 2 分钟；必须是 1413 条 / 219 套件 / 0 失败）
 .\gradlew.bat :wear:testDebugUnitTest
 
 # 3) 上下文占用（有 manage_context 插件时）
@@ -114,7 +114,7 @@ git log --oneline -5; git status --porcelain
 | `wear/src/main/java/.../presentation/ui/settings/` | 设置页全部实现（`SettingsShared.kt` 是 DSL 内核） |
 | `wear/src/main/java/.../presentation/ui/chat/` | 聊天页（`ConversationList.kt` / `ChatScreen.kt`） |
 | `wear/src/main/java/.../agent/AgentPreferences.kt` | 全部偏好（20 个可调设置都在这里，带 `KEY_*` / `DEFAULT_*`） |
-| `wear/src/test/java/...` | 1377 条单测；**结构性守卫**在这里（改动前先看它们） |
+| `wear/src/test/java/...` | 1413 条单测；**结构性守卫**在这里（改动前先看它们） |
 | `docs/device/v11/*.png` | 真机截图证据（同名文件更新即代表最近一次验证） |
 | `docs/tools/` | `release-check.mjs` / `nav.mjs` / `console-shot.mjs` |
 
