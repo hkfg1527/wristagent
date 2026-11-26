@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.settingsv2.common
 
+import com.example.myapplication.presentation.ui.settingsv2.SettingsV2Style
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -77,5 +78,29 @@ class CircleFitMathTest {
         val middle = scaleAt(h / 2f)
         val top = scaleAt(40f)
         assertTrue("靠近顶部必须比中间小（$top vs $middle）", top < middle)
+    }
+
+    /**
+     * 五套风格**各自的**下限都要真的兜住（用户要求"每个风格试一试"）。
+     *
+     * 这条与上面几条的区别：上面用的是默认下限 0.76，这里逐套读 `SettingsV2Motions.of(style).edgeScaleMin`
+     * —— M3_CARD 0.76 / M3_LIST 0.80 / ARC 0.94 / SQUARE 0.88 / TERMINAL 1.00（终端不缩）。
+     */
+    @Test
+    fun everyStyleStopsAtItsOwnFloor() {
+        SettingsV2Style.values().forEach { style ->
+            val floor = SettingsV2Motions.of(style).edgeScaleMin
+            val center = circleFitScale(h / 2f - half, h / 2f + half, w, h, floor)
+            assertTrue("${style.name} 正中应接近满缩放，实际 $center", center > 0.98f)
+            listOf(30f, 0f, -30f).forEach { y ->
+                val s = circleFitScale(y - half, y + half, w, h, floor)
+                assertEquals(
+                    "${style.name} 在 y=$y 必须停在自身下限 $floor（实际 $s）",
+                    floor,
+                    s,
+                    1e-4f,
+                )
+            }
+        }
     }
 }
