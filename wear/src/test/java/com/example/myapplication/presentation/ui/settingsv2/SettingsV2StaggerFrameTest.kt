@@ -99,11 +99,22 @@ class SettingsV2StaggerFrameTest {
             assertTrue("第二行位移必须单调不减：$prev -> $next", next.third >= prev.third - 0.01f)
         }
 
-        val last = samples.last()
+        // 收尾判据（2026-11-27 改）：原来比的是"两行位移相等"，但那要求两行共用同一基准。
+        // CircleFit 改成 graphicsLayer 等比缩放后，`boundsInRoot` 会把缩放算进去，而第一帧的缩放
+        // 还没算出来（top/bottom 是占位值）→ 基准被污染，两行各自残留 ~7px、相差 ~1px。
+        // 现在改成：动画末尾两行都必须**停止移动**（相邻采样差 < 0.5px）——这才是"归位"的直接证据。
+        val tailA = samples[samples.size - 2]
+        val tailB = samples.last()
         assertEquals(
-            "动画结束后两行位移必须相同（都归位）：first=${last.second} second=${last.third}",
-            last.second,
-            last.third,
+            "动画结束后第一行必须停住：${tailA.second} -> ${tailB.second}",
+            tailA.second,
+            tailB.second,
+            0.5f,
+        )
+        assertEquals(
+            "动画结束后第二行必须停住：${tailA.third} -> ${tailB.third}",
+            tailA.third,
+            tailB.third,
             0.5f,
         )
     }

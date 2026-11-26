@@ -116,7 +116,7 @@ fun M3CardSettings(
             val enter = rememberEnterProgress(items.indexOf(item), motion)
             // 每一项都过 CircleFit：中间吃满圆屏弦长，滚到上下两端自动收边，
             // 不再被圆弧切掉（真机截图里 banner/底栏被切就是这个原因）。
-            CircleFit(modifier = Modifier.fillMaxWidth()) {
+            CircleFit(modifier = Modifier.fillMaxWidth(), minScale = motion.edgeScaleMin) {
                 if (item.header != null) {
                     Text(
                         text = item.header,

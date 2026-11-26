@@ -123,6 +123,8 @@ fun SquareSettings(
                 )
             }
     ) {
+        // 提到列表外：分区标题的 CircleFit 也要用它的下限（各风格不同）
+        val motion = rememberStyleMotion(SettingsV2Style.SQUARE)
         TransformingLazyColumn(
             state = state,
             flingBehavior = TransformingLazyColumnDefaults.snapFlingBehavior(state = state),
@@ -133,7 +135,7 @@ fun SquareSettings(
             sections.forEach { section ->
                 item(key = "h-" + section.title) {
                     // 圆屏收边：分区标题靠近上下两端时会被圆弧切字（0.0.0.263 圆图实测）
-                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                    CircleFit(modifier = Modifier.fillMaxWidth(), minScale = motion.edgeScaleMin) {
                         Text(
                             text = section.title,
                             color = identity.subtitleColor,
@@ -146,10 +148,9 @@ fun SquareSettings(
                     }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = rememberStyleMotion(SettingsV2Style.SQUARE)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 val edge = rememberEdgeDistance()
-                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                    CircleFit(modifier = Modifier.fillMaxWidth(), minScale = motion.edgeScaleMin) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

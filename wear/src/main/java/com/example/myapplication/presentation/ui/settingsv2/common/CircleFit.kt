@@ -1,13 +1,13 @@
 package com.example.myapplication.presentation.ui.settingsv2.common
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
@@ -18,19 +18,26 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * 圆屏收边：让内容**吃满圆屏横向面积**，同时不被圆弧切掉。
+ * 圆屏收边：**等比缩小**，绝不改宽度比例。
  *
- * 为什么需要它：圆屏在竖直方向不同高度的可用弦长不同 —— 中心处等于直径，越靠近上下两端越窄。
- * 之前两种做法都不对：
- * ①定宽矩形 —— 两侧大片死黑，用户原话"裁成一个正方形了，我拿它干什么"；
- * ②满宽矩形 —— 顶部/底部被圆弧吃掉，真机截图里 banner 被切成 `1stagent`、底栏 `[风格]` 被切一半。
+ * 为什么改（2026-11-27，用户原话）：
+ * 「它可以整体缩小，它为什么一定要形变呢？让元素都挤压在一起……至少有得有个线度，不能完全挤压吧。」
+ * 之前的实现是**只收宽度**（左右 padding 到弦长，高度不变）—— 于是靠近上下两端的行会被压扁成
+ * 宽扁的条，比例失真、观感是"被挤了一下"。现在改成按弦长算一个 0~1 的**等比**系数，
+ * 用 `graphicsLayer` 同时缩两轴：元素永远保持自己的长宽比，只是变小。
  *
- * 做法：每项自己上报竖直中心位置，按圆方程算出该高度处的可用弦长，把差值作为左右内缩。
- * 滚动时位置变化 → 自动收放，形成"中间宽、上下窄"的领结形。
+ * 三道边界，缺一不可：
+ * 1. **下限**：缩到 `minScale` 就不再缩（各风格自己的 `edgeScaleMin`，0.76~0.94）——
+ *    这就是用户说的"至少得有个限度，不能完全挤压"；
+ * 2. **取最窄处**：用元素上下两条边与中线三处弦长的**最小值**，保证整块都落在圆内，
+ *    而不是只有中心点刚好贴边；
+ * 3. **只做图形层缩放**：不改布局宽高，所以文本排版宽度不变、不会因此多出省略号。
  */
 @Composable
 fun CircleFit(
     modifier: Modifier = Modifier,
+    /** 最小等比系数（= 该风格的 `edgeScaleMin`）。低于它就不再缩。 */
+    minScale: Float = 0.76f,
     content: @Composable () -> Unit,
 ) {
     val cfg = LocalConfiguration.current
@@ -38,34 +45,56 @@ fun CircleFit(
     val screenW = with(density) { cfg.screenWidthDp.dp.toPx() }
     val screenH = with(density) { cfg.screenHeightDp.dp.toPx() }
 
-    // 本项竖直中心（根坐标）；初始给屏幕中心，避免首帧算出极端内缩
-    var centerY by remember { mutableFloatStateOf(screenH / 2f) }
+    // 本项上下边界（根坐标）；初始放进屏幕正中，避免首帧算出极端值
+    var top by remember { mutableStateOf(screenH / 2f - 24f) }
+    var bottom by remember { mutableStateOf(screenH / 2f + 24f) }
 
-    // 收边**必须有上限**：纯按圆方程算，最顶上那一行会缩到几乎为 0 宽
-    // （Robolectric 实测：首屏 `连得上` 宽度不足、直接显示不出来）。
-    // 真手表应用的做法是"保证最小可读宽度，允许轻微被圆弧压边"，
-    // 所以这里最多收到屏宽的 18%：中间满宽、两端收但永远有 64% 可用。
-    val maxInset = screenW * 0.18f
-    val insetPx = circleInsetPx(centerY, screenW, screenH).coerceAtMost(maxInset)
+    val scale = circleFitScale(top, bottom, screenW, screenH, minScale)
 
     Box(
         modifier = modifier
             .onGloballyPositioned { coords ->
-                centerY = coords.positionInRoot().y + coords.size.height / 2f
+                val pos = coords.positionInRoot()
+                if (coords.size.height > 0) {
+                    top = pos.y
+                    bottom = pos.y + coords.size.height
+                }
             }
-            .padding(horizontal = with(density) { insetPx.toDp() }),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
     ) {
         content()
     }
 }
 
-/**
- * 纯函数版：给定竖直中心与屏幕尺寸，返回该高度应有的左右内缩（像素）。
- * 单独拿出来是为了能直接单测圆几何，不必渲染界面。
- */
-fun circleInsetPx(centerY: Float, screenW: Float, screenH: Float): Float {
+/** 竖直位置 y 处的可用弦长（像素）。圆外返回 0。 */
+fun chordWidthAt(y: Float, screenW: Float, screenH: Float): Float {
     val radius = min(screenW, screenH) / 2f
-    val dy = abs(centerY - screenH / 2f)
-    val halfChord = if (dy < radius) sqrt(radius * radius - dy * dy) else 0f
-    return (radius - halfChord).coerceAtLeast(0f)
+    val dy = abs(y - screenH / 2f)
+    return if (dy < radius) 2f * sqrt(radius * radius - dy * dy) else 0f
+}
+
+/**
+ * 纯函数版：给定元素的上下边界，返回它的等比缩放系数。
+ *
+ * 取 上边 / 中线 / 下边 三处弦长的**最小值**再除以屏宽，然后夹在 `[minScale, 1]`。
+ * 单独拿出来是为了能直接单测几何，不必渲染界面。
+ */
+fun circleFitScale(
+    top: Float,
+    bottom: Float,
+    screenW: Float,
+    screenH: Float,
+    minScale: Float = 0.76f,
+): Float {
+    if (screenW <= 0f || screenH <= 0f) return 1f
+    val mid = (top + bottom) / 2f
+    val narrowest = minOf(
+        chordWidthAt(top, screenW, screenH),
+        chordWidthAt(mid, screenW, screenH),
+        chordWidthAt(bottom, screenW, screenH),
+    )
+    return (narrowest / screenW).coerceIn(minScale.coerceIn(0.1f, 1f), 1f)
 }

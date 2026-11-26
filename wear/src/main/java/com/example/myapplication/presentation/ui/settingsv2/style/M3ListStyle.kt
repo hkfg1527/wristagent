@@ -82,6 +82,8 @@ fun M3ListSettings(
             .fillMaxSize()
             .background(identity.pageBackground),
     ) {
+        // 提到列表外：分区标题的 CircleFit 也要用它的下限（各风格不同）
+        val motion = rememberStyleMotion(SettingsV2Style.M3_LIST)
         TransformingLazyColumn(
             state = state,
             // 磁滑：官方吸附惯性（松手吸附到某项居中），不自己算 snapOffset
@@ -95,7 +97,7 @@ fun M3ListSettings(
                     // 圆屏收边：分区标题在靠近上下两端时会被圆弧切掉半个字
                     // （0.0.0.263 圆图实测：「连得上」左侧缺一块；y=100 处可见区从 x≈42 起，
                     //  而行内边距只有 12dp=24px）。按该项的竖直中心算弦长内缩。
-                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                    CircleFit(modifier = Modifier.fillMaxWidth(), minScale = motion.edgeScaleMin) {
                         Text(
                             text = section.title,
                             color = identity.subtitleColor,
@@ -107,11 +109,10 @@ fun M3ListSettings(
                     }
                 }
                 itemsIndexed(section.rows, key = { _, row -> row.key }) { rowIndex, row ->
-                val motion = rememberStyleMotion(SettingsV2Style.M3_LIST)
                 val enter = rememberEnterProgress(rowIndex, motion)
                 // 边缘淡出/缩放：行自己上报离屏幕中心的比例（不用官方 scrollProgress，理由见 common 层注释）
                 val edge = rememberEdgeDistance()
-                    CircleFit(modifier = Modifier.fillMaxWidth()) {
+                    CircleFit(modifier = Modifier.fillMaxWidth(), minScale = motion.edgeScaleMin) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         M3ListRow(
                             row = row,

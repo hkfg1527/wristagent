@@ -99,10 +99,14 @@ fun Modifier.enterAppearance(progress: Float, motion: V2Motion): Modifier = this
 }
 
 /** 把"边缘距离"用到一行上：等比缩放 + 淡出（两轴同值，**不做横向形变**）。 */
+/**
+ * 边缘**只做淡出**，不做缩放（2026-11-27 改）。
+ *
+ * 以前这里还乘一个 `edgeScale`，于是同一行会被"等比缩小（CircleFit）× 缩放（这里）"两次压缩，
+ * 而且两个系数各算各的，越靠近边缘越扁。现在几何缩放只由 `CircleFit` 负责一次，
+ * 这里只负责把元素淡进背景。`edgeScaleMin` 仍有用途：它是 `CircleFit` 的缩放下限。
+ */
 fun Modifier.edgeAppearance(distance: Float, motion: V2Motion): Modifier = this.graphicsLayer {
-    val scale = SettingsV2Motions.edgeScale(distance, motion)
-    scaleX = scale
-    scaleY = scale
     alpha = SettingsV2Motions.edgeAlpha(distance, motion)
 }
 

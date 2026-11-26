@@ -389,7 +389,7 @@ fun TerminalSettings(
         }
         // 钉在底部的状态条：左 `> █`（块光标）+ 状态段 `[2/4]·26L`，整行不透明。
         // 外面套 CircleFit：底栏在圆屏最下端，可用弦长只有 ~218px，不收边会把 `[ 风格 ]` 切掉。
-        CircleFit(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+        CircleFit(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), minScale = 0.94f) {
             TerminalPromptLine(
                 lineStyle = lineStyle,
                 isActive = state.isScrollInProgress,
@@ -489,7 +489,7 @@ internal fun focusItemIndex(sections: List<SettingsV2Section>, anchorItemIndex: 
 private fun TerminalGridLine(content: @Composable () -> Unit) {
     // 每行过 CircleFit：终端是满宽字符网格，圆屏上下两端的行会被圆弧切掉
     // （真机截图：banner 被切成 `1stagent`）。收边后每行按自己所在高度的弦长内缩，字符永远完整。
-    CircleFit(modifier = Modifier.fillMaxWidth()) {
+    CircleFit(modifier = Modifier.fillMaxWidth(), minScale = 0.94f) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
