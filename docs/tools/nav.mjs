@@ -35,9 +35,31 @@ export const boundsOf = (label) => {
   return m ? { cx: Math.round((+m[1] + +m[3]) / 2), cy: Math.round((+m[2] + +m[4]) / 2), raw: m[0] } : null;
 };
 
-/** 表冠：一次 su 注入 n 格。正数朝列表开头，负数朝末尾。 */
-export const crown = (delta, n) =>
-  sh('shell', "su -c 'for i in $(seq 1 " + n + "); do sendevent /dev/input/event0 2 8 " + delta + "; sendevent /dev/input/event0 0 0 0; done'");
+/**
+ * 滚动：**用手指滑动实现**（2026-11-26 改）。
+ *
+ * 原实现是 `sendevent /dev/input/event0 … REL_WHEEL`，但那个通道是本机的 `qpnp_pon`（电源键），
+ * **到不了应用** —— 0.0.0.261 查明，项目自己的 `RotaryBus` 也记着"注入 REL_WHEEL 后
+ * onRotaryScrollEvent 一行日志都没有"。也就是说建立在它上面的
+ * `sweep-pages.mjs` / `sweep-settings.mjs` / `watch.mjs` 的滚动**一直是空操作**。
+ *
+ * 现在的换算：一格表冠 ≈ 1/8 行 ≈ 19px（行高约 148px），
+ * `delta > 0` 朝列表开头（手指往下滑），`delta < 0` 朝末尾（手指往上滑）。
+ * 单次手势限制在 60–350px，超额分多次。
+ *
+ * **未在设备上验证**（改这段时 handoff 期间 adb 一直离线）。上机后请先用
+ * `crown(-5, 8)`（≈ 一行）核对位移，再信任任何 sweep 结果。
+ */
+export const crown = (delta, n) => {
+  const px = Math.max(60, Math.min(350, Math.round(Math.abs(delta) * n * 3.8)));
+  const times = Math.max(1, Math.ceil(px / 350));
+  const step = Math.round(px / times);
+  const fromY = delta > 0 ? 140 : 400;
+  const toY = delta > 0 ? fromY + step : fromY - step;
+  for (let i = 0; i < times; i++) {
+    sh('shell', 'input', 'swipe', '233', String(fromY), '233', String(Math.max(60, Math.min(430, toY))), '260');
+  }
+};
 
 /** 有没有弹层：取消/完成 同时出现基本就是文本对话框。 */
 export const overlayOpen = () => {

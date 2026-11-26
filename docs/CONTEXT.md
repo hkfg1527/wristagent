@@ -67,6 +67,15 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.273 追加 · 工具里的 `crown()` 改成手指滑动（整套 sweep 之前是空操作）**
+- 事实：`docs/tools/nav.mjs` 的 `crown()` 一直用 `sendevent /dev/input/event0 … REL_WHEEL`，
+  而 event0 是本机 `qpnp_pon`（电源键），**到不了应用**（0.0.0.261 已查明）。
+  建立在它上面的 `sweep-pages.mjs` / `sweep-settings.mjs` / `watch.mjs` 的滚动**一直是空操作** ——
+  这些工具的"滚动后取证"结果不可信。
+- 改法：`crown(delta, n)` 换成手指滑动，换算「一格 ≈ 1/8 行 ≈ 19px」，单次手势 60–350px、超额分次；
+  签名不变，调用点不用改（`crownTo()` 也跟着修好）。
+- **未在设备上验证**（改这段时 adb 仍离线）。上机第一件事：`crown(-5, 8)`（≈一行）核对位移。
+
 **0.0.0.273 追加 · 试过给"底部边距"加 JVM 判据，但没有鉴别力，已删**
 - 想法：渲染 → `performScrollToNode(末行)` → 断言末行底边 ≤ 视口高 − 24dp，用字面量 24f 而不是常量。
 - **变异验证失败**：把 `SettingsV2BottomInset` 改回 8dp，`--rerun-tasks` 强跑（1m2s，确实执行了），
