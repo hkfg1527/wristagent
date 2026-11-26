@@ -67,6 +67,12 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.274 追加 · 逐套验证「点得到」（用户要求"每个风格试一试"的一半）**
+- 新判据 `SettingsV2PerStyleClickTest`：**五套各一条**（Compose 测试规则一个用例只能 setContent 一次，
+  所以拆成 5 个 @Test；0.0.0.274 踩过 "already set content"）。每条渲染该风格、点「振动」行，
+  断言 `onRowClick` 收到 `tool_vibrate`。**5/5 通过** —— 五套的开关行都真的能点、且回调带对了行。
+- 边界：这只能证明"JVM 里点得到 + 回调正确"，**不能替代真机的手感与手势验证**（滚动、长按、表冠、滑动）。
+
 **0.0.0.274 追加 · 试过用 Robolectric 渲染成图代替真机截图 —— 不通**
 - 思路：`@GraphicsMode(NATIVE)` + `captureToImage()` 把设置页渲成 PNG，设备离线时至少看几何。
 - 结果：**`ComposeTimeoutException`**。`setContent` 之后 `waitForIdle()` 等不到静止（设置页有无限动画：时钟/呼吸），
