@@ -67,6 +67,12 @@
 - 同时记一条事实：官方 `Slider` **没有 label 参数**（`javap` 实测签名只有 value/steps/modifier/
   icons/enabled/valueRange/segmented/shape/colors），所以滑块"两站"结构已是最优，不再折腾。
 
+**0.0.0.274 追加 · 试过用 Robolectric 渲染成图代替真机截图 —— 不通**
+- 思路：`@GraphicsMode(NATIVE)` + `captureToImage()` 把设置页渲成 PNG，设备离线时至少看几何。
+- 结果：**`ComposeTimeoutException`**。`setContent` 之后 `waitForIdle()` 等不到静止（设置页有无限动画：时钟/呼吸），
+  手动 `mainClock.autoAdvance = false` + 推进帧也一样超时。两次尝试都在 `ComposeTimeoutException` 处失败。
+- 结论：**没有设备就是没有图**。探针已删（不留跑不通的代码）。要看 0.0.0.274 的观感，只能等真机。
+
 **0.0.0.274 · 圆屏收边改成「等比缩小」（用户点名：形变太丑）**
 - 用户原话：「它可以整体缩小，它为什么一定要形变呢？让元素都挤压在一起……至少有得有个线度，不能完全挤压吧。」
 - **病根**：`CircleFit` 之前只收**宽度**（左右 padding 到弦长、高度不变）——靠近上下两端的行被压成宽扁条，
